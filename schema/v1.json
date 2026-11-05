@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eflex.dev/schema/v1.json",
+  "title": "Eflex build plan v1",
+  "description": "Plan de déploiement Eflex (version 1). Ce document ne contient JAMAIS de secrets : la clé `env` est volontairement interdite. Les variables sensibles sont fournies à la plateforme au moment du déploiement, jamais commitées dans le dépôt. Seul `buildEnv` existe et il est PUBLIC : ses valeurs finissent dans le bundle client.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "version": {
+      "const": 1,
+      "description": "Version du schéma, toujours 1."
+    },
+    "framework": {
+      "description": "Framework détecté ou déclaré.",
+      "enum": [
+        "docker",
+        "eflex-config",
+        "nextjs",
+        "nuxt",
+        "astro",
+        "vite",
+        "node",
+        "laravel",
+        "php",
+        "python",
+        "static"
+      ]
+    },
+    "runtime": {
+      "description": "Runtime et version, par exemple `node@22`, `php@8.3`, `python@3.12`, `static@1` ou `docker@1`.",
+      "type": "string",
+      "pattern": "^(node|php|python|static|docker)@[0-9]+(\\.[0-9]+)?$"
+    },
+    "root": {
+      "description": "Répertoire de l'application, relatif à la racine du dépôt. Chaîne vide pour la racine du dépôt.",
+      "type": "string",
+      "pattern": "^(|[^/]+(/[^/]+)*)$"
+    },
+    "repoRoot": {
+      "description": "Chemin relatif permettant de remonter du répertoire de l'application à la racine du dépôt (par exemple `../..`). Présent uniquement quand `root` n'est pas vide.",
+      "type": "string",
+      "pattern": "^(|\\.\\.(/\\.\\.)*)$"
+    },
+    "install": {
+      "description": "Commande d'installation des dépendances.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "build": {
+      "description": "Commande de build.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "start": {
+      "description": "Commande de démarrage du service principal.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "port": {
+      "description": "Port HTTP exposé par le service principal.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "healthcheck": {
+      "description": "Chemin HTTP utilisé pour vérifier la santé du service.",
+      "type": "string",
+      "pattern": "^/"
+    },
+    "buildEnv": {
+      "description": "Variables d'environnement de BUILD, PUBLIQUES. Elles sont intégrées au bundle client : n'y mettez JAMAIS de secrets, de clés d'API ni de mots de passe. Les secrets sont fournis à la plateforme, pas au dépôt.",
+      "type": "object",
+      "maxProperties": 50,
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "services": {
+      "description": "Services supplémentaires (workers, cron, serveur web séparé, etc.).",
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z][a-z0-9-]{0,30}$": {
+          "$ref": "#/$defs/service"
+        }
+      },
+      "additionalProperties": false
+    },
+    "volumes": {
+      "description": "Répertoires persistants montés dans l'application.",
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    },
+    "postDeploy": {
+      "description": "Commandes exécutées une seule fois après le déploiement (migrations, caches, etc.).",
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "resources": {
+      "description": "Ressources allouées au service principal.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 8
+        },
+        "memoryMb": {
+          "type": "integer",
+          "minimum": 128,
+          "maximum": 16384
+        }
+      }
+    }
+  },
+  "$defs": {
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command"],
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "healthcheck": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    }
+  }
+}

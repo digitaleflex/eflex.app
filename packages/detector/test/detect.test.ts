@@ -1,0 +1,214 @@
+import { describe, expect, it } from 'vitest';
+import { detect, scoreConfidence } from '../src/index.js';
+import {
+  allFixtures,
+  astro,
+  django,
+  dockerfile,
+  dockerfileExpose,
+  eflexConfig,
+  eflexConfigInvalid,
+  express,
+  fastapi,
+  laravelFull,
+  laravelMinimal,
+  monorepoMultiple,
+  monorepoSingle,
+  nextjs,
+  nextjsWithEngines,
+  nextjsWithPnpm,
+  phpGeneric,
+  staticSite,
+  unknownRepo,
+  vite,
+} from './fixtures.js';
+
+describe('detect', () => {
+  it('detects Next.js with port 3000 and respects the build script', () => {
+    const result = detect(nextjs);
+
+    expect(result.framework).toBe('nextjs');
+    expect(result.plan?.framework).toBe('nextjs');
+    expect(result.plan?.runtime).toBe('node@22');
+    expect(result.plan?.port).toBe(3000);
+    expect(result.plan?.build).toBe('next build');
+    expect(result.plan?.start).toBe('next start');
+    expect(result.warnings.join(' ')).toContain('standalone');
+  });
+
+  it('detects Vite as a static runtime on port 80', () => {
+    const result = detect(vite);
+
+    expect(result.framework).toBe('vite');
+    expect(result.plan?.framework).toBe('vite');
+    expect(result.plan?.runtime).toBe('static@1');
+    expect(result.plan?.port).toBe(80);
+    expect(result.plan?.build).toBe('npm run build');
+  });
+
+  it('detects Astro as a static runtime on port 80', () => {
+    const result = detect(astro);
+
+    expect(result.framework).toBe('astro');
+    expect(result.plan?.runtime).toBe('static@1');
+    expect(result.plan?.port).toBe(80);
+  });
+
+  it('detects Express as a Node service on port 3000', () => {
+    const result = detect(express);
+
+    expect(result.framework).toBe('node');
+    expect(result.plan?.runtime).toBe('node@22');
+    expect(result.plan?.port).toBe(3000);
+    expect(result.plan?.start).toBe('node server.js');
+  });
+
+  it('detects a full Laravel application with queue and scheduler services', () => {
+    const result = detect(laravelFull);
+
+    expect(result.framework).toBe('laravel');
+    expect(result.plan?.runtime).toBe('php@8.3');
+    expect(Object.keys(result.plan?.services ?? {})).toEqual(['app', 'web', 'queue', 'scheduler']);
+    expect(result.plan?.services?.queue?.replicas).toBe(1);
+    expect(result.plan?.volumes).toEqual(['storage']);
+    expect(result.plan?.postDeploy).toContain('php artisan migrate --force');
+    expect(result.plan?.build).toBe('npm ci && npm run build');
+  });
+
+  it('detects a minimal Laravel application with only app and web services', () => {
+    const result = detect(laravelMinimal);
+
+    expect(result.framework).toBe('laravel');
+    expect(Object.keys(result.plan?.services ?? {})).toEqual(['app', 'web']);
+    expect(result.plan?.volumes).toEqual(['storage']);
+  });
+
+  it('detects generic PHP with confidence at most 0.75', () => {
+    const result = detect(phpGeneric);
+
+    expect(result.framework).toBe('php');
+    expect(result.plan?.port).toBe(80);
+    expect(result.confidence).toBeLessThanOrEqual(0.75);
+  });
+
+  it('detects FastAPI and starts it with uvicorn on port 8000', () => {
+    const result = detect(fastapi);
+
+    expect(result.framework).toBe('python');
+    expect(result.plan?.runtime).toBe('python@3.12');
+    expect(result.plan?.port).toBe(8000);
+    expect(result.plan?.start).toContain('uvicorn');
+    expect(result.plan?.start).toContain('main:app');
+  });
+
+  it('detects Django and starts it with gunicorn', () => {
+    const result = detect(django);
+
+    expect(result.framework).toBe('python');
+    expect(result.plan?.port).toBe(8000);
+    expect(result.plan?.start).toBe('gunicorn myproj.wsgi:application');
+  });
+
+  it('detects a plain static site with confidence 0.8', () => {
+    const result = detect(staticSite);
+
+    expect(result.framework).toBe('static');
+    expect(result.plan?.runtime).toBe('static@1');
+    expect(result.plan?.port).toBe(80);
+    expect(result.confidence).toBe(0.8);
+  });
+
+  it('detects a Dockerfile with confidence 0.99 and default port 3000', () => {
+    const result = detect(dockerfile);
+
+    expect(result.framework).toBe('docker');
+    expect(result.plan?.runtime).toBe('docker@1');
+    expect(result.plan?.port).toBe(3000);
+    expect(result.confidence).toBe(0.99);
+  });
+
+  it('reads the first exposed port from a Dockerfile', () => {
+    const result = detect(dockerfileExpose);
+
+    expect(result.framework).toBe('docker');
+    expect(result.plan?.port).toBe(8080);
+  });
+
+  it('honours an explicit eflex.json with confidence 1.0', () => {
+    const result = detect(eflexConfig);
+
+    expect(result.framework).toBe('eflex-config');
+    expect(result.confidence).toBe(1);
+    expect(result.plan?.framework).toBe('nextjs');
+    expect(result.plan?.runtime).toBe('node@20');
+    expect(result.plan?.port).toBe(4000);
+    expect(result.plan?.install).toBe('pnpm install --frozen-lockfile');
+    expect(result.plan?.start).toBe('pnpm start');
+    expect(result.plan?.healthcheck).toBe('/health');
+    expect(result.plan?.buildEnv).toEqual({ PUBLIC_URL: 'https://example.com' });
+  });
+
+  it('returns a null plan and a warning for invalid eflex.json', () => {
+    const result = detect(eflexConfigInvalid);
+
+    expect(result.plan).toBeNull();
+    expect(result.confidence).toBe(0);
+    expect(result.warnings.join(' ')).toMatch(/invalide/i);
+  });
+
+  it('asks which app to deploy in a monorepo with two candidates', () => {
+    const result = detect(monorepoMultiple);
+
+    expect(result.plan).toBeNull();
+    expect(result.confidence).toBe(0.45);
+    expect(result.questions[0]?.id).toBe('app');
+    expect(result.questions[0]?.options).toEqual(['apps/api', 'apps/web']);
+    expect(result.alternatives).toHaveLength(2);
+  });
+
+  it('resolves a monorepo with a single app and reduces confidence', () => {
+    const result = detect(monorepoSingle);
+
+    expect(result.plan?.root).toBe('apps/web');
+    expect(result.plan?.repoRoot).toBe('../..');
+    expect(result.framework).toBe('nextjs');
+    expect(result.confidence).toBeLessThan(0.92);
+    expect(result.confidence).toBeGreaterThan(0);
+  });
+
+  it('returns a null plan and a stack question for an unknown repository', () => {
+    const result = detect(unknownRepo);
+
+    expect(result.plan).toBeNull();
+    expect(result.confidence).toBe(0);
+    expect(result.framework).toBeNull();
+    expect(result.questions[0]?.id).toBe('stack');
+  });
+
+  it('uses --frozen-lockfile when a pnpm lockfile is present', () => {
+    const result = detect(nextjsWithPnpm);
+
+    expect(result.plan?.install).toBe('pnpm install --frozen-lockfile');
+  });
+
+  it('derives node@20 from engines.node ">=20"', () => {
+    const result = detect(nextjsWithEngines);
+
+    expect(result.plan?.runtime).toBe('node@20');
+  });
+
+  it('always clamps confidence between 0 and 0.99 (except explicit eflex.json)', () => {
+    for (const fixture of allFixtures()) {
+      const result = detect(fixture.snapshot);
+
+      expect(result.confidence).toBeGreaterThanOrEqual(0);
+      expect(result.confidence).toBeLessThanOrEqual(1);
+      if (result.framework !== 'eflex-config') {
+        expect(result.confidence).toBeLessThanOrEqual(0.99);
+      }
+    }
+
+    expect(scoreConfidence(5)).toBe(0.99);
+    expect(scoreConfidence(-5)).toBe(0);
+  });
+});

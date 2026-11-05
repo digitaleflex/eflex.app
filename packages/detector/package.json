@@ -1,0 +1,14 @@
+{
+  "name": "@eflex/detector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Détecteur déterministe de stack pour la plateforme Eflex.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  }
+}
