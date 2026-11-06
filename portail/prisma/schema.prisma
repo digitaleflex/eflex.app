@@ -57,3 +57,51 @@ model VerificationToken {
 
   @@unique([identifier, token])
 }
+
+model Project {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  slug          String     @unique // ex: "mon-projet-42"
+  repoUrl       String
+  branch        String     @default("main")
+  framework     String      // laravel, nextjs, node, python, static
+  runtime       String?     // node@22, php@8.3, etc.
+  domain        String?     // domaine client, sans protocole
+  coolifyAppId  String?     // ID côté Coolify (null jusqu'au premier déploiement)
+  port          Int         @default(80)
+  envVars       EnvVar[]
+  deployments   Deployment[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([slug])
+}
+
+model EnvVar {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  key       String   // ex: DATABASE_URL, NEXT_PUBLIC_URL
+  value     String   // chiffre au repos (libsodium ou pgcrypto)
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@unique([projectId, key])
+}
+
+model Deployment {
+  id             String   @id @default(cuid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  commitSha      String
+  status         String   @default("pending") // pending, building, deploying, live, failed, rollbacked
+  coolifyBuildId String?
+  logsSummary    String?  @db.Text
+  createdAt      DateTime @default(now())
+
+  @@index([projectId])
+  @@index([status])
+}
