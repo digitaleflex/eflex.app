@@ -7,6 +7,7 @@ export const BASE_CONFIDENCE: Record<Framework, number> = {
   nextjs: 0.92,
   nuxt: 0.9,
   astro: 0.9,
+  svelte: 0.9,
   vite: 0.92,
   laravel: 0.92,
   node: 0.85,

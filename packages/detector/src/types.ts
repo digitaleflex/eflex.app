@@ -37,6 +37,7 @@ export type Framework =
   | 'nuxt'
   | 'astro'
   | 'vite'
+  | 'svelte'
   | 'node'
   | 'laravel'
   | 'php'

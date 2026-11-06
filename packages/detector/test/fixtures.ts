@@ -59,6 +59,15 @@ export const astro = makeSnapshot({
   'src/pages/index.astro': '<h1>Astro</h1>\n',
 });
 
+export const svelte = makeSnapshot({
+  'package.json': json({
+    name: 'svelte-app',
+    scripts: { build: 'svelte build' },
+    dependencies: { svelte: '^4.0.0' },
+  }),
+  'src/app.svelte': '<h1>Svelte</h1>\n',
+});
+
 export const express = makeSnapshot({
   'package.json': json({
     name: 'express-app',
@@ -208,6 +217,7 @@ export function allFixtures(): Fixture[] {
     { name: 'nextjs-with-engines', snapshot: nextjsWithEngines },
     { name: 'vite', snapshot: vite },
     { name: 'astro', snapshot: astro },
+    { name: 'svelte', snapshot: svelte },
     { name: 'express', snapshot: express },
     { name: 'laravel-full', snapshot: laravelFull },
     { name: 'laravel-minimal', snapshot: laravelMinimal },
