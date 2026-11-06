@@ -8,6 +8,9 @@ export const BASE_CONFIDENCE: Record<Framework, number> = {
   nuxt: 0.9,
   astro: 0.9,
   svelte: 0.9,
+  remix: 0.9,
+  solidstart: 0.9,
+  redwoodjs: 0.85,
   vite: 0.92,
   laravel: 0.92,
   node: 0.85,
@@ -30,6 +33,8 @@ export interface ConfidenceSignals {
   missingEntrypoint?: boolean;
   /** The app was guessed while resolving a monorepo. */
   guessedMonorepoApp?: boolean;
+  /** Une configuration Remix a été détectée. */
+  hasRemixConfig?: boolean;
 }
 
 /** Round to two decimals, the only precision exposed in DetectionResult. */

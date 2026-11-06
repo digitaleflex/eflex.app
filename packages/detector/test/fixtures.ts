@@ -69,6 +69,38 @@ export const nuxt = makeSnapshot({
   'pages/index.vue': '<template><div>Hello</div></template>\n',
 });
 
+export const remix = makeSnapshot({
+  'package.json': json({
+    name: 'remix-app',
+    scripts: { build: 'remix build', start: 'remix start' },
+    dependencies: { remix: '^4.0.0' },
+  }),
+  'remix.config.js': 'export default {\n  server: {\n    freshModes: { ssr: [], app: [], dom: [] },\n  },\n},\n',
+  'app/routes/home.tsx': '<h1>Home</h1>\n',
+});
+
+export const solidstart = makeSnapshot({
+  'package.json': json({
+    name: 'solidstart-app',
+    scripts: { build: 'solid-build', start: 'solid start' },
+    dependencies: { 'solid-start': '^1.0.0' },
+  }),
+  'solid.config.ts': 'export default {\n  htmlOutput: true,\n},\n',
+  'pages/index.tsx': '<h1>Hello</h1>\n',
+});
+
+export const redwoodjs = makeSnapshot({
+  'package.json': json({
+    name: 'redwoodjs-app',
+    scripts: { build: 'redwood build', start: 'redwood serve' },
+    dependencies: {
+      '@redwoodjs/api': '^1.0.0',
+      '@redwoodjs/db': '^1.0.0',
+    },
+  }),
+  '@redwoodjs/api/index.ts': 'export function home() {\n  return {\n    data: "Hello",\n  };\n}\n',
+});
+
 export const svelte = makeSnapshot({
   'package.json': json({
     name: 'svelte-app',
@@ -228,6 +260,9 @@ export function allFixtures(): Fixture[] {
     { name: 'vite', snapshot: vite },
     { name: 'astro', snapshot: astro },
     { name: 'nuxt', snapshot: nuxt },
+    { name: 'remix', snapshot: remix },
+    { name: 'solidstart', snapshot: solidstart },
+    { name: 'redwoodjs', snapshot: redwoodjs },
     { name: 'svelte', snapshot: svelte },
     { name: 'express', snapshot: express },
     { name: 'laravel-full', snapshot: laravelFull },
