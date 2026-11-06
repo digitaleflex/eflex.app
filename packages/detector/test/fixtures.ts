@@ -59,6 +59,16 @@ export const astro = makeSnapshot({
   'src/pages/index.astro': '<h1>Astro</h1>\n',
 });
 
+export const nuxt = makeSnapshot({
+  'package.json': json({
+    name: 'nuxt-app',
+    scripts: { build: 'nuxt build', start: 'nuxt start' },
+    dependencies: { nuxt: '^3.5.0' },
+  }),
+  'nuxt.config.ts': 'export default defineNuxtConfig({}),\n',
+  'pages/index.vue': '<template><div>Hello</div></template>\n',
+});
+
 export const svelte = makeSnapshot({
   'package.json': json({
     name: 'svelte-app',
@@ -217,6 +227,7 @@ export function allFixtures(): Fixture[] {
     { name: 'nextjs-with-engines', snapshot: nextjsWithEngines },
     { name: 'vite', snapshot: vite },
     { name: 'astro', snapshot: astro },
+    { name: 'nuxt', snapshot: nuxt },
     { name: 'svelte', snapshot: svelte },
     { name: 'express', snapshot: express },
     { name: 'laravel-full', snapshot: laravelFull },
