@@ -168,6 +168,30 @@ export const monorepoSingle = makeSnapshot({
   }),
 });
 
+export const dockerfileArgRequired = makeSnapshot({
+  'Dockerfile': 'FROM node:22-alpine\nWORKDIR /app\nARG NEXT_PUBLIC_URL\nEXPOSE 3000\nCOPY . .\n',
+});
+
+export const dockerfileArgDefault = makeSnapshot({
+  'Dockerfile': 'FROM node:22-alpine\nWORKDIR /app\nARG NODE_ENV=production\nEXPOSE 3000\nCOPY . .\n',
+});
+
+export const dockerfileArgBeforeFrom = makeSnapshot({
+  'Dockerfile': 'ARG PHP_VERSION=8.3\nFROM php:${PHP_VERSION}-fpm\nWORKDIR /app\nARG APP_ENV=production\nEXPOSE 9000\nCOPY . .\nRUN apt-get update && apt-get install -y nginx\n',
+});
+
+export const dockerfileVolume = makeSnapshot({
+  'Dockerfile': 'FROM node:22-alpine\nWORKDIR /app\nVOLUME ["/app/data"]\nEXPOSE 3000\nCOPY . .\n',
+});
+
+export const dockerfileMultiExpose = makeSnapshot({
+  'Dockerfile': 'FROM node:22-alpine\nEXPOSE 3000\nEXPOSE 8080\nCOPY . .\n',
+});
+
+export const dockerfilePhpFpm = makeSnapshot({
+  'Dockerfile': 'FROM php:8.3-fpm\nWORKDIR /app\nEXPOSE 9000\nCOPY . .\n',
+});
+
 export const unknownRepo = makeSnapshot({
   'README.md': '# Projet inconnu\n',
 });
@@ -194,6 +218,12 @@ export function allFixtures(): Fixture[] {
     { name: 'dockerfile', snapshot: dockerfile },
     { name: 'dockerfile-expose', snapshot: dockerfileExpose },
     { name: 'eflex-config', snapshot: eflexConfig },
+    { name: 'dockerfile-arg-required', snapshot: dockerfileArgRequired },
+    { name: 'dockerfile-arg-default', snapshot: dockerfileArgDefault },
+    { name: 'dockerfile-arg-before-from', snapshot: dockerfileArgBeforeFrom },
+    { name: 'dockerfile-volume', snapshot: dockerfileVolume },
+    { name: 'dockerfile-multi-expose', snapshot: dockerfileMultiExpose },
+    { name: 'dockerfile-php-fpm', snapshot: dockerfilePhpFpm },
     { name: 'eflex-config-invalid', snapshot: eflexConfigInvalid },
     { name: 'monorepo-multiple', snapshot: monorepoMultiple },
     { name: 'monorepo-single', snapshot: monorepoSingle },

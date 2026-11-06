@@ -9,8 +9,9 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p packages/detector/tsconfig.json",
-    "detect": "tsx packages/detector/src/cli.ts"
+    "typecheck": "tsc --noEmit -p packages/detector/tsconfig.json && tsc --noEmit -p packages/renderer/tsconfig.json",
+    "detect": "tsx packages/detector/src/cli.ts",
+    "render": "tsx packages/renderer/src/main.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

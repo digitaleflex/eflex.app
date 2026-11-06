@@ -79,6 +79,13 @@
         "type": "string"
       }
     },
+    "buildArgs": {
+      "description": "Arguments de build Docker (`--build-arg`). Ces valeurs sont PUBLIQUES et figées dans l'image au moment du build : elles ne sont jamais injectées dans le conteneur au runtime. N'y mettez jamais de secret ; utilisez les variables d'environnement de la plateforme pour les valeurs sensibles.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
     "services": {
       "description": "Services supplémentaires (workers, cron, serveur web séparé, etc.).",
       "type": "object",

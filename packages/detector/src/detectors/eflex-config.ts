@@ -95,11 +95,11 @@ function sanitizeStringList(value: unknown, maximum: number): string[] | null {
   return unique.length > 0 ? unique : null;
 }
 
-function sanitizeBuildEnv(value: unknown): Record<string, string> | null {
+function sanitizeStringMap(value: unknown, maximum: number): Record<string, string> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const entries = Object.entries(value as Record<string, unknown>)
     .filter((entry): entry is [string, string] => typeof entry[1] === 'string')
-    .slice(0, 50);
+    .slice(0, maximum);
   if (entries.length === 0) return null;
   return Object.fromEntries(entries);
 }
@@ -212,8 +212,11 @@ export function detectEflexConfig(ctx: DetectionContext): EflexConfigOutcome | n
   const postDeploy = sanitizeStringList(config.postDeploy, 20);
   if (postDeploy) plan.postDeploy = postDeploy;
 
-  const buildEnv = sanitizeBuildEnv(config.buildEnv);
+  const buildEnv = sanitizeStringMap(config.buildEnv, 50);
   if (buildEnv) plan.buildEnv = buildEnv;
+
+  const buildArgs = sanitizeStringMap(config.buildArgs, 100);
+  if (buildArgs) plan.buildArgs = buildArgs;
 
   return {
     candidate: {

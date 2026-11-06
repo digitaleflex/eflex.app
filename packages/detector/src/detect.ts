@@ -267,11 +267,15 @@ function collectCandidates(ctx: DetectionContext): Candidate[] {
 
 function finalizeCandidate(candidate: Candidate, alternativePlans: readonly BuildPlan[]): DetectionResult {
   const confidence = clampConfidence(candidate.confidence);
-  const questions = confidence >= 0.7
-    ? []
-    : candidate.questions && candidate.questions.length > 0
-      ? candidate.questions
-      : defaultQuestions(candidate);
+  let questions: Question[];
+  if (candidate.questions && candidate.questions.length > 0) {
+    // Required build args are actionable even when detection is highly confident.
+    questions = candidate.questions;
+  } else if (confidence < 0.7) {
+    questions = defaultQuestions(candidate);
+  } else {
+    questions = [];
+  }
 
   return {
     plan: candidate.plan,

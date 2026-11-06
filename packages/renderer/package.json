@@ -1,0 +1,11 @@
+{
+  "name": "@eflex/renderer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {},
+  "dependencies": {
+    "yaml": "^2.7.0"
+  }
+}

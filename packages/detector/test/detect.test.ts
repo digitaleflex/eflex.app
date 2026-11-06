@@ -5,7 +5,13 @@ import {
   astro,
   django,
   dockerfile,
+  dockerfileArgBeforeFrom,
+  dockerfileArgDefault,
+  dockerfileArgRequired,
   dockerfileExpose,
+  dockerfileMultiExpose,
+  dockerfilePhpFpm,
+  dockerfileVolume,
   eflexConfig,
   eflexConfigInvalid,
   express,
@@ -132,6 +138,53 @@ describe('detect', () => {
 
     expect(result.framework).toBe('docker');
     expect(result.plan?.port).toBe(8080);
+  });
+
+  it('adds a buildArgs entry and a question for ARG without a default', () => {
+    const result = detect(dockerfileArgRequired);
+
+    expect(result.plan?.buildArgs).toEqual({ NEXT_PUBLIC_URL: '' });
+    expect(result.questions).toHaveLength(1);
+    expect(result.questions[0]?.id).toBe('buildArg.NEXT_PUBLIC_URL');
+    expect(result.questions[0]?.prompt).toContain('NEXT_PUBLIC_URL');
+  });
+
+  it('adds a buildArgs entry and skips the question for ARG with a default', () => {
+    const result = detect(dockerfileArgDefault);
+
+    expect(result.plan?.buildArgs).toEqual({ NODE_ENV: 'production' });
+    expect(result.questions ?? []).toHaveLength(0);
+  });
+
+  it('ignores ARG instructions appearing before the first FROM', () => {
+    const result = detect(dockerfileArgBeforeFrom);
+
+    // PHP_VERSION (before FROM) is ignored. APP_ENV (after FROM) is kept.
+    expect(result.plan?.buildArgs).toEqual({ APP_ENV: 'production' });
+    expect(result.plan?.port).toBe(9000);
+    // nginx is present, so no php-fpm warning.
+    expect(result.warnings.join(' ')).not.toContain('php-fpm');
+  });
+
+  it('reads VOLUME instructions', () => {
+    const result = detect(dockerfileVolume);
+
+    expect(result.plan?.volumes).toEqual(['/app/data']);
+  });
+
+  it('warns when multiple ports are EXPOSEd', () => {
+    const result = detect(dockerfileMultiExpose);
+
+    expect(result.plan?.port).toBe(3000);
+    expect(result.warnings.join(' ')).toContain('8080');
+  });
+
+  it('warns when EXPOSE is 9000 without a web server', () => {
+    const result = detect(dockerfilePhpFpm);
+
+    expect(result.plan?.port).toBe(9000);
+    expect(result.warnings.join(' ')).toContain('php-fpm');
+    expect(result.warnings.join(' ')).toContain('nginx');
   });
 
   it('honours an explicit eflex.json with confidence 1.0', () => {

@@ -26,6 +26,8 @@ export interface BuildPlan {
   volumes?: string[];
   postDeploy?: string[];
   buildEnv?: Record<string, string>;
+  /** Public values frozen into the image at build time. Never runtime secrets. */
+  buildArgs?: Record<string, string>;
 }
 
 export type Framework =
