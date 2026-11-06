@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import { Package, Launch, CircleCheck, Globe } from 'lucide-react'
 
 interface Project {
   id: string
@@ -60,10 +61,10 @@ export default function DashboardPage() {
   }, [])
 
   const stats = [
-    { label: 'Projets actifs', value: projects.length.toString(), icon: '📦' },
-    { label: 'Déploiements', value: projects.reduce((c, p) => c + p.deployments.length, 0).toString(), icon: '🚀' },
-    { label: 'En ligne', value: projects.filter(p => p.deployments[0]?.status === 'live').length.toString(), icon: '🟢' },
-    { label: 'Domaines', value: projects.filter(p => p.domain).length.toString(), icon: '🌐' },
+    { label: 'Projets actifs', value: projects.length.toString(), icon: <Package /> },
+    { label: 'Déploiements', value: projects.reduce((c, p) => c + p.deployments.length, 0).toString(), icon: <Launch /> },
+    { label: 'En ligne', value: projects.filter(p => p.deployments[0]?.status === 'live').length.toString(), icon: <CircleCheck /> },
+    { label: 'Domaines', value: projects.filter(p => p.domain).length.toString(), icon: <Globe /> },
   ]
 
   const timeAgo = (date: string) => {
@@ -106,7 +107,7 @@ export default function DashboardPage() {
         ) : projects.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center space-y-4">
-              <div className="text-4xl">🚀</div>
+              <div className="text-4xl"><Launch className="align-middle" /></div>
               <div className="space-y-2">
                 <h3 className="text-lg font-semibold">Aucun projet pour le moment</h3>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">

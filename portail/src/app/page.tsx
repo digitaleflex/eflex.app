@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Zap, Atom, Snake, File, Server, Package, Launch, CircleCheck, Globe, Star, Heart } from 'lucide-react'
 
 const features = [
   {
@@ -43,12 +44,12 @@ const features = [
 ]
 
 const stacks = [
-  { name: 'Next.js', icon: '▲', color: 'text-foreground' },
-  { name: 'Laravel', icon: '⚡', color: 'text-red-500' },
-  { name: 'Node.js', icon: '⬢', color: 'text-green-500' },
-  { name: 'Python', icon: '🐍', color: 'text-blue-400' },
-  { name: 'Vite', icon: '⚡', color: 'text-purple-400' },
-  { name: 'Statique', icon: '📄', color: 'text-muted-foreground' },
+  { name: 'Next.js', icon: <Zap />, color: 'text-foreground' },
+  { name: 'Laravel', icon: <Zap />, color: 'text-red-500' },
+  { name: 'Node.js', icon: <Atom />, color: 'text-green-500' },
+  { name: 'Python', icon: <Snake />, color: 'text-blue-400' },
+  { name: 'Vite', icon: <Zap />, color: 'text-purple-400' },
+  { name: 'Statique', icon: <File />, color: 'text-muted-foreground' },
 ]
 
 export default function HomePage() {

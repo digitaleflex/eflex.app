@@ -6,17 +6,18 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Zap, Atom, Snake, File, Server, Package, Launch, Star, Heart, TrendingUp, Leaf } from 'lucide-react'
 
 const frameworks = [
-  { value: 'nextjs', label: 'Next.js', icon: '▲' },
-  { value: 'vite', label: 'Vite', icon: '⚡' },
-  { value: 'astro', label: 'Astro', icon: '✦' },
-  { value: 'nuxt', label: 'Nuxt', icon: '💚' },
-  { value: 'node', label: 'Node.js', icon: '⬢' },
-  { value: 'laravel', label: 'Laravel', icon: '⚡' },
-  { value: 'python', label: 'Python', icon: '🐍' },
-  { value: 'static', label: 'Statique', icon: '📄' },
-  { value: 'docker', label: 'Docker', icon: '🐳' },
+  { value: 'nextjs', label: 'Next.js', icon: <TrendingUp /> },
+  { value: 'vite', label: 'Vite', icon: <Zap /> },
+  { value: 'astro', label: 'Astro', icon: <Star /> },
+  { value: 'nuxt', label: 'Nuxt', icon: <Heart /> },
+  { value: 'node', label: 'Node.js', icon: <Atom /> },
+  { value: 'laravel', label: 'Laravel', icon: <Zap /> },
+  { value: 'python', label: 'Python', icon: <Snake /> },
+  { value: 'static', label: 'Statique', icon: <File /> },
+  { value: 'docker', label: 'Docker', icon: <Server /> },
 ]
 
 interface EnvVar { key: string; value: string }
@@ -138,7 +139,7 @@ export default function NewProjectPage() {
         </Card>
 
         <div className="flex items-center gap-4">
-          <Button type="submit" size="lg" loading={loading}>🚀 Déployer le projet</Button>
+          <Button type="submit" size="lg" loading={loading}>Démarrer le déploiement</Button>
           <Button variant="ghost" type="button" size="lg" onClick={() => router.push('/dashboard')}>Annuler</Button>
         </div>
       </form>
