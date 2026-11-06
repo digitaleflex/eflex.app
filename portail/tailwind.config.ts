@@ -47,6 +47,11 @@ module.exports = {
           DEFAULT: 'hsl(var(--success))',
           foreground: 'hsl(var(--success-foreground))',
         },
+        // Nouvelles couleurs EFLEX
+        eflexnavy: 'hsl(var(--eflex-navy))',
+        eflexroyalblue: 'hsl(var(--eflex-royalblue))',
+        eflexblue: 'hsl(var(--eflex-blue))',
+        eflexsky: 'hsl(var(--eflex-sky))',
       },
       borderRadius: {
         lg: 'var(--radius)',

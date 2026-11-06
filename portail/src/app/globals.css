@@ -4,17 +4,22 @@
 
 @layer base {
   :root {
+    --eflex-navy: 77 91% 50%;
+    --eflex-royalblue: 41 77% 19%;
+    --eflex-blue: 14 94% 37%;
+    --eflex-sky: 83 93% 45%;
+
     --background: 240 10% 97%;
     --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
-    --primary: 239 84% 67%;
+    --primary: 14 94% 37%;       /* Blue officiel */
     --primary-foreground: 0 0% 100%;
     --secondary: 240 5% 96%;
     --secondary-foreground: 240 6% 10%;
     --muted: 240 5% 96%;
     --muted-foreground: 240 4% 46%;
-    --accent: 199 89% 48%;
+    --accent: 83 93% 45%;        /* Sky */
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
@@ -22,7 +27,7 @@
     --success-foreground: 0 0% 100%;
     --border: 240 6% 90%;
     --input: 240 6% 90%;
-    --ring: 239 84% 67%;
+    --ring: 14 94% 37%;
     --radius: 0.75rem;
   }
 
@@ -31,13 +36,13 @@
     --foreground: 0 0% 95%;
     --card: 240 10% 6%;
     --card-foreground: 0 0% 95%;
-    --primary: 239 84% 67%;
+    --primary: 14 94% 37%;
     --primary-foreground: 0 0% 100%;
     --secondary: 240 4% 16%;
     --secondary-foreground: 0 0% 95%;
     --muted: 240 4% 16%;
     --muted-foreground: 240 5% 55%;
-    --accent: 199 89% 48%;
+    --accent: 83 93% 45%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
@@ -45,7 +50,7 @@
     --success-foreground: 0 0% 100%;
     --border: 240 4% 16%;
     --input: 240 4% 16%;
-    --ring: 239 84% 67%;
+    --ring: 14 94% 37%;
   }
 }
 
@@ -73,4 +78,4 @@
     background-image: radial-gradient(hsl(var(--muted-foreground) / 0.1) 1px, transparent 1px);
     background-size: 32px 32px;
   }
-}/* v2 */
+}
