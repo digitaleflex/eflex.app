@@ -2,7 +2,77 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Zap, Atom, Snake, File, Server, Package, Launch, CircleCheck, Globe, Star, Heart } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Zap, Atom, Snake, File, Server, Package, Launch, CircleCheck, Globe, Star, Heart, TrendingUp } from 'lucide-react'
+
+const frameworkLogos: Record<string, React.ComponentType> = {
+  nextjs: Zap,
+  nuxt: Heart,
+  astro: Star,
+  vite: Zap,
+  svelte: Snake,
+  remix: TrendingUp,
+  solidstart: TrendingUp,
+  redwoodjs: Package,
+  node: Atom,
+  laravel: Zap,
+  php: Atom,
+  python: Snake,
+  static: File,
+  docker: Server,
+  eflexConfig: Package,
+}
+
+const allFrameworks = [
+  'nextjs',
+  'nuxt',
+  'astro',
+  'vite',
+  'svelte',
+  'remix',
+  'solidstart',
+  'redwoodjs',
+  'node',
+  'laravel',
+  'php',
+  'python',
+  'static',
+  'docker',
+  'eflex-config',
+]
+
+function TechnologyCarousel({ frameworks }: { frameworks: string[] }) {
+  const [index, setIndex] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => {
+      setIndex((i) => (i + 1) % frameworks.length)
+    }, 3000)
+    return () => clearInterval(id)
+  }, [frameworks])
+
+  const Logo = frameworkLogos[frameworks[index]]
+
+  return (
+    <div className="carousel rounded-xl bg-primary/5 p-4 mb-8">
+      <Logo className="w-12 h-12 mx-auto mb-2" />
+      <p className="text-center text-sm">{frameworks[index]}</p>
+      <button
+        onClick={() => setIndex((i) => (i - 1 + frameworks.length) % frameworks.length)}
+        className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/70 rounded-lg p-1 hover:bg-white"
+        aria-label="Précédent"
+      >
+        ←
+      </button>
+      <button
+        onClick={() => setIndex((i) => (i + 1) % frameworks.length)}
+        className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/70 rounded-lg p-1 hover:bg-white"
+        aria-label="Suivant"
+      >
+        →
+      </button>
+    </div>
+  )
+}
 
 const features = [
   {
@@ -162,6 +232,8 @@ export default function HomePage() {
           </Card>
         </section>
       </main>
+
+      <TechnologyCarousel frameworks={allFrameworks} />
 
       {/* Footer */}
       <footer className="border-t border-border">
