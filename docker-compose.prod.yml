@@ -1,0 +1,139 @@
+version: "3.8"
+
+# ---------------------------------------------------------------------------
+# Moteur Eflex — infrastructure de production (un seul serveur)
+# ---------------------------------------------------------------------------
+# Services :
+#   traefik   : reverse proxy, TLS Let's Encrypt, routing vers le portail
+#   portail   : API + interface client (Next.js, output standalone)
+#   postgres  : base de données principale (users, projets, déploiements)
+#   redis     : cache, sessions, file d'attente légère
+# ---------------------------------------------------------------------------
+# Prérequis :
+#   1. cp .env.prod.example .env.prod  (puis adapter)
+#   2. mkdir letsencrypt && chmod 700 letsencrypt
+#   3. docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+# ---------------------------------------------------------------------------
+
+services:
+  ###########################################################################
+  # TRAEFIK — reverse proxy et terminateur TLS
+  ###########################################################################
+  traefik:
+    image: traefik:v3.2
+    container_name: eflex-traefik
+    command:
+      - "--api.insecure=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedByDefault=false"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./letsencrypt:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - traefik-public
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  ###########################################################################
+  # PORTAIL — Next.js (API + interface client)
+  ###########################################################################
+  portail:
+    build:
+      context: .
+      dockerfile: Dockerfile.portail
+    container_name: eflex-portail
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - COOLIFY_API_URL=${COOLIFY_API_URL}
+      - COOLIFY_API_TOKEN=${COOLIFY_API_TOKEN}
+      - PORTAL_DOMAIN=${PORTAL_DOMAIN}
+      - PORTAL_URL=${PORTAL_URL}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.portail.rule=Host(`${PORTAL_DOMAIN}`)"
+      - "traefik.http.routers.portail.entrypoints=websecure"
+      - "traefik.http.routers.portail.tls.certresolver=letsencrypt"
+      - "traefik.http.services.portail.loadbalancer.server.port=3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - traefik-public
+      - eflex-internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ###########################################################################
+  # POSTGRESQL — base de données principale
+  ###########################################################################
+  postgres:
+    image: postgres:16-alpine
+    container_name: eflex-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - eflex_postgres_data:/var/lib/postgresql/data
+    networks:
+      - eflex-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ###########################################################################
+  # REDIS — cache et sessions
+  ###########################################################################
+  redis:
+    image: redis:7-alpine
+    container_name: eflex-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks:
+      - eflex-internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  eflex_postgres_data:
+  letsencrypt:
+
+networks:
+  traefik-public:
+    driver: bridge
+  eflex-internal:
+    driver: bridge

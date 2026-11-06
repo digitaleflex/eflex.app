@@ -1,0 +1,36 @@
+# syntax=docker/dockerfile:1
+# Image du portail Eflex — Next.js App Router, output standalone
+FROM node:24-alpine AS builder
+WORKDIR /app
+
+# Dépendances
+COPY package.json package-lock.json* pnpm-lock.yaml* ./
+RUN \
+  if [ -f pnpm-lock.yaml ]; then corepack enable && pnpm install --frozen-lockfile; \
+  elif [ -f package-lock.json ]; then npm ci; \
+  else npm install; \
+  fi
+
+# Code source
+COPY . .
+
+# Build Next.js (suppose un next.config.js avec output: 'standalone')
+RUN \
+  if [ -f pnpm-lock.yaml ]; then corepack enable && pnpm run build; \
+  else npm run build; \
+  fi
+
+FROM node:24-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Fichiers nécessaires au standalone
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+EXPOSE 3000
+
+# Le serveur standalone écoute sur 0.0.0.0:3000
+CMD ["node", "server.js"]

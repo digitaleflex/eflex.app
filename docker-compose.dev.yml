@@ -1,0 +1,66 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: eflex-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: eflex
+      POSTGRES_PASSWORD: eflexpass
+      POSTGRES_DB: eflex
+    ports:
+      - "5432:5432"
+    volumes:
+      - eflex_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eflex -d eflex"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: eflex-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: bitnami/minio:2023.10.10
+    container_name: eflex-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_DEFAULT_BUCKETS: eflex-dev
+    ports:
+      - "9000:9000"   # API S3
+      - "9001:9001"   # Console web
+    volumes:
+      - eflex_minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # Coolify n'est PAS inclus dans ce compose.
+  # Il doit tourner sur un serveur séparé (ou un dev distant) car :
+  # - il prend le contrôle total de docker.sock
+  # - il lance son propre Traefik sur les ports 80/443
+  # Connecte-toi via COOLIFY_API_URL + COOLIFY_API_TOKEN dans le .env.
+
+networks:
+  eflex_dev:
+    driver: bridge
+
+volumes:
+  eflex_postgres_data:
+  eflex_minio_data:

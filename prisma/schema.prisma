@@ -1,0 +1,114 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  avatar    String?
+  password  String?   // hash si credentials email/mot de passe
+  accounts  Account[]
+  sessions  Session[]
+  projects  Project[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Project {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  slug          String      @unique // ex: "mon-projet-42"
+  repoUrl       String
+  branch        String      @default("main")
+  framework     String      // laravel, nextjs, node, python, static
+  runtime       String?     // node@22, php@8.3, etc.
+  domain        String?     // domaine client, sans protocole
+  coolifyAppId  String?     // ID côté Coolify (null jusqu'au premier déploiement)
+  port          Int         @default(80)
+  envVars       EnvVar[]
+  deployments   Deployment[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([slug])
+}
+
+model EnvVar {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  key       String   // ex: DATABASE_URL, NEXT_PUBLIC_URL
+  value     String   // chiffre au repos (libsodium ou pgcrypto)
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@unique([projectId, key])
+}
+
+model Deployment {
+  id             String   @id @default(cuid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  commitSha      String
+  status         String   @default("pending") // pending, building, deploying, live, failed, rollbacked
+  coolifyBuildId String?
+  logsSummary    String?  @db.Text
+  createdAt      DateTime @default(now())
+
+  @@index([projectId])
+  @@index([status])
+}
+
+model Subscription {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      String   // active, cancelled, past_due, trialing
+  plan        String   // starter, pro, agency
+  priceCents  Int      @default(0) // en XOF ou EUR selon devise
+  providerRef String?  // ID chez Moneroo / FedaPay / Stripe
+  currentPeriodEnd DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
