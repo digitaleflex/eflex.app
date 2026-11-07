@@ -1,9 +1,17 @@
+import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 
-// La suite racine ne couvre que les packages TypeScript du workspace pnpm.
+// La suite racine couvre les packages TypeScript du workspace pnpm et les modules
+// sans dépendance du portail (analyse d'URL, analyse de dépôt).
 // La console `apps/cloud` a sa propre configuration Vitest (npm, jsdom).
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@eflex/detector': path.resolve(__dirname, 'packages/detector/src/index.ts'),
+      '@': path.resolve(__dirname, 'portail/src'),
+    },
+  },
   test: {
-    include: ['packages/**/test/**/*.test.ts'],
+    include: ['packages/**/test/**/*.test.ts', 'portail/src/**/*.test.ts'],
   },
 });

@@ -23,8 +23,8 @@ services:
   ###########################################################################
   portail:
     build:
-      context: ./portail
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: portail/Dockerfile
     container_name: eflex-portail
     restart: unless-stopped
     environment:
@@ -36,6 +36,7 @@ services:
       - REDIS_URL=${REDIS_URL}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - COOLIFY_API_URL=${COOLIFY_API_URL}
@@ -68,8 +69,8 @@ services:
   ###########################################################################
   migrate:
     build:
-      context: ./portail
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: portail/Dockerfile
       target: migrator
     profiles: ["tools"]
     environment:

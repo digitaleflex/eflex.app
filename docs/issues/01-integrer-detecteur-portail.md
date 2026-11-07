@@ -1,5 +1,7 @@
 # [P0] Intégrer le détecteur dans le flux « Nouveau projet » du portail
 
+> **Mise à jour :** réalisé. `POST /api/projects/analyze`, `lib/repo-analysis.ts`, `lib/github-url.ts`, interface en deux temps dans « Nouveau projet », plan stocké en base (`Project.plan` / `Project.detection`), plan jamais accepté du client. Voir `AGENTS.md`. Reste : dépôts privés (issue 07, GitHub App) et réponses aux questions du détecteur (aujourd'hui seulement affichées).
+
 ## Contexte
 
 La promesse d'Eflex est « vous poussez un dépôt, Eflex comprend la stack ». Le détecteur (`packages/detector`) fait exactement ça, mais **le portail ne l'utilise pas** :

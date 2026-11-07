@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detect, scoreConfidence } from '../src/index.js';
+import { detect, detectApplication, scoreConfidence } from '../src/index.js';
 import {
   allFixtures,
   astro,
@@ -227,6 +227,23 @@ describe('detect', () => {
     expect(result.questions[0]?.id).toBe('app');
     expect(result.questions[0]?.options).toEqual(['apps/api', 'apps/web']);
     expect(result.alternatives).toHaveLength(2);
+  });
+
+  it('detects the application the user picked in a monorepo with several candidates', () => {
+    const result = detectApplication(monorepoMultiple, 'apps/web');
+
+    expect(result.framework).toBe('nextjs');
+    expect(result.plan?.root).toBe('apps/web');
+    expect(result.plan?.repoRoot).toBe('../..');
+    expect(result.reasons[0]).toContain('apps/web');
+    expect(result.confidence).toBeLessThan(0.95);
+  });
+
+  it('rejects an application path that is not part of the monorepo', () => {
+    for (const app of ['apps/ghost', '../etc', '', 'apps']) {
+      const result = detectApplication(monorepoMultiple, app);
+      expect(result.plan).toBeNull();
+    }
   });
 
   it('resolves a monorepo with a single app and reduces confidence', () => {

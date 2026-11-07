@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { FrameworkIcon } from '@/components/framework-icon'
+import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 
 const STATUS: Record<string, { label: string; variant: 'success' | 'warning' | 'destructive' | 'outline' }> = {
   live: { label: 'En ligne', variant: 'success' },
@@ -14,6 +15,19 @@ const STATUS: Record<string, { label: string; variant: 'success' | 'warning' | '
   pending: { label: 'En attente', variant: 'outline' },
   failed: { label: 'Échec', variant: 'destructive' },
   rollbacked: { label: 'Annulé', variant: 'outline' },
+}
+
+type StoredAnalysis = { confidence?: number; reasons: string[]; commitSha?: string }
+
+/** `Project.detection` est du JSON libre en base : on ne retient que ce qu'on sait afficher. */
+function readAnalysis(value: unknown): StoredAnalysis | null {
+  if (typeof value !== 'object' || value === null) return null
+  const v = value as Record<string, unknown>
+  return {
+    confidence: typeof v.confidence === 'number' ? v.confidence : undefined,
+    reasons: Array.isArray(v.reasons) ? v.reasons.filter((r): r is string => typeof r === 'string') : [],
+    commitSha: typeof v.commitSha === 'string' ? v.commitSha : undefined,
+  }
 }
 
 const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
@@ -32,6 +46,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   })
   if (!project) notFound()
 
+  const analysis = readAnalysis(project.detection)
   const last = project.deployments[0]
   const lastStatus = last ? STATUS[last.status] ?? { label: last.status, variant: 'outline' as const } : null
 
@@ -94,12 +109,44 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <CardContent className="p-5 space-y-1">
             <p className="text-xs text-muted-foreground">Stack</p>
             <p className="font-medium">
-              {project.framework || 'Détection automatique'}
-              {project.runtime && <span className="text-muted-foreground font-mono text-sm"> · {project.runtime}</span>}
+              {project.framework ? frameworkLabel(project.framework) : 'Détection automatique'}
+              {project.runtime && <span className="text-muted-foreground text-sm"> · {runtimeLabel(project.runtime)}</span>}
             </p>
           </CardContent>
         </Card>
       </div>
+
+      {analysis && (
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-semibold">Détection</h2>
+              {typeof analysis.confidence === 'number' && (
+                <Badge variant={confidenceLevel(analysis.confidence).tone}>
+                  {confidenceLevel(analysis.confidence).label} · {Math.round(analysis.confidence * 100)} %
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {analysis.reasons.length > 0 && (
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                {analysis.reasons.map((reason) => (
+                  <li key={reason} className="flex gap-2">
+                    <span aria-hidden="true" className="mt-2 h-1 w-1 shrink-0 rounded-full bg-primary" />
+                    <span>{reason}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {analysis.commitSha && (
+              <p className="text-xs text-muted-foreground">
+                Analysé sur le commit <code className="font-mono">{analysis.commitSha.slice(0, 7)}</code>
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

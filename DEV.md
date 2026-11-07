@@ -47,3 +47,4 @@ Coolify prend le contrôle total de `docker.sock` et lance son propre reverse pr
 | `BETTER_AUTH_SECRET` | `openssl rand -base64 32` |
 | `BETTER_AUTH_URL` | `http://localhost:3000` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | facultatifs : sans eux, le bouton Google reste inactif |
+| `GITHUB_TOKEN` | facultatif : relève la limite de l'analyse des dépôts (60 → 5 000 requêtes/heure) ; un jeton sans aucun droit suffit |

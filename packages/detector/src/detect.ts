@@ -311,6 +311,33 @@ function unknownResult(): DetectionResult {
   };
 }
 
+/**
+ * Detect one application of a monorepo: runs the detectors at `app` and records its
+ * location (`root`) and the way back to the repository root (`repoRoot`).
+ */
+function resolveApplication(view: RepoView, app: string): DetectionResult {
+  const subResult = detectAt(view, app, false);
+  if (!subResult.plan) return subResult;
+
+  const repoRoot = repoRootFromApp(app);
+  const confidence = scaleConfidence(subResult.confidence, 0.95);
+  const plan: BuildPlan = { ...subResult.plan, root: app, repoRoot };
+
+  return {
+    plan,
+    confidence,
+    framework: subResult.framework,
+    reasons: unique([`Application détectée dans \`${app}\`.`, ...subResult.reasons]),
+    warnings: subResult.warnings,
+    questions: confidence < 0.7 ? subResult.questions : [],
+    alternatives: subResult.alternatives.map((alternative) => ({
+      ...alternative,
+      root: app,
+      repoRoot,
+    })),
+  };
+}
+
 function detectAt(view: RepoView, root: string, allowMonorepo: boolean): DetectionResult {
   const ctx = createContext(view, root);
 
@@ -354,28 +381,7 @@ function detectAt(view: RepoView, root: string, allowMonorepo: boolean): Detecti
 
     if (apps.length === 1) {
       const app = apps[0];
-      if (app) {
-        const subResult = detectAt(view, app, false);
-        if (!subResult.plan) return subResult;
-
-        const repoRoot = repoRootFromApp(app);
-        const confidence = scaleConfidence(subResult.confidence, 0.95);
-        const plan: BuildPlan = { ...subResult.plan, root: app, repoRoot };
-
-        return {
-          plan,
-          confidence,
-          framework: subResult.framework,
-          reasons: unique([`Application détectée dans \`${app}\`.`, ...subResult.reasons]),
-          warnings: subResult.warnings,
-          questions: confidence < 0.7 ? subResult.questions : [],
-          alternatives: subResult.alternatives.map((alternative) => ({
-            ...alternative,
-            root: app,
-            repoRoot,
-          })),
-        };
-      }
+      if (app) return resolveApplication(view, app);
     }
 
     if (apps.length > 1) {
@@ -420,4 +426,16 @@ function detectAt(view: RepoView, root: string, allowMonorepo: boolean): Detecti
 export function detect(snapshot: RepoSnapshot): DetectionResult {
   const view = createView(snapshot);
   return detectAt(view, '', true);
+}
+
+/**
+ * Detect a specific application directory of a monorepo, typically the one the user picked
+ * after `detect()` asked which application to deploy. `app` must be one of the applications
+ * discovered in the repository; otherwise the result carries no plan.
+ */
+export function detectApplication(snapshot: RepoSnapshot, app: string): DetectionResult {
+  const view = createView(snapshot);
+  const wanted = normalizePath(app).replace(/\/+$/, '');
+  if (!discoverApps(view.files, '').includes(wanted)) return unknownResult();
+  return resolveApplication(view, wanted);
 }

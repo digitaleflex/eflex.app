@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { Package, Rocket, CircleCheck, Globe, Plus } from 'lucide-react'
+import { frameworkLabel } from '@/lib/frameworks'
 
 interface Project {
   id: string
@@ -14,7 +15,6 @@ interface Project {
   domain: string | null
   repoUrl: string
   branch: string
-  coolifyAppId: string | null
   updatedAt: string
   createdAt: string
   deployments: Array<{
@@ -151,7 +151,7 @@ export default function DashboardPage() {
                       )}
                     </div>
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="capitalize">{project.framework || 'Détection auto'}</span>
+                      <span>{project.framework ? frameworkLabel(project.framework) : 'Détection auto'}</span>
                       <span>{timeAgo(project.updatedAt)}</span>
                     </div>
                   </Card>

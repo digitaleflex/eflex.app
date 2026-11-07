@@ -1,0 +1,16 @@
+# Le contexte de build est la racine du dépôt (voir portail/Dockerfile) :
+# on n'envoie que ce que l'image utilise, pas les services Go, les docs ni les node_modules.
+*
+!portail
+!packages/detector
+
+**/node_modules
+**/.next
+**/dist
+**/build
+**/.env
+**/.env.*
+**/*.log
+**/npm-debug.log*
+**/.pnpm-store
+packages/detector/test
