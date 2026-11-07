@@ -1,77 +1,50 @@
-version: "3.8"
-
 # ---------------------------------------------------------------------------
-# Moteur Eflex — infrastructure de production (un seul serveur)
+# Moteur Eflex — services applicatifs de production (un seul serveur)
 # ---------------------------------------------------------------------------
 # Services :
-#   traefik   : reverse proxy, TLS Let's Encrypt, routing vers le portail
 #   portail   : API + interface client (Next.js, output standalone)
 #   postgres  : base de données principale (users, projets, déploiements)
 #   redis     : cache, sessions, file d'attente légère
+#   migrate   : migration Prisma one-off (profil "tools", lancée par deploy.sh)
+# ---------------------------------------------------------------------------
+# Traefik n'est PAS géré par ce fichier : le serveur (local ou VPS) fournit
+# déjà un Traefik sur le réseau Docker externe `proxy`, avec le certresolver
+# `letsencrypt`. Le portail s'y rattache uniquement via ses labels.
 # ---------------------------------------------------------------------------
 # Prérequis :
-#   1. cp .env.prod.example .env.prod  (puis adapter)
-#   2. mkdir letsencrypt && chmod 700 letsencrypt
-#   3. docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+#   1. cp .env.prod.example .env.prod  (puis adapter les secrets)
+#   2. un Traefik existant sur le réseau `proxy` (docker network inspect proxy)
+#   3. bash deploy.sh
 # ---------------------------------------------------------------------------
 
 services:
-  ###########################################################################
-  # TRAEFIK — reverse proxy et terminateur TLS
-  ###########################################################################
-  traefik:
-    image: traefik:v3.2
-    container_name: eflex-traefik
-    command:
-      - "--api.insecure=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedByDefault=false"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
-      - "--log.level=INFO"
-      - "--accesslog=true"
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./letsencrypt:/letsencrypt
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - traefik-public
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "traefik", "healthcheck"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
   ###########################################################################
   # PORTAIL — Next.js (API + interface client)
   ###########################################################################
   portail:
     build:
-      context: .
-      dockerfile: Dockerfile.portail
+      context: ./portail
+      dockerfile: Dockerfile
     container_name: eflex-portail
     restart: unless-stopped
     environment:
       - NODE_ENV=production
+      # Next standalone écoute sur l'IP du conteneur par défaut : on force
+      # 0.0.0.0 pour que le healthcheck et Traefik puissent le joindre.
+      - HOSTNAME=0.0.0.0
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - COOLIFY_API_URL=${COOLIFY_API_URL}
       - COOLIFY_API_TOKEN=${COOLIFY_API_TOKEN}
       - PORTAL_DOMAIN=${PORTAL_DOMAIN}
       - PORTAL_URL=${PORTAL_URL}
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=traefik-public"
+      - "traefik.docker.network=proxy"
       - "traefik.http.routers.portail.rule=Host(`${PORTAL_DOMAIN}`)"
       - "traefik.http.routers.portail.entrypoints=websecure"
       - "traefik.http.routers.portail.tls.certresolver=letsencrypt"
@@ -82,14 +55,30 @@ services:
       redis:
         condition: service_started
     networks:
-      - traefik-public
+      - proxy
       - eflex-internal
-    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+  ###########################################################################
+  # MIGRATE — `prisma migrate deploy` dans le réseau interne (one-off)
+  ###########################################################################
+  migrate:
+    build:
+      context: ./portail
+      dockerfile: Dockerfile
+      target: migrator
+    profiles: ["tools"]
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - eflex-internal
 
   ###########################################################################
   # POSTGRESQL — base de données principale
@@ -130,10 +119,9 @@ services:
 
 volumes:
   eflex_postgres_data:
-  letsencrypt:
 
 networks:
-  traefik-public:
-    driver: bridge
+  proxy:
+    external: true
   eflex-internal:
     driver: bridge

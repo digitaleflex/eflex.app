@@ -6,18 +6,18 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Zap, Atom, Snake, File, Server, Package, Launch, Star, Heart, TrendingUp, Leaf } from 'lucide-react'
+import { FrameworkIcon } from '@/components/framework-icon'
 
 const frameworks = [
-  { value: 'nextjs', label: 'Next.js', icon: <TrendingUp /> },
-  { value: 'vite', label: 'Vite', icon: <Zap /> },
-  { value: 'astro', label: 'Astro', icon: <Star /> },
-  { value: 'nuxt', label: 'Nuxt', icon: <Heart /> },
-  { value: 'node', label: 'Node.js', icon: <Atom /> },
-  { value: 'laravel', label: 'Laravel', icon: <Zap /> },
-  { value: 'python', label: 'Python', icon: <Snake /> },
-  { value: 'static', label: 'Statique', icon: <File /> },
-  { value: 'docker', label: 'Docker', icon: <Server /> },
+  { value: 'nextjs', label: 'Next.js' },
+  { value: 'vite', label: 'Vite' },
+  { value: 'astro', label: 'Astro' },
+  { value: 'nuxt', label: 'Nuxt' },
+  { value: 'node', label: 'Node.js' },
+  { value: 'laravel', label: 'Laravel' },
+  { value: 'python', label: 'Python' },
+  { value: 'static', label: 'Statique' },
+  { value: 'docker', label: 'Docker' },
 ]
 
 interface EnvVar { key: string; value: string }
@@ -108,7 +108,7 @@ export default function NewProjectPage() {
                   className={`flex flex-col items-center gap-1 p-3 rounded-lg border text-sm transition-all duration-150 ${
                     framework === f.value ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:border-primary/50 hover:bg-muted'
                   }`}>
-                  <span className="text-xl">{f.icon}</span>
+                  <FrameworkIcon framework={f.value} className="h-6 w-6" />
                   <span className="text-xs">{f.label}</span>
                 </button>
               ))}

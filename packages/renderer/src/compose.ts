@@ -9,7 +9,7 @@ export function newCompose(name: string): ComposeDocument {
     name,
     services: {},
     networks: {
-      eflex_proxy: { external: true },
+      proxy: { external: true },
       internal: {},
     },
   };
@@ -32,7 +32,7 @@ export function appService(
   opts: ComposeOptions,
   extra?: { command?: string; volumes?: string[]; healthcheck?: string },
 ): ComposeService {
-  const network = opts.domain ? 'eflex_proxy' : '';
+  const network = opts.domain ? 'proxy' : '';
   const service: ComposeService = {
     ...baseService(opts.resources?.cpu, opts.resources?.memoryMb),
     image,
@@ -65,7 +65,7 @@ export function webService(
   opts: ComposeOptions,
   extra?: { image?: string; volumes?: string[]; dependsOn?: string[] },
 ): ComposeService {
-  const network = opts.domain ? 'eflex_proxy' : '';
+  const network = opts.domain ? 'proxy' : '';
   const service: ComposeService = {
     ...baseService(),
     image: extra?.image ?? 'nginx:1.27-alpine',

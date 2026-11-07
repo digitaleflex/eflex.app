@@ -28,6 +28,11 @@ export interface BuildPlan {
   buildEnv?: Record<string, string>;
   /** Public values frozen into the image at build time. Never runtime secrets. */
   buildArgs?: Record<string, string>;
+  /** Optional resource hints consumed by the renderer (limits). */
+  resources?: {
+    cpu?: number;
+    memoryMb?: number;
+  };
 }
 
 export type Framework =

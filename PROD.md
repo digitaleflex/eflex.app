@@ -12,13 +12,17 @@ Cloudflare (DNS + DDoS + WAF)
 ┌─────────────┐
 │ Traefik v3  │──► Portail Next.js (port 3000)
 │ (80/443)    │──► TLS Let's Encrypt
-└──────┬──────┘
+└──────┬──────┘   (existant, hors compose Eflex)
        │
    ┌───┴───┐
    │       │
  PostgreSQL   Redis
  (5432)       (6379)
 ```
+
+> `docker-compose.prod.yml` ne lance **pas** Traefik : il se rattache au Traefik
+> déjà présent sur le réseau Docker externe `proxy`. C'est ce qui permet
+> d'exporter la même config sur un VPS où Traefik tourne déjà.
 
 ## Hautes disponibilités (ce que ce compose NE fait pas seul)
 
@@ -41,12 +45,11 @@ cd /home/fantome/eflex
 cp .env.prod.example .env.prod
 # Éditez .env.prod : mettez vos vrais mots de passe, domaine, token Coolify
 
-# 2. Dossier Let's Encrypt
-mkdir -p letsencrypt
-chmod 700 letsencrypt
+# 2. Réseau Traefik (doit déjà exister, fourni par le Traefik du serveur)
+docker network inspect proxy
 
-# 3. Lancement
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+# 3. Lancement (Postgres/Redis → migrations Prisma → portail)
+bash deploy.sh
 
 # 4. Vérification
 docker compose -f docker-compose.prod.yml --env-file .env.prod ps
@@ -56,17 +59,20 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod logs -f portail
 ## Mise à jour du portail
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.prod pull # si image distante
-# ou rebuild local :
-docker compose -f docker-compose.prod.yml --env-file .env.prod build --no-cache portail
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d portail
+bash deploy.sh
+```
+
+Ou manuellement :
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 ```
 
 ## Sécurité
 
-- Ne commitez **jamais** `.env.prod` (ajoutez-le au `.gitignore`).
-- Le dossier `letsencrypt/` contient vos clés privées TLS : sauvegardez-le hors du serveur.
-- `traefik` écoute sur 80 et 443 uniquement. PostgreSQL et Redis ne sont **pas** exposés sur l'hôte (pas de `ports:`), ils sont seulement sur le réseau interne `eflex-internal`.
+- Ne commitez **jamais** `.env.prod` (déjà couvert par `.env.*` dans `.gitignore`).
+- Les certificats TLS sont gérés par le Traefik existant (son `acme.json`), pas par ce compose.
+- PostgreSQL et Redis ne sont **pas** exposés sur l'hôte (pas de `ports:`), ils sont seulement sur le réseau interne `eflex-internal`.
 
 ## Domaine
 
