@@ -2,7 +2,7 @@
 # Usage: docker compose -f docker-compose.dev.yml up -d
 #
 # Prerequisites:
-# 1. Domain axiom.eurinhash.com DNS A record -> your server IP
+# 1. Domain axiom.eflex.app DNS A record -> your server IP
 # 2. Ports 80, 443, 8080 open on firewall
 # 3. Traefik dashboard at http://localhost:8081 (dev only)
 
@@ -29,7 +29,7 @@ services:
       - "--api.dashboard=true"
       - "--api.insecure=true"  # Dev only! Disable in production
       # Certificates (Let's Encrypt)
-      - "--certificatesresolvers.le.acme.email=admin@eurinhash.com"
+      - "--certificatesresolvers.le.acme.email=admin@eflex.app"
       - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
       - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
       # Logging
@@ -92,7 +92,7 @@ services:
       - AXIOM_DB_REQUIRED=true
       - AXIOM_API_TOKEN=dev-token-12345
       - AXIOM_SECRET_KEY=hZhSurh2b1DMddWFzgGhGp8zrdAoTnbvUV6brhONS5U=
-      - AXIOM_CONSOLE_URL=https://axiom.eurinhash.com
+      - AXIOM_CONSOLE_URL=https://axiom.eflex.app
       - AXIOM_DOCKER_BINARY=docker
       - AXIOM_LOG_LEVEL=info
     ports:
@@ -105,9 +105,9 @@ services:
     networks:
       - axiom-network
     labels:
-      # Traefik: expose Engine API at api.axiom.eurinhash.com (optional)
+      # Traefik: expose Engine API at api.eflex.app (optional)
       - "traefik.enable=true"
-      - "traefik.http.routers.engine-api.rule=Host(`api.axiom.eurinhash.com`)"
+      - "traefik.http.routers.engine-api.rule=Host(`api.eflex.app`)"
       - "traefik.http.routers.engine-api.entrypoints=websecure"
       - "traefik.http.routers.engine-api.tls.certresolver=le"
       - "traefik.http.services.engine-api.loadbalancer.server.port=8080"

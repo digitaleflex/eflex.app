@@ -74,6 +74,26 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 - Les certificats TLS sont gérés par le Traefik existant (son `acme.json`), pas par ce compose.
 - PostgreSQL et Redis ne sont **pas** exposés sur l'hôte (pas de `ports:`), ils sont seulement sur le réseau interne `eflex-internal`.
 
-## Domaine
+## Domaine et DNS
 
-Le portail attend un domaine `PORTAL_DOMAIN` (ex: `portail.eflex.dev`). Ce domaine doit pointer vers l'IP publique du serveur avant le premier lancement, sinon Let's Encrypt ne pourra pas valider le certificat.
+Tout est centralisé sur la zone `eflex.app` : un seul certificat (`eflex.app` + `*.eflex.app`) délivré par le certresolver `letsencrypt` du Traefik existant.
+
+| Hôte | Usage | Enregistrement DNS |
+|---|---|---|
+| `eflex.app` | Console EFLEX (portail Next.js) | A / AAAA → IP publique du serveur |
+| `api.eflex.app` | API du moteur Axiom | A / AAAA → IP publique du serveur |
+| `axiom.eflex.app` | Cloud Console Axiom héritée (transitoire) | A / AAAA → IP publique du serveur |
+| `*.eflex.app` | Applications clientes déployées | A / AAAA wildcard → IP publique du serveur |
+
+`PORTAL_DOMAIN=eflex.app`, `PORTAL_URL=https://eflex.app` et `BETTER_AUTH_URL=https://eflex.app` (voir `.env.prod.example`). L'apex est réservé au portail : ne pas y exposer l'API du moteur, sinon la règle Traefik et les cookies d'authentification entrent en conflit.
+
+Ces enregistrements doivent pointer vers l'IP publique **avant** le premier lancement, sinon Let's Encrypt ne pourra pas valider le certificat. En HTTP-01, laissez ces hôtes en DNS direct (pas de proxy Cloudflare orange), ou configurez DNS-01.
+
+### Google OAuth
+
+Better Auth dérive l'URI de redirection de `BETTER_AUTH_URL`. À déclarer dans Google Cloud Console :
+
+- **URI de redirection autorisée** : `https://eflex.app/api/auth/callback/google`
+- **Origine JavaScript autorisée** : `https://eflex.app`
+
+En développement local : `http://localhost:3000/api/auth/callback/google`.

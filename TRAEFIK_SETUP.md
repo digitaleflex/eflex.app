@@ -1,7 +1,7 @@
 # Axiom + Traefik + Domain Setup Guide
 
 ## 🎯 Objectif
-Connecter `axiom.eurinhash.com` (et `api.axiom.eurinhash.com`) au stack Axiom via Traefik avec SSL Let's Encrypt automatique.
+Connecter `axiom.eflex.app` (et `api.eflex.app`) au stack Axiom via Traefik avec SSL Let's Encrypt automatique.
 
 ---
 
@@ -9,15 +9,28 @@ Connecter `axiom.eurinhash.com` (et `api.axiom.eurinhash.com`) au stack Axiom vi
 
 | Élément | Valeur |
 |---------|--------|
-| **Domaine** | `axiom.eurinhash.com` |
+| **Domaine** | `axiom.eflex.app` |
 | **DNS A record** | Doit pointer vers **l'IP publique de votre serveur** |
 | **Ports ouverts** | 80 (HTTP), 443 (HTTPS), 8080 (Engine API), 8081 (Traefik dashboard) |
-| **Email Let's Encrypt** | `admin@eurinhash.com` (à changer dans docker-compose.dev.yml) |
+| **Email Let's Encrypt** | `admin@eflex.app` (à changer dans docker-compose.dev.yml) |
+
+### Zone DNS unique `eflex.app`
+
+Tous les hôtes sont centralisés sur `eflex.app` (un seul certificat wildcard `*.eflex.app`). Les anciens hôtes `*.eurinhash.com` sont abandonnés.
+
+| Hôte | Rôle | Enregistrement |
+|------|------|----------------|
+| `eflex.app` | Console EFLEX / portail (hors de ce stack) | A/AAAA → IP du serveur |
+| `api.eflex.app` | API REST du moteur Axiom | A/AAAA → IP du serveur |
+| `axiom.eflex.app` | Cloud Console Axiom héritée | A/AAAA → IP du serveur |
+| `*.eflex.app` | Applications clientes déployées | A/AAAA wildcard → IP du serveur |
+
+Pour HTTP-01, ces enregistrements doivent pointer en direct sur l'IP du serveur (pas de proxy Cloudflare orange), sinon utilisez DNS-01.
 
 ### Vérifier le DNS
 ```bash
 # Doit retourner VOTRE IP serveur (pas Cloudflare)
-dig +short axiom.eurinhash.com A
+dig +short axiom.eflex.app A
 ```
 
 ---
@@ -41,19 +54,19 @@ docker compose -f docker-compose.dev.yml logs -f
 ### 2. Vérifier les services
 | Service | URL | Description |
 |---------|-----|-------------|
-| **Engine API** | https://api.axiom.eurinhash.com | API REST Axiom |
-| **Cloud Console** | https://axiom.eurinhash.com | Interface web (à déployer séparément) |
+| **Engine API** | https://api.eflex.app | API REST Axiom |
+| **Cloud Console** | https://axiom.eflex.app | Interface web (à déployer séparément) |
 | **Traefik Dashboard** | http://localhost:8081 | Dashboard Traefik (dev only) |
 | **PostgreSQL** | localhost:5432 | DB (user: axiom, pass: axiom) |
 
 ### 3. Tester l'API
 ```bash
 # Health check
-curl https://api.axiom.eurinhash.com/api/v1/health
+curl https://api.eflex.app/api/v1/health
 
 # Auth (avec token .env)
 curl -H "Authorization: Bearer dev-token-12345" \
-  https://api.axiom.eurinhash.com/api/v1/auth/me
+  https://api.eflex.app/api/v1/auth/me
 ```
 
 ---
@@ -89,44 +102,44 @@ L'Agent écrit dans `/etc/traefik/dynamic/` (partagé via volume) :
 ```bash
 # 1. Connecter GitHub (si configuré)
 curl -X POST -H "Authorization: Bearer dev-token-12345" \
-  https://api.axiom.eurinhash.com/api/v1/github/connections \
+  https://api.eflex.app/api/v1/github/connections \
   -d '{"clientId": "...", "clientSecret": "..."}'
 
 # 2. Lister repos
 curl -H "Authorization: Bearer dev-token-12345" \
-  https://api.axiom.eurinhash.com/api/v1/github/connections/ghc_xxx/repositories
+  https://api.eflex.app/api/v1/github/connections/ghc_xxx/repositories
 
 # 3. Créer application
 curl -X POST -H "Authorization: Bearer dev-token-12345" \
-  https://api.axiom.eurinhash.com/api/v1/applications \
+  https://api.eflex.app/api/v1/applications \
   -d '{"repositoryId": "repo_xxx", "name": "mon-app"}'
 
 # 4. Analyser
 curl -X POST -H "Authorization: Bearer dev-token-12345" \
-  https://api.axiom.eurinhash.com/api/v1/applications/app_xxx/analysis \
+  https://api.eflex.app/api/v1/applications/app_xxx/analysis \
   -d '{"ref": "main"}'
 
 # 5. Voir profil détecté
 curl -H "Authorization: Bearer dev-token-12345" \
-  https://api.axiom.eurinhash.com/api/v1/applications/app_xxx/profile
+  https://api.eflex.app/api/v1/applications/app_xxx/profile
 
 # 6. Créer plan de déploiement
 curl -X POST -H "Authorization: Bearer dev-token-12345" \
-  https://api.axiom.eurinhash.com/api/v1/applications/app_xxx/deployment-plans \
-  -d '{"serverId": "srv_local", "environment": "production", "domain": "mon-app.eurinhash.com"}'
+  https://api.eflex.app/api/v1/applications/app_xxx/deployment-plans \
+  -d '{"serverId": "srv_local", "environment": "production", "domain": "mon-app.eflex.app"}'
 
 # 7. Déployer
 curl -X POST -H "Authorization: Bearer dev-token-12345" \
-  https://api.axiom.eurinhash.com/api/v1/applications/app_xxx/deployments \
+  https://api.eflex.app/api/v1/applications/app_xxx/deployments \
   -d '{"planId": "plan_xxx"}'
 
 # 8. Suivre progression (SSE)
 curl -H "Authorization: Bearer dev-token-12345" \
-  https://api.axiom.eurinhash.com/api/v1/deployments/dep_xxx/events/stream
+  https://api.eflex.app/api/v1/deployments/dep_xxx/events/stream
 ```
 
 ### Résultat
-- L'application sera accessible à `https://mon-app.eurinhash.com`
+- L'application sera accessible à `https://mon-app.eflex.app`
 - Traefik gère automatiquement : SSL, routage, health checks
 - L'agent gère : Docker, logs, recovery
 
@@ -176,7 +189,7 @@ docker compose -f docker-compose.dev.yml up -d traefik
 | Sujet | Note |
 |-------|------|
 | **DNS** | Doit pointer vers l'IP du serveur (pas Cloudflare proxy orange) pour Let's Encrypt HTTP-01 |
-| **Email Let's Encrypt** | Changez `admin@eurinhash.com` dans docker-compose.dev.yml |
+| **Email Let's Encrypt** | Changez `admin@eflex.app` dans docker-compose.dev.yml |
 | **Traefik Dashboard** | Accessible sur port 8081 (localhost seulement), `--api.insecure=true` = dev only |
 | **Agent Data** | Persisté dans volume `agent-data` → `/data` |
 | **Dynamic Config** | Partagé via `./traefik/dynamic:/etc/traefik/dynamic` (Engine host ↔ Traefik ↔ Agent) |
@@ -208,9 +221,9 @@ agent-data              → /data                     (Agent identity, credentia
 
 ## 🎯 Prochaines Étapes
 
-1. **Configurer DNS** : `axiom.eurinhash.com` A → votre IP serveur
+1. **Configurer DNS** : `axiom.eflex.app` A → votre IP serveur
 2. **Lancer stack** : `docker compose -f docker-compose.dev.yml up -d`
 3. **Attendre certificats** : ~30-60s pour Let's Encrypt
-4. **Tester API** : `curl https://api.axiom.eurinhash.com/api/v1/health`
+4. **Tester API** : `curl https://api.eflex.app/api/v1/health`
 5. **Déployer Cloud Console** : Build React app → servir via Traefik
 6. **Premier déploiement** : Suivre guide "Déployer une Application" ci-dessus

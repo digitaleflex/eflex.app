@@ -6,7 +6,7 @@ import { bearer } from "better-auth/plugins";
 export const auth = betterAuth({
   plugins: [bearer()],
   session: { cookieCache: { enabled: true, maxAge: 5 * 60 } },
-  baseURL: process.env.NEXT_PUBLIC_ENGINE_URL || "https://axiom.eurinhash.com/api",
+  baseURL: process.env.NEXT_PUBLIC_ENGINE_URL || "https://axiom.eflex.app/api",
   secret: process.env.BETTER_AUTH_SECRET || "dev-secret-change-in-production",
 });
 

@@ -6,7 +6,7 @@ http:
   routers:
     # Axiom Cloud Console (main domain)
     axiom-console-web:
-      rule: "Host(`axiom.eurinhash.com`)"
+      rule: "Host(`axiom.eflex.app`)"
       entryPoints:
         - web
       middlewares:
@@ -14,7 +14,7 @@ http:
       service: axiom-console
 
     axiom-console-websecure:
-      rule: "Host(`axiom.eurinhash.com`)"
+      rule: "Host(`axiom.eflex.app`)"
       entryPoints:
         - websecure
       service: axiom-console
@@ -23,7 +23,7 @@ http:
 
     # API subdomain
     axiom-api-web:
-      rule: "Host(`api.axiom.eurinhash.com`)"
+      rule: "Host(`api.eflex.app`)"
       entryPoints:
         - web
       middlewares:
@@ -31,7 +31,7 @@ http:
       service: axiom-api
 
     axiom-api-websecure:
-      rule: "Host(`api.axiom.eurinhash.com`)"
+      rule: "Host(`api.eflex.app`)"
       entryPoints:
         - websecure
       service: axiom-api

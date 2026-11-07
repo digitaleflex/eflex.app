@@ -38,4 +38,4 @@ echo "Logs portail (20 dernières lignes) :"
 
 echo
 echo "Déploiement terminé. Vérifie la santé avec :"
-echo "  curl -f https://portail.eurinhash.com/api/health"
+echo "  curl -f https://eflex.app/api/health"

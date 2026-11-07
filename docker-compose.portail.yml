@@ -14,14 +14,14 @@ services:
       - HOSTNAME=0.0.0.0
       - DATABASE_URL=${DATABASE_URL}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-https://portail.eurinhash.com}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-https://eflex.app}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - 'traefik.http.routers.portail.rule=Host(`portail.eurinhash.com`)'
+      - 'traefik.http.routers.portail.rule=Host(`eflex.app`)'
       - "traefik.http.routers.portail.entrypoints=websecure"
       - "traefik.http.routers.portail.tls=true"
       - "traefik.http.routers.portail.tls.certresolver=letsencrypt"

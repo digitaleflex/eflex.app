@@ -51,6 +51,7 @@ Prisma: **une seule source de vérité**, `portail/prisma/schema.prisma` (modèl
 
 - Dev: `docker compose -f docker-compose.dev.yml up -d` (Postgres 5432, Redis 6379, MinIO 9000/9001). Coolify is **intentionally remote**; set `COOLIFY_API_URL`/`COOLIFY_API_TOKEN` in `.env`.
 - Prod: `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d`; portal image from `Dockerfile.portail` (standalone) or `portail/Dockerfile`. `.env.prod` must **never** be committed.
+- Domaine de production : `https://eflex.app` (apex = portail, `api.eflex.app` = moteur Axiom, `*.eflex.app` = applications déployées). Redirect Google OAuth : `https://eflex.app/api/auth/callback/google`. Les anciens hôtes `*.eurinhash.com` sont abandonnés.
 - `.next/`, `*.tsbuildinfo`, `portail/.env`, and root `.env` are local artifacts; do not commit them.
 - `.env.example` is tracked; `.env.prod.example` is tracked per the gitignore exception `!.env.prod.example`.
 
