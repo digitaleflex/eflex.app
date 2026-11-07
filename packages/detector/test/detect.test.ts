@@ -18,6 +18,7 @@ import {
   fastapi,
   laravelFull,
   laravelMinimal,
+  laravelVite,
   monorepoMultiple,
   monorepoSingle,
   nextjs,
@@ -79,6 +80,15 @@ describe('detect', () => {
     expect(result.plan?.volumes).toEqual(['storage']);
     expect(result.plan?.postDeploy).toContain('php artisan migrate --force');
     expect(result.plan?.build).toBe('npm ci && npm run build');
+  });
+
+  it('detects Laravel (not static Vite) when Vite compiles the front-end assets', () => {
+    const result = detect(laravelVite);
+
+    expect(result.framework).toBe('laravel');
+    expect(result.plan?.runtime).toBe('php@8.3');
+    expect(result.plan?.build).toBe('npm ci && npm run build');
+    expect(result.plan?.services?.web).toBeDefined();
   });
 
   it('detects a minimal Laravel application with only app and web services', () => {

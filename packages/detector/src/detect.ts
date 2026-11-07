@@ -253,6 +253,10 @@ function collectCandidates(ctx: DetectionContext): Candidate[] {
     if (candidate) candidates.push(candidate);
   };
 
+  // Laravel d'abord : il exige `laravel/framework` ET `artisan`, donc aucun faux positif
+  // possible, et un projet Laravel embarque presque toujours un `package.json` avec Vite
+  // (assets front) qui serait sinon pris pour un site statique.
+  add(detectLaravel(ctx));
   add(detectNext(ctx));
   add(detectNuxt(ctx));
   add(detectAstro(ctx));
@@ -264,7 +268,6 @@ function collectCandidates(ctx: DetectionContext): Candidate[] {
   add(detectNest(ctx));
   add(detectServerFramework(ctx));
   add(detectStaticBuild(ctx));
-  add(detectLaravel(ctx));
   add(detectPhp(ctx));
   add(detectPython(ctx));
   add(detectNodeFallback(ctx));
