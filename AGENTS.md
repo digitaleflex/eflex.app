@@ -8,7 +8,7 @@ Ce dépôt fusionne `digitaleflex/eflex.app` (produit EFLEX, TypeScript) et `dig
 - `services/agent`, `services/orchestrator` — modules Go séparés (chacun son `go.mod`).
 - `apps/cloud` (Vite) et `apps/client-dashboard` (Next 16) — consoles Axiom héritées, npm, hors workspace pnpm ; vouées à être remplacées par la console EFLEX.
 - `schemas/` (Axiom) ≠ `schema/` (Eflex `eflex.json`). Docs Axiom dans `docs/` (ADR dans `docs/adr`).
-- CI : `.github/workflows/` (Go, contrats de schémas, agent).
+- CI : `.github/workflows/` (Go, contrats de schémas, agent, et `ts.yml` pour les packages TS + le portail).
 
 - `packages/detector` — deterministic repo snapshot → `BuildPlan`; no network/LLM/runtime deps. Entry: `src/detect.ts` (`detect`), CLI `src/cli.ts`.
 - `packages/renderer` — `BuildPlan` → docker-compose YAML + nginx/env templates. Entry: `src/render.ts`; yaml dependency.
@@ -20,14 +20,14 @@ Ce dépôt fusionne `digitaleflex/eflex.app` (produit EFLEX, TypeScript) et `dig
 
 ```bash
 pnpm install          # pnpm@10, Node >=24
-pnpm test             # Vitest (47 tests across detector + renderer; scope set in vitest.config.ts)
+pnpm test             # Vitest (packages TS + modules du portail ; périmètre dans vitest.config.ts)
 pnpm typecheck        # tsc detector + renderer only; NOT portail
 pnpm detect <dir>     # tsx packages/detector/src/cli.ts
 pnpm render <dir>     # tsx packages/renderer/src/main.ts
 ```
 
 Single test: `pnpm vitest run packages/detector/test/detect.test.ts`; filter test: `pnpm vitest run -t "detects Next.js"`.
-Portal: `cd portail && npm install && npm run dev|build|start`. Root `typecheck` does not cover it.
+Portal: `cd portail && npm install && npm run dev|build|start`. Root `typecheck` does not cover it ; la CI (`ts.yml`) y lance `npx prisma validate`, `npx prisma generate` et `npx tsc --noEmit`.
 
 Détection dans le portail : `POST /api/projects/analyze` → `lib/repo-analysis.ts` récupère l'arborescence (API GitHub, dépôts publics uniquement) puis les fichiers demandés (raw.githubusercontent.com), et appelle `@eflex/detector` en boucle. `lib/github-url.ts` valide les URL. Le portail importe le détecteur par alias (`tsconfig` paths + `experimental.externalDir` + `extensionAlias` dans `next.config.mjs`) : **n'importer que des types (`import type`) dans les composants client**. `POST /api/projects` refait l'analyse côté serveur et ne reçoit jamais le plan du client. Les tests de ces modules (`portail/src/**/*.test.ts`) tournent avec `pnpm test`.
 
@@ -35,7 +35,7 @@ Docker : l'image du portail se construit avec la **racine du dépôt** comme con
 
 Auth: Better Auth (`portail/src/lib/auth.ts` serveur, `auth-client.ts` client, `session.ts` pour `getSession()`). Modèles Prisma `User`/`Session`/`Account`/`Verification` imposés par Better Auth ; le mot de passe e-mail vit dans `Account.password` (hash bcrypt). Variables : `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`.
 
-Prisma: from `portail/` run `npx prisma generate` / `npx prisma migrate dev`. `prisma/schema.prisma` (racine) est synchronisé avec `portail/prisma/schema.prisma` (modèles auth + `Project`/`EnvVar`/`Deployment`/`Subscription`) ; toute dérive doit être réconciliée avant `tsc --noEmit` du portail.
+Prisma: **une seule source de vérité**, `portail/prisma/schema.prisma` (modèles Better Auth + `Project`/`EnvVar`/`Deployment`/`Subscription`). Depuis `portail/` : `npx prisma generate` / `npx prisma migrate dev` / `npx prisma validate`. Il n'existe plus de schéma Prisma à la racine ; la CI valide le schéma avant `tsc --noEmit`.
 
 ## Detector / renderer rules
 

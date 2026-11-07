@@ -1,0 +1,63 @@
+name: TypeScript (packages + portail)
+
+on:
+  pull_request:
+    paths:
+      - "packages/**"
+      - "portail/**"
+      - "schema/**"
+      - "vitest.config.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/ts.yml"
+  push:
+    branches: [main]
+    paths:
+      - "packages/**"
+      - "portail/**"
+      - "schema/**"
+      - "vitest.config.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/ts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests, schémas et typecheck
+    runs-on: ubuntu-latest
+    env:
+      # Prisma résout env("DATABASE_URL") même pour validate/generate. Aucune
+      # connexion n'est ouverte : une valeur factice suffit en CI.
+      DATABASE_URL: postgresql://eflex:eflex@localhost:5432/eflex?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.0.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install (workspace pnpm)
+        run: pnpm install --frozen-lockfile
+      - name: Tests (détecteur, renderer, modules du portail)
+        run: pnpm test
+      - name: Typecheck (détecteur + renderer)
+        run: pnpm typecheck
+
+      - name: Install (portail, npm)
+        working-directory: portail
+        run: npm ci
+      - name: Prisma — validate
+        working-directory: portail
+        run: npx prisma validate
+      - name: Prisma — generate
+        working-directory: portail
+        run: npx prisma generate
+      - name: Typecheck (portail)
+        working-directory: portail
+        run: npx tsc --noEmit
