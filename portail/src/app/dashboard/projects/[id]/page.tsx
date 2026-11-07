@@ -6,6 +6,9 @@ import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { FrameworkIcon } from '@/components/framework-icon'
+import { AutoRefresh } from '@/components/auto-refresh'
+import { CoolifyClient, loadCoolifyConfig } from '@/lib/coolify'
+import { syncDeployment } from '@/lib/deployer'
 import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 
 const STATUS: Record<string, { label: string; variant: 'success' | 'warning' | 'destructive' | 'outline' }> = {
@@ -17,15 +20,18 @@ const STATUS: Record<string, { label: string; variant: 'success' | 'warning' | '
   rollbacked: { label: 'Annulé', variant: 'outline' },
 }
 
-type StoredAnalysis = { confidence?: number; reasons: string[]; commitSha?: string }
+type StoredAnalysis = { confidence?: number; reasons: string[]; warnings: string[]; commitSha?: string }
 
 /** `Project.detection` est du JSON libre en base : on ne retient que ce qu'on sait afficher. */
+const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter((x): x is string => typeof x === 'string') : [])
+
 function readAnalysis(value: unknown): StoredAnalysis | null {
   if (typeof value !== 'object' || value === null) return null
   const v = value as Record<string, unknown>
   return {
     confidence: typeof v.confidence === 'number' ? v.confidence : undefined,
-    reasons: Array.isArray(v.reasons) ? v.reasons.filter((r): r is string => typeof r === 'string') : [],
+    reasons: strings(v.reasons),
+    warnings: [...strings(v.warnings), ...strings(v.deployWarnings)],
     commitSha: typeof v.commitSha === 'string' ? v.commitSha : undefined,
   }
 }
@@ -46,12 +52,30 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   })
   if (!project) notFound()
 
+  // Tant que le déploiement est en cours, on demande son état à Coolify (sans bloquer la page
+  // si Coolify tarde ou n'est pas configuré : on affiche alors l'état enregistré).
+  let deployments = project.deployments
+  const latest = deployments[0]
+  if (latest) {
+    try {
+      const patch = await syncDeployment(new CoolifyClient(loadCoolifyConfig(), fetch, 4_000), latest)
+      if (patch) {
+        await prisma.deployment.update({ where: { id: latest.id }, data: patch })
+        deployments = [{ ...latest, ...patch, logsSummary: patch.logsSummary ?? latest.logsSummary }, ...deployments.slice(1)]
+      }
+    } catch {
+      // Configuration Coolify absente ou incomplète.
+    }
+  }
+
   const analysis = readAnalysis(project.detection)
-  const last = project.deployments[0]
+  const last = deployments[0]
+  const inProgress = last !== undefined && ['pending', 'building', 'deploying'].includes(last.status) && last.coolifyBuildId !== null
   const lastStatus = last ? STATUS[last.status] ?? { label: last.status, variant: 'outline' as const } : null
 
   return (
     <div className="space-y-8 max-w-5xl">
+      <AutoRefresh active={inProgress} />
       <Link
         href="/dashboard"
         className="inline-flex items-center gap-2 min-h-11 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -139,6 +163,16 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                 ))}
               </ul>
             )}
+            {analysis.warnings.length > 0 && (
+              <div role="note" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                <p className="text-sm font-medium text-amber-800">À savoir</p>
+                <ul className="mt-2 space-y-1 text-sm text-amber-900">
+                  {analysis.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {analysis.commitSha && (
               <p className="text-xs text-muted-foreground">
                 Analysé sur le commit <code className="font-mono">{analysis.commitSha.slice(0, 7)}</code>
@@ -153,11 +187,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <h2 className="font-semibold">Déploiements</h2>
         </CardHeader>
         <CardContent>
-          {project.deployments.length === 0 ? (
+          {deployments.length === 0 ? (
             <p className="text-sm text-muted-foreground">Aucun déploiement pour ce projet.</p>
           ) : (
-            <ul className="divide-y divide-border">
-              {project.deployments.map((d) => {
+            <ul aria-live="polite" className="divide-y divide-border">
+              {deployments.map((d) => {
                 const s = STATUS[d.status] ?? { label: d.status, variant: 'outline' as const }
                 return (
                   <li key={d.id} className="py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

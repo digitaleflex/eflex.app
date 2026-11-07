@@ -19,6 +19,8 @@ export function detectSvelte(ctx: DetectionContext): Candidate | null {
     root: '',
     ...(pkg ? { install: installCommand(ctx) } : {}),
     build: hasBuildScript ? scripts.build : 'svelte build',
+    // Sortie par défaut de @sveltejs/adapter-static.
+    publish: 'build',
     port: 80,
   };
 

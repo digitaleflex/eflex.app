@@ -80,6 +80,7 @@ model Project {
   runtime       String?     // node@22, php@8.3, etc.
   domain        String?     // domaine client, sans protocole
   coolifyAppId  String?     // ID côté Coolify (null jusqu'au premier déploiement)
+  coolifyWorkers Json?      // applications Coolify des services annexes : { "queue": "uuid", … }
   plan          Json?       // BuildPlan retenu à la création (voir packages/detector)
   detection     Json?       // résultat de l'analyse : confiance, raisons, avertissements, commit
   port          Int         @default(80)

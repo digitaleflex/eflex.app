@@ -1,5 +1,9 @@
 # [P0] Déployer à partir du BuildPlan (renderer) au lieu de Nixpacks par défaut
 
+> **Mise à jour :** réalisé par la voie Coolify (build packs nixpacks / static / dockerfile pilotés par le plan, plus une application « worker » par service annexe). Le client Coolify a dû être réécrit : l'ancien ne correspondait pas à l'API réelle (champs obligatoires manquants, mauvais chemins, réponses mal lues). Voir `AGENTS.md`.
+>
+> **Reste à faire :** volumes persistants (ex. `storage` de Laravel : à monter sans masquer l'arborescence du dépôt), monorepos dont l'application dépend d'autres paquets du workspace (filtre `--filter`), fallback SPA des sites statiques (`is_spa`, absent des anciennes versions de Coolify), redéploiement et annulation, mise à jour du statut en tâche de fond (issue 06), dépôts privés (issue 07), et la voie Axiom si le moteur remplace Coolify.
+
 ## Contexte
 
 Aujourd'hui, `createApplication()` dans `portail/src/lib/coolify.ts` envoie le dépôt à Coolify avec :

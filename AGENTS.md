@@ -31,6 +31,8 @@ Portal: `cd portail && npm install && npm run dev|build|start`. Root `typecheck`
 
 Détection dans le portail : `POST /api/projects/analyze` → `lib/repo-analysis.ts` récupère l'arborescence (API GitHub, dépôts publics uniquement) puis les fichiers demandés (raw.githubusercontent.com), et appelle `@eflex/detector` en boucle. `lib/github-url.ts` valide les URL. Le portail importe le détecteur par alias (`tsconfig` paths + `experimental.externalDir` + `extensionAlias` dans `next.config.mjs`) : **n'importer que des types (`import type`) dans les composants client**. `POST /api/projects` refait l'analyse côté serveur et ne reçoit jamais le plan du client. Les tests de ces modules (`portail/src/**/*.test.ts`) tournent avec `pnpm test`.
 
+Déploiement : `lib/coolify-plan.ts` (pur) traduit un `BuildPlan` en applications Coolify (runtime `docker@*` → build pack dockerfile, `static@*` → static + `publish`, sinon nixpacks avec les commandes du plan ; chaque service annexe devient une application « worker »). `lib/coolify.ts` est le client de l'API v4 (réponses non enveloppées dans `data`, chemins `/envs` et `/deploy?uuid=`), `lib/deployer.ts` orchestre tout-ou-rien (supprime les applications créées en cas d'échec) et synchronise le statut. Les tests valident chaque charge utile contre le schéma officiel (`lib/test-support/coolify-api-schemas.json`, extrait de https://raw.githubusercontent.com/coollabsio/coolify/v4.x/openapi.json : à rafraîchir si l'API évolue) ; `fake-coolify.ts` imite le serveur. Ne pas envoyer de champ absent de ce schéma : Coolify refuse les champs inconnus (422).
+
 Docker : l'image du portail se construit avec la **racine du dépôt** comme contexte (`docker build -f portail/Dockerfile .`), car elle embarque `packages/detector` ; l'allowlist du contexte est dans `portail/Dockerfile.dockerignore`.
 
 Auth: Better Auth (`portail/src/lib/auth.ts` serveur, `auth-client.ts` client, `session.ts` pour `getSession()`). Modèles Prisma `User`/`Session`/`Account`/`Verification` imposés par Better Auth ; le mot de passe e-mail vit dans `Account.password` (hash bcrypt). Variables : `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`.
@@ -49,7 +51,7 @@ Prisma: from `portail/` run `npx prisma generate` / `npx prisma migrate dev`. `p
 
 ## Infra
 
-- Dev: `docker compose -f docker-compose.dev.yml up -d` (Postgres 5432, Redis 6379, MinIO 9000/9001). Coolify is **intentionally remote**; set `COOLIFY_API_URL`/`COOLIFY_API_TOKEN` in `.env`.
+- Dev: `docker compose -f docker-compose.dev.yml up -d` (Postgres 5432, Redis 6379, MinIO 9000/9001). Coolify is **intentionally remote**; set `COOLIFY_API_URL`, `COOLIFY_API_TOKEN`, `COOLIFY_SERVER_UUID`, `COOLIFY_PROJECT_UUID` in `.env` (voir `DEV.md`).
 - Prod: `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d`; portal image from `Dockerfile.portail` (standalone) or `portail/Dockerfile`. `.env.prod` must **never** be committed.
 - `.next/`, `*.tsbuildinfo`, `portail/.env`, and root `.env` are local artifacts; do not commit them.
 - `.env.example` is tracked; `.env.prod.example` is tracked per the gitignore exception `!.env.prod.example`.

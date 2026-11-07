@@ -170,6 +170,7 @@ export function detectDocker(ctx: DetectionContext): Candidate | null {
     root: '',
     port: firstPort,
   };
+  if (dockerfile !== 'Dockerfile') plan.dockerfile = dockerfile;
 
   const volumes = [...new Set(parsed.volumes)];
   if (volumes.length > 0) plan.volumes = volumes;
@@ -192,7 +193,7 @@ export function detectDocker(ctx: DetectionContext): Candidate | null {
     'Aucun autoscaling ni health check n\'est déduit d\'un Dockerfile : déclarez-les dans `eflex.json`.',
   ];
 
-  const reasons = [`\`${dockerfile}\` détecté à la racine du dépôt.`];
+  const reasons = [`\`${dockerfile}\` détecté ${dockerfile === 'Dockerfile' ? 'à la racine du dépôt' : 'dans le dépôt'}.`];
   if (manifests.length > 0) {
     reasons.push(`Manifeste(s) détecté(s) pour information : ${manifests.map((file) => `\`${file}\``).join(', ')}.`);
   }

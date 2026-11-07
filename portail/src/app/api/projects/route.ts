@@ -6,7 +6,8 @@ import type { Prisma } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { allow } from '@/lib/rate-limit'
-import { createApplication, deployApplication, setEnvironmentVariable } from '@/lib/coolify'
+import { CoolifyClient, loadCoolifyConfig } from '@/lib/coolify'
+import { DeployError, provisionAndDeploy, type DeployResult } from '@/lib/deployer'
 import { analyzeGitHubRepo } from '@/lib/repo-analysis'
 import { errorResponse, repoFields, resolveRepo } from '@/lib/analysis-request'
 
@@ -153,61 +154,51 @@ export async function POST(request: NextRequest) {
     return created
   })
 
-  // 3. Coolify : application, variables, déploiement.
-  let coolifyAppId: string | null = null
-  let deploymentId: string | null = null
+  // 3. Coolify : applications, variables, déploiement. Tout ou rien : en cas d'échec, les
+  //    applications déjà créées sont supprimées (voir lib/deployer.ts).
+  let deploy: DeployResult | null = null
   let deployError: string | null = null
 
   try {
-    const appResult = await createApplication({
-      name: slug,
-      gitRepository: repo.url,
-      gitBranch: repo.branch,
-      portsExposes: String(plan.port),
-      ...(plan.framework === 'docker' ? { buildPack: 'dockerfile' as const } : {}),
+    const client = new CoolifyClient(loadCoolifyConfig())
+    deploy = await provisionAndDeploy(client, {
+      plan,
+      slug,
+      repoUrl: repo.url,
+      branch: repo.branch,
+      env: input.envVars,
     })
-
-    if ('error' in appResult) {
-      deployError = appResult.error
-    } else {
-      coolifyAppId = appResult.id
-
-      for (const v of input.envVars) {
-        const result = await setEnvironmentVariable(coolifyAppId, v.key, v.value)
-        if ('error' in result) {
-          deployError = `Variable « ${v.key} » non transmise : ${result.error}`
-          break
-        }
-      }
-
-      if (!deployError) {
-        const deployResult = await deployApplication(coolifyAppId)
-        if ('error' in deployResult) deployError = deployResult.error
-        else deploymentId = deployResult.deploymentId
-      }
-    }
-  } catch (err) {
-    deployError = err instanceof Error ? err.message : 'Erreur inconnue avec Coolify'
+  } catch (error) {
+    deployError = error instanceof Error ? error.message : 'Erreur inconnue avec Coolify'
+    if (!(error instanceof DeployError)) console.error('[déploiement] échec avant provisionnement', error)
   }
 
-  if (coolifyAppId) {
-    await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId } })
+  if (deploy) {
+    await prisma.project.update({
+      where: { id: project.id },
+      data: {
+        coolifyAppId: deploy.appId,
+        ...(Object.keys(deploy.workers).length > 0 ? { coolifyWorkers: deploy.workers } : {}),
+        ...(deploy.domain ? { domain: deploy.domain } : {}),
+        detection: { ...(project.detection as Prisma.JsonObject), deployWarnings: deploy.warnings },
+      },
+    })
   }
 
   const deployment = await prisma.deployment.create({
     data: {
       projectId: project.id,
       commitSha: repo.commitSha,
-      status: deploymentId ? 'building' : deployError ? 'failed' : 'pending',
-      coolifyBuildId: deploymentId || null,
-      logsSummary: deployError || null,
+      status: deploy ? 'building' : 'failed',
+      coolifyBuildId: deploy?.deploymentUuid ?? null,
+      logsSummary: deployError,
     },
   })
 
   return NextResponse.json({
     project: { id: project.id, name: project.name, slug: project.slug },
     deployment: { id: deployment.id, status: deployment.status },
-    coolify: { appId: coolifyAppId, deploymentId },
+    coolify: { appId: deploy?.appId ?? null, deploymentId: deploy?.deploymentUuid ?? null },
     warning: deployError,
   })
 }
