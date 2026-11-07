@@ -3,10 +3,11 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { CreditCard, FolderKanban, LogOut, Plus, Settings } from 'lucide-react'
+import { CreditCard, FolderKanban, LogOut, Plus, Settings, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { signOut } from '@/lib/auth-client'
+import { OrgSwitcher } from '@/components/org-switcher'
 
 type NavItem = {
   label: string
@@ -23,6 +24,7 @@ const navigation: NavItem[] = [
     match: (p) => p === '/dashboard' || p.startsWith('/dashboard/projects'),
   },
   { label: 'Nouveau', href: '/dashboard/new', icon: Plus, match: (p) => p === '/dashboard/new' },
+  { label: 'Équipe', href: '/dashboard/organization', icon: Users, match: (p) => p.startsWith('/dashboard/organization') },
   // Pas encore de page : affichés comme « Bientôt » plutôt que comme des liens morts.
   { label: 'Facturation', icon: CreditCard },
   { label: 'Paramètres', icon: Settings },
@@ -53,6 +55,7 @@ export function DashboardShell({
             <Image src="/logo-horizontal.webp" alt="Eflex — tableau de bord" width={1200} height={312} className="h-8 w-auto" priority />
           </Link>
         </div>
+        <OrgSwitcher className="px-4 pt-4" />
         <nav aria-label="Navigation principale" className="flex-1 p-4 space-y-1">
           {navigation.map((item) => {
             const Icon = item.icon
@@ -115,6 +118,7 @@ export function DashboardShell({
             Déconnexion
           </Button>
         </div>
+        <OrgSwitcher className="px-4 pb-2" />
       </div>
 
       {/* Navigation basse (mobile) */}
@@ -141,7 +145,7 @@ export function DashboardShell({
         </div>
       </nav>
 
-      <main className="flex-1 min-w-0 pt-14 pb-20 lg:pt-0 lg:pb-0">
+      <main className="flex-1 min-w-0 pt-28 pb-20 lg:pt-0 lg:pb-0">
         <div className="container py-8">{children}</div>
       </main>
     </div>

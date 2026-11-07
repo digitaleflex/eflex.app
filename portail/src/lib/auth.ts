@@ -1,4 +1,4 @@
-import { betterAuth } from 'better-auth'
+import { APIError, betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { nextCookies } from 'better-auth/next-js'
 import { admin, organization } from 'better-auth/plugins'
@@ -72,7 +72,22 @@ export const auth = betterAuth({
 
   plugins: [
     // Organisations : membres, rôles (owner / admin / member) et invitations.
-    organization({ organizationLimit: 10 }),
+    organization({
+      organizationLimit: 10,
+      organizationHooks: {
+        // Supprimer l'organisation effacerait ses projets en base sans retirer leurs applications
+        // chez Coolify : on exige de supprimer d'abord les projets (qui nettoient l'infrastructure).
+        beforeDeleteOrganization: async ({ organization }) => {
+          const projects = await prisma.project.count({ where: { organizationId: organization.id } })
+          if (projects > 0) {
+            throw new APIError('BAD_REQUEST', {
+              message: `Supprimez d'abord les ${projects} projet(s) de l'organisation.`,
+              code: 'ORGANIZATION_HAS_PROJECTS',
+            })
+          }
+        },
+      },
+    }),
     // Administration de la plateforme (utilisateurs, suspension, usurpation).
     admin(),
     // Doit rester en dernier : permet de poser les cookies depuis les Server Actions.
