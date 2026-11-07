@@ -1,13 +1,13 @@
 'use client'
 
-import { signIn } from 'next-auth/react'
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
+import { authErrorMessage, signIn } from '@/lib/auth-client'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -21,9 +21,9 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
     try {
-      const result = await signIn('credentials', { email, password, redirect: false })
-      if (result?.error) {
-        setError('Email ou mot de passe incorrect.')
+      const { error: authError } = await signIn.email({ email: email.trim(), password })
+      if (authError) {
+        setError(authErrorMessage(authError, 'Email ou mot de passe incorrect.'))
       } else {
         router.push('/dashboard')
         router.refresh()
@@ -35,7 +35,11 @@ export default function LoginPage() {
     }
   }
 
-  const handleGoogle = () => signIn('google', { callbackUrl: '/dashboard' })
+  const handleGoogle = async () => {
+    setError('')
+    const { error: authError } = await signIn.social({ provider: 'google', callbackURL: '/dashboard' })
+    if (authError) setError(authErrorMessage(authError, 'La connexion avec Google est indisponible pour le moment.'))
+  }
 
   return (
     <div className="min-h-screen flex flex-col">

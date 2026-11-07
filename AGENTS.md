@@ -13,7 +13,7 @@ Ce dépôt fusionne `digitaleflex/eflex.app` (produit EFLEX, TypeScript) et `dig
 - `packages/detector` — deterministic repo snapshot → `BuildPlan`; no network/LLM/runtime deps. Entry: `src/detect.ts` (`detect`), CLI `src/cli.ts`.
 - `packages/renderer` — `BuildPlan` → docker-compose YAML + nginx/env templates. Entry: `src/render.ts`; yaml dependency.
 - `schema/v1.json` — authoritative JSON Schema for plans; `schema/test.ts` validates every fixture plan/alternative via Ajv.
-- `portail/` — Next.js 15 App Router portal (NextAuth v5 beta, Prisma, Coolify client). **Not** in root pnpm workspace; has own `package-lock.json`; use `npm` there.
+- `portail/` — Next.js 15 App Router portal (Better Auth, Prisma, Coolify client). **Not** in root pnpm workspace; has own `package-lock.json`; use `npm` there.
 - `README.md` (detector behavior), `DEV.md`/`PROD.md` (infra), `schema/README.md` (plan contract).
 
 ## Commands (root)
@@ -28,6 +28,8 @@ pnpm render <dir>     # tsx packages/renderer/src/main.ts
 
 Single test: `pnpm vitest run packages/detector/test/detect.test.ts`; filter test: `pnpm vitest run -t "detects Next.js"`.
 Portal: `cd portail && npm install && npm run dev|build|start`. Root `typecheck` does not cover it.
+
+Auth: Better Auth (`portail/src/lib/auth.ts` serveur, `auth-client.ts` client, `session.ts` pour `getSession()`). Modèles Prisma `User`/`Session`/`Account`/`Verification` imposés par Better Auth ; le mot de passe e-mail vit dans `Account.password` (hash bcrypt). Variables : `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`.
 
 Prisma: from `portail/` run `npx prisma generate` / `npx prisma migrate dev`. `prisma/schema.prisma` (racine) est synchronisé avec `portail/prisma/schema.prisma` (modèles auth + `Project`/`EnvVar`/`Deployment`/`Subscription`) ; toute dérive doit être réconciliée avant `tsc --noEmit` du portail.
 

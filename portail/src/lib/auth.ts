@@ -1,66 +1,38 @@
-import NextAuth from "next-auth"
-import GoogleProvider from "next-auth/providers/google"
-import CredentialsProvider from "next-auth/providers/credentials"
-import { PrismaAdapter } from "@auth/prisma-adapter"
-import { compare } from "bcryptjs"
-import { prisma } from "@/lib/prisma"
+import { betterAuth } from 'better-auth'
+import { prismaAdapter } from 'better-auth/adapters/prisma'
+import { nextCookies } from 'better-auth/next-js'
+import { compare, hash } from 'bcryptjs'
+import { prisma } from '@/lib/prisma'
 
-const INVALID_CREDENTIALS = "Email ou mot de passe incorrect."
+const googleConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
-  trustHost: true,
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-    }),
-    CredentialsProvider({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Mot de passe", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null
+// BETTER_AUTH_SECRET et BETTER_AUTH_URL sont lus automatiquement depuis l'environnement.
+export const auth = betterAuth({
+  database: prismaAdapter(prisma, { provider: 'postgresql' }),
 
-        const email = (credentials.email as string).trim().toLowerCase()
-        const password = credentials.password as string
-
-        // Aucun compte n'est créé ici : l'inscription passe par /register.
-        // Recherche insensible à la casse : les comptes créés avant la normalisation
-        // peuvent contenir des majuscules.
-        const user = await prisma.user.findFirst({
-          where: { email: { equals: email, mode: "insensitive" } },
-        })
-
-        // Message identique dans tous les cas, pour ne pas révéler si un compte existe.
-        if (!user?.hashedPassword) throw new Error(INVALID_CREDENTIALS)
-
-        const isValid = await compare(password, user.hashedPassword)
-        if (!isValid) throw new Error(INVALID_CREDENTIALS)
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        }
-      },
-    }),
-  ],
-  callbacks: {
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.sub as string
-      }
-      return session
+  emailAndPassword: {
+    enabled: true,
+    minPasswordLength: 8,
+    // bcrypt ignore tout ce qui dépasse 72 octets : on refuse plutôt que de tronquer.
+    maxPasswordLength: 72,
+    // Garde bcrypt (et non scrypt) pour que les mots de passe créés avec l'ancien
+    // système (migration 20261107120000_better_auth) restent valides.
+    password: {
+      hash: (password) => hash(password, 12),
+      verify: ({ hash: stored, password }) => compare(password, stored),
     },
   },
-  pages: {
-    signIn: "/login",
-  },
-  session: {
-    strategy: "jwt",
-  },
-  secret: process.env.NEXTAUTH_SECRET,
+
+  // Google n'est proposé que si les identifiants OAuth sont configurés.
+  socialProviders: googleConfigured
+    ? {
+        google: {
+          clientId: process.env.GOOGLE_CLIENT_ID as string,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+        },
+      }
+    : {},
+
+  // Doit rester en dernier : permet de poser les cookies depuis les Server Actions.
+  plugins: [nextCookies()],
 })

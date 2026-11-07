@@ -1,10 +1,10 @@
 import { redirect } from 'next/navigation'
-import { auth } from '@/lib/auth'
+import { getSession } from '@/lib/session'
 import { DashboardShell } from '@/components/dashboard-shell'
 
 // Protection côté serveur : aucune page du tableau de bord n'est rendue sans session.
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth()
+  const session = await getSession()
   if (!session?.user) redirect('/login')
 
   return (

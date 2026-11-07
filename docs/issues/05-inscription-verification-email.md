@@ -1,5 +1,7 @@
 # [P0][Sécurité] Supprimer l'inscription implicite par identifiants et ajouter la vérification d'email
 
+> **Mise à jour :** l'authentification est passée à **Better Auth** (voir `portail/src/lib/auth.ts`). Sont déjà réglés : plus de création de compte implicite, page `/register`, message d'erreur unique, e-mail normalisé, limitation des tentatives (429 vérifié). **Reste à faire :** vérification de l'e-mail (`emailVerification.sendVerificationEmail` + `requireEmailVerification`, nécessite un serveur SMTP), mot de passe oublié (`sendResetPassword`), et un limiteur de débit partagé via Redis si le portail passe sur plusieurs instances.
+
 ## Contexte
 
 Dans `portail/src/lib/auth.ts`, la fonction `authorize()` du `CredentialsProvider` **crée automatiquement un compte** quand l'email n'existe pas :

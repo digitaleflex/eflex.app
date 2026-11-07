@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft, ExternalLink, GitBranch, Globe, KeyRound } from 'lucide-react'
-import { auth } from '@/lib/auth'
+import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -19,7 +19,7 @@ const STATUS: Record<string, { label: string; variant: 'success' | 'warning' | '
 const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await auth()
+  const session = await getSession()
   if (!session?.user?.id) redirect('/login')
 
   const { id } = await params

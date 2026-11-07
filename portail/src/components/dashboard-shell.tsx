@@ -2,11 +2,11 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
-import { signOut } from 'next-auth/react'
+import { usePathname, useRouter } from 'next/navigation'
 import { CreditCard, FolderKanban, LogOut, Plus, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { signOut } from '@/lib/auth-client'
 
 type NavItem = {
   label: string
@@ -36,6 +36,13 @@ export function DashboardShell({
   user: { name?: string | null; email?: string | null }
 }) {
   const pathname = usePathname()
+  const router = useRouter()
+
+  const handleSignOut = async () => {
+    await signOut()
+    router.push('/')
+    router.refresh()
+  }
 
   return (
     <div className="min-h-screen flex">
@@ -89,7 +96,7 @@ export function DashboardShell({
             variant="ghost"
             size="sm"
             className="w-full justify-start text-muted-foreground"
-            onClick={() => signOut({ callbackUrl: '/' })}
+            onClick={handleSignOut}
           >
             <LogOut className="w-4 h-4 mr-2" />
             Déconnexion
@@ -103,7 +110,7 @@ export function DashboardShell({
           <Link href="/dashboard" className="flex items-center">
             <Image src="/logo-horizontal.webp" alt="Eflex — tableau de bord" width={1200} height={312} className="h-7 w-auto" />
           </Link>
-          <Button variant="ghost" size="sm" className="h-11 text-muted-foreground" onClick={() => signOut({ callbackUrl: '/' })}>
+          <Button variant="ghost" size="sm" className="h-11 text-muted-foreground" onClick={handleSignOut}>
             <LogOut className="w-4 h-4 mr-2" />
             Déconnexion
           </Button>

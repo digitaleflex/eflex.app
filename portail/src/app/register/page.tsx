@@ -1,6 +1,5 @@
 'use client'
 
-import { signIn } from 'next-auth/react'
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -8,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
+import { authErrorMessage, signIn, signUp } from '@/lib/auth-client'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -22,23 +22,14 @@ export default function RegisterPage() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(data.error || 'Impossible de créer le compte. Réessayez dans un instant.')
+      // Le compte est créé puis la session ouverte dans la foulée.
+      const { error: authError } = await signUp.email({ name: name.trim(), email: email.trim(), password })
+      if (authError) {
+        setError(authErrorMessage(authError, 'Impossible de créer le compte. Réessayez dans un instant.'))
         return
       }
-      const result = await signIn('credentials', { email, password, redirect: false })
-      if (result?.error) {
-        router.push('/login')
-      } else {
-        router.push('/dashboard')
-        router.refresh()
-      }
+      router.push('/dashboard')
+      router.refresh()
     } catch {
       setError('Impossible de contacter le serveur. Vérifiez votre connexion et réessayez.')
     } finally {
@@ -68,7 +59,11 @@ export default function RegisterPage() {
               variant="outline"
               size="lg"
               className="w-full justify-center gap-3 font-normal"
-              onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+              onClick={async () => {
+                setError('')
+                const { error: authError } = await signIn.social({ provider: 'google', callbackURL: '/dashboard' })
+                if (authError) setError(authErrorMessage(authError, 'La connexion avec Google est indisponible pour le moment.'))
+              }}
               disabled={loading}
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
@@ -101,8 +96,9 @@ export default function RegisterPage() {
                 label="Mot de passe"
                 type="password"
                 autoComplete="new-password"
-                hint="8 caractères minimum."
+                hint="Entre 8 et 72 caractères."
                 minLength={8}
+                maxLength={72}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required

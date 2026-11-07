@@ -1,10 +1,10 @@
-import { auth } from '@/lib/auth'
+import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { createApplication, deployApplication, setEnvironmentVariable } from '@/lib/coolify'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
-  const session = await auth()
+  const session = await getSession()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  const session = await auth()
+  const session = await getSession()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
