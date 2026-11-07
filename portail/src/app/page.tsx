@@ -1,172 +1,373 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import {
+  ArrowRight,
+  Boxes,
+  Check,
+  FileCode2,
+  GitBranch,
+  KeyRound,
+  Layers,
+  Lock,
+  Rocket,
+  SearchCheck,
+} from 'lucide-react'
 import { FrameworkIcon } from '@/components/framework-icon'
-
-const features = [
-  {
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-      </svg>
-    ),
-    title: 'Déploiement en 1 clic',
-    description: 'Indiquez votre dépôt GitHub et votre branche : Eflex détecte la stack, construit l\'application et la met en ligne.',
-  },
-  {
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" />
-      </svg>
-    ),
-    title: 'Variables d\'environnement',
-    description: 'Déclarez vos variables depuis l\'interface. Elles sont injectées au déploiement et ne sont jamais écrites dans votre dépôt.',
-  },
-  {
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" />
-      </svg>
-    ),
-    title: 'Domaines personnalisés',
-    description: 'Associez vos propres noms de domaine à vos projets. Certificats SSL Let\'s Encrypt inclus et renouvelés automatiquement.',
-  },
-  {
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
-      </svg>
-    ),
-    title: 'Zéro SSH, zéro Docker',
-    description: 'Builds et déploiements se pilotent depuis l\'interface web. Pas de ligne de commande, pas de Dockerfile obligatoire — mais vous pouvez fournir le vôtre.',
-  },
-]
+import { SiteHeader } from '@/components/marketing/site-header'
+import { DeployDemo } from '@/components/marketing/deploy-demo'
 
 const stacks = [
-  { name: 'Next.js', framework: 'nextjs' },
-  { name: 'Laravel', framework: 'laravel' },
-  { name: 'Node.js', framework: 'node' },
-  { name: 'Python', framework: 'python' },
-  { name: 'Vite', framework: 'vite' },
-  { name: 'Statique', framework: 'static' },
+  { id: 'nextjs', name: 'Next.js' },
+  { id: 'nuxt', name: 'Nuxt' },
+  { id: 'astro', name: 'Astro' },
+  { id: 'vite', name: 'Vite' },
+  { id: 'svelte', name: 'SvelteKit' },
+  { id: 'remix', name: 'Remix' },
+  { id: 'solidstart', name: 'SolidStart' },
+  { id: 'redwoodjs', name: 'RedwoodJS' },
+  { id: 'node', name: 'Node.js' },
+  { id: 'laravel', name: 'Laravel' },
+  { id: 'php', name: 'PHP' },
+  { id: 'python', name: 'Python' },
+  { id: 'static', name: 'HTML' },
+  { id: 'docker', name: 'Docker' },
 ]
+
+const steps = [
+  {
+    icon: GitBranch,
+    title: 'Connectez votre dépôt',
+    text: "Collez l'URL de votre dépôt GitHub et choisissez la branche à publier.",
+  },
+  {
+    icon: SearchCheck,
+    title: "Vérifiez ce qu'Eflex a compris",
+    text: 'Framework, version, commandes de build, port : chaque choix est expliqué. Vous corrigez si besoin.',
+  },
+  {
+    icon: Rocket,
+    title: 'Mettez en ligne',
+    text: "Eflex construit l'application, la démarre et active HTTPS. Vous recevez l'adresse de votre site.",
+  },
+]
+
+const faqs = [
+  {
+    q: 'Quelles technologies sont prises en charge ?',
+    a: 'Next.js, Nuxt, Astro, Vite, SvelteKit, Remix, SolidStart, RedwoodJS, Node.js (Express, Fastify, NestJS…), Laravel, PHP, Python (Django, FastAPI, Flask) et les sites HTML statiques. Pour tout le reste, un Dockerfile suffit.',
+  },
+  {
+    q: 'Dois-je écrire un Dockerfile ?',
+    a: "Non. Eflex déduit la configuration de votre dépôt. Si vous en avez déjà un, il est utilisé tel quel : c'est vous qui gardez la main.",
+  },
+  {
+    q: "Que se passe-t-il si Eflex se trompe de stack ?",
+    a: "Vous pouvez forcer le framework à la création du projet, ou ajouter un fichier eflex.json à la racine du dépôt. Ce fichier a toujours priorité sur la détection automatique.",
+  },
+  {
+    q: "Où sont stockées mes variables d'environnement ?",
+    a: "Dans Eflex, jamais dans votre dépôt. Elles sont transmises à l'application au moment du déploiement et ne s'affichent plus une fois enregistrées.",
+  },
+  {
+    q: 'Mes dépôts privés sont-ils compatibles ?',
+    a: 'Pas encore. Pour le moment, Eflex déploie les dépôts GitHub publics. La connexion à votre compte GitHub pour les dépôts privés est en préparation.',
+  },
+  {
+    q: 'Mon dépôt contient plusieurs applications. Ça marche ?',
+    a: "Oui. Eflex reconnaît les monorepos (pnpm, Turborepo, Nx, Lerna…). S'il trouve plusieurs applications, il vous demande laquelle publier.",
+  },
+]
+
+function SectionHeading({ eyebrow, title, lead }: { eyebrow: string; title: string; lead?: string }) {
+  return (
+    <div className="max-w-2xl space-y-3">
+      <p className="text-sm font-semibold text-primary">{eyebrow}</p>
+      <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-balance">{title}</h2>
+      {lead && <p className="text-lg text-muted-foreground text-balance">{lead}</p>}
+    </div>
+  )
+}
 
 export default function HomePage() {
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Navigation */}
-      <header className="sticky top-0 z-50 glass">
-        <nav className="container flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-bold text-xl tracking-tight">
-            <Image src="/logo-horizontal.webp" alt="Eflex" width={1200} height={312} className="h-8 w-auto" priority />
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link href="/login" className="inline-flex items-center justify-center h-11 px-3 sm:px-4 text-sm rounded-lg font-medium hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Connexion</Link>
-            <Link href="/register" className="inline-flex items-center justify-center h-11 px-3 sm:px-4 text-sm rounded-lg font-medium bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">Créer un compte</Link>
-          </div>
-        </nav>
-      </header>
+    <div className="flex min-h-screen flex-col">
+      <a
+        href="#contenu"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-background focus:px-4 focus:py-2 focus:shadow-lg"
+      >
+        Aller au contenu
+      </a>
+      <SiteHeader />
 
-      <main className="flex-1">
-        {/* Hero */}
+      <main id="contenu" className="flex-1">
+        {/* ─── Hero ─── */}
         <section className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-grid opacity-50" />
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
-          <div className="container relative py-24 md:py-36 space-y-12 text-center">
-            <div className="space-y-6 max-w-3xl mx-auto animate-fade-in">
-              <Badge variant="outline" className="mb-4">Plateforme d&apos;hébergement pour développeurs</Badge>
-              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl text-balance">
-                Déployez vos applications{' '}
-                <span className="gradient-text">sans jamais toucher au DevOps</span>
-              </h1>
-              <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
-                Connectez votre repo GitHub, ajoutez vos variables d&apos;environnement, et déployez en un clic.
-                Zéro SSH. Zéro fichier Docker obligatoire. Zéro friction.
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_70%_0%,hsl(var(--primary)/0.12),transparent),radial-gradient(40%_40%_at_0%_30%,hsl(var(--eflex-sky)/0.10),transparent)]"
+          />
+          <div className="container relative grid items-center gap-12 py-16 md:py-24 lg:grid-cols-[1.05fr_1fr] lg:gap-16">
+            <div className="space-y-8 animate-fade-in">
+              <p className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm font-medium text-primary">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+                Next.js, Laravel, Python… reconnus automatiquement
               </p>
+
+              <div className="space-y-5">
+                <h1 className="text-4xl font-bold tracking-tight text-balance sm:text-5xl lg:text-6xl">
+                  Poussez votre code.{' '}
+                  <span className="gradient-text">Eflex le met en ligne.</span>
+                </h1>
+                <p className="max-w-xl text-lg text-muted-foreground sm:text-xl text-pretty">
+                  Indiquez votre dépôt GitHub : Eflex reconnaît la stack, construit l&apos;application et la publie
+                  en HTTPS. Pas de serveur à configurer, pas de Dockerfile à écrire.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/register"
+                  className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-medium text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  Déployer un projet
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                </Link>
+                <Link
+                  href="#fonctionnement"
+                  className="inline-flex h-12 items-center justify-center rounded-xl border border-input bg-background px-6 text-base font-medium hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  Voir comment ça marche
+                </Link>
+              </div>
+
+              <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
+                {['HTTPS automatique', 'Dockerfile facultatif', 'Secrets hors de votre dépôt'].map((item) => (
+                  <li key={item} className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-primary" aria-hidden="true" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
             </div>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up">
-              <Link href="/register" className="inline-flex w-full sm:w-auto items-center justify-center h-14 px-8 text-base font-medium rounded-xl bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">Créer un compte</Link>
-            <Link href="#features" className="inline-flex w-full sm:w-auto items-center justify-center h-14 px-8 text-base font-medium rounded-xl border border-input bg-background hover:bg-muted transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">Découvrir</Link>
+
+            <div className="relative lg:pl-4">
+              <DeployDemo />
             </div>
           </div>
         </section>
 
-        {/* Features */}
-        <section id="features" className="container py-24 md:py-32 space-y-16">
-          <div className="text-center space-y-4">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Pourquoi <span className="gradient-text">Eflex</span> ?
+        {/* ─── Stacks ─── */}
+        <section aria-labelledby="stacks-titre" className="border-y border-border bg-card">
+          <div className="container py-10">
+            <h2 id="stacks-titre" className="text-center text-sm font-medium text-muted-foreground">
+              Les technologies reconnues sans configuration
             </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Construit pour les développeurs et les agences qui veulent héberger leurs projets
-              sans perdre de temps sur l&apos;infrastructure.
-            </p>
-          </div>
-
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {features.map((feature, i) => (
-              <Card key={i} variant="elevated" className="p-6 space-y-4 hover:shadow-md transition-shadow duration-300">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                  {feature.icon}
-                </div>
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-foreground">{feature.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
-                </div>
-              </Card>
-            ))}
+            <ul className="mt-6 grid grid-cols-4 gap-x-4 gap-y-6 sm:grid-cols-7">
+              {stacks.map((stack) => (
+                <li key={stack.id} className="flex flex-col items-center gap-2 text-center">
+                  <FrameworkIcon framework={stack.id} alt="" className="h-8 w-8" />
+                  <span className="text-xs text-muted-foreground">{stack.name}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
-        {/* Stacks */}
-        <section className="bg-muted/50 border-y border-border">
-          <div className="container py-24 md:py-32 space-y-16">
-            <div className="text-center space-y-4">
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                Nous détectons <span className="gradient-text">votre stack automatiquement</span>
-              </h2>
-              <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-                Pas besoin de configurer quoi que ce soit. Notre moteur reconnaît votre projet
-                et génère le déploiement optimal.
-              </p>
-            </div>
+        {/* ─── Fonctionnement ─── */}
+        <section id="fonctionnement" className="scroll-mt-20 container py-20 md:py-28 space-y-12">
+          <SectionHeading
+            eyebrow="Fonctionnement"
+            title="Du dépôt à l'URL, en trois étapes"
+            lead="Pas de serveur à préparer ni de pipeline à écrire. Vous gardez le contrôle à chaque étape."
+          />
+          <ol className="grid gap-6 md:grid-cols-3">
+            {steps.map((step, i) => {
+              const Icon = step.icon
+              return (
+                <li key={step.title} className="relative rounded-2xl border border-border bg-card p-6 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <Icon className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <span className="font-mono text-sm text-muted-foreground" aria-hidden="true">0{i + 1}</span>
+                  </div>
+                  <h3 className="mt-5 text-lg font-semibold">{step.title}</h3>
+                  <p className="mt-2 text-muted-foreground">{step.text}</p>
+                </li>
+              )
+            })}
+          </ol>
+        </section>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-              {stacks.map((stack) => (
-                <Card key={stack.name} variant="elevated" className="p-6 flex flex-col items-center gap-3 hover:scale-105 transition-transform duration-200">
-                  <FrameworkIcon framework={stack.framework} alt={stack.name} className="h-10 w-10" />
-                  <span className="text-sm font-medium">{stack.name}</span>
-                </Card>
+        {/* ─── Fonctionnalités ─── */}
+        <section id="fonctionnalites" className="scroll-mt-20 bg-muted/50 border-y border-border">
+          <div className="container py-20 md:py-28 space-y-12">
+            <SectionHeading
+              eyebrow="Fonctionnalités"
+              title="Pensé pour les vrais projets, pas seulement pour les démos"
+              lead="Files d'attente, tâches planifiées, migrations, monorepos : Eflex gère ce que les autres plateformes vous laissent configurer."
+            />
+
+            <div className="grid gap-6 lg:grid-cols-3">
+              {/* Carte principale : détection expliquée */}
+              <article className="rounded-2xl border border-border bg-card p-6 shadow-sm lg:col-span-2 lg:row-span-2 flex flex-col">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <SearchCheck className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <h3 className="mt-5 text-xl font-semibold">Des choix expliqués, pas une boîte noire</h3>
+                <p className="mt-2 max-w-xl text-muted-foreground">
+                  Eflex vous montre ce qu&apos;il a trouvé dans votre dépôt et pourquoi. En cas de doute, il vous pose la
+                  question au lieu de deviner.
+                </p>
+                <div className="mt-6 flex-1 rounded-xl border border-border bg-muted/40 p-5 font-mono text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="flex items-center gap-2 font-sans font-semibold">
+                      <FrameworkIcon framework="nextjs" alt="" className="h-5 w-5" />
+                      Next.js · node@22
+                    </span>
+                    <span className="rounded-full bg-success/10 px-2.5 py-0.5 font-sans text-xs font-medium text-emerald-700">
+                      Confiance 95 %
+                    </span>
+                  </div>
+                  <ul className="mt-4 space-y-2 text-muted-foreground">
+                    {[
+                      'Dépendance `next` trouvée dans `package.json`.',
+                      'Gestionnaire de paquets détecté : pnpm.',
+                      'Fichier de configuration Next.js détecté.',
+                    ].map((r) => (
+                      <li key={r} className="flex gap-2">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                        <span>{r}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 font-sans text-xs text-amber-800">
+                    Conseil : activez <code className="font-mono">output: &apos;standalone&apos;</code> dans next.config pour un démarrage plus rapide.
+                  </p>
+                </div>
+              </article>
+
+              <article className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Layers className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <h3 className="mt-5 text-lg font-semibold">Laravel, au complet</h3>
+                <p className="mt-2 text-muted-foreground">
+                  PHP-FPM et Nginx, files d&apos;attente, planificateur, migrations et mise en cache à chaque déploiement.
+                </p>
+              </article>
+
+              <article className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Lock className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <h3 className="mt-5 text-lg font-semibold">HTTPS sans y penser</h3>
+                <p className="mt-2 text-muted-foreground">
+                  Certificats Let&apos;s Encrypt émis et renouvelés automatiquement, sur votre domaine.
+                </p>
+              </article>
+
+              <article className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <KeyRound className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <h3 className="mt-5 text-lg font-semibold">Vos secrets restent hors de Git</h3>
+                <p className="mt-2 text-muted-foreground">
+                  Déclarez vos variables d&apos;environnement dans Eflex : elles sont injectées au démarrage, jamais écrites dans le dépôt.
+                </p>
+              </article>
+
+              <article className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Boxes className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <h3 className="mt-5 text-lg font-semibold">Monorepos compris</h3>
+                <p className="mt-2 text-muted-foreground">
+                  pnpm, Turborepo, Nx, Lerna : Eflex repère vos applications et vous demande laquelle publier.
+                </p>
+              </article>
+
+              <article className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <FileCode2 className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <h3 className="mt-5 text-lg font-semibold">Vous gardez la main</h3>
+                <p className="mt-2 text-muted-foreground">
+                  Un Dockerfile est utilisé tel quel. Un besoin particulier ? Décrivez-le dans <code className="font-mono text-sm text-foreground">eflex.json</code>.
+                </p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        {/* ─── FAQ ─── */}
+        <section id="questions" className="scroll-mt-20 container py-20 md:py-28">
+          <div className="grid gap-12 lg:grid-cols-[1fr_1.6fr]">
+            <SectionHeading
+              eyebrow="Questions"
+              title="Questions fréquentes"
+              lead="Tout ce qu'il faut savoir avant de déployer votre premier projet."
+            />
+            <div className="divide-y divide-border rounded-2xl border border-border bg-card">
+              {faqs.map((item) => (
+                <details key={item.q} className="group px-6 [&_summary::-webkit-details-marker]:hidden">
+                  <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 py-4 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
+                    {item.q}
+                    <span
+                      aria-hidden="true"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-transform group-open:rotate-45"
+                    >
+                      +
+                    </span>
+                  </summary>
+                  <p className="pb-5 text-muted-foreground">{item.a}</p>
+                </details>
               ))}
             </div>
           </div>
         </section>
 
-        {/* CTA */}
-        <section className="container py-24 md:py-32">
-          <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-eflexnavy via-eflexnavy to-primary text-white p-12 md:p-16 text-center space-y-8">
-            <div className="absolute inset-0 bg-grid opacity-10" />
-            <div className="relative space-y-4">
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                Prêt à déployer votre premier projet ?
+        {/* ─── Appel final ─── */}
+        <section className="container pb-20 md:pb-28">
+          <div className="relative overflow-hidden rounded-3xl bg-eflexnavy px-6 py-14 text-center text-white sm:px-12 md:py-20">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_80%_at_50%_120%,hsl(var(--primary)/0.55),transparent)]"
+            />
+            <div className="relative mx-auto max-w-2xl space-y-6">
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-balance">
+                Votre prochain projet mérite mieux qu&apos;un serveur à configurer.
               </h2>
-              <p className="text-white/80 text-lg max-w-xl mx-auto">
-                Connectez un dépôt, Eflex s&apos;occupe du reste.
+              <p className="text-lg text-white/75">
+                Créez un compte, collez l&apos;URL de votre dépôt : Eflex s&apos;occupe du reste.
               </p>
+              <Link
+                href="/register"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white px-6 text-base font-medium text-eflexnavy shadow-lg hover:bg-white/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-eflexnavy"
+              >
+                Créer mon compte
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
             </div>
-            <div className="relative">
-              <Link href="/register" className="inline-flex items-center justify-center h-14 px-8 text-base font-medium rounded-xl bg-white text-eflexnavy hover:bg-white/90 shadow-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-eflexnavy">Créer mon compte</Link>
-            </div>
-          </Card>
+          </div>
         </section>
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-border">
-        <div className="container py-10 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <Image src="/logo-horizontal.webp" alt="Eflex" width={1200} height={312} className="h-6 w-auto" />
-          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Eflex. Tous droits réservés.</p>
+        <div className="container flex flex-col gap-6 py-10 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-2">
+            <Image src="/logo-horizontal.webp" alt="Eflex" width={1200} height={312} className="h-6 w-auto" />
+            <p className="text-sm text-muted-foreground">Le déploiement depuis Git, sans DevOps.</p>
+          </div>
+          <nav aria-label="Pied de page" className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
+            <Link href="#fonctionnement" className="hover:text-foreground">Fonctionnement</Link>
+            <Link href="#fonctionnalites" className="hover:text-foreground">Fonctionnalités</Link>
+            <Link href="#questions" className="hover:text-foreground">Questions</Link>
+            <Link href="/login" className="hover:text-foreground">Connexion</Link>
+          </nav>
+        </div>
+        <div className="container border-t border-border py-6 text-xs text-muted-foreground">
+          © {new Date().getFullYear()} Eflex. Tous droits réservés.
         </div>
       </footer>
     </div>

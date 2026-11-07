@@ -14,8 +14,8 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Eflex — Déployez sans DevOps',
-  description: 'Importez votre repo GitHub, configurez vos variables, et déployez en un clic. Sans jamais toucher à SSH.',
+  title: 'Eflex — Poussez votre code, Eflex le met en ligne',
+  description: 'Indiquez votre dépôt GitHub : Eflex reconnaît la stack (Next.js, Laravel, Python…), construit l\'application et la publie en HTTPS. Sans serveur à configurer.',
 }
 
 export default function RootLayout({

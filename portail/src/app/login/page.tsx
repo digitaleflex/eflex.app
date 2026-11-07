@@ -50,8 +50,8 @@ export default function LoginPage() {
       <main className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-8 animate-fade-in">
           <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight">Bienvenue</h1>
-            <p className="text-muted-foreground">Connectez-vous à votre compte Eflex.</p>
+            <h1 className="text-3xl font-bold tracking-tight">Connexion</h1>
+            <p className="text-muted-foreground">Retrouvez vos projets et vos déploiements.</p>
           </div>
 
           <Card className="p-6 space-y-6">
