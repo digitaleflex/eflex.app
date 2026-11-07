@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detect, scoreConfidence } from '../src/index.js';
+import { detect, detectApplication, scoreConfidence } from '../src/index.js';
 import {
   allFixtures,
   astro,
@@ -18,6 +18,7 @@ import {
   fastapi,
   laravelFull,
   laravelMinimal,
+  laravelVite,
   monorepoMultiple,
   monorepoSingle,
   nextjs,
@@ -79,6 +80,15 @@ describe('detect', () => {
     expect(result.plan?.volumes).toEqual(['storage']);
     expect(result.plan?.postDeploy).toContain('php artisan migrate --force');
     expect(result.plan?.build).toBe('npm ci && npm run build');
+  });
+
+  it('detects Laravel (not static Vite) when Vite compiles the front-end assets', () => {
+    const result = detect(laravelVite);
+
+    expect(result.framework).toBe('laravel');
+    expect(result.plan?.runtime).toBe('php@8.3');
+    expect(result.plan?.build).toBe('npm ci && npm run build');
+    expect(result.plan?.services?.web).toBeDefined();
   });
 
   it('detects a minimal Laravel application with only app and web services', () => {
@@ -217,6 +227,23 @@ describe('detect', () => {
     expect(result.questions[0]?.id).toBe('app');
     expect(result.questions[0]?.options).toEqual(['apps/api', 'apps/web']);
     expect(result.alternatives).toHaveLength(2);
+  });
+
+  it('detects the application the user picked in a monorepo with several candidates', () => {
+    const result = detectApplication(monorepoMultiple, 'apps/web');
+
+    expect(result.framework).toBe('nextjs');
+    expect(result.plan?.root).toBe('apps/web');
+    expect(result.plan?.repoRoot).toBe('../..');
+    expect(result.reasons[0]).toContain('apps/web');
+    expect(result.confidence).toBeLessThan(0.95);
+  });
+
+  it('rejects an application path that is not part of the monorepo', () => {
+    for (const app of ['apps/ghost', '../etc', '', 'apps']) {
+      const result = detectApplication(monorepoMultiple, app);
+      expect(result.plan).toBeNull();
+    }
   });
 
   it('resolves a monorepo with a single app and reduces confidence', () => {

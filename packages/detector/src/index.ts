@@ -1,6 +1,7 @@
 export * from './types.js';
 export {
   detect,
+  detectApplication,
   normalizeFiles,
   normalizePath,
   isIgnoredPath,

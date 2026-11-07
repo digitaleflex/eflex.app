@@ -44,5 +44,7 @@ Coolify prend le contrôle total de `docker.sock` et lance son propre reverse pr
 | `MINIO_ENDPOINT` | `http://localhost:9000` |
 | `COOLIFY_API_URL` | `https://coolify.tonserveur.com/api/v1` |
 | `COOLIFY_API_TOKEN` | ton token API Coolify |
-| `NEXTAUTH_SECRET` | `openssl rand -base64 32` |
-| `NEXTAUTH_URL` | `http://localhost:3000` |
+| `BETTER_AUTH_SECRET` | `openssl rand -base64 32` |
+| `BETTER_AUTH_URL` | `http://localhost:3000` |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | facultatifs : sans eux, le bouton Google reste inactif |
+| `GITHUB_TOKEN` | facultatif : relève la limite de l'analyse des dépôts (60 → 5 000 requêtes/heure) ; un jeton sans aucun droit suffit |

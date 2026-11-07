@@ -135,6 +135,32 @@ export const laravelFull = makeSnapshot({
   'routes/console.php': '<?php\n',
 });
 
+/** Projet Laravel réel : Vite et laravel-vite-plugin compilent les assets front. */
+export const laravelVite = makeSnapshot({
+  'artisan': '#!/usr/bin/env php\n<?php\n',
+  'composer.json': json({
+    require: {
+      php: '^8.3',
+      'laravel/framework': '^11.0',
+    },
+  }),
+  'composer.lock': '{}',
+  'public/index.php': '<?php\n',
+  'package.json': json({
+    private: true,
+    type: 'module',
+    scripts: { dev: 'vite', build: 'vite build' },
+    devDependencies: {
+      vite: '^5.0.0',
+      'laravel-vite-plugin': '^1.0.0',
+    },
+  }),
+  'package-lock.json': '{}',
+  'vite.config.js': 'export default {};\n',
+  'resources/js/app.js': '',
+  'routes/console.php': '<?php\n',
+});
+
 export const laravelMinimal = makeSnapshot({
   'artisan': '#!/usr/bin/env php\n<?php\n',
   'composer.json': json({
@@ -266,6 +292,7 @@ export function allFixtures(): Fixture[] {
     { name: 'svelte', snapshot: svelte },
     { name: 'express', snapshot: express },
     { name: 'laravel-full', snapshot: laravelFull },
+    { name: 'laravel-vite', snapshot: laravelVite },
     { name: 'laravel-minimal', snapshot: laravelMinimal },
     { name: 'php-generic', snapshot: phpGeneric },
     { name: 'fastapi', snapshot: fastapi },

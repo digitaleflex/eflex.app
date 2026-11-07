@@ -1,0 +1,144 @@
+package config
+
+import (
+	"strings"
+	"testing"
+	"time"
+)
+
+func env(m map[string]string) func(string) (string, bool) {
+	return func(k string) (string, bool) { v, ok := m[k]; return v, ok }
+}
+
+func TestLoadDefaults(t *testing.T) {
+	cfg, err := LoadFrom(env(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Env != EnvDevelopment || cfg.Host != DefaultHost || cfg.Port != DefaultPort || cfg.Version != DefaultVersion {
+		t.Fatalf("unexpected defaults: %+v", cfg)
+	}
+	if cfg.Database.Required {
+		t.Fatal("database must be optional in development by default")
+	}
+}
+
+func TestLoadEnvironment(t *testing.T) {
+	cfg, err := LoadFrom(env(map[string]string{
+		"AXIOM_ENGINE_HOST": "127.0.0.1", "AXIOM_ENGINE_PORT": "9090", "AXIOM_ENGINE_VERSION": "0.1.1",
+		"AXIOM_LOG_LEVEL": "DEBUG", "DATABASE_URL": "postgres://u:p@db:5432/axiom",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Addr() != "127.0.0.1:9090" || cfg.Version != "0.1.1" || cfg.LogLevel != "debug" {
+		t.Fatalf("unexpected config: %+v", cfg)
+	}
+}
+
+func TestProductionRequiresDatabase(t *testing.T) {
+	_, err := LoadFrom(env(map[string]string{"AXIOM_ENV": "production"}))
+	if err == nil || !strings.Contains(err.Error(), "DATABASE_URL is required") {
+		t.Fatalf("expected database requirement error, got %v", err)
+	}
+	_, err = LoadFrom(env(map[string]string{"AXIOM_ENV": "production", "DATABASE_URL": "postgres://db/axiom", "AXIOM_DB_REQUIRED": "false"}))
+	if err == nil {
+		t.Fatal("production must not allow AXIOM_DB_REQUIRED=false")
+	}
+	token := "0123456789abcdef0123456789abcdef"
+	if _, err := LoadFrom(env(map[string]string{"AXIOM_ENV": "production", "DATABASE_URL": "postgres://db/axiom"})); err == nil {
+		t.Fatal("production must require AXIOM_API_TOKEN")
+	}
+	cfg, err := LoadFrom(env(map[string]string{"AXIOM_ENV": "production", "DATABASE_URL": "postgres://db/axiom", "AXIOM_API_TOKEN": token, "AXIOM_SECRET_KEY": testKey}))
+	if err != nil || !cfg.Database.Required {
+		t.Fatalf("valid production config rejected: %v", err)
+	}
+}
+
+func TestInvalidValuesFailFast(t *testing.T) {
+	cases := map[string]map[string]string{
+		"port":     {"AXIOM_ENGINE_PORT": "99999"},
+		"port nan": {"AXIOM_ENGINE_PORT": "http"},
+		"env":      {"AXIOM_ENV": "staging"},
+		"level":    {"AXIOM_LOG_LEVEL": "verbose"},
+		"int":      {"AXIOM_DB_MAX_OPEN_CONNS": "-1"},
+		"duration": {"AXIOM_SHUTDOWN_TIMEOUT": "soon"},
+		"bool":     {"AXIOM_DB_REQUIRED": "maybe"},
+		"url":      {"DATABASE_URL": "mysql://db/axiom"},
+		"pool":     {"AXIOM_DB_MAX_OPEN_CONNS": "2", "AXIOM_DB_MAX_IDLE_CONNS": "5"},
+	}
+	for name, m := range cases {
+		if _, err := LoadFrom(env(m)); err == nil {
+			t.Errorf("%s: expected validation error", name)
+		}
+	}
+}
+
+func TestErrorsNeverLeakDatabaseCredentials(t *testing.T) {
+	_, err := LoadFrom(env(map[string]string{"DATABASE_URL": "mysql://admin:s3cret@db/axiom"}))
+	if err == nil || strings.Contains(err.Error(), "s3cret") {
+		t.Fatalf("error must not contain credentials: %v", err)
+	}
+}
+
+const testKey = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
+
+func TestSessionDefaults(t *testing.T) {
+	cfg, err := LoadFrom(env(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.SessionTTL != 720*time.Hour {
+		t.Fatalf("SessionTTL = %v, want 720h", cfg.SessionTTL)
+	}
+	if cfg.CookieSecure {
+		t.Fatal("session cookie must not be Secure by default outside production")
+	}
+}
+
+func TestSessionSettings(t *testing.T) {
+	base := map[string]string{
+		"AXIOM_ENV": "production", "DATABASE_URL": "postgres://db/axiom",
+		"AXIOM_API_TOKEN": strings.Repeat("a", 32), "AXIOM_SECRET_KEY": testKey,
+	}
+	cfg, err := LoadFrom(env(base))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.CookieSecure {
+		t.Fatal("session cookie must default to Secure in production")
+	}
+	base["AXIOM_COOKIE_SECURE"] = "false"
+	base["AXIOM_SESSION_TTL"] = "1h"
+	cfg, err = LoadFrom(env(base))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.CookieSecure || cfg.SessionTTL != time.Hour {
+		t.Fatalf("explicit session settings ignored: %+v", cfg)
+	}
+	if _, err := LoadFrom(env(map[string]string{"AXIOM_SESSION_TTL": "0s"})); err == nil {
+		t.Fatal("zero session TTL must be rejected")
+	}
+	if _, err := LoadFrom(env(map[string]string{"AXIOM_SESSION_TTL": "soon"})); err == nil {
+		t.Fatal("invalid session TTL must be rejected")
+	}
+}
+
+func TestGitHubConfiguration(t *testing.T) {
+	base := map[string]string{"AXIOM_GITHUB_CLIENT_ID": "Iv1.abc", "AXIOM_GITHUB_CLIENT_SECRET": "s", "AXIOM_GITHUB_REDIRECT_URL": "https://engine.example.com/api/v1/github/callback"}
+	if _, err := LoadFrom(env(base)); err == nil {
+		t.Fatal("GitHub requires AXIOM_SECRET_KEY")
+	}
+	base["AXIOM_SECRET_KEY"] = testKey
+	cfg, err := LoadFrom(env(base))
+	if err != nil || !cfg.GitHub.Enabled() || cfg.GitHub.APIURL != "https://api.github.com" {
+		t.Fatalf("valid GitHub config rejected: %v %+v", err, cfg.GitHub)
+	}
+	if _, err := LoadFrom(env(map[string]string{"AXIOM_GITHUB_CLIENT_ID": "x"})); err == nil {
+		t.Fatal("partial GitHub config must be rejected")
+	}
+	if _, err := LoadFrom(env(map[string]string{"AXIOM_SECRET_KEY": "short"})); err == nil {
+		t.Fatal("invalid secret key must be rejected")
+	}
+}

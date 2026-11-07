@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import { Package, Rocket, CircleCheck, Globe } from 'lucide-react'
+import { Package, Rocket, CircleCheck, Globe, Plus } from 'lucide-react'
+import { frameworkLabel } from '@/lib/frameworks'
 
 interface Project {
   id: string
@@ -14,7 +15,6 @@ interface Project {
   domain: string | null
   repoUrl: string
   branch: string
-  coolifyAppId: string | null
   updatedAt: string
   createdAt: string
   deployments: Array<{
@@ -79,8 +79,22 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Projets</h1>
+          <p className="text-sm text-muted-foreground">Vos applications et leur dernier déploiement.</p>
+        </div>
+        <Link
+          href="/dashboard/new"
+          className="inline-flex items-center justify-center gap-2 h-11 px-4 text-sm rounded-lg font-medium bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <Plus className="w-4 h-4" aria-hidden="true" />
+          Nouveau projet
+        </Link>
+      </div>
+
       {error && (
-        <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">{error}</div>
+        <div role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">{error}</div>
       )}
 
       {/* Stats */}
@@ -89,8 +103,8 @@ export default function DashboardPage() {
           <Card key={stat.label}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
-                <span className="text-2xl">{stat.icon}</span>
-                <span className="text-2xl font-bold tracking-tight">{loading ? '...' : stat.value}</span>
+                <span className="text-primary" aria-hidden="true">{stat.icon}</span>
+                <span className="text-2xl font-bold tracking-tight">{loading ? '–' : stat.value}</span>
               </div>
               <p className="text-sm text-muted-foreground mt-2">{stat.label}</p>
             </CardContent>
@@ -103,7 +117,7 @@ export default function DashboardPage() {
         <h2 className="text-lg font-semibold">Projets récents</h2>
 
         {loading ? (
-          <Card><CardContent className="p-12 text-center text-muted-foreground">Chargement...</CardContent></Card>
+          <Card><CardContent className="p-12 text-center text-muted-foreground">Chargement des projets…</CardContent></Card>
         ) : projects.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center space-y-4">
@@ -114,6 +128,10 @@ export default function DashboardPage() {
                   Importez votre premier projet depuis GitHub et déployez-le en quelques clics.
                 </p>
               </div>
+              <Link href="/dashboard/new" className="inline-flex items-center justify-center gap-2 h-11 px-4 text-sm rounded-lg font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                <Plus className="w-4 h-4" aria-hidden="true" />
+                Créer mon premier projet
+              </Link>
             </CardContent>
           </Card>
         ) : (
@@ -121,7 +139,7 @@ export default function DashboardPage() {
             {projects.map((project) => {
               const lastDeploy = project.deployments[0]
               return (
-                <Link key={project.id} href={`/dashboard/projects/${project.id}`}>
+                <Link key={project.id} href={`/dashboard/projects/${project.id}`} className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <Card className="p-6 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 space-y-4">
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
@@ -133,7 +151,7 @@ export default function DashboardPage() {
                       )}
                     </div>
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="capitalize">{project.framework || 'Détection auto'}</span>
+                      <span>{project.framework ? frameworkLabel(project.framework) : 'Détection auto'}</span>
                       <span>{timeAgo(project.updatedAt)}</span>
                     </div>
                   </Card>
