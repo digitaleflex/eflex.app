@@ -2,10 +2,10 @@ import NextAuth from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { PrismaAdapter } from "@auth/prisma-adapter"
-import { PrismaClient } from "@prisma/client"
-import { compare, hash } from "bcryptjs"
+import { compare } from "bcryptjs"
+import { prisma } from "@/lib/prisma"
 
-const prisma = new PrismaClient()
+const INVALID_CREDENTIALS = "Email ou mot de passe incorrect."
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -24,40 +24,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
 
-        const email = credentials.email as string
+        const email = (credentials.email as string).trim().toLowerCase()
         const password = credentials.password as string
 
-        const user = await prisma.user.findUnique({ where: { email } })
+        // Aucun compte n'est créé ici : l'inscription passe par /register.
+        // Recherche insensible à la casse : les comptes créés avant la normalisation
+        // peuvent contenir des majuscules.
+        const user = await prisma.user.findFirst({
+          where: { email: { equals: email, mode: "insensitive" } },
+        })
 
-        // New user: create account with hashed password
-        if (!user) {
-          if (password.length < 8) {
-            throw new Error("Le mot de passe doit contenir au moins 8 caractères.")
-          }
-          const hashedPassword = await hash(password, 12)
-          const newUser = await prisma.user.create({
-            data: {
-              email,
-              hashedPassword,
-              name: email.split("@")[0],
-            },
-          })
-          return {
-            id: newUser.id,
-            email: newUser.email,
-            name: newUser.name,
-          }
-        }
-
-        // Existing user: verify password
-        if (!user.hashedPassword) {
-          throw new Error("Ce compte utilise Google. Connectez-vous avec Google.")
-        }
+        // Message identique dans tous les cas, pour ne pas révéler si un compte existe.
+        if (!user?.hashedPassword) throw new Error(INVALID_CREDENTIALS)
 
         const isValid = await compare(password, user.hashedPassword)
-        if (!isValid) {
-          throw new Error("Email ou mot de passe incorrect.")
-        }
+        if (!isValid) throw new Error(INVALID_CREDENTIALS)
 
         return {
           id: user.id,

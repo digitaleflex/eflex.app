@@ -29,7 +29,7 @@ export default function LoginPage() {
         router.refresh()
       }
     } catch {
-      setError('Une erreur est survenue.')
+      setError('Impossible de contacter le serveur. Vérifiez votre connexion et réessayez.')
     } finally {
       setLoading(false)
     }
@@ -42,7 +42,7 @@ export default function LoginPage() {
       <header className="sticky top-0 z-50 glass">
         <nav className="container flex h-16 items-center">
           <Link href="/" className="flex items-center gap-2 font-bold text-xl tracking-tight">
-            <Image src="/logo-horizontal.webp" alt="Eflex" width={1200} height={312} className="h-8 w-auto" priority />
+            <Image src="/logo-horizontal.webp" alt="Eflex — accueil" width={1200} height={312} className="h-8 w-auto" priority />
           </Link>
         </nav>
       </header>
@@ -50,7 +50,7 @@ export default function LoginPage() {
       <main className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-8 animate-fade-in">
           <div className="text-center space-y-2">
-            <h2 className="text-3xl font-bold tracking-tight">Bienvenue</h2>
+            <h1 className="text-3xl font-bold tracking-tight">Bienvenue</h1>
             <p className="text-muted-foreground">Connectez-vous à votre compte Eflex.</p>
           </div>
 
@@ -62,7 +62,7 @@ export default function LoginPage() {
               onClick={handleGoogle}
               disabled={loading}
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09" />
                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23" />
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 9.99 1 12.48 1 15.23c0 2.74 1.02 5.24 2.81 7.07z" />
@@ -79,7 +79,7 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+              <div role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
                 {error}
               </div>
             )}
@@ -113,7 +113,7 @@ export default function LoginPage() {
 
           <p className="text-center text-sm text-muted-foreground">
             Pas encore de compte ?{' '}
-            <Link href="/login" className="font-medium text-primary hover:text-primary/90">
+            <Link href="/register" className="font-medium text-primary hover:underline">
               Créer un compte
             </Link>
           </p>

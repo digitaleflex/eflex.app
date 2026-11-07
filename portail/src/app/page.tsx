@@ -1,61 +1,8 @@
-'use client'
-
 import Link from 'next/link'
 import Image from 'next/image'
-import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { useState, useEffect } from 'react'
 import { FrameworkIcon } from '@/components/framework-icon'
-
-const allFrameworks = [
-  'nextjs',
-  'nuxt',
-  'astro',
-  'vite',
-  'svelte',
-  'remix',
-  'solidstart',
-  'redwoodjs',
-  'node',
-  'laravel',
-  'php',
-  'python',
-  'static',
-  'docker',
-  'eflex-config',
-]
-
-function TechnologyCarousel({ frameworks }: { frameworks: string[] }) {
-  const [index, setIndex] = useState(0)
-  useEffect(() => {
-    const id = setInterval(() => {
-      setIndex((i) => (i + 1) % frameworks.length)
-    }, 3000)
-    return () => clearInterval(id)
-  }, [frameworks])
-
-  return (
-    <div className="carousel rounded-xl bg-primary/5 p-4 mb-8">
-      <FrameworkIcon framework={frameworks[index]} className="h-12 w-12 mx-auto mb-2" />
-      <p className="text-center text-sm">{frameworks[index]}</p>
-      <button
-        onClick={() => setIndex((i) => (i - 1 + frameworks.length) % frameworks.length)}
-        className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/70 rounded-lg p-1 hover:bg-white"
-        aria-label="Précédent"
-      >
-        ←
-      </button>
-      <button
-        onClick={() => setIndex((i) => (i + 1) % frameworks.length)}
-        className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/70 rounded-lg p-1 hover:bg-white"
-        aria-label="Suivant"
-      >
-        →
-      </button>
-    </div>
-  )
-}
 
 const features = [
   {
@@ -65,7 +12,7 @@ const features = [
       </svg>
     ),
     title: 'Déploiement en 1 clic',
-    description: 'Connectez votre repo GitHub, choisissez votre branche, et nous nous occupons du build et du déploiement. Aucune configuration manuelle.',
+    description: 'Indiquez votre dépôt GitHub et votre branche : Eflex détecte la stack, construit l\'application et la met en ligne.',
   },
   {
     icon: (
@@ -73,8 +20,8 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" />
       </svg>
     ),
-    title: 'Variables d\'environnement sécurisées',
-    description: 'Ajoutez, modifiez et chiffrez vos variables d\'environnement directement depuis l\'interface. Redéploiement automatique après chaque changement.',
+    title: 'Variables d\'environnement',
+    description: 'Déclarez vos variables depuis l\'interface. Elles sont injectées au déploiement et ne sont jamais écrites dans votre dépôt.',
   },
   {
     icon: (
@@ -83,7 +30,7 @@ const features = [
       </svg>
     ),
     title: 'Domaines personnalisés',
-    description: 'Associez gratuitement vos propres noms de domaine à chaque projet. Certificats SSL Let\'s Encrypt inclus et renouvelés automatiquement.',
+    description: 'Associez vos propres noms de domaine à vos projets. Certificats SSL Let\'s Encrypt inclus et renouvelés automatiquement.',
   },
   {
     icon: (
@@ -92,7 +39,7 @@ const features = [
       </svg>
     ),
     title: 'Zéro SSH, zéro Docker',
-    description: 'Tout se fait depuis l\'interface web. Builds, déploiements, rollbacks : aucune ligne de commande, aucun fichier Docker — sauf si vous le voulez.',
+    description: 'Builds et déploiements se pilotent depuis l\'interface web. Pas de ligne de commande, pas de Dockerfile obligatoire — mais vous pouvez fournir le vôtre.',
   },
 ]
 
@@ -115,8 +62,8 @@ export default function HomePage() {
             <Image src="/logo-horizontal.webp" alt="Eflex" width={1200} height={312} className="h-8 w-auto" priority />
           </Link>
           <div className="flex items-center gap-3">
-            <Link href="/login" className="inline-flex items-center justify-center h-8 px-3 text-xs rounded-md font-medium hover:bg-muted transition-colors">Connexion</Link>
-            <Link href="/login" className="inline-flex items-center justify-center h-8 px-3 text-xs rounded-lg font-medium bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors">Créer un compte</Link>
+            <Link href="/login" className="inline-flex items-center justify-center h-11 px-3 sm:px-4 text-sm rounded-lg font-medium hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Connexion</Link>
+            <Link href="/register" className="inline-flex items-center justify-center h-11 px-3 sm:px-4 text-sm rounded-lg font-medium bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">Créer un compte</Link>
           </div>
         </nav>
       </header>
@@ -139,8 +86,8 @@ export default function HomePage() {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up">
-              <Link href="/login" className="inline-flex items-center justify-center h-14 px-8 text-base font-medium rounded-xl bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">Commencer gratuitement</Link>
-            <Link href="#features" className="inline-flex items-center justify-center h-14 px-8 text-base font-medium rounded-xl border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">Découvrir</Link>
+              <Link href="/register" className="inline-flex w-full sm:w-auto items-center justify-center h-14 px-8 text-base font-medium rounded-xl bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">Créer un compte</Link>
+            <Link href="#features" className="inline-flex w-full sm:w-auto items-center justify-center h-14 px-8 text-base font-medium rounded-xl border border-input bg-background hover:bg-muted transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">Découvrir</Link>
             </div>
           </div>
         </section>
@@ -198,38 +145,28 @@ export default function HomePage() {
 
         {/* CTA */}
         <section className="container py-24 md:py-32">
-          <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-primary via-primary to-accent text-primary-foreground p-12 md:p-16 text-center space-y-8">
+          <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-eflexnavy via-eflexnavy to-primary text-white p-12 md:p-16 text-center space-y-8">
             <div className="absolute inset-0 bg-grid opacity-10" />
             <div className="relative space-y-4">
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
                 Prêt à déployer votre premier projet ?
               </h2>
-              <p className="text-primary-foreground/80 text-lg max-w-xl mx-auto">
-                Rejoignez les développeurs qui déploient leurs applications sans jamais ouvrir un terminal.
+              <p className="text-white/80 text-lg max-w-xl mx-auto">
+                Connectez un dépôt, Eflex s&apos;occupe du reste.
               </p>
             </div>
             <div className="relative">
-              <Link href="/login" className="inline-flex items-center justify-center h-14 px-8 text-base font-medium rounded-xl bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">Créer mon compte gratuitement</Link>
+              <Link href="/register" className="inline-flex items-center justify-center h-14 px-8 text-base font-medium rounded-xl bg-white text-eflexnavy hover:bg-white/90 shadow-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-eflexnavy">Créer mon compte</Link>
             </div>
           </Card>
         </section>
       </main>
 
-      <TechnologyCarousel frameworks={allFrameworks} />
-
       {/* Footer */}
       <footer className="border-t border-border">
-        <div className="container py-12 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="bg-primary text-primary-foreground rounded-lg w-6 h-6 flex items-center justify-center text-xs font-bold">E</span>
-            <span className="text-sm text-muted-foreground">© {new Date().getFullYear()} Eflex</span>
-          </div>
-          <div className="flex items-center gap-6 text-sm text-muted-foreground">
-            <Link href="#" className="hover:text-foreground transition-colors">Documentation</Link>
-            <Link href="#" className="hover:text-foreground transition-colors">Statut</Link>
-            <Link href="#" className="hover:text-foreground transition-colors">CGU</Link>
-            <Link href="#" className="hover:text-foreground transition-colors">Contact</Link>
-          </div>
+        <div className="container py-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <Image src="/logo-horizontal.webp" alt="Eflex" width={1200} height={312} className="h-6 w-auto" />
+          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Eflex. Tous droits réservés.</p>
         </div>
       </footer>
     </div>

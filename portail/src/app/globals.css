@@ -13,7 +13,7 @@
     --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
-    --primary: 217 91% 60%;       /* Blue officiel #3B82F6 */
+    --primary: 221 83% 53%;       /* Royal Blue #2563EB — texte blanc 5,2:1 (AA) */
     --primary-foreground: 0 0% 100%;
     --secondary: 240 5% 96%;
     --secondary-foreground: 240 6% 10%;
@@ -27,7 +27,7 @@
     --success-foreground: 0 0% 100%;
     --border: 240 6% 90%;
     --input: 240 6% 90%;
-    --ring: 217 91% 60%;
+    --ring: 221 83% 53%;
     --radius: 0.75rem;
   }
 
@@ -37,7 +37,7 @@
     --card: 240 10% 6%;
     --card-foreground: 0 0% 95%;
     --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
+    --primary-foreground: 215 69% 14%;
     --secondary: 240 4% 16%;
     --secondary-foreground: 0 0% 95%;
     --muted: 240 4% 16%;
@@ -72,7 +72,10 @@
     @apply bg-background/80 backdrop-blur-xl border border-border/50;
   }
   .gradient-text {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-eflexnavy;
+  }
+  .dark .gradient-text {
+    @apply from-eflexblue to-eflexsky;
   }
   .bg-grid {
     background-image: radial-gradient(hsl(var(--muted-foreground) / 0.1) 1px, transparent 1px);
