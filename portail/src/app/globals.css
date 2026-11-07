@@ -2,55 +2,88 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Source unique des tokens (Tailwind v3 / HSL). Identité Eflex conservée :
+   navy + bleu royal, neutres légèrement refroidis et contrastes renforcés.
+   Chaque token de surface possède son pendant « -foreground ».
+   ───────────────────────────────────────────────────────────────────────────── */
 @layer base {
   :root {
-    --eflex-navy: 215 69% 14%;      /* Navy #0B1F3B */
-    --eflex-royalblue: 221 83% 53%; /* Royal Blue #2563EB */
-    --eflex-blue: 217 91% 60%;      /* Blue #3B82F6 */
-    --eflex-sky: 198 93% 60%;       /* Sky #38BDF8 */
+    --eflex-navy: 215 69% 14%;
+    --eflex-royalblue: 221 83% 53%;
+    --eflex-blue: 217 91% 60%;
+    --eflex-sky: 198 93% 60%;
 
-    --background: 240 10% 97%;
-    --foreground: 240 10% 3.9%;
+    --background: 220 20% 98%;
+    --foreground: 215 45% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --primary: 221 83% 53%;       /* Royal Blue #2563EB — texte blanc 5,2:1 (AA) */
+    --card-foreground: 215 45% 11%;
+    --primary: 221 83% 53%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 10%;
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
-    --accent: 198 93% 60%;        /* Sky #38BDF8 */
-    --accent-foreground: 215 69% 14%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
-    --ring: 221 83% 53%;
-    --radius: 0.75rem;
-  }
-
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 95%;
-    --card: 240 10% 6%;
-    --card-foreground: 0 0% 95%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 215 69% 14%;
-    --secondary: 240 4% 16%;
-    --secondary-foreground: 0 0% 95%;
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 55%;
+    --secondary: 220 16% 95%;
+    --secondary-foreground: 215 40% 16%;
+    --muted: 220 16% 95%;
+    --muted-foreground: 220 9% 40%; /* ≥ 4.5:1 sur --background */
     --accent: 198 93% 60%;
     --accent-foreground: 215 69% 14%;
-    --destructive: 0 72% 51%;
+    --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
-    --success: 142 71% 45%;
+    --success: 142 72% 30%; /* 4.8:1 avec du texte blanc */
     --success-foreground: 0 0% 100%;
-    --border: 240 4% 16%;
-    --input: 240 4% 16%;
-    --ring: 217 91% 60%;
+    --border: 220 14% 89%;
+    --input: 220 14% 86%;
+    --ring: 221 83% 53%;
+
+    --radius: 0.875rem; /* 14px — cartes 12–16px */
+
+    /* Élévation : décalage + flou doux, jamais de halo à décalage nul. */
+    --shadow-color: 215 45% 18%;
+    --shadow-sm: 0 1px 2px hsl(var(--shadow-color) / 0.06), 0 1px 3px hsl(var(--shadow-color) / 0.04);
+    --shadow-md: 0 4px 6px -1px hsl(var(--shadow-color) / 0.08), 0 10px 24px -6px hsl(var(--shadow-color) / 0.10);
+    --shadow-lg: 0 12px 24px -8px hsl(var(--shadow-color) / 0.14), 0 24px 48px -12px hsl(var(--shadow-color) / 0.12);
+
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    color-scheme: light;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
+  }
+
+  /* Thème sombre automatique : aucun JS, donc aucun conflit avec l'hydratation React. */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: 215 40% 7%;
+    --foreground: 210 20% 96%;
+    --card: 215 35% 10%;
+    --card-foreground: 210 20% 96%;
+    --primary: 217 91% 65%;
+    --primary-foreground: 215 69% 12%;
+    --secondary: 215 25% 16%;
+    --secondary-foreground: 210 20% 96%;
+    --muted: 215 25% 16%;
+    --muted-foreground: 215 15% 66%;
+    --accent: 198 93% 60%;
+    --accent-foreground: 215 69% 12%;
+    /* Fond vif + texte navy : lisible comme texte sur carte ET comme bouton. */
+    --destructive: 0 85% 68%;
+    --destructive-foreground: 215 69% 12%;
+    --success: 142 60% 50%;
+    --success-foreground: 215 69% 12%;
+    --border: 215 22% 20%;
+    --input: 215 22% 26%;
+    --ring: 217 91% 65%;
+
+    --shadow-color: 0 0% 0%;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.25);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 10px 24px -6px rgb(0 0 0 / 0.45);
+    --shadow-lg: 0 12px 24px -8px rgb(0 0 0 / 0.55), 0 24px 48px -12px rgb(0 0 0 / 0.5);
+
+      color-scheme: dark;
+      scrollbar-color: hsl(var(--muted-foreground) / 0.45) transparent;
+    }
+
+    /* Le logo Eflex est un fichier sombre : on l'éclaircit sur fond sombre. */
+    img[alt^='Eflex'] {
+      filter: brightness(0) invert(1);
+    }
   }
 }
 
@@ -58,42 +91,115 @@
   * {
     @apply border-border;
   }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: hsl(var(--primary) / 0.12);
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    line-height: 1.5;
+    font-feature-settings: 'rlig' 1, 'calt' 1, 'ss01' 1;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Les surfaces que l'on ne dessine pas font quand même partie du design. */
+  ::selection {
+    background: hsl(var(--primary) / 0.18);
+    color: hsl(var(--foreground));
+  }
+
+  :where(h1, h2, h3, h4) {
+    text-wrap: balance;
+    letter-spacing: -0.02em;
+    scroll-margin-top: 6rem;
+  }
+
+  :where(p, li) {
+    text-wrap: pretty;
+  }
+
+  :where(button):not(:disabled),
+  :where(a),
+  :where(summary),
+  :where([role='button']) {
+    touch-action: manipulation;
+  }
+
+  :where(button):not(:disabled) {
+    cursor: pointer;
+  }
+
+  :where(code, kbd, time, .font-mono) {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :where(input, textarea) {
+    caret-color: hsl(var(--primary));
+  }
+
+  /* Filet de sécurité : aucun contrôle ne peut perdre son indicateur de focus. */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.35);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.6);
+    background-clip: content-box;
   }
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+  .text-balance { text-wrap: balance; }
+  .text-pretty { text-wrap: pretty; }
+
+  /* Translucidité fonctionnelle pour l'en-tête collant, pas un effet décoratif. */
   .glass {
-    @apply bg-background/80 backdrop-blur-xl border border-border/50;
+    @apply border-b border-border/70 bg-background/85 backdrop-blur-md;
   }
-  .gradient-text {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-eflexnavy;
-  }
-  .dark .gradient-text {
-    @apply from-eflexblue to-eflexsky;
-  }
+
   .bg-grid {
     background-image: radial-gradient(hsl(var(--muted-foreground) / 0.1) 1px, transparent 1px);
     background-size: 32px 32px;
   }
-}
 
-/* Démo de déploiement (page d'accueil) : étapes qui apparaissent l'une après l'autre. */
-@layer utilities {
-  .text-pretty { text-wrap: pretty; }
-  .demo-step {
-    opacity: 0;
-    animation: demo-step-in 0.45s ease-out forwards;
+  /* Un seul moment d'entrée orchestré, avec décalage optionnel. */
+  .animate-reveal {
+    animation: reveal 0.7s var(--ease-out-expo) both;
     animation-delay: var(--d, 0s);
   }
-  .demo-ping { animation: demo-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite; }
+
+  .demo-step {
+    opacity: 0;
+    animation: demo-step-in 0.5s var(--ease-out-expo) forwards;
+    animation-delay: var(--d, 0s);
+  }
+  .demo-ping {
+    animation: demo-ping 1.6s var(--ease-out-expo) infinite;
+  }
 }
 
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
 @keyframes demo-step-in {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
@@ -102,10 +208,12 @@
   75%, 100% { transform: scale(2); opacity: 0; }
 }
 
-html { scroll-behavior: smooth; }
-
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .demo-step { opacity: 1; animation: none; }
-  .demo-ping, .animate-fade-in, .animate-slide-up { animation: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .demo-step, .animate-reveal { opacity: 1; }
 }

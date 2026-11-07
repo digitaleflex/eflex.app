@@ -30,11 +30,12 @@ export function FrameworkIcon({
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
+    // Sur fond sombre, les logos de marque foncés redeviennent lisibles.
     <img
       src={src}
       alt={alt ?? framework}
       loading="lazy"
-      className={`object-contain ${className}`}
+      className={`object-contain dark:rounded-md dark:bg-white/95 ${className}`}
     />
   )
 }

@@ -57,8 +57,12 @@ type Probe = Omit<ComponentResult, 'key' | 'label'>
 const TIMEOUT_MS = 3000
 const SNAPSHOT_INTERVAL_MS = 60_000
 
-function errorMessage(error: unknown): string {
-  return (error instanceof Error ? error.message : String(error)).slice(0, 120)
+/** Les détails techniques restent côté serveur : la réponse publique reste générique. */
+function logProbeFailure(component: ComponentKey, error: unknown): void {
+  console.error(
+    `[eflex/status] ${component}:`,
+    (error instanceof Error ? error.message : String(error)).slice(0, 200)
+  )
 }
 
 function withTimeout<T>(promise: Promise<T>): Promise<T> {
@@ -83,7 +87,8 @@ async function probeDatabase(): Promise<Probe> {
     await withTimeout(prisma.$queryRaw`SELECT 1`)
     return { state: 'ok', latencyMs: Date.now() - start, detail: 'PostgreSQL' }
   } catch (error) {
-    return { state: 'down', latencyMs: null, detail: errorMessage(error) }
+    logProbeFailure('database', error)
+    return { state: 'down', latencyMs: null, detail: 'Base de données injoignable' }
   }
 }
 
@@ -118,7 +123,10 @@ function probeRedis(): Promise<Probe> {
       finish(reply.includes('PONG') ? 'ok' : 'degraded', reply.slice(0, 80))
     })
     socket.once('timeout', () => finish('down', 'Délai dépassé'))
-    socket.once('error', (error) => finish('down', errorMessage(error)))
+    socket.once('error', (error) => {
+      logProbeFailure('redis', error)
+      finish('down', 'Cache injoignable')
+    })
   })
 }
 
@@ -135,7 +143,8 @@ async function probeCoolify(): Promise<Probe> {
       detail: ok ? 'API Coolify' : 'API Coolify injoignable',
     }
   } catch (error) {
-    return { state: 'down', latencyMs: null, detail: errorMessage(error) }
+    logProbeFailure('coolify', error)
+    return { state: 'down', latencyMs: null, detail: 'API Coolify injoignable' }
   }
 }
 
@@ -153,10 +162,11 @@ async function probeEngine(): Promise<Probe> {
     return {
       state: res.ok ? 'ok' : 'down',
       latencyMs: Date.now() - start,
-      detail: res.ok ? 'GET /health' : `HTTP ${res.status}`,
+      detail: res.ok ? 'GET /health' : 'Moteur Axiom injoignable',
     }
   } catch (error) {
-    return { state: 'down', latencyMs: null, detail: errorMessage(error) }
+    logProbeFailure('engine', error)
+    return { state: 'down', latencyMs: null, detail: 'Moteur Axiom injoignable' }
   }
 }
 

@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  darkMode: ['class'],
+  darkMode: 'media',
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -47,7 +47,6 @@ module.exports = {
           DEFAULT: 'hsl(var(--success))',
           foreground: 'hsl(var(--success-foreground))',
         },
-        // Nouvelles couleurs EFLEX
         eflexnavy: 'hsl(var(--eflex-navy))',
         eflexroyalblue: 'hsl(var(--eflex-royalblue))',
         eflexblue: 'hsl(var(--eflex-blue))',
@@ -62,19 +61,37 @@ module.exports = {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
       },
+      // Échelle fluide : un seul réglage, lisible de 375px à 1440px.
+      fontSize: {
+        'display-sm': ['clamp(2rem, 5vw, 2.75rem)', { lineHeight: '1.12', letterSpacing: '-0.025em' }],
+        display: ['clamp(2.5rem, 6.5vw, 4.5rem)', { lineHeight: '1.05', letterSpacing: '-0.03em' }],
+        'lead-lg': ['clamp(1.0625rem, 1.6vw, 1.25rem)', { lineHeight: '1.6' }],
+      },
+      letterSpacing: {
+        tightest: '-0.03em',
+      },
+      boxShadow: {
+        sm: 'var(--shadow-sm)',
+        md: 'var(--shadow-md)',
+        lg: 'var(--shadow-lg)',
+        primary: '0 8px 24px -8px hsl(var(--primary) / 0.45)',
+      },
+      transitionTimingFunction: {
+        'out-expo': 'var(--ease-out-expo)',
+      },
       keyframes: {
         'fade-in': {
-          '0%': { opacity: '0', transform: 'translateY(4px)' },
+          '0%': { opacity: '0', transform: 'translateY(6px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         'slide-up': {
-          '0%': { opacity: '0', transform: 'translateY(12px)' },
+          '0%': { opacity: '0', transform: 'translateY(14px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
       },
       animation: {
-        'fade-in': 'fade-in 0.5s ease-out',
-        'slide-up': 'slide-up 0.4s ease-out',
+        'fade-in': 'fade-in 0.6s var(--ease-out-expo) both',
+        'slide-up': 'slide-up 0.55s var(--ease-out-expo) both',
       },
     },
   },

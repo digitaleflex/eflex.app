@@ -91,10 +91,9 @@ export default async function StatusPage() {
     <div className="min-h-screen flex flex-col">
       <SiteHeader />
 
-      <main className="container flex-1 py-10 sm:py-14 space-y-10">
+      <main id="contenu" className="container flex-1 py-10 sm:py-14 space-y-10">
         <header className="space-y-3">
-          <p className="text-sm font-medium text-primary">Eflex · Disponibilité</p>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Statut des services</h1>
+          <h1 className="text-display-sm font-bold">Statut des services</h1>
           <p className="text-muted-foreground">
             État en temps réel de la plateforme. Dernière vérification : {formatDate(snapshot.checkedAt)}.
           </p>
@@ -160,7 +159,7 @@ export default async function StatusPage() {
                 </p>
                 <div className="h-2 rounded-full bg-muted overflow-hidden" aria-hidden>
                   <div
-                    className="h-full rounded-full bg-success transition-all"
+                    className="h-full rounded-full bg-success transition-[width] duration-500 ease-out-expo"
                     style={{ width: `${entry.percent ?? 0}%` }}
                   />
                 </div>

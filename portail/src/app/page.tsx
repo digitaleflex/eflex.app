@@ -78,12 +78,11 @@ const faqs = [
   },
 ]
 
-function SectionHeading({ eyebrow, title, lead }: { eyebrow: string; title: string; lead?: string }) {
+function SectionHeading({ title, lead }: { title: string; lead?: string }) {
   return (
-    <div className="max-w-2xl space-y-3">
-      <p className="text-sm font-semibold text-primary">{eyebrow}</p>
-      <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-balance">{title}</h2>
-      {lead && <p className="text-lg text-muted-foreground text-balance">{lead}</p>}
+    <div className="max-w-2xl space-y-4">
+      <h2 className="text-display-sm font-bold text-balance">{title}</h2>
+      {lead && <p className="text-lead-lg text-muted-foreground text-pretty">{lead}</p>}
     </div>
   )
 }
@@ -91,12 +90,6 @@ function SectionHeading({ eyebrow, title, lead }: { eyebrow: string; title: stri
 export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col">
-      <a
-        href="#contenu"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-background focus:px-4 focus:py-2 focus:shadow-lg"
-      >
-        Aller au contenu
-      </a>
       <SiteHeader />
 
       <main id="contenu" className="flex-1">
@@ -107,18 +100,13 @@ export default function HomePage() {
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_70%_0%,hsl(var(--primary)/0.12),transparent),radial-gradient(40%_40%_at_0%_30%,hsl(var(--eflex-sky)/0.10),transparent)]"
           />
           <div className="container relative grid items-center gap-12 py-16 md:py-24 lg:grid-cols-[1.05fr_1fr] lg:gap-16">
-            <div className="space-y-8 animate-fade-in">
-              <p className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm font-medium text-primary">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
-                Next.js, Laravel, Python… reconnus automatiquement
-              </p>
-
+            <div className="space-y-9 animate-reveal">
               <div className="space-y-5">
-                <h1 className="text-4xl font-bold tracking-tight text-balance sm:text-5xl lg:text-6xl">
+                <h1 className="text-display font-bold text-balance">
                   Poussez votre code.{' '}
-                  <span className="gradient-text">Eflex le met en ligne.</span>
+                  <span className="text-primary">Eflex le met en ligne.</span>
                 </h1>
-                <p className="max-w-xl text-lg text-muted-foreground sm:text-xl text-pretty">
+                <p className="max-w-xl text-lead-lg text-muted-foreground text-pretty">
                   Indiquez votre dépôt GitHub : Eflex reconnaît la stack, construit l&apos;application et la publie
                   en HTTPS. Pas de serveur à configurer, pas de Dockerfile à écrire.
                 </p>
@@ -127,14 +115,14 @@ export default function HomePage() {
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="/register"
-                  className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-medium text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-medium text-primary-foreground shadow-primary transition-[background-color,box-shadow,transform] duration-200 ease-out-expo hover:bg-primary/90 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   Déployer un projet
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                 </Link>
                 <Link
                   href="#fonctionnement"
-                  className="inline-flex h-12 items-center justify-center rounded-xl border border-input bg-background px-6 text-base font-medium hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="inline-flex h-12 items-center justify-center rounded-xl border border-input bg-background px-6 text-base font-medium transition-[background-color,border-color,transform] duration-200 ease-out-expo hover:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   Voir comment ça marche
                 </Link>
@@ -176,7 +164,6 @@ export default function HomePage() {
         {/* ─── Fonctionnement ─── */}
         <section id="fonctionnement" className="scroll-mt-20 container py-20 md:py-28 space-y-12">
           <SectionHeading
-            eyebrow="Fonctionnement"
             title="Du dépôt à l'URL, en trois étapes"
             lead="Pas de serveur à préparer ni de pipeline à écrire. Vous gardez le contrôle à chaque étape."
           />
@@ -203,7 +190,6 @@ export default function HomePage() {
         <section id="fonctionnalites" className="scroll-mt-20 bg-muted/50 border-y border-border">
           <div className="container py-20 md:py-28 space-y-12">
             <SectionHeading
-              eyebrow="Fonctionnalités"
               title="Pensé pour les vrais projets, pas seulement pour les démos"
               lead="Files d'attente, tâches planifiées, migrations, monorepos : Eflex gère ce que les autres plateformes vous laissent configurer."
             />
@@ -304,7 +290,6 @@ export default function HomePage() {
         <section id="questions" className="scroll-mt-20 container py-20 md:py-28">
           <div className="grid gap-12 lg:grid-cols-[1fr_1.6fr]">
             <SectionHeading
-              eyebrow="Questions"
               title="Questions fréquentes"
               lead="Tout ce qu'il faut savoir avant de déployer votre premier projet."
             />
@@ -329,7 +314,7 @@ export default function HomePage() {
 
         {/* ─── Appel final ─── */}
         <section className="container pb-20 md:pb-28">
-          <div className="relative overflow-hidden rounded-3xl bg-eflexnavy px-6 py-14 text-center text-white sm:px-12 md:py-20">
+          <div className="relative overflow-hidden rounded-2xl bg-eflexnavy px-6 py-14 text-center text-white sm:px-12 md:py-20">
             <div
               aria-hidden="true"
               className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_80%_at_50%_120%,hsl(var(--primary)/0.55),transparent)]"
@@ -343,7 +328,7 @@ export default function HomePage() {
               </p>
               <Link
                 href="/register"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white px-6 text-base font-medium text-eflexnavy shadow-lg hover:bg-white/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-eflexnavy"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white px-6 text-base font-medium text-eflexnavy shadow-md transition-[background-color,box-shadow,transform] duration-200 ease-out-expo hover:bg-white/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-eflexnavy"
               >
                 Créer mon compte
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -363,6 +348,7 @@ export default function HomePage() {
             <Link href="#fonctionnement" className="hover:text-foreground">Fonctionnement</Link>
             <Link href="#fonctionnalites" className="hover:text-foreground">Fonctionnalités</Link>
             <Link href="#questions" className="hover:text-foreground">Questions</Link>
+            <Link href="/status" className="hover:text-foreground">Statut</Link>
             <Link href="/login" className="hover:text-foreground">Connexion</Link>
           </nav>
         </div>

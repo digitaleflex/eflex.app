@@ -47,7 +47,7 @@ export default function RegisterPage() {
         </nav>
       </header>
 
-      <main className="flex-1 flex items-center justify-center p-4">
+      <main id="contenu" className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-8 animate-fade-in">
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">Créer un compte</h1>

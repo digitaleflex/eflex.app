@@ -141,7 +141,7 @@ export function DashboardShell({
         </div>
       </nav>
 
-      <main className="flex-1 min-w-0 pt-14 pb-20 lg:pt-0 lg:pb-0">
+      <main id="contenu" className="flex-1 min-w-0 pt-14 pb-20 lg:pt-0 lg:pb-0">
         <div className="container py-8">{children}</div>
       </main>
     </div>

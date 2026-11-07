@@ -140,7 +140,7 @@ export default function DashboardPage() {
               const lastDeploy = project.deployments[0]
               return (
                 <Link key={project.id} href={`/dashboard/projects/${project.id}`} className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <Card className="p-6 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 space-y-4">
+                  <Card className="p-6 hover:shadow-md hover:-translate-y-0.5 transition-[box-shadow,transform] duration-200 ease-out-expo space-y-4">
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
                         <h3 className="font-semibold truncate">{project.name}</h3>

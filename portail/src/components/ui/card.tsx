@@ -11,9 +11,9 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         className={cn(
-          'rounded-xl',
+          'rounded-xl transition-[box-shadow,border-color] duration-200 ease-out-expo',
           variant === 'default' && 'bg-card text-card-foreground border border-border shadow-sm',
-          variant === 'elevated' && 'bg-card text-card-foreground border border-border shadow-lg',
+          variant === 'elevated' && 'bg-card text-card-foreground border border-border shadow-md',
           variant === 'ghost' && 'bg-transparent',
           className
         )}

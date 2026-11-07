@@ -38,6 +38,14 @@ Auth: Better Auth (`portail/src/lib/auth.ts` serveur, `auth-client.ts` client, `
 
 Prisma: **une seule source de vérité**, `portail/prisma/schema.prisma` (modèles Better Auth + `Project`/`EnvVar`/`Deployment`/`Subscription`). Depuis `portail/` : `npx prisma generate` / `npx prisma migrate dev` / `npx prisma validate`. Il n'existe plus de schéma Prisma à la racine ; la CI valide le schéma avant `tsc --noEmit`.
 
+## Design system & UI
+
+- Skills de design disponibles dans `.agents/skills/` : `tailwind-design-system`, `web-design-guidelines` (règles Vercel), `fixing-accessibility`, `responsive-design`, `improve-ui`, `frontend-ui-ux`. Les charger avant toute retouche d'interface.
+- `portail/src/app/globals.css` est la **source unique des tokens** (Tailwind v3 / HSL) : chaque surface a son `-foreground`, thèmes clair et sombre complets **via `prefers-color-scheme`** (aucun JS, `darkMode: 'media'`), élévation (`--shadow-*`), easing (`--ease-out-expo`), `color-scheme`, `::selection`, scrollbars, focus de secours et `prefers-reduced-motion`. Toutes les paires texte/fond sont ≥ 4.5:1 (AA) dans les deux thèmes.
+- `portail/tailwind.config.ts` relie ces tokens aux utilitaires : échelle fluide `text-display` / `text-display-sm` / `text-lead-lg`, `shadow-sm|md|lg|primary`, `ease-out-expo`.
+- Identité du portail : navy + bleu royal (pas de bascule vers l'Axiom Design DNA, réservé à `docs/design/design-dna/README.md` pour la console du moteur). Inter + JetBrains Mono via `next/font`.
+- Règles UI : pas de texte en dégradé, pas d'« eyebrow »/kicker au-dessus d'un titre, pas de `transition-all` (propriétés explicites), focus visible partout, cibles tactiles ≥ 44 px, `tabular-nums` pour les valeurs techniques, libellés et messages en français.
+
 ## Detector / renderer rules
 
 - Detection precedence in `detect.ts`: valid `eflex.json` > `Dockerfile` > monorepo resolution > candidates in `collectCandidates` order; **invalid** `eflex.json` → `plan: null` (no fallback).

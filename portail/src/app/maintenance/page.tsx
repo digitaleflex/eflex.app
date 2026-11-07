@@ -13,7 +13,7 @@ export default function MaintenancePage() {
   const message = process.env.MAINTENANCE_MESSAGE
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center gap-8 bg-background px-4 text-center">
+    <main id="contenu" className="min-h-screen flex flex-col items-center justify-center gap-8 bg-background px-4 text-center">
       <Image src="/logo-horizontal.webp" alt="Eflex" width={1200} height={312} className="h-8 w-auto" priority />
 
       <div className="max-w-lg space-y-4">
@@ -22,8 +22,7 @@ export default function MaintenancePage() {
             <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z" />
           </svg>
         </div>
-        <p className="text-sm font-medium uppercase tracking-widest text-primary">Maintenance</p>
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Nous revenons très vite</h1>
+        <h1 className="text-display-sm font-bold">Nous revenons très vite</h1>
         <p className="text-muted-foreground">
           {message ||
             'Une opération de maintenance est en cours sur la plateforme Eflex. Les services seront de retour dès que possible.'}

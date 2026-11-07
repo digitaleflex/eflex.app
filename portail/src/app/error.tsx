@@ -15,10 +15,9 @@ export default function ErrorPage({
   }, [error])
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center gap-7 bg-background px-4 text-center">
+    <main id="contenu" className="min-h-screen flex flex-col items-center justify-center gap-7 bg-background px-4 text-center">
       <div className="space-y-3">
-        <p className="text-sm font-medium uppercase tracking-widest text-destructive">Erreur 500</p>
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Une erreur est survenue</h1>
+        <h1 className="text-display-sm font-bold">Une erreur est survenue</h1>
         <p className="max-w-md text-muted-foreground">
           Nous n&apos;avons pas pu afficher cette page. Réessayez : si le problème persiste, consultez le statut des services.
         </p>
