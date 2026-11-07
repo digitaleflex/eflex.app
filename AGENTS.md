@@ -13,6 +13,7 @@ Ce dépôt fusionne `digitaleflex/eflex.app` (produit EFLEX, TypeScript) et `dig
 - `packages/detector` — deterministic repo snapshot → `BuildPlan`; no network/LLM/runtime deps. Entry: `src/detect.ts` (`detect`), CLI `src/cli.ts`.
 - `packages/renderer` — `BuildPlan` → docker-compose YAML + nginx/env templates. Entry: `src/render.ts`; yaml dependency.
 - `schema/v1.json` — authoritative JSON Schema for plans; `schema/test.ts` validates every fixture plan/alternative via Ajv.
+- `config/domains.sh` — **source unique** des domaines/URLs publics (un seul `EFLEX_ROOT_DOMAIN`, aucune valeur secrète) ; `scripts/sync-domains.sh` régénère les fichiers statiques qui ne peuvent pas interpoler `${VAR}`.
 - `portail/` — Next.js 15 App Router portal (Better Auth, Prisma, Coolify client). **Not** in root pnpm workspace; has own `package-lock.json`; use `npm` there.
 - `README.md` (detector behavior), `DEV.md`/`PROD.md` (infra), `schema/README.md` (plan contract).
 
@@ -51,7 +52,7 @@ Prisma: **une seule source de vérité**, `portail/prisma/schema.prisma` (modèl
 
 - Dev: `docker compose -f docker-compose.dev.yml up -d` (Postgres 5432, Redis 6379, MinIO 9000/9001). Coolify is **intentionally remote**; set `COOLIFY_API_URL`/`COOLIFY_API_TOKEN` in `.env`.
 - Prod: `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d`; portal image from `Dockerfile.portail` (standalone) or `portail/Dockerfile`. `.env.prod` must **never** be committed.
-- Domaine de production : `https://eflex.app` (apex = portail, `api.eflex.app` = moteur Axiom, `*.eflex.app` = applications déployées). Redirect Google OAuth : `https://eflex.app/api/auth/callback/google`. Les anciens hôtes `*.eurinhash.com` sont abandonnés.
+- Domaines/URLs publics : **source unique** `config/domains.sh` (une seule variable `EFLEX_ROOT_DOMAIN`, le reste est dérivé et exporté). Aucun domaine codé en dur dans les fichiers Compose ou les scripts : `deploy.sh` source ce fichier. Après un changement : `bash scripts/sync-domains.sh` puis `bash deploy.sh`. Les anciens hôtes `*.eurinhash.com` sont abandonnés.
 - `.next/`, `*.tsbuildinfo`, `portail/.env`, and root `.env` are local artifacts; do not commit them.
 - `.env.example` is tracked; `.env.prod.example` is tracked per the gitignore exception `!.env.prod.example`.
 

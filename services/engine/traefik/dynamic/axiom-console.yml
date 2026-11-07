@@ -1,3 +1,5 @@
+# GÉNÉRÉ — ne pas éditer. Source : services/engine/traefik/dynamic/axiom-console.yml.tpl
+# Régénérer avec : bash scripts/sync-domains.sh
 # Static Traefik config for Axiom Console (main domain)
 # This file is managed manually; per-deployment configs are managed by the Agent
 # via axiom-<deploymentID>.yml files in the same directory.

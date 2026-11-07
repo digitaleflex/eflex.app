@@ -11,8 +11,11 @@
 # déjà un Traefik sur le réseau Docker externe `proxy`, avec le certresolver
 # `letsencrypt`. Le portail s'y rattache uniquement via ses labels.
 # ---------------------------------------------------------------------------
+# Domaines : AUCUN domaine codé en dur. `bash deploy.sh` source
+# `config/domains.sh` (source unique) ; pour un appel direct à Compose, faire
+# `set -a; . ./config/domains.sh; set +a` au préalable.
 # Prérequis :
-#   1. cp .env.prod.example .env.prod  (puis adapter les secrets)
+#   1. cp .env.prod.example .env.prod  (puis adapter les secrets uniquement)
 #   2. un Traefik existant sur le réseau `proxy` (docker network inspect proxy)
 #   3. bash deploy.sh
 # ---------------------------------------------------------------------------
@@ -35,18 +38,18 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-      - BETTER_AUTH_URL=${BETTER_AUTH_URL}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:?sourcer config/domains.sh}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - COOLIFY_API_URL=${COOLIFY_API_URL}
       - COOLIFY_API_TOKEN=${COOLIFY_API_TOKEN}
-      - PORTAL_DOMAIN=${PORTAL_DOMAIN}
-      - PORTAL_URL=${PORTAL_URL}
+      - PORTAL_DOMAIN=${PORTAL_DOMAIN:?sourcer config/domains.sh}
+      - PORTAL_URL=${PORTAL_URL:?sourcer config/domains.sh}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.portail.rule=Host(`${PORTAL_DOMAIN}`)"
+      - "traefik.http.routers.portail.rule=Host(`${PORTAL_DOMAIN:?sourcer config/domains.sh}`)"
       - "traefik.http.routers.portail.entrypoints=websecure"
       - "traefik.http.routers.portail.tls.certresolver=letsencrypt"
       - "traefik.http.services.portail.loadbalancer.server.port=3000"

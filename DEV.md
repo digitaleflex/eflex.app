@@ -37,6 +37,10 @@ Coolify prend le contrôle total de `docker.sock` et lance son propre reverse pr
 
 ## 4. Les variables d'environnement à remplir
 
+> Les domaines/URLs publics ne sont **pas** définis ici : leur source unique est
+> `config/domains.sh` (`EFLEX_ROOT_DOMAIN`). En dev, les valeurs ci-dessous
+> restent en `localhost` et surchargent ces exports.
+
 | Variable | Exemple dev |
 |---|---|
 | `DATABASE_URL` | `postgresql://eflex:eflexpass@localhost:5432/eflex` |

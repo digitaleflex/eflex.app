@@ -1,3 +1,5 @@
+# Domaines : `set -a; . ./config/domains.sh; set +a` avant toute commande,
+# ou passer par `bash deploy.sh`. Aucun domaine n'est codé en dur ici.
 services:
   portail:
     build:
@@ -14,14 +16,14 @@ services:
       - HOSTNAME=0.0.0.0
       - DATABASE_URL=${DATABASE_URL}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-https://eflex.app}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:?sourcer config/domains.sh}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - 'traefik.http.routers.portail.rule=Host(`eflex.app`)'
+      - 'traefik.http.routers.portail.rule=Host(`${PORTAL_DOMAIN:?sourcer config/domains.sh}`)'
       - "traefik.http.routers.portail.entrypoints=websecure"
       - "traefik.http.routers.portail.tls=true"
       - "traefik.http.routers.portail.tls.certresolver=letsencrypt"

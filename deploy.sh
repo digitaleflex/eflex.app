@@ -6,6 +6,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+# Source unique des domaines : une seule variable à modifier dans config/domains.sh.
+# Les variables exportées sont prioritaires sur --env-file pour l'interpolation Compose.
+set -a
+. ./config/domains.sh
+set +a
+
 if [ ! -f .env.prod ]; then
   echo "ERREUR : .env.prod introuvable."
   echo "Copie d'abord : cp .env.prod.example .env.prod  (puis renseigne les secrets)"
@@ -38,4 +44,4 @@ echo "Logs portail (20 dernières lignes) :"
 
 echo
 echo "Déploiement terminé. Vérifie la santé avec :"
-echo "  curl -f https://eflex.app/api/health"
+echo "  curl -f ${PORTAL_URL}/api/health"

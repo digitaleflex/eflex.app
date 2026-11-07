@@ -6,6 +6,10 @@ on:
       - "packages/**"
       - "portail/**"
       - "schema/**"
+      - "config/**"
+      - "scripts/**"
+      - "deploy.sh"
+      - "docker-compose*.yml"
       - "vitest.config.ts"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -16,6 +20,10 @@ on:
       - "packages/**"
       - "portail/**"
       - "schema/**"
+      - "config/**"
+      - "scripts/**"
+      - "deploy.sh"
+      - "docker-compose*.yml"
       - "vitest.config.ts"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -48,6 +56,10 @@ jobs:
         run: pnpm test
       - name: Typecheck (détecteur + renderer)
         run: pnpm typecheck
+      - name: Domaines — fichiers générés à jour
+        run: |
+          bash scripts/sync-domains.sh
+          git diff --exit-code -- services/engine/traefik/dynamic/axiom-console.yml schema/v1.json schema/README.md
 
       - name: Install (portail, npm)
         working-directory: portail

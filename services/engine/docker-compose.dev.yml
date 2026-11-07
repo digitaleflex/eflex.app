@@ -1,8 +1,10 @@
 # Axiom Local Development Stack with Traefik
-# Usage: docker compose -f docker-compose.dev.yml up -d
+# Usage: set -a; . ../../config/domains.sh; set +a
+#        docker compose -f docker-compose.dev.yml up -d
+# Domaines : source unique ../../config/domains.sh (aucun domaine codé en dur).
 #
 # Prerequisites:
-# 1. Domain axiom.eflex.app DNS A record -> your server IP
+# 1. Domaine : $AXIOM_CONSOLE_DOMAIN (config/domains.sh) -> A/AAAA vers IP serveur
 # 2. Ports 80, 443, 8080 open on firewall
 # 3. Traefik dashboard at http://localhost:8081 (dev only)
 
@@ -29,7 +31,7 @@ services:
       - "--api.dashboard=true"
       - "--api.insecure=true"  # Dev only! Disable in production
       # Certificates (Let's Encrypt)
-      - "--certificatesresolvers.le.acme.email=admin@eflex.app"
+      - "--certificatesresolvers.le.acme.email=${ACME_EMAIL:?sourcer config/domains.sh}"
       - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
       - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
       # Logging
@@ -92,7 +94,7 @@ services:
       - AXIOM_DB_REQUIRED=true
       - AXIOM_API_TOKEN=dev-token-12345
       - AXIOM_SECRET_KEY=hZhSurh2b1DMddWFzgGhGp8zrdAoTnbvUV6brhONS5U=
-      - AXIOM_CONSOLE_URL=https://axiom.eflex.app
+      - AXIOM_CONSOLE_URL=${AXIOM_CONSOLE_URL:?sourcer config/domains.sh}
       - AXIOM_DOCKER_BINARY=docker
       - AXIOM_LOG_LEVEL=info
     ports:
@@ -105,9 +107,9 @@ services:
     networks:
       - axiom-network
     labels:
-      # Traefik: expose Engine API at api.eflex.app (optional)
+      # Traefik: expose Engine API on $ENGINE_API_DOMAIN (config/domains.sh)
       - "traefik.enable=true"
-      - "traefik.http.routers.engine-api.rule=Host(`api.eflex.app`)"
+      - "traefik.http.routers.engine-api.rule=Host(`${ENGINE_API_DOMAIN:?sourcer config/domains.sh}`)"
       - "traefik.http.routers.engine-api.entrypoints=websecure"
       - "traefik.http.routers.engine-api.tls.certresolver=le"
       - "traefik.http.services.engine-api.loadbalancer.server.port=8080"

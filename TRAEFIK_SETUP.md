@@ -1,7 +1,9 @@
 # Axiom + Traefik + Domain Setup Guide
 
+> **Source unique des domaines : `config/domains.sh`** (une seule variable `EFLEX_ROOT_DOMAIN`). Avant les exemples ci-dessous : `set -a; . ./config/domains.sh; set +a`. Aucun domaine n'est codé en dur dans ce guide ; après un changement, lancer `bash scripts/sync-domains.sh`.
+
 ## 🎯 Objectif
-Connecter `axiom.eflex.app` (et `api.eflex.app`) au stack Axiom via Traefik avec SSL Let's Encrypt automatique.
+Connecter `${AXIOM_CONSOLE_DOMAIN}` (et `${ENGINE_API_DOMAIN}`) au stack Axiom via Traefik avec SSL Let's Encrypt automatique.
 
 ---
 
@@ -9,28 +11,28 @@ Connecter `axiom.eflex.app` (et `api.eflex.app`) au stack Axiom via Traefik avec
 
 | Élément | Valeur |
 |---------|--------|
-| **Domaine** | `axiom.eflex.app` |
+| **Domaine** | `${AXIOM_CONSOLE_DOMAIN}` |
 | **DNS A record** | Doit pointer vers **l'IP publique de votre serveur** |
 | **Ports ouverts** | 80 (HTTP), 443 (HTTPS), 8080 (Engine API), 8081 (Traefik dashboard) |
-| **Email Let's Encrypt** | `admin@eflex.app` (à changer dans docker-compose.dev.yml) |
+| **Email Let's Encrypt** | `${ACME_EMAIL}` (défini dans `config/domains.sh`) |
 
-### Zone DNS unique `eflex.app`
+### Zone DNS unique `${EFLEX_ROOT_DOMAIN}`
 
-Tous les hôtes sont centralisés sur `eflex.app` (un seul certificat wildcard `*.eflex.app`). Les anciens hôtes `*.eurinhash.com` sont abandonnés.
+Tous les hôtes sont centralisés sur `${EFLEX_ROOT_DOMAIN}`. `${WILDCARD_DOMAIN}` est un enregistrement de **routage DNS** : le résolveur `le`/HTTP-01 émet un certificat par hôte et ne peut pas délivrer de wildcard (utiliser `letsencrypt-dns`/DNS-01 pour cela). Les anciens hôtes `*.eurinhash.com` sont abandonnés.
 
 | Hôte | Rôle | Enregistrement |
 |------|------|----------------|
-| `eflex.app` | Console EFLEX / portail (hors de ce stack) | A/AAAA → IP du serveur |
-| `api.eflex.app` | API REST du moteur Axiom | A/AAAA → IP du serveur |
-| `axiom.eflex.app` | Cloud Console Axiom héritée | A/AAAA → IP du serveur |
-| `*.eflex.app` | Applications clientes déployées | A/AAAA wildcard → IP du serveur |
+| `${EFLEX_ROOT_DOMAIN}` | Console EFLEX / portail (hors de ce stack) | A/AAAA → IP du serveur |
+| `${ENGINE_API_DOMAIN}` | API REST du moteur Axiom | A/AAAA → IP du serveur |
+| `${AXIOM_CONSOLE_DOMAIN}` | Cloud Console Axiom héritée | A/AAAA → IP du serveur |
+| `${WILDCARD_DOMAIN}` | Applications clientes déployées | A/AAAA wildcard → IP du serveur |
 
 Pour HTTP-01, ces enregistrements doivent pointer en direct sur l'IP du serveur (pas de proxy Cloudflare orange), sinon utilisez DNS-01.
 
 ### Vérifier le DNS
 ```bash
 # Doit retourner VOTRE IP serveur (pas Cloudflare)
-dig +short axiom.eflex.app A
+dig +short ${AXIOM_CONSOLE_DOMAIN} A
 ```
 
 ---
@@ -39,7 +41,7 @@ dig +short axiom.eflex.app A
 
 ### 1. Démarrer le stack
 ```bash
-cd /home/audest/axiom/services/engine
+cd services/engine
 
 # Construire les images
 docker compose -f docker-compose.dev.yml build
@@ -54,19 +56,19 @@ docker compose -f docker-compose.dev.yml logs -f
 ### 2. Vérifier les services
 | Service | URL | Description |
 |---------|-----|-------------|
-| **Engine API** | https://api.eflex.app | API REST Axiom |
-| **Cloud Console** | https://axiom.eflex.app | Interface web (à déployer séparément) |
+| **Engine API** | ${ENGINE_API_URL} | API REST Axiom |
+| **Cloud Console** | ${AXIOM_CONSOLE_URL} | Interface web (à déployer séparément) |
 | **Traefik Dashboard** | http://localhost:8081 | Dashboard Traefik (dev only) |
 | **PostgreSQL** | localhost:5432 | DB (user: axiom, pass: axiom) |
 
 ### 3. Tester l'API
 ```bash
 # Health check
-curl https://api.eflex.app/api/v1/health
+curl ${ENGINE_API_URL}/api/v1/health
 
 # Auth (avec token .env)
 curl -H "Authorization: Bearer dev-token-12345" \
-  https://api.eflex.app/api/v1/auth/me
+  ${ENGINE_API_URL}/api/v1/auth/me
 ```
 
 ---
@@ -80,7 +82,8 @@ services/engine/
 ├── Dockerfile                      # Engine image
 ├── traefik/
 │   └── dynamic/
-│       └── axiom-console.yml       # Config statique (console + API)
+│       ├── axiom-console.yml.tpl   # SOURCE (règles Host en ${VAR})
+│       └── axiom-console.yml       # GÉNÉRÉ par scripts/sync-domains.sh
 └── .env                            # Variables d'environnement
 ```
 
@@ -102,44 +105,44 @@ L'Agent écrit dans `/etc/traefik/dynamic/` (partagé via volume) :
 ```bash
 # 1. Connecter GitHub (si configuré)
 curl -X POST -H "Authorization: Bearer dev-token-12345" \
-  https://api.eflex.app/api/v1/github/connections \
+  ${ENGINE_API_URL}/api/v1/github/connections \
   -d '{"clientId": "...", "clientSecret": "..."}'
 
 # 2. Lister repos
 curl -H "Authorization: Bearer dev-token-12345" \
-  https://api.eflex.app/api/v1/github/connections/ghc_xxx/repositories
+  ${ENGINE_API_URL}/api/v1/github/connections/ghc_xxx/repositories
 
 # 3. Créer application
 curl -X POST -H "Authorization: Bearer dev-token-12345" \
-  https://api.eflex.app/api/v1/applications \
+  ${ENGINE_API_URL}/api/v1/applications \
   -d '{"repositoryId": "repo_xxx", "name": "mon-app"}'
 
 # 4. Analyser
 curl -X POST -H "Authorization: Bearer dev-token-12345" \
-  https://api.eflex.app/api/v1/applications/app_xxx/analysis \
+  ${ENGINE_API_URL}/api/v1/applications/app_xxx/analysis \
   -d '{"ref": "main"}'
 
 # 5. Voir profil détecté
 curl -H "Authorization: Bearer dev-token-12345" \
-  https://api.eflex.app/api/v1/applications/app_xxx/profile
+  ${ENGINE_API_URL}/api/v1/applications/app_xxx/profile
 
 # 6. Créer plan de déploiement
 curl -X POST -H "Authorization: Bearer dev-token-12345" \
-  https://api.eflex.app/api/v1/applications/app_xxx/deployment-plans \
-  -d '{"serverId": "srv_local", "environment": "production", "domain": "mon-app.eflex.app"}'
+  ${ENGINE_API_URL}/api/v1/applications/app_xxx/deployment-plans \
+  -d "{\"serverId\": \"srv_local\", \"environment\": \"production\", \"domain\": \"mon-app.${EFLEX_ROOT_DOMAIN}\"}"
 
 # 7. Déployer
 curl -X POST -H "Authorization: Bearer dev-token-12345" \
-  https://api.eflex.app/api/v1/applications/app_xxx/deployments \
+  ${ENGINE_API_URL}/api/v1/applications/app_xxx/deployments \
   -d '{"planId": "plan_xxx"}'
 
 # 8. Suivre progression (SSE)
 curl -H "Authorization: Bearer dev-token-12345" \
-  https://api.eflex.app/api/v1/deployments/dep_xxx/events/stream
+  ${ENGINE_API_URL}/api/v1/deployments/dep_xxx/events/stream
 ```
 
 ### Résultat
-- L'application sera accessible à `https://mon-app.eflex.app`
+- L'application sera accessible à `https://mon-app.${EFLEX_ROOT_DOMAIN}`
 - Traefik gère automatiquement : SSL, routage, health checks
 - L'agent gère : Docker, logs, recovery
 
@@ -189,7 +192,7 @@ docker compose -f docker-compose.dev.yml up -d traefik
 | Sujet | Note |
 |-------|------|
 | **DNS** | Doit pointer vers l'IP du serveur (pas Cloudflare proxy orange) pour Let's Encrypt HTTP-01 |
-| **Email Let's Encrypt** | Changez `admin@eflex.app` dans docker-compose.dev.yml |
+| **Email Let's Encrypt** | Modifier `EFLEX_ROOT_DOMAIN` dans `config/domains.sh` puis `bash scripts/sync-domains.sh` |
 | **Traefik Dashboard** | Accessible sur port 8081 (localhost seulement), `--api.insecure=true` = dev only |
 | **Agent Data** | Persisté dans volume `agent-data` → `/data` |
 | **Dynamic Config** | Partagé via `./traefik/dynamic:/etc/traefik/dynamic` (Engine host ↔ Traefik ↔ Agent) |
@@ -221,9 +224,9 @@ agent-data              → /data                     (Agent identity, credentia
 
 ## 🎯 Prochaines Étapes
 
-1. **Configurer DNS** : `axiom.eflex.app` A → votre IP serveur
+1. **Configurer DNS** : `${AXIOM_CONSOLE_DOMAIN}` A → votre IP serveur
 2. **Lancer stack** : `docker compose -f docker-compose.dev.yml up -d`
 3. **Attendre certificats** : ~30-60s pour Let's Encrypt
-4. **Tester API** : `curl https://api.eflex.app/api/v1/health`
+4. **Tester API** : `curl ${ENGINE_API_URL}/api/v1/health`
 5. **Déployer Cloud Console** : Build React app → servir via Traefik
 6. **Premier déploiement** : Suivre guide "Déployer une Application" ci-dessus
