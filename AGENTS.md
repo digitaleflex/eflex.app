@@ -39,6 +39,10 @@ Auth: Better Auth (`portail/src/lib/auth.ts` serveur, `auth-client.ts` client, `
 
 Prisma: from `portail/` run `npx prisma generate` / `npx prisma migrate dev`. `prisma/schema.prisma` (racine) est synchronisé avec `portail/prisma/schema.prisma` (modèles auth + `Project`/`EnvVar`/`Deployment`/`Subscription`) ; toute dérive doit être réconciliée avant `tsc --noEmit` du portail.
 
+Axiom (Go) : `cd services/<engine|agent|orchestrator> && go test ./... -count=1 -p 1`. Avec PostgreSQL : `AXIOM_TEST_DATABASE_URL=postgres://axiom:axiom@127.0.0.1:5432/axiom?sslmode=disable`. Tests Docker réels : `AXIOM_TEST_DOCKER=1` (plus `AXIOM_TEST_E2E=1` pour `engine/internal/e2e`). La CI ne les lance que pour le moteur (`./internal/e2e/`, `./internal/build/`), pas pour l'agent. État vérifié du moteur (ce qui est prouvé ou non) : `docs/roadmap/parallel-plan.md`, section « Verified status ».
+
+Docker dans la sandbox cloud : `dockerd` est installé mais à démarrer à la main, avec `HTTPS_PROXY` et sans `--bridge=none` (sans réseau de pont, aucun port ne se publie) : `dockerd --host=unix:///var/run/docker.sock --iptables=false --ip6tables=false --registry-mirror=https://mirror.gcr.io &`. Docker Hub limite les téléchargements anonymes : passer par le miroir. Les `RUN` d'un build qui sortent sur Internet exigent `--build-arg HTTPS_PROXY` (et `--network=host`). Rien de tout cela ne persiste d'une session à l'autre ; nettoyer avec `docker system prune -af`.
+
 ## Detector / renderer rules
 
 - Detection precedence in `detect.ts`: valid `eflex.json` > `Dockerfile` > monorepo resolution > candidates in `collectCandidates` order; **invalid** `eflex.json` → `plan: null` (no fallback).

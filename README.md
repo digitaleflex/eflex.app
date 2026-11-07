@@ -48,6 +48,8 @@ Documentation détaillée :
 3. **Une seule console** : la console client EFLEX (charte EFLEX, en français) construite sur l'API du moteur ; retrait de Coolify, de `apps/cloud` et de `apps/client-dashboard`.
 4. Ensuite seulement, retrait de `packages/detector`, `packages/renderer` et `schema/`.
 
+État vérifié du moteur Axiom (tests exécutés, ce qui est prouvé et ce qui ne l'est pas encore) : [`docs/roadmap/parallel-plan.md`](./docs/roadmap/parallel-plan.md), section « Verified status ».
+
 ## Commandes
 
 ```bash
