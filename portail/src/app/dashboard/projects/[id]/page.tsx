@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft, ExternalLink, GitBranch, Globe, KeyRound } from 'lucide-react'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { resolveOrganization } from '@/lib/organizations'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { FrameworkIcon } from '@/components/framework-icon'
@@ -43,8 +44,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   if (!session?.user?.id) redirect('/login')
 
   const { id } = await params
+  const org = await resolveOrganization(session)
+  if (!org) notFound()
   const project = await prisma.project.findFirst({
-    where: { id, userId: session.user.id },
+    where: { id, organizationId: org.organizationId },
     include: {
       envVars: { select: { key: true }, orderBy: { key: 'asc' } },
       deployments: { orderBy: { createdAt: 'desc' }, take: 10 },

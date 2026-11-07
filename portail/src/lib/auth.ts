@@ -1,8 +1,10 @@
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { nextCookies } from 'better-auth/next-js'
+import { admin, organization } from 'better-auth/plugins'
 import { compare, hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
+import { personalOrganizationSlug } from '@/lib/organizations'
 
 const googleConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
 
@@ -33,6 +35,47 @@ export const auth = betterAuth({
       }
     : {},
 
-  // Doit rester en dernier : permet de poser les cookies depuis les Server Actions.
-  plugins: [nextCookies()],
+  databaseHooks: {
+    user: {
+      create: {
+        // Plateforme : les adresses listées dans ADMIN_EMAILS deviennent administrateurs.
+        before: async (user) => {
+          const admins = (process.env.ADMIN_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+          return { data: admins.includes(user.email.toLowerCase()) ? { ...user, role: 'admin' } : user }
+        },
+        // Multi-tenant : chaque compte démarre avec son organisation personnelle.
+        after: async (user) => {
+          await prisma.organization.create({
+            data: {
+              name: user.name,
+              slug: personalOrganizationSlug(user.id),
+              members: { create: { userId: user.id, role: 'owner' } },
+            },
+          })
+        },
+      },
+    },
+    session: {
+      create: {
+        // Organisation active par défaut : la première dont l'utilisateur est membre.
+        before: async (session) => {
+          const member = await prisma.member.findFirst({
+            where: { userId: session.userId },
+            orderBy: { createdAt: 'asc' },
+            select: { organizationId: true },
+          })
+          return { data: { ...session, activeOrganizationId: member?.organizationId ?? null } }
+        },
+      },
+    },
+  },
+
+  plugins: [
+    // Organisations : membres, rôles (owner / admin / member) et invitations.
+    organization({ organizationLimit: 10 }),
+    // Administration de la plateforme (utilisateurs, suspension, usurpation).
+    admin(),
+    // Doit rester en dernier : permet de poser les cookies depuis les Server Actions.
+    nextCookies(),
+  ],
 })

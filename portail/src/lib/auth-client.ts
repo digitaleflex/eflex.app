@@ -1,9 +1,10 @@
 'use client'
 
 import { createAuthClient } from 'better-auth/react'
+import { adminClient, organizationClient } from 'better-auth/client/plugins'
 
 // Sans baseURL, le client appelle /api/auth sur l'origine courante.
-export const authClient = createAuthClient()
+export const authClient = createAuthClient({ plugins: [organizationClient(), adminClient()] })
 
 export const { signIn, signUp, signOut, useSession } = authClient
 

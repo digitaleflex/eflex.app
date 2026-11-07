@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { resolveOrganization } from '@/lib/organizations'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
@@ -10,9 +11,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params
 
-  // Le filtre sur userId garantit qu'un utilisateur ne lit que ses propres projets.
+  const org = await resolveOrganization(session)
+  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+
+  // Le filtre sur l'organisation garantit qu'on ne lit que les projets de son organisation.
   const project = await prisma.project.findFirst({
-    where: { id, userId: session.user.id },
+    where: { id, organizationId: org.organizationId },
     select: {
       id: true,
       name: true,

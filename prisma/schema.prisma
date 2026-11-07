@@ -17,24 +17,34 @@ model User {
   email         String        @unique
   emailVerified Boolean       @default(false)
   image         String?
+  // Plugin admin : rôle plateforme ("user" | "admin"), suspension.
+  role          String?
+  banned        Boolean       @default(false)
+  banReason     String?
+  banExpires    DateTime?
   sessions      Session[]
   accounts      Account[]
   projects      Project[]
+  members       Member[]
+  invitations   Invitation[]  @relation("InvitationInviter")
   subscription  Subscription?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  expiresAt DateTime
-  token     String   @unique
-  ipAddress String?
-  userAgent String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  expiresAt            DateTime
+  token                String   @unique
+  ipAddress            String?
+  userAgent            String?
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Plugin organization : organisation active de la session. Plugin admin : usurpation.
+  activeOrganizationId String?
+  impersonatedBy       String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   @@index([userId])
 }
@@ -69,28 +79,75 @@ model Verification {
   @@index([identifier])
 }
 
+// ─── Multi-tenant (plugin organization) ─────────────────────────────────────
+// Tout projet appartient à une organisation. Chaque utilisateur a une organisation
+// personnelle créée à l'inscription. Rôles : owner, admin, member.
+model Organization {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  logo        String?
+  metadata    String?      @db.Text
+  createdAt   DateTime     @default(now())
+  members     Member[]
+  invitations Invitation[]
+  projects    Project[]
+}
+
+model Member {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String       @default("member")
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+model Invitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           String?
+  status         String       @default("pending")
+  expiresAt      DateTime
+  inviterId      String
+  inviter        User         @relation("InvitationInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([email])
+}
+
 model Project {
-  id            String     @id @default(cuid())
-  userId        String
-  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name          String
-  slug          String     @unique // ex: "mon-projet-42"
-  repoUrl       String
-  branch        String     @default("main")
-  framework     String      // laravel, nextjs, node, python, static
-  runtime       String?     // node@22, php@8.3, etc.
-  domain        String?     // domaine client, sans protocole
-  coolifyAppId  String?     // ID côté Coolify (null jusqu'au premier déploiement)
-  coolifyWorkers Json?      // applications Coolify des services annexes : { "queue": "uuid", … }
-  plan          Json?       // BuildPlan retenu à la création (voir packages/detector)
-  detection     Json?       // résultat de l'analyse : confiance, raisons, avertissements, commit
-  port          Int         @default(80)
-  envVars       EnvVar[]
-  deployments   Deployment[]
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String // créateur du projet
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  slug           String       @unique // ex: "mon-projet-42"
+  repoUrl        String
+  branch         String       @default("main")
+  framework      String // laravel, nextjs, node, python, static
+  runtime        String? // node@22, php@8.3, etc.
+  domain         String? // domaine client, sans protocole
+  coolifyAppId   String? // ID côté Coolify (null jusqu'au premier déploiement)
+  coolifyWorkers Json? // applications Coolify des services annexes : { "queue": "uuid", … }
+  plan           Json? // BuildPlan retenu à la création (voir packages/detector)
+  detection      Json? // résultat de l'analyse : confiance, raisons, avertissements, commit
+  port           Int          @default(80)
+  envVars        EnvVar[]
+  deployments    Deployment[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@index([userId])
+  @@index([organizationId])
   @@index([slug])
 }
 
@@ -98,12 +155,12 @@ model EnvVar {
   id        String   @id @default(cuid())
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  key       String   // ex: DATABASE_URL, NEXT_PUBLIC_URL
-  value     String   // chiffre au repos (libsodium ou pgcrypto)
+  key       String // ex: DATABASE_URL, NEXT_PUBLIC_URL
+  value     String // chiffre au repos (libsodium ou pgcrypto)
   updatedAt DateTime @updatedAt
 
-  @@index([projectId])
   @@unique([projectId, key])
+  @@index([projectId])
 }
 
 model Deployment {
@@ -124,8 +181,8 @@ model Subscription {
   id               String   @id @default(cuid())
   userId           String   @unique
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status           String   // active, cancelled, past_due, trialing
-  plan             String   // starter, pro, agency
+  status           String // active, cancelled, past_due, trialing
+  plan             String // starter, pro, agency
   priceCents       Int      @default(0)
   providerRef      String?
   currentPeriodEnd DateTime

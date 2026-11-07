@@ -4,6 +4,7 @@ import { z } from 'zod'
 import type { BuildPlan } from '@eflex/detector'
 import type { Prisma } from '@prisma/client'
 import { getSession } from '@/lib/session'
+import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { prisma } from '@/lib/prisma'
 import { allow } from '@/lib/rate-limit'
 import { CoolifyClient, loadCoolifyConfig } from '@/lib/coolify'
@@ -65,6 +66,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
   const userId = session.user.id
+
+  const org = await resolveOrganization(session)
+  if (!org) return NextResponse.json({ error: "Aucune organisation active." }, { status: 403 })
+  if (!canManageProjects(org.role)) {
+    return NextResponse.json({ error: "Votre rôle dans cette organisation ne permet pas de créer des projets." }, { status: 403 })
+  }
 
   if (!allow(`create:${userId}`, 10, 60_000)) {
     return NextResponse.json({ error: 'Trop de créations en peu de temps. Patientez une minute.' }, { status: 429 })
@@ -128,6 +135,7 @@ export async function POST(request: NextRequest) {
     const created = await tx.project.create({
       data: {
         userId,
+        organizationId: org.organizationId,
         name: input.name,
         slug,
         repoUrl: repo.url,
@@ -209,8 +217,11 @@ export async function GET() {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
+  const org = await resolveOrganization(session)
+  if (!org) return NextResponse.json({ projects: [] })
+
   const projects = await prisma.project.findMany({
-    where: { userId: session.user.id },
+    where: { organizationId: org.organizationId },
     // Le plan et le détail de l'analyse n'ont pas à transiter dans la liste.
     select: {
       id: true,
