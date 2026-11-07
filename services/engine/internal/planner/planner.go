@@ -140,6 +140,8 @@ func runtimeType(p ApplicationProfile) string {
 		return "static"
 	case "go":
 		return "go"
+	case "python":
+		return "python"
 	case "dockerfile":
 		return "image"
 	case "compose":

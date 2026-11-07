@@ -16,7 +16,7 @@ type Hints struct {
 	StartCommand   *string `json:"startCommand,omitempty"`
 	Port           *int    `json:"port,omitempty"`
 	HealthPath     *string `json:"healthPath,omitempty"`
-	Entrypoint     *string `json:"entrypoint,omitempty"`    // Go main package
+	Entrypoint     *string `json:"entrypoint,omitempty"`    // Go main package, or Python "module:attribute"
 	Strategy       *string `json:"strategy,omitempty"`      // dockerfile | compose | source
 	PublicService  *string `json:"publicService,omitempty"` // compose
 }
@@ -90,6 +90,8 @@ func Build(res evidence.Result, src Source, in Inputs) Profile {
 		}
 	} else if preset.Runtime == "go" {
 		p.PackageManager = Field[string]{Value: "go", Provenance: ProvenanceDetected, Confidence: 1}
+	} else if preset.Runtime == "python" {
+		p.PackageManager = Field[string]{Value: "pip", Provenance: ProvenanceDetected, Confidence: 1}
 	}
 
 	// Go entrypoint choice.
@@ -100,6 +102,21 @@ func Build(res evidence.Result, src Source, in Inputs) Profile {
 			preset.BuildCommand = presets.GoBuild(entry)
 		case len(preset.EntrypointCandidates) > 1:
 			b.issue(Issue{Field: "entrypoint", Code: "ambiguous", Message: "Several main packages were found; choose the one to deploy", Options: preset.EntrypointCandidates})
+		}
+	}
+
+	// Python application object choice.
+	if preset.Name == presets.Python {
+		entry := b.hintString(func(h Hints) *string { return h.Entrypoint })
+		switch {
+		case entry != "":
+			if err := presets.ValidatePythonEntrypoint(entry); err != nil {
+				b.issue(Issue{Field: "entrypoint", Code: "invalid_override", Message: err.Error()})
+			} else {
+				preset.StartCommand = presets.PythonStart(facts.Framework, entry, preset.DefaultPort)
+			}
+		case len(preset.EntrypointCandidates) > 1:
+			b.issue(Issue{Field: "entrypoint", Code: "ambiguous", Message: "Several application objects were found; choose the one to deploy", Options: preset.EntrypointCandidates})
 		}
 	}
 
@@ -241,7 +258,11 @@ func (b *builder) facts() presets.Facts {
 		f.HasStartScript = true // an explicit start command makes generic Node deployable
 	}
 	if x, ok := b.res.Get(evidence.KindEntrypoint); ok && x.State == evidence.StateDetected {
-		f.GoEntrypoints = x.Values
+		if f.Language == "Python" {
+			f.PythonEntrypoints = x.Values
+		} else {
+			f.GoEntrypoints = x.Values
+		}
 	}
 	if x, ok := b.res.Get(evidence.KindServices); ok && x.State == evidence.StateDetected {
 		f.ComposeServices = x.Values
@@ -361,6 +382,8 @@ func summary(p Profile, pr presets.Preset) string {
 		return fmt.Sprintf("Axiom will build this %s app with %s and serve the static output on port %d.", stack, p.PackageManager.Value, p.Port.Value)
 	case presets.Go:
 		return fmt.Sprintf("Axiom will compile this Go application and run it as a container on port %d.", p.Port.Value)
+	case presets.Python:
+		return fmt.Sprintf("Axiom will install this %s app with pip and run it as a container on port %d.", stack, p.Port.Value)
 	default:
 		return fmt.Sprintf("Axiom will build this %s app with %s and run it as a container on port %d.", stack, p.PackageManager.Value, p.Port.Value)
 	}

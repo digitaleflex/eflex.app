@@ -458,6 +458,7 @@
             "vite",
             "node",
             "go",
+            "python",
             "dockerfile",
             "compose"
           ]

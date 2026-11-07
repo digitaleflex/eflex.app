@@ -86,7 +86,8 @@ func TestParseErrors(t *testing.T) {
 		{"app.root traversal", "version: 1\napp: {root: ../outside}\n", CodeSchemaInvalid},
 		{"app.root dotdot in name", "version: 1\napp: {root: apps/../web}\n", CodeSchemaInvalid},
 		{"bad strategy", "version: 1\nstrategy: rails\n", CodeSchemaInvalid},
-		{"bad language", "version: 1\nruntime: {language: python}\n", CodeSchemaInvalid},
+		{"bad language", "version: 1\nruntime: {language: rust}\n", CodeSchemaInvalid},
+		{"bad package manager", "version: 1\nruntime: {packageManager: poetry}\n", CodeSchemaInvalid},
 		{"bad runtime version", "version: 1\nruntime: {version: \"1.2.3.4\"}\n", CodeSchemaInvalid},
 		{"bad package manager", "version: 1\nruntime: {packageManager: cargo}\n", CodeSchemaInvalid},
 		{"port too low", "version: 1\nport: 0\n", CodeSchemaInvalid},
@@ -329,5 +330,15 @@ func TestLoad(t *testing.T) {
 	_, _, err = Load(snap(map[string]string{"axiom.yaml": "version: 1\nstrategy: compose\n", "docker-compose.yml": "services: {}\n"}), "")
 	if err != nil {
 		t.Fatalf("compose with a compose file must pass: %v", err)
+	}
+}
+
+func TestParsePythonManifest(t *testing.T) {
+	m, err := Parse([]byte("version: 1\nstrategy: python\nruntime: {language: python, packageManager: pip}\nstart: {command: \"gunicorn --bind 0.0.0.0:8000 app:app\"}\n"))
+	if err != nil {
+		t.Fatalf("a Python manifest must be accepted: %v", err)
+	}
+	if m.Runtime.Language != "python" {
+		t.Fatalf("language = %q", m.Runtime.Language)
 	}
 }

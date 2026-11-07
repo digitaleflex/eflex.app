@@ -116,11 +116,19 @@ func (nilResolver) LookupIP(context.Context, string) ([]string, error) { return 
 type dockerAgent struct {
 	t                 *testing.T
 	container         string
+	port              int // container port; 8080 when zero
 	hostPort          string
 	networkConfigured bool
 	networkDomain     string
 	networkContainer  string
 	networkPort       int
+}
+
+func (a *dockerAgent) containerPort() int {
+	if a.port == 0 {
+		return 8080
+	}
+	return a.port
 }
 
 func (a *dockerAgent) run(ctx context.Context, args ...string) string {
@@ -134,7 +142,7 @@ func (a *dockerAgent) run(ctx context.Context, args ...string) string {
 }
 
 func (a *dockerAgent) CreateRuntime(ctx context.Context, req executor.CreateRuntimeRequest) error {
-	a.run(ctx, "create", "--name", a.container, "-p", "127.0.0.1::8080", req.ImageRef)
+	a.run(ctx, "create", "--name", a.container, "-p", fmt.Sprintf("127.0.0.1::%d", a.containerPort()), req.ImageRef)
 	return nil
 }
 func (a *dockerAgent) ConfigureNetwork(_ context.Context, req executor.NetworkRequest) error {
@@ -147,7 +155,7 @@ func (a *dockerAgent) StartRuntime(ctx context.Context, req executor.StartReques
 		return fmt.Errorf("unknown container %q", req.Container)
 	}
 	a.run(ctx, "start", a.container)
-	hostPort := a.run(ctx, "inspect", "-f", `{{(index (index .NetworkSettings.Ports "8080/tcp") 0).HostPort}}`, a.container)
+	hostPort := a.run(ctx, "inspect", "-f", fmt.Sprintf(`{{(index (index .NetworkSettings.Ports "%d/tcp") 0).HostPort}}`, a.containerPort()), a.container)
 	if hostPort == "" {
 		a.t.Fatal("no host port mapped")
 	}
@@ -281,7 +289,27 @@ func (a *protocolAgent) HealthCheck(ctx context.Context, req executor.HealthChec
 	return health.ProbeReport{}, fmt.Errorf("protocol agent health unavailable: listener %s not reachable (key missing, module gap)", a.addr)
 }
 
+// scenario is one reference application driven through the whole deployment path.
+type scenario struct {
+	slug      string
+	container string
+	files     map[string]string
+	preset    string // expected profile preset
+	port      int    // expected container port
+	wantBody  string // substring the running application must serve on "/"
+	// pull lists extra base images to fetch first; the test is skipped when one cannot be pulled.
+	pull []string
+}
+
+// TestGitHubToLive drives the Dockerfile reference application (a busybox static page).
 func TestGitHubToLive(t *testing.T) {
+	runScenario(t, scenario{
+		slug: "e2e-ref", container: container, files: fixture(),
+		preset: "dockerfile", port: 8080, wantBody: "axiom e2e ok",
+	})
+}
+
+func runScenario(t *testing.T, sc scenario) {
 	if os.Getenv("AXIOM_TEST_DOCKER") == "" || os.Getenv("AXIOM_TEST_E2E") == "" {
 		t.Skip("AXIOM_TEST_DOCKER and AXIOM_TEST_E2E are not set")
 	}
@@ -291,11 +319,20 @@ func TestGitHubToLive(t *testing.T) {
 	if out, err := exec.Command("docker", "pull", "alpine:3.21").CombinedOutput(); err != nil {
 		t.Skipf("cannot pull fixture base image: %s", out)
 	}
+	for _, image := range sc.pull {
+		// Fetched only when absent, so a locally prepared image (offline or proxied CI) is kept.
+		if exec.Command("docker", "image", "inspect", image).Run() == nil {
+			continue
+		}
+		if out, err := exec.Command("docker", "pull", image).CombinedOutput(); err != nil {
+			t.Skipf("cannot pull fixture base image %s: %s", image, out)
+		}
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
 	defer cancel()
 
 	db := setupDB(t, ctx)
-	data := tarball(fixture())
+	data := tarball(sc.files)
 	app := application.Record{ID: "app_e2e", RepositoryID: "repo_e2e", OwnerID: userID}
 	for _, q := range []string{
 		`INSERT INTO users (id) VALUES ('` + userID + `')`,
@@ -323,7 +360,7 @@ func TestGitHubToLive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("profile: %v", err)
 	}
-	if prof.Status != profile.StatusReady || prof.Preset != "dockerfile" || prof.Port.Value != 8080 {
+	if prof.Status != profile.StatusReady || prof.Preset != sc.preset || prof.Port.Value != sc.port {
 		t.Fatalf("profile = %+v", prof)
 	}
 	t.Logf("profile: %s", prof.Summary)
@@ -370,7 +407,7 @@ func TestGitHubToLive(t *testing.T) {
 			appID:             "app_e2e",
 		}
 	} else {
-		agent = &dockerAgent{t: t, container: container}
+		agent = &dockerAgent{t: t, container: sc.container, port: sc.port}
 	}
 	if d, ok := agent.(*dockerAgent); ok {
 		t.Cleanup(d.cleanup)
@@ -382,7 +419,7 @@ func TestGitHubToLive(t *testing.T) {
 	ex := executor.New(deployments, builder, agent)
 	ex.Servers = reposDB.Servers
 	res, err := ex.Execute(ctx, executor.Request{DeploymentID: rec.ID, CorrelationID: "req_e2e-1",
-		AppSlug: "e2e-ref", Container: container, Source: fixtureSource{data: data}, Plan: plan})
+		AppSlug: sc.slug, Container: sc.container, Source: fixtureSource{data: data}, Plan: plan})
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -397,7 +434,7 @@ func TestGitHubToLive(t *testing.T) {
 	// vérifie le dockerAgent in-process.
 	switch a := agent.(type) {
 	case *dockerAgent:
-		if !a.networkConfigured || a.networkDomain != domain || a.networkPort != 8080 {
+		if !a.networkConfigured || a.networkDomain != domain || a.networkPort != sc.port {
 			t.Fatalf("routing intent not dispatched: %+v", a)
 		}
 	case *protocolAgent:
@@ -414,7 +451,7 @@ func TestGitHubToLive(t *testing.T) {
 		a.t.Logf("protocol path blocked: no hostPort (listener not reachable)")
 	}
 	if hostPort != "" {
-		out, err := exec.CommandContext(ctx, "docker", "inspect", "-f", "{{.State.Running}}", container).CombinedOutput()
+		out, err := exec.CommandContext(ctx, "docker", "inspect", "-f", "{{.State.Running}}", sc.container).CombinedOutput()
 		if err != nil || strings.TrimSpace(string(out)) != "true" {
 			t.Fatalf("container running = %q %v", out, err)
 		}
@@ -424,7 +461,7 @@ func TestGitHubToLive(t *testing.T) {
 		}
 		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		if resp.StatusCode != 200 || !strings.Contains(string(body), "axiom e2e ok") {
+		if resp.StatusCode != 200 || !strings.Contains(string(body), sc.wantBody) {
 			t.Fatalf("app returned %d %q", resp.StatusCode, body)
 		}
 	}
@@ -459,7 +496,7 @@ func TestGitHubToLive(t *testing.T) {
 
 	// Cleanup: stop and remove the container first (the image cannot be
 	// removed while in use), then the image. t.Cleanup is the safety net.
-	_ = exec.Command("docker", "rm", "-f", container).Run()
+	_ = exec.Command("docker", "rm", "-f", sc.container).Run()
 	_ = exec.Command("docker", "rmi", res.ImageRef).Run()
 	t.Logf("LIVE at %s in %s", res.Deployment.URL, res.Deployment.CompletedAt.Sub(res.Deployment.CreatedAt).Round(time.Second))
 }

@@ -56,7 +56,7 @@ var (
 	shaRe     = regexp.MustCompile(`^[0-9a-f]{40}$`)
 	domainRe  = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
 	envNameRe = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
-	presetSet = map[string]string{presets.NextJS: "source", presets.Vite: "source", presets.Node: "source", presets.Go: "source",
+	presetSet = map[string]string{presets.NextJS: "source", presets.Vite: "source", presets.Node: "source", presets.Go: "source", presets.Python: "source",
 		presets.Dockerfile: "dockerfile", presets.Compose: "compose"}
 )
 

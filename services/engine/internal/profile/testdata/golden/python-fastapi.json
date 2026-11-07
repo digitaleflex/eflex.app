@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "version": 0,
+  "analyzerVersion": "evidence/1.0.0",
+  "source": {
+    "repositoryId": "repo_1",
+    "ref": "main",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "root": ""
+  },
+  "status": "ready",
+  "preset": "python",
+  "summary": "Axiom will install this FastAPI app with pip and run it as a container on port 8000.",
+  "blocking": [],
+  "language": {
+    "value": "Python",
+    "provenance": "detected",
+    "confidence": 0.95
+  },
+  "runtimeVersion": {
+    "value": ""
+  },
+  "framework": {
+    "value": "FastAPI",
+    "provenance": "detected",
+    "confidence": 0.8
+  },
+  "packageManager": {
+    "value": "pip",
+    "provenance": "detected",
+    "confidence": 1
+  },
+  "buildCommand": {
+    "value": "pip install --no-cache-dir -r requirements.txt \u0026\u0026 pip install --no-cache-dir uvicorn",
+    "provenance": "default"
+  },
+  "startCommand": {
+    "value": "uvicorn main:app --host 0.0.0.0 --port 8000",
+    "provenance": "default"
+  },
+  "port": {
+    "value": 8000,
+    "provenance": "default"
+  },
+  "containerStrategy": {
+    "value": "source",
+    "provenance": "default"
+  },
+  "healthCheck": {
+    "value": {
+      "type": "http",
+      "path": "/"
+    },
+    "provenance": "default"
+  },
+  "services": [],
+  "configuration": [
+    {
+      "name": "DATABASE_URL",
+      "required": true,
+      "secret": true
+    }
+  ],
+  "confidence": 0.8
+}

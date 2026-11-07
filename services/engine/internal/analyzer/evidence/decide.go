@@ -7,8 +7,7 @@ import (
 
 // Unsupported frameworks for V0.1 (detected, never deployable by preset).
 var unsupportedFrameworks = map[string]string{
-	"Django": "Python frameworks are not supported in V0.1", "Flask": "Python frameworks are not supported in V0.1",
-	"FastAPI": "Python frameworks are not supported in V0.1", "Rails": "Ruby frameworks are not supported in V0.1",
+	"Rails":   "Ruby frameworks are not supported in V0.1",
 	"Laravel": "PHP frameworks are not supported in V0.1", "Spring Boot": "Java frameworks are not supported in V0.1",
 }
 

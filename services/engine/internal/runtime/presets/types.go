@@ -17,3 +17,14 @@ const (
 	FrameworkNextJS = "Next.js"
 	FrameworkVite   = "Vite"
 )
+
+// PythonVersion is the CPython minor version the Python preset builds with.
+// The analyzer warns when a repository declares another one.
+const PythonVersion = "3.12"
+
+// Python frameworks with dedicated runtime presets.
+const (
+	FrameworkFastAPI = "FastAPI"
+	FrameworkFlask   = "Flask"
+	FrameworkDjango  = "Django"
+)

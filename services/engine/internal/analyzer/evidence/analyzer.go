@@ -49,6 +49,7 @@ func Analyze(s snapshot.Snapshot, opts Options) Result {
 	pkg := a.detectNode()
 	a.detectGo()
 	a.detectOtherLanguages()
+	a.detectPython()
 	a.detectFrameworkConfigs(pkg)
 	a.detectContainers()
 	a.detectConfiguration()
@@ -547,15 +548,15 @@ func (a *analysis) notApplicable(kind string) string {
 			return "scripts apply to Node.js projects"
 		}
 	case KindEntrypoint:
-		if !a.hasVote(KindLanguage, "Go") {
-			return "entrypoints are detected for Go modules"
+		if !a.hasVote(KindLanguage, "Go") && !a.hasVote(KindLanguage, "Python") {
+			return "entrypoints are detected for Go and Python projects"
 		}
 	case KindPublicService:
 		if !a.hasVote(KindContainer, "compose") {
 			return "applies to Compose projects"
 		}
 	case KindPackageManager:
-		if len(a.votes[KindLanguage]) > 0 && !hasNode && !a.hasVote(KindLanguage, "Go") {
+		if len(a.votes[KindLanguage]) > 0 && !hasNode && !a.hasVote(KindLanguage, "Go") && !a.hasVote(KindLanguage, "Python") {
 			return "no supported package manager for this language"
 		}
 	}

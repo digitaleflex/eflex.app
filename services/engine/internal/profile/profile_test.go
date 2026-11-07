@@ -48,6 +48,25 @@ var fixtures = map[string]map[string]string{
 	"unsupported": {
 		"pyproject.toml": "[project]\ndependencies=['fastapi']\n",
 	},
+	"unsupported-rails": {
+		"Gemfile": "gem 'rails', '~> 7.1'\n",
+	},
+	"python-fastapi": {
+		"requirements.txt": "fastapi==0.115\nuvicorn[standard]\n",
+		"main.py":          "from fastapi import FastAPI\napp = FastAPI()\n",
+		".env.example":     "DATABASE_URL=\n",
+	},
+	"python-django": {
+		"requirements.txt":   "Django>=5.0\n",
+		"manage.py":          "#!/usr/bin/env python\n",
+		"mysite/__init__.py": "",
+		"mysite/wsgi.py":     "from django.core.wsgi import get_wsgi_application\napplication = get_wsgi_application()\n",
+	},
+	"python-ambiguous": {
+		"requirements.txt": "flask\n",
+		"app.py":           "from flask import Flask\napp = Flask(__name__)\n",
+		"worker.py":        "from flask import Flask\nworker = Flask(__name__)\n",
+	},
 }
 
 func TestGoldenProfiles(t *testing.T) {
