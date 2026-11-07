@@ -163,10 +163,28 @@ The Agent binary (`services/agent/cmd/agent/main.go`) builds its composition roo
 - The test records `https://e2e-test.local` as the application URL. No Traefik, DNS record or certificate is involved.
 - Its agent transport is in-process. The real handshake listener → protocol → HMAC verification → bridge, and the registration of a real agent, are not exercised end to end.
 - The source is a fixture. The GitHub connection (OAuth application, repository and archive download) has never been run end to end.
-- Supported stacks in V0.1: Node (Next.js, Vite), Dockerfile and compose. Laravel, Django, FastAPI, Flask, Rails and Spring Boot are detected but rejected (`internal/analyzer/evidence/decide.go`).
+- Supported stacks in V0.1: Node (Next.js, Vite, generic), Go, Python (FastAPI, Flask, Django with a `requirements.txt`, see below), Dockerfile and compose. Laravel (PHP), Rails and Spring Boot are detected but rejected (`internal/analyzer/evidence/decide.go`).
 - Docker-gated tests only run where `AXIOM_TEST_DOCKER` is set. The CI engine job sets it for `./internal/e2e/` and `./internal/build/` only; the agent job does not.
 
 A run of the Engine and a real Agent on a real server, with Traefik, a domain and a repository reached through GitHub, is the missing proof.
+
+### Python preset (V1)
+
+Added on 2026-11-07. A repository with a `requirements.txt` and a detected FastAPI, Flask or Django application resolves to the `python` preset (container strategy `source`):
+
+- **Entrypoint from the code.** The analyzer reads `app = FastAPI(...)`, `application = Flask(...)`, `app = create_app()` (Flask factory) and Django's `wsgi.py` (`get_wsgi_application`), skipping tests and virtualenv directories. Several candidates make the profile `needs_review`; the user picks one with the `entrypoint` override of the profile review (`axiom.yaml` has no such key).
+- **Commands.** Build: `pip install --no-cache-dir -r requirements.txt`, then `pip install --no-cache-dir uvicorn` (FastAPI) or `gunicorn` (Flask, Django); pip leaves an already satisfied requirement untouched, so a pinned server keeps its version. Start: `uvicorn <module>:<app> --host 0.0.0.0 --port 8000` or `gunicorn --bind 0.0.0.0:8000 <module>:<app>`. The runtime does not inject `PORT`: the port is part of the command.
+- **Image.** `python:3.12-slim-bookworm`, dependencies installed in their own layer, non-root user, no bytecode, unbuffered output (`internal/runtime/presets/python`, golden files in `testdata/golden`).
+
+Limits — do not report these as supported:
+
+- `requirements.txt` only. Poetry, uv, Pipenv and `pyproject.toml`-only projects are rejected with an actionable message. Files included with `-r` are not followed: the framework is read from `requirements.txt` itself, and the image copies only that file before installing.
+- The interpreter is always Python 3.12. A `.python-version` or `runtime.txt` declaring another minor version produces a warning, not another image.
+- `slim` images have no compiler: packages without a wheel (for example `psycopg2` instead of `psycopg2-binary`) fail to build.
+- Django: no `collectstatic`, no migrations; the health probe requests `/` on the loopback address.
+- A repository that ships its own Dockerfile keeps using it (Dockerfile precedence).
+
+Verified: unit tests, golden profiles and Dockerfiles, and `internal/e2e` `TestPythonToLive` — a minimal FastAPI, Flask and Django application each go through analysis, plan, a real `pip install` and image build, a real container and a real health probe to `LIVE` (the CI engine job runs it; it needs PyPI and Docker Hub). A static analysis of two real repositories: Microblog ships its own Dockerfile, which is used; Flasky is refused because its requirements use `-r` includes. Not done: building and running third-party repositories.
 
 Two packages are delivered and tested but **not adopted by production code**:
 

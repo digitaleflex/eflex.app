@@ -89,7 +89,7 @@ Measured with PostgreSQL 16 and a real Docker daemon (`AXIOM_TEST_DATABASE_URL`,
 - Its agent transport is in-process: the real listener → protocol → HMAC → bridge handshake is not exercised end to end.
 - The source is a fixture: the GitHub connection (OAuth application, archive download) was never run end to end.
 - The agent CI job sets no `AXIOM_TEST_DOCKER`, so the agent's Docker integration tests never run in CI. That is how `TestIntegrationLifecycle` went stale.
-- V0.1 stack coverage: Node (Next.js, Vite), Dockerfile, compose. Laravel, Django, FastAPI, Flask, Rails and Spring Boot are detected but rejected (`analyzer/evidence/decide.go`).
+- V0.1 stack coverage: Node (Next.js, Vite, generic), Go, Python (FastAPI, Flask, Django with a `requirements.txt`), Dockerfile, compose. Laravel (PHP), Rails and Spring Boot are detected but rejected (`analyzer/evidence/decide.go`).
 
 ### What that means for the roadmap
 

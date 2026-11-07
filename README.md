@@ -43,7 +43,7 @@ Documentation détaillée :
 
 ## Feuille de route de l'unification
 
-1. **Un seul moteur** : porter les règles du détecteur Eflex (Laravel, PHP, Python, Svelte, Remix, SolidStart, RedwoodJS, monorepos) dans l'analyseur Go (`services/engine/internal/analyzer`), puis ajouter les presets d'exécution correspondants (Laravel : php-fpm + nginx + queue + scheduler).
+1. **Un seul moteur** : porter les règles du détecteur Eflex (Laravel, PHP, Python, Svelte, Remix, SolidStart, RedwoodJS, monorepos) dans l'analyseur Go (`services/engine/internal/analyzer`), puis ajouter les presets d'exécution correspondants (Laravel : php-fpm + nginx + queue + scheduler). **Python (FastAPI, Flask, Django avec `requirements.txt`) est fait et testé de bout en bout** ; restent Laravel/PHP et le reste de la liste (voir `docs/axiom-engine.md`, « Python preset »).
 2. **Un seul manifeste** : converger `eflex.json` et `axiom.yaml`.
 3. **Une seule console** : la console client EFLEX (charte EFLEX, en français) construite sur l'API du moteur ; retrait de Coolify, de `apps/cloud` et de `apps/client-dashboard`.
 4. Ensuite seulement, retrait de `packages/detector`, `packages/renderer` et `schema/`.
