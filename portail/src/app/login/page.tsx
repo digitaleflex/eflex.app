@@ -3,6 +3,7 @@
 import { signIn } from 'next-auth/react'
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,8 +42,7 @@ export default function LoginPage() {
       <header className="sticky top-0 z-50 glass">
         <nav className="container flex h-16 items-center">
           <Link href="/" className="flex items-center gap-2 font-bold text-xl tracking-tight">
-            <span className="bg-primary text-primary-foreground rounded-lg w-8 h-8 flex items-center justify-center text-sm">E</span>
-            <span>Eflex</span>
+            <Image src="/logo-horizontal.webp" alt="Eflex" width={1200} height={312} className="h-8 w-auto" priority />
           </Link>
         </nav>
       </header>

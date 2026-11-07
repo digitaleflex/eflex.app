@@ -1,27 +1,12 @@
+'use client'
+
 import Link from 'next/link'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useState, useEffect } from 'react'
-import { Zap, Atom, Snake, File, Server, Package, Launch, CircleCheck, Globe, Star, Heart, TrendingUp } from 'lucide-react'
-
-const frameworkLogos: Record<string, React.ComponentType> = {
-  nextjs: Zap,
-  nuxt: Heart,
-  astro: Star,
-  vite: Zap,
-  svelte: Snake,
-  remix: TrendingUp,
-  solidstart: TrendingUp,
-  redwoodjs: Package,
-  node: Atom,
-  laravel: Zap,
-  php: Atom,
-  python: Snake,
-  static: File,
-  docker: Server,
-  eflexConfig: Package,
-}
+import { FrameworkIcon } from '@/components/framework-icon'
 
 const allFrameworks = [
   'nextjs',
@@ -50,11 +35,9 @@ function TechnologyCarousel({ frameworks }: { frameworks: string[] }) {
     return () => clearInterval(id)
   }, [frameworks])
 
-  const Logo = frameworkLogos[frameworks[index]]
-
   return (
     <div className="carousel rounded-xl bg-primary/5 p-4 mb-8">
-      <Logo className="w-12 h-12 mx-auto mb-2" />
+      <FrameworkIcon framework={frameworks[index]} className="h-12 w-12 mx-auto mb-2" />
       <p className="text-center text-sm">{frameworks[index]}</p>
       <button
         onClick={() => setIndex((i) => (i - 1 + frameworks.length) % frameworks.length)}
@@ -114,12 +97,12 @@ const features = [
 ]
 
 const stacks = [
-  { name: 'Next.js', icon: <Zap />, color: 'text-foreground' },
-  { name: 'Laravel', icon: <Zap />, color: 'text-red-500' },
-  { name: 'Node.js', icon: <Atom />, color: 'text-green-500' },
-  { name: 'Python', icon: <Snake />, color: 'text-blue-400' },
-  { name: 'Vite', icon: <Zap />, color: 'text-purple-400' },
-  { name: 'Statique', icon: <File />, color: 'text-muted-foreground' },
+  { name: 'Next.js', framework: 'nextjs' },
+  { name: 'Laravel', framework: 'laravel' },
+  { name: 'Node.js', framework: 'node' },
+  { name: 'Python', framework: 'python' },
+  { name: 'Vite', framework: 'vite' },
+  { name: 'Statique', framework: 'static' },
 ]
 
 export default function HomePage() {
@@ -129,8 +112,7 @@ export default function HomePage() {
       <header className="sticky top-0 z-50 glass">
         <nav className="container flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center gap-2 font-bold text-xl tracking-tight">
-            <span className="bg-primary text-primary-foreground rounded-lg w-8 h-8 flex items-center justify-center text-sm">E</span>
-            <span>Eflex</span>
+            <Image src="/logo-horizontal.webp" alt="Eflex" width={1200} height={312} className="h-8 w-auto" priority />
           </Link>
           <div className="flex items-center gap-3">
             <Link href="/login" className="inline-flex items-center justify-center h-8 px-3 text-xs rounded-md font-medium hover:bg-muted transition-colors">Connexion</Link>
@@ -206,7 +188,7 @@ export default function HomePage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               {stacks.map((stack) => (
                 <Card key={stack.name} variant="elevated" className="p-6 flex flex-col items-center gap-3 hover:scale-105 transition-transform duration-200">
-                  <span className={`text-3xl ${stack.color}`}>{stack.icon}</span>
+                  <FrameworkIcon framework={stack.framework} alt={stack.name} className="h-10 w-10" />
                   <span className="text-sm font-medium">{stack.name}</span>
                 </Card>
               ))}

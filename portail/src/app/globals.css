@@ -4,30 +4,30 @@
 
 @layer base {
   :root {
-    --eflex-navy: 77 91% 50%;
-    --eflex-royalblue: 41 77% 19%;
-    --eflex-blue: 14 94% 37%;
-    --eflex-sky: 83 93% 45%;
+    --eflex-navy: 215 69% 14%;      /* Navy #0B1F3B */
+    --eflex-royalblue: 221 83% 53%; /* Royal Blue #2563EB */
+    --eflex-blue: 217 91% 60%;      /* Blue #3B82F6 */
+    --eflex-sky: 198 93% 60%;       /* Sky #38BDF8 */
 
     --background: 240 10% 97%;
     --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
-    --primary: 14 94% 37%;       /* Blue officiel */
+    --primary: 217 91% 60%;       /* Blue officiel #3B82F6 */
     --primary-foreground: 0 0% 100%;
     --secondary: 240 5% 96%;
     --secondary-foreground: 240 6% 10%;
     --muted: 240 5% 96%;
     --muted-foreground: 240 4% 46%;
-    --accent: 83 93% 45%;        /* Sky */
-    --accent-foreground: 0 0% 100%;
+    --accent: 198 93% 60%;        /* Sky #38BDF8 */
+    --accent-foreground: 215 69% 14%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
     --border: 240 6% 90%;
     --input: 240 6% 90%;
-    --ring: 14 94% 37%;
+    --ring: 217 91% 60%;
     --radius: 0.75rem;
   }
 
@@ -36,21 +36,21 @@
     --foreground: 0 0% 95%;
     --card: 240 10% 6%;
     --card-foreground: 0 0% 95%;
-    --primary: 14 94% 37%;
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
     --secondary: 240 4% 16%;
     --secondary-foreground: 0 0% 95%;
     --muted: 240 4% 16%;
     --muted-foreground: 240 5% 55%;
-    --accent: 83 93% 45%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 198 93% 60%;
+    --accent-foreground: 215 69% 14%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
     --border: 240 4% 16%;
     --input: 240 4% 16%;
-    --ring: 14 94% 37%;
+    --ring: 217 91% 60%;
   }
 }
 

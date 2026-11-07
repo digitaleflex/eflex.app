@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { signOut, useSession } from 'next-auth/react'
@@ -71,8 +72,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-muted/30">
         <div className="flex items-center gap-2 h-16 px-6 border-b border-border">
           <Link href="/" className="flex items-center gap-2 font-bold text-xl tracking-tight">
-            <span className="bg-primary text-primary-foreground rounded-lg w-8 h-8 flex items-center justify-center text-sm">E</span>
-            <span>Eflex</span>
+            <Image src="/logo-horizontal.webp" alt="Eflex" width={1200} height={312} className="h-8 w-auto" priority />
           </Link>
         </div>
         <nav className="flex-1 p-4 space-y-1">
