@@ -18,7 +18,7 @@ function validateProjectId(id: string): void {
 function composeOptions(ctx: RenderContext): ComposeOptions {
   return {
     projectId: ctx.projectId,
-    network: ctx.network ?? 'eflex-proxy',
+    network: ctx.network ?? 'proxy',
     resources: ctx.resources,
     domain: ctx.domain,
     traefik: ctx.traefik,
@@ -94,6 +94,10 @@ export function renderStack(plan: BuildPlan, ctx: RenderContext): RenderedStack 
     case 'nextjs':
     case 'nuxt':
     case 'node':
+    case 'remix':
+    case 'solidstart':
+    case 'redwoodjs':
+    case 'php':
     case 'python': {
       const svc = appService(ctx.projectId, ctx.image, plan.port, opts, {
         command: plan.start,
@@ -106,6 +110,7 @@ export function renderStack(plan: BuildPlan, ctx: RenderContext): RenderedStack 
 
     case 'static':
     case 'vite':
+    case 'svelte':
     case 'astro': {
       doc.services.web = webService(ctx.projectId, 80, opts);
       ports.web = 80;

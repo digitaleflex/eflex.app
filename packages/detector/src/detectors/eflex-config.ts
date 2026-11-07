@@ -19,6 +19,10 @@ const FRAMEWORKS: readonly Framework[] = [
   'nuxt',
   'astro',
   'vite',
+  'svelte',
+  'remix',
+  'solidstart',
+  'redwoodjs',
   'node',
   'laravel',
   'php',
@@ -120,9 +124,14 @@ function inferRuntime(
     case 'nextjs':
     case 'nuxt':
     case 'node':
+    case 'remix':
+    case 'solidstart':
       return 'node@22';
+    case 'redwoodjs':
+      return 'node@20';
     case 'astro':
     case 'vite':
+    case 'svelte':
     case 'static':
       return 'static@1';
     case 'laravel':
