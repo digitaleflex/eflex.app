@@ -2,13 +2,22 @@
 
 The Engine is the backend foundation for Axiom's deployment platform.
 
-## Local PostgreSQL
+## Local stack
 
-Start the development database:
+The development compose file needs two things before starting:
 
 ```bash
+cp .env.example .env                       # secrets locaux, jamais commités
+# puis remplacer AXIOM_API_TOKEN / AXIOM_SECRET_KEY (openssl rand -base64 32)
+set -a; . ../../config/domains.sh; set +a # source unique des domaines
 docker compose -f docker-compose.dev.yml up -d
 ```
+
+`AXIOM_API_TOKEN` and `AXIOM_SECRET_KEY` are injected via `${VAR:?…}` guards: no
+secret is stored in version control and Compose refuses to start if they are missing.
+
+The same file also provides a local PostgreSQL service (the `${VAR:?…}` guards
+apply to any `docker compose` invocation, including `up -d postgres`).
 
 Default connection:
 

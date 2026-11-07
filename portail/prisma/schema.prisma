@@ -132,3 +132,30 @@ model Subscription {
 
   @@index([userId])
 }
+
+// ─── Statut public / supervision ────────────────────────────────────────────
+// Un relevé par composant, écrit au plus une fois par minute (voir lib/status.ts).
+model StatusCheck {
+  id        String   @id @default(cuid())
+  checkedAt DateTime @default(now())
+  component String
+  status    String   // ok | degraded | down | unknown
+  latencyMs Int?
+
+  @@index([checkedAt])
+  @@index([component, checkedAt])
+}
+
+model StatusIncident {
+  id          String    @id @default(cuid())
+  title       String
+  description String?   @db.Text
+  severity    String    @default("minor")        // minor | major | critical
+  status      String    @default("investigating") // investigating | identified | monitoring | resolved
+  startedAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([startedAt])
+}

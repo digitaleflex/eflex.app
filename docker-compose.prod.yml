@@ -46,6 +46,12 @@ services:
       - COOLIFY_API_TOKEN=${COOLIFY_API_TOKEN}
       - PORTAL_DOMAIN=${PORTAL_DOMAIN:?sourcer config/domains.sh}
       - PORTAL_URL=${PORTAL_URL:?sourcer config/domains.sh}
+      # ─── Statut public et maintenance ─────────────────────────────────────
+      # MAINTENANCE_MODE=true → 503 sur tout le site (middleware) + bannière.
+      - MAINTENANCE_MODE=${MAINTENANCE_MODE:-false}
+      - MAINTENANCE_MESSAGE=${MAINTENANCE_MESSAGE:-}
+      # Laisser vide tant que le moteur Axiom n'est pas déployé (sinon "non surveillé").
+      - STATUS_ENGINE_URL=${STATUS_ENGINE_URL:-}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"

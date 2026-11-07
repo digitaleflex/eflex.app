@@ -20,6 +20,9 @@ services:
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - MAINTENANCE_MODE=${MAINTENANCE_MODE:-false}
+      - MAINTENANCE_MESSAGE=${MAINTENANCE_MESSAGE:-}
+      - STATUS_ENGINE_URL=${STATUS_ENGINE_URL:-}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
