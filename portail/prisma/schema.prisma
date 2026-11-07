@@ -16,6 +16,8 @@ model User {
   hashedPassword String?
   accounts       Account[]
   sessions       Session[]
+  projects       Project[]
+  subscription   Subscription?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
@@ -104,4 +106,19 @@ model Deployment {
 
   @@index([projectId])
   @@index([status])
+}
+
+model Subscription {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status           String   // active, cancelled, past_due, trialing
+  plan             String   // starter, pro, agency
+  priceCents       Int      @default(0)
+  providerRef      String?
+  currentPeriodEnd DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId])
 }

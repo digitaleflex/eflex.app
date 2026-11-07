@@ -13,6 +13,14 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 
+# Étape légère utilisée par le service compose `migrate` (profil "tools")
+FROM node:24-alpine AS migrator
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm install
+COPY prisma ./prisma
+CMD ["npx", "prisma", "migrate", "deploy"]
+
 FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production

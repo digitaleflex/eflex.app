@@ -21,7 +21,7 @@ pnpm render <dir>     # tsx packages/renderer/src/main.ts
 Single test: `pnpm vitest run packages/detector/test/detect.test.ts`; filter test: `pnpm vitest run -t "detects Next.js"`.
 Portal: `cd portail && npm install && npm run dev|build|start`. Root `typecheck` does not cover it.
 
-Prisma: from `portail/` run `npx prisma generate` / `npx prisma migrate dev`. Root `prisma/schema.prisma` is a divergent copy; portal schema currently has auth‑only models while `src/app/api/projects/route.ts` uses `project`/`envVar`/`deployment`, so portal `tsc --noEmit` fails until reconciled.
+Prisma: from `portail/` run `npx prisma generate` / `npx prisma migrate dev`. `prisma/schema.prisma` (racine) est synchronisé avec `portail/prisma/schema.prisma` (modèles auth + `Project`/`EnvVar`/`Deployment`/`Subscription`) ; toute dérive doit être réconciliée avant `tsc --noEmit` du portail.
 
 ## Detector / renderer rules
 
@@ -31,7 +31,7 @@ Prisma: from `portail/` run `npx prisma generate` / `npx prisma migrate dev`. Ro
 - Detection is deterministic: inputs are only `RepoSnapshot`; no filesystem or network access inside `detect()`.
 - User‑facing detector strings (reasons, warnings, questions) are **French**; keep them French.
 - Relative TS imports use explicit `.js` suffixes (ESM, strict TS `noUnused*`/`noFallthroughCasesInSwitch`).
-- Renderer maps frameworks in `render.ts`; unsupported framework → `RenderError`. Generated compose is parsed as YAML in tests.
+- Renderer maps every framework in `render.ts` (serveurs: `nextjs`/`nuxt`/`node`/`remix`/`solidstart`/`redwoodjs`/`php`/`python` → service `app` ; statique: `static`/`vite`/`astro`/`svelte` → `web` nginx ; `laravel` → `app`+`web`+workers ; `docker`/`eflex-config` → générique) ; framework inconnu → `RenderError`. Réseau externe unifié : `proxy`. Generated compose is parsed as YAML in tests.
 
 ## Infra
 
