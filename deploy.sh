@@ -40,6 +40,10 @@ echo "==> 1/5 Démarrage de PostgreSQL et Redis"
 "${COMPOSE[@]}" up -d postgres redis
 
 echo "==> 2/5 Migration Prisma (conteneur one-off)"
+# L'image du profil `tools` embarque le dossier prisma/ : il faut la
+# reconstruire à chaque déploiement, sinon les nouvelles migrations ne sont
+# pas vues (up -d --build ne couvre pas les services hors profil).
+"${COMPOSE[@]}" --profile tools build migrate
 "${COMPOSE[@]}" --profile tools run --rm migrate
 
 echo "==> 3/5 Build + redémarrage prod"
