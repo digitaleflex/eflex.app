@@ -53,17 +53,19 @@ BuildPlan (framework, runtime, install, build, start, port, services, postDeploy
    │  packages/renderer → buildDeploymentArtifacts()
    ▼
 Dockerfile + docker-compose.yml + nginx/default.conf + .env.example
-   │  portail → POST /api/projects → Coolify
+   │  portail → POST /api/projects (202) → worker BullMQ → Coolify
    ▼
-build_pack dockercompose (ou dockerfile si le dépôt a son propre Dockerfile)
+build_pack dockerfile (Dockerfile du dépôt) ou nixpacks (commandes du plan)
 + ports_exposes = port réel du plan + variables d'environnement chiffrées
++ domaine https://<slug>.<PORTAL_DOMAIN> + labels Traefik websecure
 ```
 
 Points clés :
 
 - **Port réel** : Python 8000, statique 80, Node 3000… ce n'est plus `3000` par défaut.
-- **Laravel** : le compose lance `app` (php-fpm), `web` (nginx), `queue`, `scheduler`, plus un service one-shot `migrate` qui exécute les `postDeploy` (`php artisan migrate --force`, caches…).
-- **Aucun `nixpacks` implicite** : `build_pack` est toujours explicite.
+- **Laravel** : le compose décrit `app` (php-fpm), `web` (nginx), `queue`, `scheduler`, plus un service one-shot `migrate` qui exécute les `postDeploy` (`php artisan migrate --force`, caches…).
+- **Aucun `nixpacks` implicite** : `build_pack` est toujours explicite. Coolify 4.6 ne déployant pas un compose brut sans `docker-compose.yaml` dans le dépôt, les plans multi-services sont refusés avec un message explicite : seuls les dépôts avec leur propre Dockerfile (`dockerfile`) ou les frameworks mono-service (`nixpacks`) sont déployés.
+- **Domaine public** : chaque projet reçoit `<slug>.<PORTAL_DOMAIN>` (défaut `eflex.app`, DNS wildcard). Les labels Traefik (`websecure`, réseau `proxy`, `letsencrypt`) sont réappliqués par `PATCH` après création, car Coolify écrase les `custom_labels` avec ses propres entrypoints `http`/`https`.
 - **Secrets** : jamais dans le plan, le Dockerfile ou le compose ; uniquement via les variables d'environnement Coolify, chiffrées au repos dans PostgreSQL (AES-256-GCM).
 - `framework === 'docker'` : le Dockerfile du dépôt fait foi, Eflex n'en génère pas.
 

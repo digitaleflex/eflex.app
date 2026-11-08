@@ -17,9 +17,12 @@ Services disponibles :
 
 ## 2. Initialiser la base
 
+Le schéma Prisma a une seule source de vérité : `portail/prisma/schema.prisma`.
+
 ```bash
+cd portail
+npx prisma generate
 npx prisma migrate dev --name init
-npx prisma db seed   # si tu crées un fichier seed
 npx prisma studio    # interface graphique pour inspecter la BDD
 ```
 

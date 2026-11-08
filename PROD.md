@@ -76,12 +76,27 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 
 1. `packages/detector` analyse le dépôt (ou `eflex.json`) et produit le plan stocké dans `Project.plan` / `Project.detection`.
 2. `packages/renderer.buildDeploymentArtifacts()` génère le `Dockerfile`, le `docker-compose.yml`, `nginx/default.conf` et le modèle `.env` ; le port exposé vient du plan, pas d'une valeur par défaut.
-3. Le portail transmet à Coolify `build_pack` (`dockercompose` ou `dockerfile`), `ports_exposes`, le compose encodé en base64 (`docker_compose_raw`) et le Dockerfile généré.
+3. Le worker BullMQ crée ensuite l'application Coolify (API v4.6) : `build_pack=dockerfile` si le dépôt a son propre Dockerfile, sinon `nixpacks` avec les commandes du plan (`install`/`build`/`start`, `publish_directory` pour les sites statiques) et `ports_exposes`.
 4. Les variables d'environnement du client sont chiffrées (AES-256-GCM) en base et transmises séparément à Coolify ; elles n'apparaissent jamais dans les artefacts de build.
 
-Les `postDeploy` (migrations Laravel, caches) sont exécutés par un service one-shot `migrate` du compose. Ce pipeline est couvert par `packages/renderer/test/deploy.test.ts` et `portail/src/lib/deploy-plan.test.ts`.
+Les `postDeploy` (migrations Laravel, caches) sont exécutés par Coolify via `post_deployment_command`. Ce pipeline est couvert par `packages/renderer/test/deploy.test.ts` et `portail/src/lib/deploy-plan.test.ts`.
+
+⚠️ Coolify 4.6 **ne déploie pas un compose brut multi-services** sans `docker-compose.yaml` dans le dépôt : un plan qui produirait plusieurs services (app + workers) est refusé explicitement par le worker. Pour ces plans, ajouter le compose au dépôt ou choisir un plan mono-service.
 
 ⚠️ Coolify est **volontairement distant** : `COOLIFY_API_URL` / `COOLIFY_API_TOKEN` doivent être renseignés dans `.env.prod`. Sans eux, la création de projet reste en base mais le déploiement est signalé en échec (`/api/status` affiche « non surveillé » si laissé vide).
+
+## Domaine public et labels Traefik
+
+`POST /api/projects` attribue à chaque projet le domaine `<slug>.<PORTAL_DOMAIN>` (`PORTAL_DOMAIN` vient de `config/domains.sh`, défaut `eflex.app`) et le renvoie dans la réponse ; le DNS wildcard de la zone pointe déjà sur le VPS.
+
+Le Traefik de l'hôte n'est **pas** géré par Coolify : l'application est créée avec un domaine explicite, `autogenerate_domain=false` et `connect_to_docker_network=true`. Coolify remplaçant les `custom_labels` fournis à la création par ses propres entrypoints `http`/`https`, le worker **réapplique les labels par `PATCH /applications/{uuid}`** à chaque déploiement (labels `websecure`, réseau `proxy`, certresolver `letsencrypt`, port du conteneur). Sans ce PATCH, Traefik ignore le conteneur et le domaine répond en 404.
+
+Vérification après déploiement :
+
+```bash
+curl -I https://<slug>.eflex.app        # attendu : 200/301 avec certificat valide
+docker inspect <conteneur> --format '{{json .Config.Labels}}' | grep traefik
+```
 
 ## GitHub App (dépôts privés et redéploiement sur push)
 
