@@ -191,3 +191,25 @@ model Subscription {
 
   @@index([userId])
 }
+
+// ─── Administration de la plateforme ────────────────────────────────────────
+// Journal d'audit en ajout seul : aucune route ne le modifie ni ne le supprime.
+// `details` ne contient jamais de secret (valeurs de variables, jetons, mots de passe).
+model AuditLog {
+  id             String   @id @default(cuid())
+  actorId        String?
+  actorEmail     String // dénormalisé : l'entrée reste lisible si le compte est supprimé
+  action         String // ex: "user.ban", "user.unban"
+  targetType     String // user | organization | project | deployment | …
+  targetId       String
+  organizationId String?
+  details        Json?
+  ip             String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId])
+  @@index([targetType, targetId])
+  @@index([organizationId])
+}

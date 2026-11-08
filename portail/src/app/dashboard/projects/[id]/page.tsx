@@ -167,9 +167,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
               </ul>
             )}
             {analysis.warnings.length > 0 && (
-              <div role="note" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-                <p className="text-sm font-medium text-amber-800">À savoir</p>
-                <ul className="mt-2 space-y-1 text-sm text-amber-900">
+              <div role="note" className="rounded-lg border border-warning/30 bg-warning/10 p-3">
+                <p className="text-sm font-medium text-warning">À savoir</p>
+                <ul className="mt-2 space-y-1 text-sm text-warning">
                   {analysis.warnings.map((warning) => (
                     <li key={warning}>{warning}</li>
                   ))}

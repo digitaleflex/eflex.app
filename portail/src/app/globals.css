@@ -21,10 +21,14 @@
     --muted-foreground: 240 4% 46%;
     --accent: 198 93% 60%;        /* Sky #38BDF8 */
     --accent-foreground: 215 69% 14%;
-    --destructive: 0 84% 60%;
+    /* Sémantiques : le même jeton sert de fond plein (texte blanc) et de texte sur teinte à 10 %.
+       Contrastes vérifiés (≥ 4,5:1) par src/lib/contrast.test.ts. */
+    --destructive: 0 72% 42%;
     --destructive-foreground: 0 0% 100%;
-    --success: 142 71% 45%;
+    --success: 142 72% 24%;
     --success-foreground: 0 0% 100%;
+    --warning: 32 95% 30%;
+    --warning-foreground: 0 0% 100%;
     --border: 240 6% 90%;
     --input: 240 6% 90%;
     --ring: 221 83% 53%;
@@ -44,10 +48,12 @@
     --muted-foreground: 240 5% 55%;
     --accent: 198 93% 60%;
     --accent-foreground: 215 69% 14%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 240 10% 4%;
     --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
+    --success-foreground: 240 10% 4%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 240 10% 4%;
     --border: 240 4% 16%;
     --input: 240 4% 16%;
     --ring: 217 91% 60%;

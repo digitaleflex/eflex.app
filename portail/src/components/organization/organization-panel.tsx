@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 const ROLE_LABEL: Record<string, string> = { owner: 'Propriétaire', admin: 'Administrateur', member: 'Membre' }
 const roleLabel = (role: string) => ROLE_LABEL[role] ?? role
@@ -19,6 +20,7 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
   const router = useRouter()
   const { data: org, isPending, refetch } = authClient.useActiveOrganization()
   const [message, setMessage] = useState<{ kind: 'error' | 'ok'; text: string } | null>(null)
+  const [confirm, setConfirm] = useState<null | { kind: 'remove'; memberId: string; name: string } | { kind: 'leave' }>(null)
 
   const fail = (error: Parameters<typeof authErrorMessage>[0]) => setMessage({ kind: 'error', text: authErrorMessage(error) })
   const ok = (text: string) => setMessage({ kind: 'ok', text })
@@ -99,12 +101,7 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
                               variant="ghost"
                               size="sm"
                               aria-label={`Retirer ${member.user.name}`}
-                              onClick={async () => {
-                                if (!window.confirm(`Retirer ${member.user.name} de l'organisation ?`)) return
-                                const { error } = await authClient.organization.removeMember({ memberIdOrEmail: member.id, organizationId: org.id })
-                                if (error) fail(error)
-                                else { ok('Membre retiré.'); void refetch() }
-                              }}
+                              onClick={() => setConfirm({ kind: 'remove', memberId: member.id, name: member.user.name })}
                             >
                               <Trash2 className="h-4 w-4" aria-hidden="true" />
                             </Button>
@@ -176,13 +173,7 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
             <CardContent className="flex flex-wrap gap-3">
               <Button
                 variant="outline"
-                onClick={async () => {
-                  if (!window.confirm(`Quitter l'organisation « ${org.name} » ?`)) return
-                  const { error } = await authClient.organization.leave({ organizationId: org.id })
-                  if (error) return fail(error)
-                  router.push('/dashboard')
-                  router.refresh()
-                }}
+                onClick={() => setConfirm({ kind: 'leave' })}
               >
                 <LogOut className="h-4 w-4" aria-hidden="true" />Quitter l&apos;organisation
               </Button>
@@ -190,6 +181,40 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
             </CardContent>
           </Card>
         </>
+      )}
+
+      {org && confirm?.kind === 'remove' && (
+        <ConfirmDialog
+          open
+          destructive
+          title={`Retirer ${confirm.name} ?`}
+          description={`${confirm.name} perdra immédiatement l'accès aux projets de « ${org.name} ». Ses propres organisations ne sont pas touchées.`}
+          confirmLabel="Retirer le membre"
+          onCancel={() => setConfirm(null)}
+          onConfirm={async () => {
+            const { error } = await authClient.organization.removeMember({ memberIdOrEmail: confirm.memberId, organizationId: org.id })
+            setConfirm(null)
+            if (error) fail(error)
+            else { ok('Membre retiré.'); void refetch() }
+          }}
+        />
+      )}
+      {org && confirm?.kind === 'leave' && (
+        <ConfirmDialog
+          open
+          destructive
+          title={`Quitter « ${org.name} » ?`}
+          description="Vous n'aurez plus accès à ses projets. Un propriétaire pourra vous réinviter."
+          confirmLabel="Quitter l'organisation"
+          onCancel={() => setConfirm(null)}
+          onConfirm={async () => {
+            const { error } = await authClient.organization.leave({ organizationId: org.id })
+            setConfirm(null)
+            if (error) return fail(error)
+            router.push('/dashboard')
+            router.refresh()
+          }}
+        />
       )}
 
       <Card>

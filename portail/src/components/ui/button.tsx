@@ -12,11 +12,12 @@ const variants = {
 } as const
 
 const sizes = {
-  sm: 'h-8 px-3 text-xs rounded-md gap-1.5',
+  // Cible tactile ≥ 44 px (WCAG 2.5.5) sur écran tactile ; compact au pointeur précis.
+  sm: 'h-8 px-3 text-xs rounded-md gap-1.5 [@media(pointer:coarse)]:h-11',
   md: 'h-10 px-4 py-2 text-sm rounded-lg gap-2',
   lg: 'h-12 px-6 text-base rounded-lg gap-2.5',
   xl: 'h-14 px-8 text-base rounded-xl gap-3',
-  icon: 'h-10 w-10',
+  icon: 'h-10 w-10 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11',
 } as const
 
 type ButtonVariant = keyof typeof variants

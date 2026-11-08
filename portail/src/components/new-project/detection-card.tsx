@@ -123,11 +123,11 @@ export function DetectionCard({
         )}
 
         {isPrimary && detection.warnings.length > 0 && (
-          <div role="note" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-            <p className="flex items-center gap-2 text-sm font-medium text-amber-800">
+          <div role="note" className="rounded-lg border border-warning/30 bg-warning/10 p-3">
+            <p className="flex items-center gap-2 text-sm font-medium text-warning">
               <TriangleAlert className="h-4 w-4" aria-hidden="true" />À savoir
             </p>
-            <ul className="mt-2 space-y-1 text-sm text-amber-900">
+            <ul className="mt-2 space-y-1 text-sm text-warning">
               {detection.warnings.map((warning) => (
                 <li key={warning}>{warning}</li>
               ))}
