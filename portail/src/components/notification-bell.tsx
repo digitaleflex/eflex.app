@@ -68,7 +68,7 @@ export function NotificationBell({ className }: { className?: string }) {
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((o) => !o)}
-        className="relative flex h-11 w-11 items-center justify-center rounded-lg border border-input bg-background text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-input bg-background text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11"
       >
         <Bell className="h-5 w-5" aria-hidden="true" />
         <span className="sr-only">Notifications{unread > 0 ? `, ${unread} non lue${unread > 1 ? 's' : ''}` : ''}</span>
@@ -84,7 +84,7 @@ export function NotificationBell({ className }: { className?: string }) {
           id={panelId}
           role="region"
           aria-label="Dernières notifications"
-          className="fixed inset-x-4 top-28 z-50 max-h-[65vh] overflow-auto rounded-xl border border-border bg-card text-card-foreground shadow-lg lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-2 lg:w-96"
+          className="fixed inset-x-4 top-16 z-50 max-h-[70vh] overflow-auto rounded-xl border border-border bg-card text-card-foreground shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96"
         >
           <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
             <h2 className="text-sm font-semibold">Notifications</h2>

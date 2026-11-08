@@ -9,7 +9,7 @@
     --eflex-blue: 217 91% 60%;      /* Blue #3B82F6 */
     --eflex-sky: 198 93% 60%;       /* Sky #38BDF8 */
 
-    --background: 240 10% 97%;
+    --background: 216 33% 97%;   /* toile bleu-gris très clair */
     --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
@@ -29,8 +29,8 @@
     --success-foreground: 0 0% 100%;
     --warning: 32 95% 30%;
     --warning-foreground: 0 0% 100%;
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
+    --border: 216 22% 89%;
+    --input: 216 22% 87%;
     --ring: 221 83% 53%;
     --radius: 0.75rem;
   }

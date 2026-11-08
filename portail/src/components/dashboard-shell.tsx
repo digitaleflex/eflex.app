@@ -2,160 +2,70 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname, useRouter } from 'next/navigation'
-import { CreditCard, FolderKanban, LogOut, Plus, Settings, Users } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { signOut } from '@/lib/auth-client'
+import { usePathname } from 'next/navigation'
 import { OrgSwitcher } from '@/components/org-switcher'
-import { ConnectionBadge } from '@/components/connection-badge'
 import { NotificationBell } from '@/components/notification-bell'
+import { CommandPalette } from '@/components/command-palette'
+import { UserMenu } from '@/components/user-menu'
+import { cn } from '@/lib/utils'
 
-type NavItem = {
-  label: string
-  href?: string
-  icon: React.ComponentType<{ className?: string }>
-  match?: (pathname: string) => boolean
-}
-
-const navigation: NavItem[] = [
-  {
-    label: 'Projets',
-    href: '/dashboard',
-    icon: FolderKanban,
-    match: (p) => p === '/dashboard' || p.startsWith('/dashboard/projects'),
-  },
-  { label: 'Nouveau', href: '/dashboard/new', icon: Plus, match: (p) => p === '/dashboard/new' },
-  { label: 'Équipe', href: '/dashboard/organization', icon: Users, match: (p) => p.startsWith('/dashboard/organization') },
-  // Pas encore de page : affichés comme « Bientôt » plutôt que comme des liens morts.
-  { label: 'Facturation', icon: CreditCard },
-  { label: 'Paramètres', icon: Settings },
+const TABS = [
+  { label: 'Projets', href: '/dashboard', match: (p: string) => p === '/dashboard' || p.startsWith('/dashboard/projects') || p === '/dashboard/new' },
+  { label: 'Activité', href: '/dashboard/activity', match: (p: string) => p.startsWith('/dashboard/activity') },
+  { label: 'Équipe', href: '/dashboard/organization', match: (p: string) => p.startsWith('/dashboard/organization') },
+  { label: 'Notifications', href: '/dashboard/notifications', match: (p: string) => p.startsWith('/dashboard/notifications') },
 ]
 
-export function DashboardShell({
-  children,
-  user,
-}: {
-  children: React.ReactNode
-  user: { name?: string | null; email?: string | null }
-}) {
+/**
+ * Coque de la console : barre du haut (marque, organisation, recherche ⌘K, notifications, compte)
+ * et onglets soulignés. Une seule navigation, la même sur téléphone et sur ordinateur.
+ */
+export function DashboardShell({ children, user }: { children: React.ReactNode; user: { name?: string | null; email?: string | null } }) {
   const pathname = usePathname()
-  const router = useRouter()
-
-  const handleSignOut = async () => {
-    await signOut()
-    router.push('/')
-    router.refresh()
-  }
 
   return (
-    <div className="min-h-screen flex">
-      {/* Barre latérale (desktop) */}
-      <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-muted/30">
-        <div className="flex items-center h-16 px-6 border-b border-border">
-          <Link href="/dashboard" className="flex items-center">
-            <Image src="/logo-horizontal.webp" alt="Eflex — tableau de bord" width={1200} height={312} className="h-8 w-auto" priority />
+    <div className="min-h-screen">
+      <a href="#contenu" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[70] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground">
+        Aller au contenu
+      </a>
+      <header className="sticky top-0 z-40 border-b border-border bg-card/85 backdrop-blur supports-[backdrop-filter]:bg-card/70">
+        <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4 sm:gap-3 sm:px-6">
+          <Link href="/dashboard" className="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Image src="/logo-mark.png" alt="Eflex — accueil de la console" width={28} height={28} className="h-7 w-7" priority />
           </Link>
-        </div>
-        <div className="flex items-center gap-2 px-4 pt-4">
-          <OrgSwitcher className="min-w-0 flex-1" />
-          <NotificationBell />
-        </div>
-        <nav aria-label="Navigation principale" className="flex-1 p-4 space-y-1">
-          {navigation.map((item) => {
-            const Icon = item.icon
-            if (!item.href) {
-              return (
-                <span
-                  key={item.label}
-                  aria-disabled="true"
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground/70 cursor-not-allowed"
-                >
-                  <Icon className="w-5 h-5" />
-                  {item.label}
-                  <span className="ml-auto text-[10px] uppercase tracking-wide rounded-full border border-border px-2 py-0.5">Bientôt</span>
-                </span>
-              )
-            }
-            const active = item.match?.(pathname) ?? pathname === item.href
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-                )}
-              >
-                <Icon className="w-5 h-5" />
-                {item.label}
-              </Link>
-            )
-          })}
-        </nav>
-        <div className="p-4 border-t border-border space-y-3">
-          <div className="px-3 min-w-0">
-            <p className="text-sm font-medium truncate">{user.name || 'Mon compte'}</p>
-            {user.email && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
-            <ConnectionBadge className="mt-2" />
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-muted-foreground"
-            onClick={handleSignOut}
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Déconnexion
-          </Button>
-        </div>
-      </aside>
-
-      {/* En-tête (mobile) */}
-      <div className="lg:hidden fixed top-0 inset-x-0 z-40 glass border-b border-border">
-        <div className="flex items-center justify-between h-14 px-4">
-          <Link href="/dashboard" className="flex items-center">
-            <Image src="/logo-horizontal.webp" alt="Eflex — tableau de bord" width={1200} height={312} className="h-7 w-auto" />
-          </Link>
-          <div className="flex items-center gap-1">
+          <span aria-hidden="true" className="select-none text-xl font-light text-border">/</span>
+          <OrgSwitcher className="min-w-0 max-w-[45vw] sm:max-w-xs" />
+          <div className="ml-auto flex items-center gap-2">
+            <CommandPalette />
             <NotificationBell />
-            <Button variant="ghost" size="sm" className="h-11 text-muted-foreground" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Déconnexion
-            </Button>
+            <UserMenu name={user.name || 'Mon compte'} email={user.email ?? ''} />
           </div>
         </div>
-        <OrgSwitcher className="px-4 pb-2" />
-      </div>
+        <nav aria-label="Navigation principale" className="mx-auto max-w-7xl overflow-x-auto px-2 sm:px-4">
+          <ul className="flex gap-1">
+            {TABS.map((tab) => {
+              const active = tab.match(pathname)
+              return (
+                <li key={tab.href}>
+                  <Link
+                    href={tab.href}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(
+                      'relative inline-flex h-11 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+                      active ? 'text-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-foreground' : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {tab.label}
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </nav>
+      </header>
 
-      {/* Navigation basse (mobile) */}
-      <nav aria-label="Navigation principale" className="lg:hidden fixed bottom-0 inset-x-0 z-50 glass border-t border-border">
-        <div className="flex items-center justify-around h-16 px-2">
-          {navigation.filter((item) => item.href).map((item) => {
-            const Icon = item.icon
-            const active = item.match?.(pathname) ?? pathname === item.href
-            return (
-              <Link
-                key={item.label}
-                href={item.href!}
-                aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'flex flex-col items-center justify-center gap-1 min-w-16 min-h-11 px-3 rounded-lg text-xs font-medium transition-colors',
-                  active ? 'text-primary' : 'text-muted-foreground',
-                )}
-              >
-                <Icon className="w-5 h-5" />
-                <span>{item.label}</span>
-              </Link>
-            )
-          })}
-        </div>
-      </nav>
-
-      <main className="flex-1 min-w-0 pt-28 pb-20 lg:pt-0 lg:pb-0">
-        <div className="container py-8">{children}</div>
+      <main id="contenu" tabIndex={-1} className="mx-auto max-w-7xl px-4 py-8 focus:outline-none sm:px-6">
+        {children}
       </main>
     </div>
   )

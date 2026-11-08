@@ -1,4 +1,6 @@
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
+import { THEME_ROOT_ID, themeBootScript } from '@/lib/theme'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { resolveOrganization } from '@/lib/organizations'
@@ -20,7 +22,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
     await prisma.session.update({ where: { id: session.session.id }, data: { activeOrganizationId: org.organizationId } })
   }
 
+  const theme = (await cookies()).get('eflex-theme')?.value
   return (
+    // Thème propre à la console : `dark` posé côté serveur si choisi, sinon par le script (mode système).
+    <div id={THEME_ROOT_ID} className={`${theme === 'dark' ? 'dark ' : ''}min-h-screen bg-background text-foreground`} suppressHydrationWarning>
+      <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
     <EventsProvider>
       <ToastProvider>
         <MembershipWatcher />
@@ -30,5 +36,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </DashboardShell>
       </ToastProvider>
     </EventsProvider>
+    </div>
   )
 }

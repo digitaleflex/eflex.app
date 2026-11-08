@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Building2 } from 'lucide-react'
+import { ChevronsUpDown } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 
 /** Choix de l'organisation active ; tout le tableau de bord se recharge sur la nouvelle. */
@@ -38,18 +38,21 @@ export function OrgSwitcher({ className }: { className?: string }) {
     <div className={className}>
       <label htmlFor={id} className="sr-only">Organisation active</label>
       <div className="relative">
-        <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+        <span aria-hidden="true" className="pointer-events-none absolute left-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md bg-gradient-to-br from-eflexnavy to-eflexroyalblue text-[10px] font-bold text-white">
+          {(active?.name ?? organizations[0]?.name ?? '?').charAt(0).toUpperCase()}
+        </span>
         <select
           id={id}
           value={active?.id ?? ''}
           onChange={(e) => void change(e.target.value)}
-          className="h-10 w-full appearance-none rounded-lg border border-input bg-background pl-9 pr-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="h-9 w-full cursor-pointer appearance-none truncate rounded-lg border border-transparent bg-transparent pl-9 pr-8 text-sm font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11"
         >
           {!active && <option value="">Choisir…</option>}
           {organizations.map((org) => (
             <option key={org.id} value={org.id}>{org.name}</option>
           ))}
         </select>
+        <ChevronsUpDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
       </div>
     </div>
   )
