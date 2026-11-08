@@ -25,6 +25,8 @@ services:
       - STATUS_ENGINE_URL=${STATUS_ENGINE_URL:-}
       - ENV_ENCRYPTION_KEY=${ENV_ENCRYPTION_KEY:?openssl rand -base64 32}
       - ENV_ENCRYPTION_KEY_PREVIOUS=${ENV_ENCRYPTION_KEY_PREVIOUS:-}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - EMAIL_FROM=${EMAIL_FROM:-}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"

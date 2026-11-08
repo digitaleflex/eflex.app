@@ -109,10 +109,22 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              <div className="flex justify-end">
+                <Link href="/forgot-password" className="text-sm font-medium text-primary hover:underline">
+                  Mot de passe oublié ?
+                </Link>
+              </div>
               <Button type="submit" size="lg" className="w-full" loading={loading}>
                 Se connecter
               </Button>
             </form>
+            {error.startsWith('Vérifiez votre adresse') && (
+              <p className="text-center text-sm text-muted-foreground">
+                <Link href={`/verify-email?email=${encodeURIComponent(email.trim())}`} className="font-medium text-primary hover:underline">
+                  Renvoyer l&apos;e-mail de vérification
+                </Link>
+              </p>
+            )}
           </Card>
 
           <p className="text-center text-sm text-muted-foreground">
