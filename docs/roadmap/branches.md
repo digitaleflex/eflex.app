@@ -2,6 +2,9 @@
 
 > Créé le 2026-11-08. Base commune : `main` @ `6e30ce9`.
 > Règle : **une branche = un jalon = une PR vers `main`**.
+>
+> **Feuille de route Eflex terminée** : les 7 jalons sont livrés, mergés et déployés. Branches remises à niveau sur `main` ; elles peuvent être supprimées ou réutilisées.
+> Reste hors périmètre : unification (moteur/manifeste/console) et fermeture des 2 points de rupture Axiom — voir ci-dessous.
 
 ## Convention
 

@@ -1,5 +1,7 @@
 # Feuille de route — issues à créer
 
+> **État (nov. 2026) : les 9 jalons sont livrés** (01, 03 et le gros de 08 étaient déjà faits ; 02, 04, 05, 06, 07 et 09 ont été réalisés sur branches dédiées puis mergés sur `main`). Voir `docs/roadmap/branches.md` pour le détail branche → jalon.
+
 Ces fichiers sont des brouillons d'issues GitHub, issus de l'analyse du projet. Chaque fichier commence par une ligne `# Titre`, et le reste constitue le corps de l'issue.
 
 ## Ordre recommandé
