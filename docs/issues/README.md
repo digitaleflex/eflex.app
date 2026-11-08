@@ -25,6 +25,7 @@ Socle déjà posé (organisations Better Auth, projets rattachés à une organis
 | [#20](https://github.com/digitaleflex/eflex.app/issues/20) | P1 | Profil utilisateur et paramètres du compte |
 | [#21](https://github.com/digitaleflex/eflex.app/issues/21) | P1 | CRUD complet du projet (paramètres, variables, transfert, activité) |
 | [#22](https://github.com/digitaleflex/eflex.app/issues/22) | P1 | Isolation des locataires : quotas, limites, audit de sécurité |
+| [#32](https://github.com/digitaleflex/eflex.app/issues/32) | P1 | Console client : audit d'accessibilité WCAG 2.1 AA et mobile *(en cours)* |
 
 ### M3 · Facturation et administration
 Monétisation par organisation et back-office.
@@ -32,7 +33,15 @@ Monétisation par organisation et back-office.
 | Issue | Priorité | Sujet |
 |---|---|---|
 | [#18](https://github.com/digitaleflex/eflex.app/issues/18) | P0 | Facturation : abonnements par organisation, quotas, paiement, factures |
-| [#19](https://github.com/digitaleflex/eflex.app/issues/19) | P1 | Espace d'administration de la plateforme |
+| [#19](https://github.com/digitaleflex/eflex.app/issues/19) | P1 | Espace d'administration de la plateforme (épopée, détaillée en #24 à #31) |
+| [#24](https://github.com/digitaleflex/eflex.app/issues/24) | P0 | Admin : bibliothèque de composants et accessibilité *(en cours)* |
+| [#25](https://github.com/digitaleflex/eflex.app/issues/25) | P0 | Admin : socle (garde d'accès, layout, journal d'audit) *(en cours)* |
+| [#26](https://github.com/digitaleflex/eflex.app/issues/26) | P1 | Admin : utilisateurs *(liste et suspension faites)* |
+| [#27](https://github.com/digitaleflex/eflex.app/issues/27) | P1 | Admin : organisations, abonnements, quotas |
+| [#28](https://github.com/digitaleflex/eflex.app/issues/28) | P1 | Admin : projets, déploiements, opérations |
+| [#29](https://github.com/digitaleflex/eflex.app/issues/29) | P1 | Admin : tableau de bord et indicateurs |
+| [#30](https://github.com/digitaleflex/eflex.app/issues/30) | P1 | Admin : consultation du journal d'audit et conformité |
+| [#31](https://github.com/digitaleflex/eflex.app/issues/31) | P2 | Admin : infrastructure et configuration |
 
 ### M4 · Capacités de déploiement
 Ce qu'attendent les vrais projets clients.
@@ -60,6 +69,8 @@ Décider, puis prouver le moteur maison sur serveur réel.
 |---|---|---|
 | [#15](https://github.com/digitaleflex/eflex.app/issues/15) | P2 | Page d'accueil : promesses alignées sur le livré |
 | [#16](https://github.com/digitaleflex/eflex.app/issues/16) | P2 | Nettoyage du dépôt fusionné |
+
+Administration : #24 → #25 → (#26, #27, #28 en parallèle) → #29, #30 → #31.
 
 Ordre conseillé : M1 d'abord (#2 et #3). M2 peut avancer en parallèle (#17 est la base de M3). #14 décide si M5 passe avant M4.
 
