@@ -9,6 +9,7 @@ import { allow } from '@/lib/rate-limit'
 import { createApplication, deployApplication, setEnvironmentVariable } from '@/lib/coolify'
 import { analyzeGitHubRepo } from '@/lib/repo-analysis'
 import { errorResponse, repoFields, resolveRepo } from '@/lib/analysis-request'
+import { assertCryptoConfig, encrypt } from '@/lib/crypto'
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Donnez un nom au projet.').max(60, 'Le nom du projet est trop long (60 caractères maximum).'),
@@ -64,6 +65,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
   const userId = session.user.id
+
+  // Échoue clairement si la clé de chiffrement est absente, plutôt qu'au
+  // milieu de la création du projet.
+  try {
+    assertCryptoConfig()
+  } catch {
+    return NextResponse.json({ error: 'Configuration du serveur incomplète.' }, { status: 500 })
+  }
 
   if (!allow(`create:${userId}`, 10, 60_000)) {
     return NextResponse.json({ error: 'Trop de créations en peu de temps. Patientez une minute.' }, { status: 429 })
@@ -147,7 +156,13 @@ export async function POST(request: NextRequest) {
     })
     if (input.envVars.length > 0) {
       await tx.envVar.createMany({
-        data: input.envVars.map((v) => ({ projectId: created.id, key: v.key, value: v.value })), // TODO: chiffrer (issue 04)
+        data: input.envVars.map((v) => ({
+          projectId: created.id,
+          key: v.key,
+          // AAD = projectId:key : une valeur chiffrée ne peut pas être
+          // déplacée vers une autre variable ou un autre projet.
+          value: encrypt(v.value, `${created.id}:${v.key}`),
+        })),
       })
     }
     return created

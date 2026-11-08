@@ -15,7 +15,7 @@
 
 | Ordre | Branche | Issue | Priorité | Dépend de | État |
 |---|---|---|---|---|---|
-| 1 | `feat/04-encrypt-env-vars` | [04 — chiffrer les variables d'env](../issues/04-chiffrer-variables-env.md) | **P0 sécurité** | — | à faire |
+| 1 | `feat/04-encrypt-env-vars` | [04 — chiffrer les variables d'env](../issues/04-chiffrer-variables-env.md) | **P0 sécurité** | — | ✅ livré (mergé sur `main`) |
 | 2 | `feat/05-email-verification` | [05 — vérification d'email + reset](../issues/05-inscription-verification-email.md) | **P0 sécurité** | serveur SMTP | à faire |
 | 3 | `feat/02-buildplan-deploy` | [02 — déployer depuis le BuildPlan](../issues/02-deployer-depuis-buildplan.md) | **P0** | 01 ✅, 03 ✅ (débloqué) | à faire |
 | 4 | `feat/06-redis-queue` | [06 — file de déploiement Redis](../issues/06-file-deploiement-redis.md) | P1 | 02 | à faire |

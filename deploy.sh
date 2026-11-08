@@ -24,6 +24,12 @@ if ! docker network inspect proxy >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! grep -qE '^ENV_ENCRYPTION_KEY=.+' .env.prod; then
+  echo "ERREUR : ENV_ENCRYPTION_KEY est absente ou vide dans .env.prod."
+  echo "Générez-la avec : openssl rand -base64 32"
+  exit 1
+fi
+
 COMPOSE=(docker compose -f docker-compose.prod.yml --env-file .env.prod)
 
 echo "==> 1/5 Démarrage de PostgreSQL et Redis"
