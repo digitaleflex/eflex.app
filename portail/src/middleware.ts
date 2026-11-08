@@ -13,6 +13,10 @@ const ALLOWED_PATHS = new Set([
   '/api/health',
   '/api/status',
   '/api/maintenance',
+  // Les webhooks doivent continuer à arriver même pendant une maintenance
+  // (deux chemins : /api/webhooks et /api/webhooks/resend).
+  '/api/webhooks/resend',
+  '/api/webhooks',
   '/robots.txt',
   '/icon.png',
   '/apple-icon.png',
@@ -24,7 +28,11 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   if (process.env.MAINTENANCE_MODE !== 'true') return NextResponse.next()
-  if (pathname.startsWith('/_next/') || ALLOWED_PATHS.has(pathname)) return NextResponse.next()
+  if (
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/api/webhooks') ||
+    ALLOWED_PATHS.has(pathname)
+  ) return NextResponse.next()
 
   const url = request.nextUrl.clone()
   url.pathname = '/maintenance'

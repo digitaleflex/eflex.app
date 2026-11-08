@@ -7,6 +7,10 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  // Resend envoie sur https://eflex.app/api/webhooks/ (slash final) : on sert
+  // la route directement au lieu de répondre par une redirection 308 qu'un
+  // webhook POST ne suivrait pas forcément.
+  skipTrailingSlashRedirect: true,
   // Le build « standalone » reste à la racine de portail/ même quand le dépôt parent
   // contient un autre lockfile (sans cela, Next remonte au dossier du monorepo).
   outputFileTracingRoot: here,

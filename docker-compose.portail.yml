@@ -27,6 +27,7 @@ services:
       - ENV_ENCRYPTION_KEY_PREVIOUS=${ENV_ENCRYPTION_KEY_PREVIOUS:-}
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - EMAIL_FROM=${EMAIL_FROM:-}
+      - RESEND_WEBHOOK_SECRET=${RESEND_WEBHOOK_SECRET:-}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
