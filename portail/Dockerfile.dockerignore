@@ -3,6 +3,7 @@
 *
 !portail
 !packages/detector
+!packages/renderer
 
 **/node_modules
 **/.next

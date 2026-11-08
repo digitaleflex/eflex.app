@@ -15,6 +15,7 @@ COPY portail/package.json portail/package-lock.json ./
 RUN npm ci
 
 COPY packages/detector /repo/packages/detector
+COPY packages/renderer /repo/packages/renderer
 COPY portail/ ./
 RUN npx prisma generate
 RUN npm run build

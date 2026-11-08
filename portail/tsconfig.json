@@ -30,6 +30,9 @@
       ],
       "@eflex/renderer": [
         "../packages/renderer/src/index.ts"
+      ],
+      "yaml": [
+        "./node_modules/yaml"
       ]
     },
     "target": "ES2017"

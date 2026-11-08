@@ -24,6 +24,12 @@ const nextConfig = {
       '.js': ['.ts', '.tsx', '.js'],
       '.mjs': ['.mts', '.mjs'],
     }
+    // `packages/renderer` vit hors de portail/ : dans l'image Docker, `yaml`
+    // n'existe que dans portail/node_modules. On l'y résout explicitement.
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      yaml: path.resolve(here, 'node_modules/yaml'),
+    }
     return config
   },
 }
