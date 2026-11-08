@@ -16,7 +16,7 @@ Action: close issues with a status comment each; keep epics (#13–#17) open unt
 - **Wave 3 — DELIVERED** (K #81/#82 agent state + recovery, L #87/#103 metrics, M #125 auth, N #126 secrets)
 - **Wave 4 — DELIVERED** (O #88 agent network security, P #123 compose preset, Q #127/#128 authz + audit). R (#102 diagnostics API) is **NOT** delivered: `services/engine/internal/observability/diagnostics/` does not exist.
 
-Wave 3 and Wave 4 code is present and tested, but the GitHub issues are still open and — more importantly — much of it is not reachable from a running binary. See "Known production gap" below before concluding anything about operational state.
+Wave 3 and Wave 4 code is present and tested, and the two wiring breakpoints that kept it out of a running binary are now closed (see "Known production gap — closed" below). The remaining blockers before a real release are human-gated: reference VPS, installed agent, real credentials, then the `#110` end-to-end gate.
 
 ## Wave 1 — launch now (5 lanes, no inter-dependencies)
 
