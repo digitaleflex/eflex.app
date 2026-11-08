@@ -4,7 +4,8 @@
 > Règle : **une branche = un jalon = une PR vers `main`**.
 >
 > **Feuille de route Eflex terminée** : les 7 jalons sont livrés, mergés et déployés. Branches remises à niveau sur `main` ; elles peuvent être supprimées ou réutilisées.
-> Reste hors périmètre : unification (moteur/manifeste/console) et fermeture des 2 points de rupture Axiom — voir ci-dessous.
+> **Points de rupture Axiom fermés** (`fix/axiom-breakpoints`) : le moteur construit `build.Engine` + `executor.Runner` + `agentclient`, et le binaire agent passe par `internal/bootstrap`. Engine et agent compilent et passent `go test ./...`.
+> Reste hors périmètre : unification (moteur/manifeste/console) et gates humaines de release (VPS de référence, agent installé, credentials).
 
 ## Convention
 
@@ -35,7 +36,7 @@
 ## Hors périmètre actuel (à planifier ensuite)
 
 - **Unification** (`README.md`) : `feat/unify-engine-analyzer`, `feat/unify-manifest`, `feat/unify-console`, `chore/retire-legacy`.
-- **Axiom V0.1** (`docs/roadmap/parallel-plan.md`) : `fix/axiom-executor-wiring` et `fix/axiom-agent-wiring` (2 points de rupture bloquant la release), puis Wave 5.
+- **Axiom V0.1** (`docs/roadmap/parallel-plan.md`) : points de rupture **fermés** (`fix/axiom-breakpoints`) ; reste Wave 5 et les gates humaines (#108/#109 : VPS de référence, agent installé).
 
 ## Protocole de merge
 

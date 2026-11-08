@@ -88,12 +88,13 @@ Scenario coverage: **14 / 14** from issue #90, plus one gap-documentation test
    `NETWORK_CONFIG_FAILED` and health failures to `HEALTH_CHECK_FAILED`;
    a canonical code set should be defined by #84/#85.
 
-5. **`cmd/agent/main.go` is not wired to the M5 packages.**
-   `services/agent/cmd/agent/main.go:21-22` still builds the old
-   `agent.LocalRuntime` skeleton and never constructs identity, auth,
-   heartbeat, dispatcher, state or recovery. The M5 acceptance path
-   (register → heartbeat → dispatch → recover) therefore has no production
-   entry point yet; this lane wires the real packages only in tests.
+5. **`cmd/agent/main.go` is now wired to the M5 packages.**
+   `services/agent/cmd/agent/main.go` passe par `internal/bootstrap`,
+   qui construit identité, auth, heartbeat, dispatcher, state, recovery,
+   capacités et listener. Le chemin d'acceptation M5
+   (register → heartbeat → dispatch → recover) a donc un point d'entrée de
+   production. Les tests de bootstrap injectent un discoverer factice pour
+   rester hermétiques (pas de dépendance à Docker/Traefik de l'hôte).
 
 ## Running the suite
 

@@ -64,7 +64,20 @@ Wave 3 and Wave 4 code is present and tested, but the GitHub issues are still op
 - #110/#111 release gates, #112 evidence docs (parallelizable late), #113 tagging (human).
 - #69/#71 verify-and-close; close epics #13–#18.
 
-## Known production gap
+## Known production gap — closed
+
+> **Mise à jour (nov. 2026) :** les deux points de rupture ci-dessous sont
+> fermés. `services/engine/internal/bootstrap/bootstrap.go` construit
+> `build.Engine`, l'`agentclient` (client et variante NAT) et
+> `executor.NewRunner(executor.New(...))`, et l'injecte dans l'API comme
+> `DeploymentRunner` ; `services/agent/cmd/agent/main.go` passe par
+> `internal/bootstrap`, qui monte identité, credentials, état, capacités,
+> adaptateurs Docker/Traefik/health, dispatcher, reprise et listener.
+> L'Engine et l'Agent compilent et passent `go test ./...` (vérifié dans
+> `golang:1.25-alpine`). Ce qui reste avant une release réellement
+> opérationnelle est **humain** : provisionner le VPS de référence,
+> installer l'agent, renseigner les credentials GitHub/Coolify, puis passer
+> la gate `#110`. Le texte historique ci-dessous est conservé pour mémoire.
 
 **Do not read the shipped agent and build packages as an operational runtime.** Waves 1 to 4 landed a large amount of code, but the path from a deployment record to a running application is broken at two wiring points.
 
