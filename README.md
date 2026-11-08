@@ -41,6 +41,32 @@ Documentation détaillée :
 - détecteur Eflex : [`packages/detector/README.md`](./packages/detector/README.md) ;
 - infrastructure : [`DEV.md`](./DEV.md), [`PROD.md`](./PROD.md), [`TRAEFIK_SETUP.md`](./TRAEFIK_SETUP.md).
 
+## Pipeline de déploiement d'un projet
+
+Le portail ne laisse **jamais** l'orchestrateur deviner la stack : le `BuildPlan` issu du détecteur est la source de vérité.
+
+```text
+Dépôt GitHub (snapshot)
+   │  packages/detector → detect()
+   ▼
+BuildPlan (framework, runtime, install, build, start, port, services, postDeploy)
+   │  packages/renderer → buildDeploymentArtifacts()
+   ▼
+Dockerfile + docker-compose.yml + nginx/default.conf + .env.example
+   │  portail → POST /api/projects → Coolify
+   ▼
+build_pack dockercompose (ou dockerfile si le dépôt a son propre Dockerfile)
++ ports_exposes = port réel du plan + variables d'environnement chiffrées
+```
+
+Points clés :
+
+- **Port réel** : Python 8000, statique 80, Node 3000… ce n'est plus `3000` par défaut.
+- **Laravel** : le compose lance `app` (php-fpm), `web` (nginx), `queue`, `scheduler`, plus un service one-shot `migrate` qui exécute les `postDeploy` (`php artisan migrate --force`, caches…).
+- **Aucun `nixpacks` implicite** : `build_pack` est toujours explicite.
+- **Secrets** : jamais dans le plan, le Dockerfile ou le compose ; uniquement via les variables d'environnement Coolify, chiffrées au repos dans PostgreSQL (AES-256-GCM).
+- `framework === 'docker'` : le Dockerfile du dépôt fait foi, Eflex n'en génère pas.
+
 ## Feuille de route de l'unification
 
 1. **Un seul moteur** : porter les règles du détecteur Eflex (Laravel, PHP, Python, Svelte, Remix, SolidStart, RedwoodJS, monorepos) dans l'analyseur Go (`services/engine/internal/analyzer`), puis ajouter les presets d'exécution correspondants (Laravel : php-fpm + nginx + queue + scheduler).

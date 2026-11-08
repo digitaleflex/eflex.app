@@ -11,7 +11,7 @@ Ce dépôt fusionne `digitaleflex/eflex.app` (produit EFLEX, TypeScript) et `dig
 - CI : `.github/workflows/` (Go, contrats de schémas, agent, et `ts.yml` pour les packages TS + le portail).
 
 - `packages/detector` — deterministic repo snapshot → `BuildPlan`; no network/LLM/runtime deps. Entry: `src/detect.ts` (`detect`), CLI `src/cli.ts`.
-- `packages/renderer` — `BuildPlan` → docker-compose YAML + nginx/env templates. Entry: `src/render.ts`; yaml dependency.
+- `packages/renderer` — `BuildPlan` → docker-compose YAML + nginx/env templates. Entry: `src/render.ts`; yaml dependency. `src/dockerfile.ts` génère le Dockerfile, `src/deploy.ts` assemble les artefacts de déploiement (port réel, `build_pack`, `postDeploy` en service one-shot). Le portail les consomme via l'alias `@eflex/renderer` (`lib/deploy-plan.ts`) ; `yaml` est aussi dépendance du portail.
 - `schema/v1.json` — authoritative JSON Schema for plans; `schema/test.ts` validates every fixture plan/alternative via Ajv.
 - `config/domains.sh` — **source unique** des domaines/URLs publics (un seul `EFLEX_ROOT_DOMAIN`, aucune valeur secrète) ; `scripts/sync-domains.sh` régénère les fichiers statiques qui ne peuvent pas interpoler `${VAR}`.
 - `portail/` — Next.js 15 App Router portal (Better Auth, Prisma, Coolify client). **Not** in root pnpm workspace; has own `package-lock.json`; use `npm` there.

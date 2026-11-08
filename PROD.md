@@ -70,6 +70,19 @@ set -a; . ./config/domains.sh; set +a
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 ```
 
+## Pipeline de déploiement des projets clients
+
+`POST /api/projects` ne déploie pas « un dépôt » mais **un BuildPlan** :
+
+1. `packages/detector` analyse le dépôt (ou `eflex.json`) et produit le plan stocké dans `Project.plan` / `Project.detection`.
+2. `packages/renderer.buildDeploymentArtifacts()` génère le `Dockerfile`, le `docker-compose.yml`, `nginx/default.conf` et le modèle `.env` ; le port exposé vient du plan, pas d'une valeur par défaut.
+3. Le portail transmet à Coolify `build_pack` (`dockercompose` ou `dockerfile`), `ports_exposes`, le compose encodé en base64 (`docker_compose_raw`) et le Dockerfile généré.
+4. Les variables d'environnement du client sont chiffrées (AES-256-GCM) en base et transmises séparément à Coolify ; elles n'apparaissent jamais dans les artefacts de build.
+
+Les `postDeploy` (migrations Laravel, caches) sont exécutés par un service one-shot `migrate` du compose. Ce pipeline est couvert par `packages/renderer/test/deploy.test.ts` et `portail/src/lib/deploy-plan.test.ts`.
+
+⚠️ Coolify est **volontairement distant** : `COOLIFY_API_URL` / `COOLIFY_API_TOKEN` doivent être renseignés dans `.env.prod`. Sans eux, la création de projet reste en base mais le déploiement est signalé en échec (`/api/status` affiche « non surveillé » si laissé vide).
+
 ## Sécurité
 
 - Ne commitez **jamais** `.env.prod` (déjà couvert par `.env.*` dans `.gitignore`).

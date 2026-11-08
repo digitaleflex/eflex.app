@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@eflex/detector': path.resolve(__dirname, 'packages/detector/src/index.ts'),
+      '@eflex/renderer': path.resolve(__dirname, 'packages/renderer/src/index.ts'),
       '@': path.resolve(__dirname, 'portail/src'),
     },
   },
