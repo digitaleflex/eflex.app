@@ -28,9 +28,10 @@ pnpm render <dir>     # tsx packages/renderer/src/main.ts
 ```
 
 Single test: `pnpm vitest run packages/detector/test/detect.test.ts`; filter test: `pnpm vitest run -t "detects Next.js"`.
-Portal: `cd portail && npm install && npm run dev|build|start`. Root `typecheck` does not cover it ; la CI (`ts.yml`) y lance `npx prisma validate`, `npx prisma generate` et `npx tsc --noEmit`.
+`pnpm typecheck:all` couvre détecteur + renderer + portail (avec `prisma generate`). Le portail a aussi `npm run lint` (ESLint `--max-warnings=0`, `.eslintrc.json` ; `next lint` est déprécié). La CI `ts.yml` lance tests, typechecks, garde-fou domaines, `prisma validate/generate`, lint et **`next build`** avec des variables factices.
+Portal: `cd portail && npm install && npm run dev|build|start|lint|typecheck`.
 
-Détection dans le portail : `POST /api/projects/analyze` → `lib/repo-analysis.ts` récupère l'arborescence (API GitHub, dépôts publics uniquement) puis les fichiers demandés (raw.githubusercontent.com), et appelle `@eflex/detector` en boucle. `lib/github-url.ts` valide les URL. Le portail importe le détecteur par alias (`tsconfig` paths + `experimental.externalDir` + `extensionAlias` dans `next.config.mjs`) : **n'importer que des types (`import type`) dans les composants client**. `POST /api/projects` refait l'analyse côté serveur et ne reçoit jamais le plan du client. Les tests de ces modules (`portail/src/**/*.test.ts`) tournent avec `pnpm test`.
+Détection dans le portail : `POST /api/projects/analyze` → `lib/repo-analysis.ts` récupère l'arborescence (API GitHub ; dépôts publics via raw.githubusercontent.com, dépôts privés via l'API Contents avec jeton d'installation GitHub App) puis les fichiers demandés, et appelle `@eflex/detector` en boucle. `lib/github-url.ts` valide les URL. Le portail importe le détecteur par alias (`tsconfig` paths + `experimental.externalDir` + `extensionAlias` dans `next.config.mjs`) : **n'importer que des types (`import type`) dans les composants client**. `POST /api/projects` refait l'analyse côté serveur et ne reçoit jamais le plan du client. Les tests de ces modules (`portail/src/**/*.test.ts`) tournent avec `pnpm test`.
 
 Docker : l'image du portail se construit avec la **racine du dépôt** comme contexte (`docker build -f portail/Dockerfile .`), car elle embarque `packages/detector` ; l'allowlist du contexte est dans `portail/Dockerfile.dockerignore`.
 

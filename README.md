@@ -85,6 +85,7 @@ cd services/agent && go test ./...
 pnpm install
 pnpm test
 pnpm typecheck
+pnpm typecheck:all   # détecteur + renderer + portail (avec prisma generate)
 
 # Portail EFLEX (npm)
 cd portail && npm install && npm run dev

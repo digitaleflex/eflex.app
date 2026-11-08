@@ -13,8 +13,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params
+  // Le filtre relationnel garantit qu'un utilisateur ne lit que ses propres
+  // déploiements, sans avoir à sélectionner (puis jeter) le projet.
   const deployment = await prisma.deployment.findFirst({
-    where: { id },
+    where: { id, project: { userId: session.user.id } },
     select: {
       id: true,
       status: true,
@@ -22,15 +24,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       coolifyBuildId: true,
       logsSummary: true,
       createdAt: true,
-      project: { select: { userId: true } },
     },
   })
 
-  if (!deployment || deployment.project.userId !== session.user.id) {
+  if (!deployment) {
     return NextResponse.json({ error: 'Déploiement introuvable' }, { status: 404 })
   }
 
-  const { project: _project, ...rest } = deployment
+  const rest = deployment
   return NextResponse.json(
     {
       deployment: {

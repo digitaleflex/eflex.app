@@ -72,4 +72,16 @@ jobs:
         run: npx prisma generate
       - name: Typecheck (portail)
         working-directory: portail
-        run: npx tsc --noEmit
+        run: npm run typecheck
+      - name: Lint (portail, ESLint sans avertissement)
+        working-directory: portail
+        run: npm run lint
+      - name: Build (portail)
+        working-directory: portail
+        # `next build` ne contacte aucune base : des valeurs factices suffisent.
+        run: npm run build
+        env:
+          BETTER_AUTH_SECRET: ci-placeholder-not-used-at-runtime
+          BETTER_AUTH_URL: http://localhost:3000
+          ENV_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          REDIS_URL: redis://localhost:6379

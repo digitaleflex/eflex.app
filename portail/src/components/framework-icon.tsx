@@ -50,8 +50,8 @@ export function FrameworkIcon({
   if (!src) return null
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
     // Le SVG d'origine reste en couleur ; seule la plaque de fond est teintée.
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
       alt={alt ?? framework}

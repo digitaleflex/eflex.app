@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import type { BuildPlan } from '@eflex/detector'
 import type { Prisma } from '@prisma/client'
@@ -11,6 +10,7 @@ import { errorResponse, repoFields, resolveInstallationToken, resolveRepo } from
 import { assertCryptoConfig, encrypt } from '@/lib/crypto'
 import { buildProjectArtifacts } from '@/lib/deploy-plan'
 import { enqueueDeployment } from '@/lib/queue'
+import { uniqueSlug } from '@/lib/project-slug'
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Donnez un nom au projet.').max(60, 'Le nom du projet est trop long (60 caractères maximum).'),
@@ -34,31 +34,6 @@ const schema = z.object({
     .max(100, 'Trop de variables d\'environnement (100 maximum).')
     .default([]),
 })
-
-function slugify(name: string): string {
-  const slug = name
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 40)
-    .replace(/-$/, '')
-  return slug || 'projet'
-}
-
-/** Slug unique : le nom seul si libre, sinon suffixé (le slug est unique pour toute la plateforme). */
-async function uniqueSlug(name: string): Promise<string> {
-  const base = slugify(name)
-  let candidate = base
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const taken = await prisma.project.findUnique({ where: { slug: candidate }, select: { id: true } })
-    if (!taken) return candidate
-    candidate = `${base}-${randomBytes(2).toString('hex')}`
-  }
-  return `${base}-${randomBytes(4).toString('hex')}`
-}
 
 export async function POST(request: NextRequest) {
   const session = await getSession()
@@ -140,7 +115,9 @@ export async function POST(request: NextRequest) {
   // 2. Le BuildPlan devient la source de vérité du déploiement (issue 02) :
   //    Dockerfile, compose, port réel, services et commandes post-déploiement.
   //    Plus aucune détection Nixpacks : Eflex garde la main.
-  const slug = await uniqueSlug(input.name)
+  const slug = await uniqueSlug(input.name, async (candidate) =>
+    Boolean(await prisma.project.findUnique({ where: { slug: candidate }, select: { id: true } })),
+  )
   let artifacts: ReturnType<typeof buildProjectArtifacts>
   try {
     artifacts = buildProjectArtifacts(plan, slug)

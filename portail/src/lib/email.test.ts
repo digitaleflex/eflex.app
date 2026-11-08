@@ -77,7 +77,7 @@ describe('sendEmail', () => {
     process.env.NODE_ENV = 'development'
     const fetchMock = vi.fn()
     globalThis.fetch = fetchMock as unknown as typeof fetch
-    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'info').mockImplementation(() => {})
     await expect(sendEmail(INPUT)).resolves.toBeUndefined()
     expect(fetchMock).not.toHaveBeenCalled()
   })
