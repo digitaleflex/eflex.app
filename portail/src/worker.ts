@@ -24,6 +24,7 @@ import {
   deployApplication,
   getDeploymentLogs,
   getDeploymentStatus,
+  setApplicationLabels,
   setEnvironmentVariable,
 } from '@/lib/coolify'
 
@@ -150,6 +151,18 @@ export async function processDeployment(deploymentId: string): Promise<void> {
         await fail(deploymentId, `Version du runtime non transmise à Nixpacks : ${result.error}`)
         return
       }
+    }
+  }
+
+  // Coolify remplace les custom_labels fournis à la création par ses propres
+  // labels (entrypoints http/https). On les réapplique pour le Traefik existant
+  // (websecure), à chaque déploiement, y compris pour une application existante.
+  if (domain) {
+    const labels = buildApplicationLabels(project.slug, domain, artifacts.portsExposes)
+    const labeled = await setApplicationLabels(appId, labels)
+    if ('error' in labeled) {
+      await fail(deploymentId, `Labels Traefik non appliqués : ${labeled.error}`)
+      return
     }
   }
 

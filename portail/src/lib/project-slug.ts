@@ -31,3 +31,16 @@ export async function uniqueSlug(
   }
   return `${base}-${randomBytes(4).toString('hex')}`
 }
+
+/**
+ * Domaine public par défaut d'un projet : `<slug>.<racine>`.
+ * Le DNS wildcard `*.eflex.app` pointe déjà sur le VPS ; Traefik émet le
+ * certificat Let's Encrypt à la première requête.
+ */
+export function projectDomain(slug: string, rootDomain: string | undefined): string | null {
+  const root = (rootDomain ?? '')
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/.*$/, '')
+  return root ? `${slug}.${root}` : null
+}

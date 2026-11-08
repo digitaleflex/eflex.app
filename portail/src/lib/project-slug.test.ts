@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { slugify, uniqueSlug } from './project-slug'
+import { projectDomain, slugify, uniqueSlug } from './project-slug'
 
 describe('slugify', () => {
   it('normalise les accents, la casse et les espaces', () => {
@@ -47,5 +47,19 @@ describe('uniqueSlug', () => {
     const first = await make()
     const second = await make()
     expect(first).not.toBe(second)
+  })
+})
+
+describe('projectDomain', () => {
+  it('construit un sous-domaine à partir du slug et de la racine', () => {
+    expect(projectDomain('mon-app', 'eflex.app')).toBe('mon-app.eflex.app')
+    expect(projectDomain('mon-app', 'https://eflex.app/')).toBe('mon-app.eflex.app')
+    expect(projectDomain('mon-app', '  eflex.app  ')).toBe('mon-app.eflex.app')
+  })
+
+  it('renvoie null sans racine configurée', () => {
+    expect(projectDomain('mon-app', undefined)).toBeNull()
+    expect(projectDomain('mon-app', '')).toBeNull()
+    expect(projectDomain('mon-app', '   ')).toBeNull()
   })
 })

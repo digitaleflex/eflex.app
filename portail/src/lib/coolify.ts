@@ -328,8 +328,29 @@ export async function getDeploymentLogs(
   return { logs: decodeDeploymentLogs(res.data?.logs) }
 }
 
-/** Ajoute ou met à jour une variable d'environnement d'une application. */
-export async function setEnvironmentVariable(
+/**
+ * Remplace les labels du conteneur.
+ *
+ * Coolify écrase les `custom_labels` fournis à la création par ses propres
+ * labels (entrypoints `http`/`https`, qui n'existent pas dans le Traefik
+ * existant). Un PATCH après création est donc nécessaire pour imposer les
+ * labels `websecure` du proxy de l'hôte.
+ */
+export async function setApplicationLabels(
+  appId: string,
+  labels: string[],
+): Promise<{ ok: true } | { error: string }> {
+  const res = await coolifyFetch(`/applications/${encodeURIComponent(appId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      custom_labels: Buffer.from(labels.join('\n'), 'utf8').toString('base64'),
+    }),
+  })
+  if (res.error) return { error: res.error }
+  return { ok: true }
+}
+
+/** Ajoute ou met à jour une variable d'environnement d'une application. */export async function setEnvironmentVariable(
   appId: string,
   key: string,
   value: string,
