@@ -20,6 +20,7 @@ model User {
   accounts      Account[]
   projects      Project[]
   subscription  Subscription?
+  gitInstallations GitInstallation[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 }
@@ -76,6 +77,10 @@ model Project {
   slug          String     @unique // ex: "mon-projet-42"
   repoUrl       String
   branch        String     @default("main")
+  /** Dépôt au format « proprietaire/nom » et installation GitHub App liée (issue 07). */
+  repoFullName  String?
+  installationId String?
+  productionBranch String?
   framework     String      // laravel, nextjs, node, python, static
   runtime       String?     // node@22, php@8.3, etc.
   domain        String?     // domaine client, sans protocole
@@ -131,6 +136,25 @@ model Subscription {
   updatedAt        DateTime @updatedAt
 
   @@index([userId])
+}
+
+// ─── GitHub App (issue 07) ──────────────────────────────────────────────────
+model GitInstallation {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  installationId String   @unique
+  accountLogin   String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/** Idempotence des webhooks : une livraison `X-GitHub-Delivery` n'est traitée qu'une fois. */
+model WebhookDelivery {
+  id        String   @id
+  createdAt DateTime @default(now())
 }
 
 // ─── Statut public / supervision ────────────────────────────────────────────

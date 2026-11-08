@@ -83,6 +83,23 @@ Les `postDeploy` (migrations Laravel, caches) sont exécutés par un service one
 
 ⚠️ Coolify est **volontairement distant** : `COOLIFY_API_URL` / `COOLIFY_API_TOKEN` doivent être renseignés dans `.env.prod`. Sans eux, la création de projet reste en base mais le déploiement est signalé en échec (`/api/status` affiche « non surveillé » si laissé vide).
 
+## GitHub App (dépôts privés et redéploiement sur push)
+
+Une fois l'App créée sur GitHub, déclarer l'URL du webhook :
+
+```
+https://eflex.app/api/webhooks/github
+```
+
+- **Permissions** : `contents: read`, `metadata: read`, `pull_requests: write`, `checks: write`.
+- **Événements** : `push`, `pull_request`, `installation`, `installation_repositories`.
+- **Variables** (`.env.prod`, jamais commitées) : `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (PEM, `\n` échappés acceptés), `GITHUB_WEBHOOK_SECRET`, `GITHUB_APP_SLUG`.
+- Le secret du webhook sert à vérifier `X-Hub-Signature-256` ; une signature invalide renvoie **401** sans rien enfiler.
+- `X-GitHub-Delivery` est stocké dans `WebhookDelivery` : une livraison rejouée ne crée pas de second déploiement.
+- Un `push` sur la branche de production crée un `Deployment` `queued` avec le SHA reçu et l'enfile dans BullMQ.
+
+Sans ces variables, `/api/github/config` annonce l'App non configurée et le sélecteur GitHub est masqué ; l'analyse des dépôts publics reste disponible.
+
 ## File de déploiement
 
 `POST /api/projects` répond **202** avec un `Deployment` `queued` : le travail lourd (Coolify, variables chiffrées, build, statut, logs) est effectué par un **worker BullMQ** démarré dans le processus du portail via `src/instrumentation.ts`. Il se connecte à Redis avec `REDIS_URL` (`redis://eflex-redis:6379`, réseau interne — aucun port publié sur l'hôte).

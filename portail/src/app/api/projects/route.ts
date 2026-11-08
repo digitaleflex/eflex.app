@@ -7,7 +7,7 @@ import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { allow } from '@/lib/rate-limit'
 import { analyzeGitHubRepo } from '@/lib/repo-analysis'
-import { errorResponse, repoFields, resolveRepo } from '@/lib/analysis-request'
+import { errorResponse, repoFields, resolveInstallationToken, resolveRepo } from '@/lib/analysis-request'
 import { assertCryptoConfig, encrypt } from '@/lib/crypto'
 import { buildProjectArtifacts } from '@/lib/deploy-plan'
 import { enqueueDeployment } from '@/lib/queue'
@@ -102,7 +102,13 @@ export async function POST(request: NextRequest) {
   let analysis
   try {
     const { ref, root } = resolveRepo(input)
-    analysis = await analyzeGitHubRepo(ref, { root, commitSha: input.commitSha, token: process.env.GITHUB_TOKEN })
+    const installationToken = await resolveInstallationToken(userId, input.installationId)
+    analysis = await analyzeGitHubRepo(ref, {
+      root,
+      commitSha: input.commitSha,
+      token: process.env.GITHUB_TOKEN,
+      installationToken,
+    })
   } catch (error) {
     return errorResponse(error)
   }
@@ -154,6 +160,9 @@ export async function POST(request: NextRequest) {
         slug,
         repoUrl: repo.url,
         branch: repo.branch,
+        repoFullName: `${repo.owner}/${repo.repo}`,
+        installationId: input.installationId ?? null,
+        productionBranch: repo.branch,
         framework: plan.framework,
         runtime: plan.runtime,
         port: plan.port,

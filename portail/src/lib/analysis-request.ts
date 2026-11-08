@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { isValidBranch, parseGitHubUrl, type GitHubRepoRef } from '@/lib/github-url'
 import { AnalysisError } from '@/lib/repo-analysis'
+import { prisma } from '@/lib/prisma'
+import { getInstallationToken } from '@/lib/github-app'
 
 const ROOT_RE = /^[A-Za-z0-9._/-]{1,200}$/
 
@@ -10,12 +12,36 @@ export const repoFields = {
   branch: z.string().trim().max(200).optional(),
   /** Application choisie dans un monorepo (dossier relatif à la racine du dépôt). */
   root: z.string().trim().max(200).optional(),
+  /** Installation GitHub App de l'utilisateur (dépôts privés, issue 07). */
+  installationId: z.string().trim().regex(/^\d+$/, 'Installation GitHub invalide.').optional(),
 }
 
 export type RepoFields = {
   repoUrl: string
   branch?: string | undefined
   root?: string | undefined
+  installationId?: string | undefined
+}
+
+/**
+ * Jeton d'installation court, uniquement si l'installation appartient bien à
+ * l'utilisateur connecté (un client ne peut pas fournir un ID arbitraire).
+ */
+export async function resolveInstallationToken(
+  userId: string,
+  installationId?: string,
+): Promise<string | undefined> {
+  if (!installationId) return undefined
+  const row = await prisma.gitInstallation.findFirst({
+    where: { userId, installationId },
+    select: { installationId: true },
+  })
+  if (!row) throw new AnalysisError('Cette installation GitHub n’est pas liée à votre compte.', 403)
+  try {
+    return await getInstallationToken(row.installationId)
+  } catch {
+    throw new AnalysisError('Impossible d’obtenir l’accès GitHub. Réessayez dans un instant.', 502)
+  }
 }
 
 /** Valide l'URL, la branche et le dossier ; lève une AnalysisError 400 sinon. */
