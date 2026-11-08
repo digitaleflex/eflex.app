@@ -10,6 +10,7 @@ import { createApplication, deployApplication, setEnvironmentVariable } from '@/
 import { analyzeGitHubRepo } from '@/lib/repo-analysis'
 import { errorResponse, repoFields, resolveRepo } from '@/lib/analysis-request'
 import { assertCryptoConfig, encrypt } from '@/lib/crypto'
+import { buildProjectArtifacts } from '@/lib/deploy-plan'
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Donnez un nom au projet.').max(60, 'Le nom du projet est trop long (60 caractères maximum).'),
@@ -130,8 +131,21 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 2. Le projet et ses variables, ensemble ou pas du tout.
+  // 2. Le BuildPlan devient la source de vérité du déploiement (issue 02) :
+  //    Dockerfile, compose, port réel, services et commandes post-déploiement.
+  //    Plus aucune détection Nixpacks : Eflex garde la main.
   const slug = await uniqueSlug(input.name)
+  let artifacts: ReturnType<typeof buildProjectArtifacts>
+  try {
+    artifacts = buildProjectArtifacts(plan, slug)
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Impossible de préparer le déploiement.' },
+      { status: 422 },
+    )
+  }
+
+  // 3. Le projet et ses variables, ensemble ou pas du tout.
   const project = await prisma.$transaction(async (tx) => {
     const created = await tx.project.create({
       data: {
@@ -168,7 +182,7 @@ export async function POST(request: NextRequest) {
     return created
   })
 
-  // 3. Coolify : application, variables, déploiement.
+  // 4. Coolify : application, variables, déploiement — pilotés par le plan.
   let coolifyAppId: string | null = null
   let deploymentId: string | null = null
   let deployError: string | null = null
@@ -178,8 +192,13 @@ export async function POST(request: NextRequest) {
       name: slug,
       gitRepository: repo.url,
       gitBranch: repo.branch,
-      portsExposes: String(plan.port),
-      ...(plan.framework === 'docker' ? { buildPack: 'dockerfile' as const } : {}),
+      buildPack: artifacts.buildPack,
+      portsExposes: String(artifacts.portsExposes),
+      // Coolify attend le compose encodé en base64 (docker_compose_raw).
+      dockerComposeRaw: artifacts.compose
+        ? Buffer.from(artifacts.compose, 'utf8').toString('base64')
+        : undefined,
+      dockerfile: artifacts.dockerfile ?? undefined,
     })
 
     if ('error' in appResult) {
@@ -223,6 +242,13 @@ export async function POST(request: NextRequest) {
     project: { id: project.id, name: project.name, slug: project.slug },
     deployment: { id: deployment.id, status: deployment.status },
     coolify: { appId: coolifyAppId, deploymentId },
+    plan: {
+      framework: plan.framework,
+      buildPack: artifacts.buildPack,
+      port: artifacts.portsExposes,
+      services: artifacts.services,
+      postDeploy: artifacts.postDeploy,
+    },
     warning: deployError,
   })
 }

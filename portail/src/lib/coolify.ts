@@ -64,25 +64,41 @@ async function coolifyFetch<T>(
 // Applications
 // ============================================================================
 
-/** Crée une application Coolify à partir d'un dépôt Git (public ou privé). */
+/**
+ * Crée une application Coolify à partir d'un dépôt Git.
+ *
+ * Le build pack et le port sont **obligatoires** : ils viennent du BuildPlan
+ * (issue 02). Plus aucun `nixpacks` implicite : Eflex garde la main sur la
+ * détection et le rendu.
+ *
+ * `dockerComposeRaw` est le compose généré, encodé en base64 (champ
+ * `docker_compose_raw` de l'API Coolify) ; `dockerfile` est le contenu brut
+ * généré quand le plan prévoit un build Dockerfile.
+ */
 export async function createApplication(params: {
   name: string
   gitRepository: string
   gitBranch?: string
-  buildPack?: 'nixpacks' | 'dockerfile' | 'dockercompose'
-  portsExposes?: string
+  buildPack: 'dockerfile' | 'dockercompose'
+  portsExposes: string
+  dockerComposeRaw?: string
+  dockerfile?: string
   fqdn?: string
 }): Promise<{ id: string } | { error: string }> {
+  const payload: Record<string, unknown> = {
+    name: params.name,
+    git_repository: params.gitRepository,
+    git_branch: params.gitBranch || 'main',
+    build_pack: params.buildPack,
+    ports_exposes: params.portsExposes,
+    fqdn: params.fqdn || '',
+  }
+  if (params.dockerComposeRaw) payload.docker_compose_raw = params.dockerComposeRaw
+  if (params.dockerfile) payload.dockerfile = params.dockerfile
+
   const res = await coolifyFetch<{ uuid: string }>('/applications/public', {
     method: 'POST',
-    body: JSON.stringify({
-      name: params.name,
-      git_repository: params.gitRepository,
-      git_branch: params.gitBranch || 'main',
-      build_pack: params.buildPack || 'nixpacks',
-      ports_exposes: params.portsExposes || '3000',
-      fqdn: params.fqdn || '',
-    }),
+    body: JSON.stringify(payload),
   })
 
   if (res.error) return { error: res.error }
