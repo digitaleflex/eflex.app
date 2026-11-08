@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { FrameworkIcon } from '@/components/framework-icon'
 import { AutoRefresh } from '@/components/auto-refresh'
+import { DeploymentLogs } from '@/components/deployment-logs'
 import { CoolifyClient, loadCoolifyConfig } from '@/lib/coolify'
 import { syncDeployment } from '@/lib/deployer'
 import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
@@ -197,7 +198,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
               {deployments.map((d) => {
                 const s = STATUS[d.status] ?? { label: d.status, variant: 'outline' as const }
                 return (
-                  <li key={d.id} className="py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <li key={d.id} className="py-3 flex flex-wrap gap-2 sm:items-center sm:justify-between">
                     <div className="min-w-0 space-y-1">
                       <p className="text-sm font-medium">{dateFormat.format(d.createdAt)}</p>
                       <p className="text-xs text-muted-foreground font-mono">
@@ -208,6 +209,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                       )}
                     </div>
                     <Badge variant={s.variant} className="self-start sm:self-center">{s.label}</Badge>
+                    <DeploymentLogs projectId={project.id} deploymentId={d.id} defaultOpen={d.id === last?.id && inProgress} />
                   </li>
                 )
               })}
