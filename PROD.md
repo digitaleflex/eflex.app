@@ -83,6 +83,15 @@ Les `postDeploy` (migrations Laravel, caches) sont exécutés par un service one
 
 ⚠️ Coolify est **volontairement distant** : `COOLIFY_API_URL` / `COOLIFY_API_TOKEN` doivent être renseignés dans `.env.prod`. Sans eux, la création de projet reste en base mais le déploiement est signalé en échec (`/api/status` affiche « non surveillé » si laissé vide).
 
+## File de déploiement
+
+`POST /api/projects` répond **202** avec un `Deployment` `queued` : le travail lourd (Coolify, variables chiffrées, build, statut, logs) est effectué par un **worker BullMQ** démarré dans le processus du portail via `src/instrumentation.ts`. Il se connecte à Redis avec `REDIS_URL` (`redis://eflex-redis:6379`, réseau interne — aucun port publié sur l'hôte).
+
+- `jobId = deploymentId` : pas de doublon de job ; `coolifyAppId` est stocké dès sa création pour rendre chaque étape reprenable.
+- BullMQ reprend automatiquement les jobs « stalled » après un redémarrage du portail.
+- Suivi : `GET /api/deployments/[id]`, bouton « Redéployer » et panneau à polling 3 s sur `/dashboard/projects/[id]`.
+- Sans `REDIS_URL`, le worker ne démarre pas et les créations de projet échouent explicitement (plutôt que de rester bloquées).
+
 ## Sécurité
 
 - Ne commitez **jamais** `.env.prod` (déjà couvert par `.env.*` dans `.gitignore`).

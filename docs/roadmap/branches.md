@@ -18,7 +18,7 @@
 | 1 | `feat/04-encrypt-env-vars` | [04 — chiffrer les variables d'env](../issues/04-chiffrer-variables-env.md) | **P0 sécurité** | — | ✅ livré (mergé sur `main`) |
 | 2 | `feat/05-email-verification` | [05 — vérification d'email + reset](../issues/05-inscription-verification-email.md) | **P0 sécurité** | domaine Resend vérifié + `RESEND_API_KEY` | ✅ livré (Resend actif + webhooks signés) |
 | 3 | `feat/02-buildplan-deploy` | [02 — déployer depuis le BuildPlan](../issues/02-deployer-depuis-buildplan.md) | **P0** | 01 ✅, 03 ✅ (débloqué) | ✅ livré ( artefacts générés + testés ; validation Coolify distant à faire ) |
-| 4 | `feat/06-redis-queue` | [06 — file de déploiement Redis](../issues/06-file-deploiement-redis.md) | P1 | 02 | à faire |
+| 4 | `feat/06-redis-queue` | [06 — file de déploiement Redis](../issues/06-file-deploiement-redis.md) | P1 | 02 | ✅ livré (file BullMQ, worker, 202, statut/logs temps réel) |
 | 5 | `feat/07-github-app` | [07 — GitHub App, dépôts privés, webhooks](../issues/07-github-app-webhooks.md) | P1 | 06 | à faire |
 | 6 | `chore/08-ci-slug` | [08 — slug sûr, lint/build en CI](../issues/08-prisma-ci-qualite.md) | P2 | — | à faire |
 | 7 | `chore/09-repo-cleanup` | [09 — nettoyage du dépôt](../issues/09-nettoyage-depot.md) | P2 | — | à faire |

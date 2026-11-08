@@ -6,14 +6,20 @@ import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { FrameworkIcon } from '@/components/framework-icon'
+import { DeploymentPanel, type DeploymentView } from '@/components/deployment-panel'
+import { STATUS_LABELS, isDeploymentStatus } from '@/lib/deployment-state'
 import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 
 const STATUS: Record<string, { label: string; variant: 'success' | 'warning' | 'destructive' | 'outline' }> = {
-  live: { label: 'En ligne', variant: 'success' },
-  building: { label: 'Build en cours', variant: 'warning' },
-  deploying: { label: 'Déploiement en cours', variant: 'warning' },
+  queued: { label: STATUS_LABELS.queued, variant: 'outline' },
+  analyzing: { label: STATUS_LABELS.analyzing, variant: 'warning' },
+  provisioning: { label: STATUS_LABELS.provisioning, variant: 'warning' },
+  live: { label: STATUS_LABELS.live, variant: 'success' },
+  building: { label: STATUS_LABELS.building, variant: 'warning' },
+  deploying: { label: STATUS_LABELS.deploying, variant: 'warning' },
   pending: { label: 'En attente', variant: 'outline' },
-  failed: { label: 'Échec', variant: 'destructive' },
+  failed: { label: STATUS_LABELS.failed, variant: 'destructive' },
+  cancelled: { label: STATUS_LABELS.cancelled, variant: 'outline' },
   rollbacked: { label: 'Annulé', variant: 'outline' },
 }
 
@@ -29,8 +35,6 @@ function readAnalysis(value: unknown): StoredAnalysis | null {
     commitSha: typeof v.commitSha === 'string' ? v.commitSha : undefined,
   }
 }
-
-const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
@@ -49,6 +53,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const analysis = readAnalysis(project.detection)
   const last = project.deployments[0]
   const lastStatus = last ? STATUS[last.status] ?? { label: last.status, variant: 'outline' as const } : null
+  const deploymentViews: DeploymentView[] = project.deployments.map((d) => ({
+    id: d.id,
+    status: d.status,
+    label: isDeploymentStatus(d.status) ? STATUS_LABELS[d.status] : d.status,
+    commitSha: d.commitSha,
+    logsSummary: d.logsSummary,
+    createdAt: d.createdAt.toISOString(),
+  }))
 
   return (
     <div className="space-y-8 max-w-5xl">
@@ -148,36 +160,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <h2 className="font-semibold">Déploiements</h2>
-        </CardHeader>
-        <CardContent>
-          {project.deployments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucun déploiement pour ce projet.</p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {project.deployments.map((d) => {
-                const s = STATUS[d.status] ?? { label: d.status, variant: 'outline' as const }
-                return (
-                  <li key={d.id} className="py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0 space-y-1">
-                      <p className="text-sm font-medium">{dateFormat.format(d.createdAt)}</p>
-                      <p className="text-xs text-muted-foreground font-mono">
-                        {d.commitSha === 'pending' ? 'Commit en attente' : d.commitSha.slice(0, 7)}
-                      </p>
-                      {d.status === 'failed' && d.logsSummary && (
-                        <p className="text-xs text-destructive break-words">{d.logsSummary}</p>
-                      )}
-                    </div>
-                    <Badge variant={s.variant} className="self-start sm:self-center">{s.label}</Badge>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <DeploymentPanel projectId={project.id} initial={deploymentViews} />
 
       <Card>
         <CardHeader>
