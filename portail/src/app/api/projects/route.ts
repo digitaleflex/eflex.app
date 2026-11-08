@@ -10,7 +10,7 @@ import { errorResponse, repoFields, resolveInstallationToken, resolveRepo } from
 import { assertCryptoConfig, encrypt } from '@/lib/crypto'
 import { buildProjectArtifacts } from '@/lib/deploy-plan'
 import { enqueueDeployment } from '@/lib/queue'
-import { uniqueSlug } from '@/lib/project-slug'
+import { projectDomain, uniqueSlug } from '@/lib/project-slug'
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Donnez un nom au projet.').max(60, 'Le nom du projet est trop long (60 caractères maximum).'),
@@ -118,6 +118,9 @@ export async function POST(request: NextRequest) {
   const slug = await uniqueSlug(input.name, async (candidate) =>
     Boolean(await prisma.project.findUnique({ where: { slug: candidate }, select: { id: true } })),
   )
+  // Chaque projet reçoit un sous-domaine public (DNS wildcard *.eflex.app) :
+  // le worker génère les labels Traefik et Coolify route l'application.
+  const domain = projectDomain(slug, process.env.PORTAL_DOMAIN)
   let artifacts: ReturnType<typeof buildProjectArtifacts>
   try {
     artifacts = buildProjectArtifacts(plan, slug)
@@ -135,6 +138,7 @@ export async function POST(request: NextRequest) {
         userId,
         name: input.name,
         slug,
+        domain,
         repoUrl: repo.url,
         branch: repo.branch,
         repoFullName: `${repo.owner}/${repo.repo}`,
@@ -193,7 +197,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json(
     {
-      project: { id: project.id, name: project.name, slug: project.slug },
+      project: { id: project.id, name: project.name, slug: project.slug, domain: project.domain },
       deployment: { id: deployment.id, status: warning ? 'failed' : 'queued' },
       plan: {
         framework: plan.framework,

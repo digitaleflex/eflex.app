@@ -234,6 +234,23 @@ describe('decodeDeploymentLogs', () => {
   })
 })
 
+describe('setApplicationLabels', () => {
+  it('patche les custom_labels en base64', async () => {
+    const calls = mockFetch((url) => {
+      if (url.endsWith('/applications/app')) return json({ uuid: 'app' })
+      throw new Error(url)
+    })
+    const { setApplicationLabels } = await loadModule()
+    const labels = ['traefik.enable=true', 'traefik.http.routers.x.entrypoints=websecure']
+
+    await expect(setApplicationLabels('app', labels)).resolves.toEqual({ ok: true })
+    expect(calls[0]?.init?.method).toBe('PATCH')
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      custom_labels: Buffer.from(labels.join('\n'), 'utf8').toString('base64'),
+    })
+  })
+})
+
 describe('setEnvironmentVariable', () => {
   it('poste sur /applications/{uuid}/envs', async () => {
     const calls = mockFetch((url) => {
