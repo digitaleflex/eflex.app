@@ -169,8 +169,21 @@ export async function listApplications(): Promise<
   return { applications: res.data || [] }
 }
 
-/** Vérifie si l'API Coolify est accessible. */
+/**
+ * Vérifie si l'API Coolify est accessible.
+ *
+ * `/health` renvoie « OK » en texte brut, pas du JSON : on ne peut pas passer
+ * par `coolifyFetch` (qui appelle `res.json()` et lèverait une exception).
+ */
 export async function checkConnection(): Promise<boolean> {
-  const res = await coolifyFetch('/health')
-  return !res.error
+  if (!COOLIFY_URL || !COOLIFY_TOKEN) return false
+  try {
+    const res = await fetch(`${COOLIFY_URL.replace(/\/$/, '')}/health`, {
+      headers: { Authorization: `Bearer ${COOLIFY_TOKEN}` },
+      cache: 'no-store',
+    })
+    return res.ok
+  } catch {
+    return false
+  }
 }
