@@ -97,7 +97,7 @@ model EnvVar {
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   key       String   // ex: DATABASE_URL, NEXT_PUBLIC_URL
-  value     String   // chiffre au repos (libsodium ou pgcrypto)
+  value     String   // AES-256-GCM : v1:<nonce base64>:<ciphertext+tag base64> (voir lib/crypto.ts)
   updatedAt DateTime @updatedAt
 
   @@index([projectId])

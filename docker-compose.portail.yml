@@ -23,6 +23,8 @@ services:
       - MAINTENANCE_MODE=${MAINTENANCE_MODE:-false}
       - MAINTENANCE_MESSAGE=${MAINTENANCE_MESSAGE:-}
       - STATUS_ENGINE_URL=${STATUS_ENGINE_URL:-}
+      - ENV_ENCRYPTION_KEY=${ENV_ENCRYPTION_KEY:?openssl rand -base64 32}
+      - ENV_ENCRYPTION_KEY_PREVIOUS=${ENV_ENCRYPTION_KEY_PREVIOUS:-}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"

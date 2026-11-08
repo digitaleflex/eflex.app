@@ -38,6 +38,8 @@ Auth: Better Auth (`portail/src/lib/auth.ts` serveur, `auth-client.ts` client, `
 
 Prisma: **une seule source de vérité**, `portail/prisma/schema.prisma` (modèles Better Auth + `Project`/`EnvVar`/`Deployment`/`Subscription`). Depuis `portail/` : `npx prisma generate` / `npx prisma migrate dev` / `npx prisma validate`. Il n'existe plus de schéma Prisma à la racine ; la CI valide le schéma avant `tsc --noEmit`.
 
+Secrets des projets (issue 04) : `portail/src/lib/crypto.ts` chiffre `EnvVar.value` en AES-256-GCM (`v1:<nonce>:<ciphertext+tag>`, AAD `projectId:key`). Clé `ENV_ENCRYPTION_KEY` (32 octets base64) **hors base et hors image Docker**, `ENV_ENCRYPTION_KEY_PREVIOUS` pour la rotation, validation au démarrage via `portail/src/instrumentation.ts`, migration/rotation via `pnpm exec tsx portail/scripts/encrypt-existing-env-vars.ts`. Aucune route `GET` ne renvoie de valeur.
+
 ## Design system & UI
 
 - Skills de design disponibles dans `.agents/skills/` : `tailwind-design-system`, `web-design-guidelines` (règles Vercel), `fixing-accessibility`, `responsive-design`, `improve-ui`, `frontend-ui-ux`. Les charger avant toute retouche d'interface.
