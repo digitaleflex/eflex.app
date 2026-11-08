@@ -11,6 +11,9 @@ const nextConfig = {
   // la route directement au lieu de répondre par une redirection 308 qu'un
   // webhook POST ne suivrait pas forcément.
   skipTrailingSlashRedirect: true,
+  // BullMQ / ioredis sont des modules Node natifs : on les laisse externes au
+  // bundle serveur (sinon webpack tente de résoudre leurs requires dynamiques).
+  serverExternalPackages: ['bullmq', 'ioredis'],
   // Le build « standalone » reste à la racine de portail/ même quand le dépôt parent
   // contient un autre lockfile (sans cela, Next remonte au dossier du monorepo).
   outputFileTracingRoot: here,

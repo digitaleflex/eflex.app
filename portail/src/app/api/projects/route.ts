@@ -6,11 +6,11 @@ import type { Prisma } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { allow } from '@/lib/rate-limit'
-import { createApplication, deployApplication, setEnvironmentVariable } from '@/lib/coolify'
 import { analyzeGitHubRepo } from '@/lib/repo-analysis'
 import { errorResponse, repoFields, resolveRepo } from '@/lib/analysis-request'
 import { assertCryptoConfig, encrypt } from '@/lib/crypto'
 import { buildProjectArtifacts } from '@/lib/deploy-plan'
+import { enqueueDeployment } from '@/lib/queue'
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Donnez un nom au projet.').max(60, 'Le nom du projet est trop long (60 caractères maximum).'),
@@ -182,75 +182,44 @@ export async function POST(request: NextRequest) {
     return created
   })
 
-  // 4. Coolify : application, variables, déploiement — pilotés par le plan.
-  let coolifyAppId: string | null = null
-  let deploymentId: string | null = null
-  let deployError: string | null = null
-
-  try {
-    const appResult = await createApplication({
-      name: slug,
-      gitRepository: repo.url,
-      gitBranch: repo.branch,
-      buildPack: artifacts.buildPack,
-      portsExposes: String(artifacts.portsExposes),
-      // Coolify attend le compose encodé en base64 (docker_compose_raw).
-      dockerComposeRaw: artifacts.compose
-        ? Buffer.from(artifacts.compose, 'utf8').toString('base64')
-        : undefined,
-      dockerfile: artifacts.dockerfile ?? undefined,
-    })
-
-    if ('error' in appResult) {
-      deployError = appResult.error
-    } else {
-      coolifyAppId = appResult.id
-
-      for (const v of input.envVars) {
-        const result = await setEnvironmentVariable(coolifyAppId, v.key, v.value)
-        if ('error' in result) {
-          deployError = `Variable « ${v.key} » non transmise : ${result.error}`
-          break
-        }
-      }
-
-      if (!deployError) {
-        const deployResult = await deployApplication(coolifyAppId)
-        if ('error' in deployResult) deployError = deployResult.error
-        else deploymentId = deployResult.deploymentId
-      }
-    }
-  } catch (err) {
-    deployError = err instanceof Error ? err.message : 'Erreur inconnue avec Coolify'
-  }
-
-  if (coolifyAppId) {
-    await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId } })
-  }
-
+  // 4. Le déploiement est asynchrone (issue 06) : on crée un Deployment
+  //    `queued`, on l'enfile et on répond immédiatement. Le worker prend le
+  //    relais (Coolify, variables, build, statut, logs).
   const deployment = await prisma.deployment.create({
     data: {
       projectId: project.id,
       commitSha: repo.commitSha,
-      status: deploymentId ? 'building' : deployError ? 'failed' : 'pending',
-      coolifyBuildId: deploymentId || null,
-      logsSummary: deployError || null,
+      status: 'queued',
     },
   })
 
-  return NextResponse.json({
-    project: { id: project.id, name: project.name, slug: project.slug },
-    deployment: { id: deployment.id, status: deployment.status },
-    coolify: { appId: coolifyAppId, deploymentId },
-    plan: {
-      framework: plan.framework,
-      buildPack: artifacts.buildPack,
-      port: artifacts.portsExposes,
-      services: artifacts.services,
-      postDeploy: artifacts.postDeploy,
+  let warning: string | null = null
+  try {
+    await enqueueDeployment(deployment.id)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'File indisponible.'
+    await prisma.deployment.update({
+      where: { id: deployment.id },
+      data: { status: 'failed', logsSummary: `Déploiement non enfilé : ${message}` },
+    })
+    warning = `Déploiement en échec : ${message}`
+  }
+
+  return NextResponse.json(
+    {
+      project: { id: project.id, name: project.name, slug: project.slug },
+      deployment: { id: deployment.id, status: warning ? 'failed' : 'queued' },
+      plan: {
+        framework: plan.framework,
+        buildPack: artifacts.buildPack,
+        port: artifacts.portsExposes,
+        services: artifacts.services,
+        postDeploy: artifacts.postDeploy,
+      },
+      warning,
     },
-    warning: deployError,
-  })
+    { status: 202 },
+  )
 }
 
 export async function GET() {

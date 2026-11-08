@@ -9,4 +9,21 @@ export async function register() {
 
   const { assertCryptoConfig } = await import('./lib/crypto')
   assertCryptoConfig()
+
+  // Worker de déploiement (issue 06) : un seul par processus, même après HMR.
+  if (process.env.REDIS_URL) {
+    try {
+      const { startDeploymentWorker } = await import('./worker')
+      const globalForWorker = globalThis as unknown as { __eflexWorker?: unknown }
+      if (!globalForWorker.__eflexWorker) {
+        globalForWorker.__eflexWorker = startDeploymentWorker()
+        console.info('[eflex/worker] file de déploiement démarrée')
+      }
+    } catch (error) {
+      console.error(
+        '[eflex/worker] démarrage impossible :',
+        error instanceof Error ? error.message : String(error),
+      )
+    }
+  }
 }
