@@ -28,6 +28,18 @@ export default function RegisterPage() {
         setError(authErrorMessage(authError, 'Impossible de créer le compte. Réessayez dans un instant.'))
         return
       }
+      // Si la vérification d'e-mail est active, aucun session n'est créée à
+      // l'inscription : on dirige vers la page qui explique quoi faire.
+      try {
+        const config = await fetch('/api/auth/config', { cache: 'no-store' }).then((r) => r.json())
+        if (config.emailVerificationRequired) {
+          router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`)
+          return
+        }
+      } catch {
+        // En cas d'indisponibilité de ce petit endpoint, on garde le parcours
+        // historique plutôt que de bloquer l'inscription.
+      }
       router.push('/dashboard')
       router.refresh()
     } catch {

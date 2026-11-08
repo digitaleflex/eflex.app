@@ -30,6 +30,10 @@ if ! grep -qE '^ENV_ENCRYPTION_KEY=.+' .env.prod; then
   exit 1
 fi
 
+if ! grep -qE '^RESEND_API_KEY=.+' .env.prod; then
+  echo "ATTENTION : RESEND_API_KEY est vide — la vérification d'e-mail reste désactivée."
+fi
+
 COMPOSE=(docker compose -f docker-compose.prod.yml --env-file .env.prod)
 
 echo "==> 1/5 Démarrage de PostgreSQL et Redis"

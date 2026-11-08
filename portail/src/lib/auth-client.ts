@@ -5,6 +5,7 @@ import { createAuthClient } from 'better-auth/react'
 // Sans baseURL, le client appelle /api/auth sur l'origine courante.
 export const authClient = createAuthClient()
 
+// `authClient` reste exporté pour les méthodes de vérification et de reset.
 export const { signIn, signUp, signOut, useSession } = authClient
 
 const MESSAGES: Record<string, string> = {

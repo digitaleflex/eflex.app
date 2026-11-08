@@ -40,6 +40,8 @@ Prisma: **une seule source de vérité**, `portail/prisma/schema.prisma` (modèl
 
 Secrets des projets (issue 04) : `portail/src/lib/crypto.ts` chiffre `EnvVar.value` en AES-256-GCM (`v1:<nonce>:<ciphertext+tag>`, AAD `projectId:key`). Clé `ENV_ENCRYPTION_KEY` (32 octets base64) **hors base et hors image Docker**, `ENV_ENCRYPTION_KEY_PREVIOUS` pour la rotation, validation au démarrage via `portail/src/instrumentation.ts`, migration/rotation via `pnpm exec tsx portail/scripts/encrypt-existing-env-vars.ts`. Aucune route `GET` ne renvoie de valeur.
 
+E-mails (issue 05) : `portail/src/lib/email.ts` envoie via l'API REST **Resend** (aucune dépendance), `email-templates.ts` pour les gabarits français. `RESEND_API_KEY` + `EMAIL_FROM` (domaine vérifié dans Resend). Better Auth : `emailVerification.sendVerificationEmail`, `sendOnSignUp`/`sendOnSignIn`, `requireEmailVerification` et `sendResetPassword`. **La vérification n'est exigée que si `RESEND_API_KEY` est présente** (sinon aucun compte ne peut être verrouillé sans lien). Pages `/verify-email`, `/forgot-password`, `/reset-password` ; `/api/auth/config` expose l'état à l'interface. Le limiteur de débit partagé Redis reste au jalon 06.
+
 ## Design system & UI
 
 - Skills de design disponibles dans `.agents/skills/` : `tailwind-design-system`, `web-design-guidelines` (règles Vercel), `fixing-accessibility`, `responsive-design`, `improve-ui`, `frontend-ui-ux`. Les charger avant toute retouche d'interface.
