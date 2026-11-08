@@ -102,6 +102,12 @@ export function generateDockerfile(plan: BuildPlan): string | null {
   }
   const install = shell(plan.install, 'RUN');
   if (install) lines.push(install);
+  // Node/Next.js/Python : le build se fait dans l'image finale.
+  // PHP et statique l'ont déjà fait dans l'étape `assets`.
+  if (!hasJsBuild && plan.build) {
+    const build = shell(plan.build, 'RUN');
+    if (build) lines.push(build);
+  }
   lines.push(`EXPOSE ${plan.port}`);
   const start = shell(plan.start, 'CMD');
   if (start) lines.push(start);
