@@ -26,16 +26,36 @@ fi
 
 COMPOSE=(docker compose -f docker-compose.prod.yml --env-file .env.prod)
 
-echo "==> 1/4 Démarrage de PostgreSQL et Redis"
+echo "==> 1/5 Démarrage de PostgreSQL et Redis"
 "${COMPOSE[@]}" up -d postgres redis
 
-echo "==> 2/4 Migration Prisma (conteneur one-off)"
+echo "==> 2/5 Migration Prisma (conteneur one-off)"
 "${COMPOSE[@]}" --profile tools run --rm migrate
 
-echo "==> 3/4 Build + redémarrage prod"
+echo "==> 3/5 Build + redémarrage prod"
 "${COMPOSE[@]}" up -d --build
 
-echo "==> 4/4 État des services"
+echo "==> 4/5 Attente de la disponibilité du portail"
+# Traefik met quelques dizaines de secondes à re-détecter le conteneur recréé.
+# Sans cette attente, le déploiement semblerait terminé alors que le site
+# renvoie encore un 404 temporaire.
+PORTAL_READY=0
+for _ in $(seq 1 30); do
+  if curl -fsS --max-time 5 "${PORTAL_URL}/api/health" >/dev/null 2>&1; then
+    PORTAL_READY=1
+    break
+  fi
+  sleep 2
+done
+if [ "$PORTAL_READY" -eq 1 ]; then
+  echo "    Portail disponible sur ${PORTAL_URL}."
+else
+  echo "    ATTENTION : le portail ne répond pas encore via Traefik."
+  echo "    À vérifier : docker logs traefik"
+  echo "                 ${COMPOSE[*]} ps"
+fi
+
+echo "==> 5/5 État des services"
 "${COMPOSE[@]}" ps
 
 echo
