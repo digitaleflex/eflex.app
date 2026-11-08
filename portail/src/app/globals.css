@@ -80,9 +80,12 @@
       scrollbar-color: hsl(var(--muted-foreground) / 0.45) transparent;
     }
 
-    /* Le logo Eflex est un fichier sombre : on l'éclaircit sur fond sombre. */
+    /* L'asset original (marine + dégradé bleu) reste INTACT : on lui offre
+       simplement une plaque claire au lieu de le rendre monochrome. */
     img[alt^='Eflex'] {
-      filter: brightness(0) invert(1);
+      background-color: #ffffff;
+      border-radius: 0.5rem;
+      padding: 0.3rem 0.45rem;
     }
   }
 }
@@ -178,6 +181,21 @@
   .bg-grid {
     background-image: radial-gradient(hsl(var(--muted-foreground) / 0.1) 1px, transparent 1px);
     background-size: 32px 32px;
+  }
+
+  /* Chaque framework garde son SVG d'origine, posé sur une plaque teintée
+     de sa couleur de marque (claire en sombre pour les logos foncés). */
+  .framework-icon {
+    background-color: rgb(255 255 255 / 0.92);
+    background-color: color-mix(in srgb, rgb(var(--brand-rgb, 100 116 139)) 10%, white);
+    border-radius: 0.5rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .framework-icon {
+      background-color: rgb(255 255 255 / 0.92);
+      background-color: color-mix(in srgb, rgb(var(--brand-rgb, 100 116 139)) 16%, white);
+    }
   }
 
   /* Un seul moment d'entrée orchestré, avec décalage optionnel. */
