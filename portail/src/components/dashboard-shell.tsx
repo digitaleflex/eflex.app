@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { signOut } from '@/lib/auth-client'
 import { OrgSwitcher } from '@/components/org-switcher'
 import { ConnectionBadge } from '@/components/connection-badge'
+import { NotificationBell } from '@/components/notification-bell'
 
 type NavItem = {
   label: string
@@ -56,7 +57,10 @@ export function DashboardShell({
             <Image src="/logo-horizontal.webp" alt="Eflex — tableau de bord" width={1200} height={312} className="h-8 w-auto" priority />
           </Link>
         </div>
-        <OrgSwitcher className="px-4 pt-4" />
+        <div className="flex items-center gap-2 px-4 pt-4">
+          <OrgSwitcher className="min-w-0 flex-1" />
+          <NotificationBell />
+        </div>
         <nav aria-label="Navigation principale" className="flex-1 p-4 space-y-1">
           {navigation.map((item) => {
             const Icon = item.icon
@@ -115,10 +119,13 @@ export function DashboardShell({
           <Link href="/dashboard" className="flex items-center">
             <Image src="/logo-horizontal.webp" alt="Eflex — tableau de bord" width={1200} height={312} className="h-7 w-auto" />
           </Link>
-          <Button variant="ghost" size="sm" className="h-11 text-muted-foreground" onClick={handleSignOut}>
-            <LogOut className="w-4 h-4 mr-2" />
-            Déconnexion
-          </Button>
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <Button variant="ghost" size="sm" className="h-11 text-muted-foreground" onClick={handleSignOut}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Déconnexion
+            </Button>
+          </div>
         </div>
         <OrgSwitcher className="px-4 pb-2" />
       </div>

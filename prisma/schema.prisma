@@ -12,24 +12,26 @@ datasource db {
 // Modèles attendus par better-auth : user, session, account, verification.
 // Le mot de passe e-mail est stocké dans Account.password (providerId = "credential").
 model User {
-  id            String        @id @default(cuid())
-  name          String
-  email         String        @unique
-  emailVerified Boolean       @default(false)
-  image         String?
+  id                      String                   @id @default(cuid())
+  name                    String
+  email                   String                   @unique
+  emailVerified           Boolean                  @default(false)
+  image                   String?
   // Plugin admin : rôle plateforme ("user" | "admin"), suspension.
-  role          String?
-  banned        Boolean       @default(false)
-  banReason     String?
-  banExpires    DateTime?
-  sessions      Session[]
-  accounts      Account[]
-  projects      Project[]
-  members       Member[]
-  invitations   Invitation[]  @relation("InvitationInviter")
-  subscription  Subscription?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  role                    String?
+  banned                  Boolean                  @default(false)
+  banReason               String?
+  banExpires              DateTime?
+  sessions                Session[]
+  accounts                Account[]
+  projects                Project[]
+  members                 Member[]
+  invitations             Invitation[]             @relation("InvitationInviter")
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
+  subscription            Subscription?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
 }
 
 model Session {
@@ -229,4 +231,36 @@ model Event {
 
   @@index([createdAt])
   @@index([organizationId, id])
+}
+
+// ─── Notifications ──────────────────────────────────────────────────────────
+// `dedupeKey` rend l'envoi idempotent : deux chemins qui constatent le même changement de statut
+// ne créent qu'une notification. Les textes ne contiennent jamais de secret.
+model Notification {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String?
+  type           String
+  title          String
+  body           String?   @db.Text
+  href           String?
+  dedupeKey      String?
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt, createdAt])
+}
+
+// On ne stocke que les choix explicites : l'absence de ligne signifie « activé ».
+model NotificationPreference {
+  id      String  @id @default(cuid())
+  userId  String
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type    String
+  channel String  @default("app") // app (e-mail : voir issue sur les e-mails transactionnels)
+  enabled Boolean
+
+  @@unique([userId, type, channel])
 }

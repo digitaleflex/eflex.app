@@ -11,7 +11,7 @@ import { AutoRefresh } from '@/components/auto-refresh'
 import { DeploymentLogs } from '@/components/deployment-logs'
 import { CoolifyClient, loadCoolifyConfig } from '@/lib/coolify'
 import { syncDeployment } from '@/lib/deployer'
-import { publish } from '@/lib/event-bus'
+import { announceDeploymentStatus } from '@/lib/deployment-events'
 import { LiveRefresh } from '@/components/live-refresh'
 import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 
@@ -68,7 +68,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       if (patch) {
         await prisma.deployment.update({ where: { id: latest.id }, data: patch })
         if (patch.status !== latest.status) {
-          await publish({ type: 'deployment.status', organizationId: org.organizationId, payload: { projectId: project.id, deploymentId: latest.id, status: patch.status } })
+          await announceDeploymentStatus({ organizationId: org.organizationId, projectId: project.id, projectName: project.name, deploymentId: latest.id, status: patch.status })
         }
         deployments = [{ ...latest, ...patch, logsSummary: patch.logsSummary ?? latest.logsSummary }, ...deployments.slice(1)]
       }

@@ -3,6 +3,8 @@ import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { resolveOrganization } from '@/lib/organizations'
 import { EventsProvider } from '@/hooks/events-provider'
+import { ToastProvider } from '@/components/ui/toast'
+import { NotificationToaster } from '@/components/notification-toaster'
 import { MembershipWatcher } from '@/components/membership-watcher'
 import { DashboardShell } from '@/components/dashboard-shell'
 
@@ -20,10 +22,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <EventsProvider>
-      <MembershipWatcher />
-      <DashboardShell user={{ name: session.user.name, email: session.user.email }}>
-        {children}
-      </DashboardShell>
+      <ToastProvider>
+        <MembershipWatcher />
+        <NotificationToaster />
+        <DashboardShell user={{ name: session.user.name, email: session.user.email }}>
+          {children}
+        </DashboardShell>
+      </ToastProvider>
     </EventsProvider>
   )
 }

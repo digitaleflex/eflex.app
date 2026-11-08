@@ -5,7 +5,7 @@ import { resolveOrganization } from '@/lib/organizations'
 import { CoolifyClient, loadCoolifyConfig } from '@/lib/coolify'
 import { streamDeploymentLogs } from '@/lib/deployment-stream'
 import { sseResponse } from '@/lib/sse'
-import { publish } from '@/lib/event-bus'
+import { announceDeploymentStatus } from '@/lib/deployment-events'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -30,7 +30,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const deployment = org
     ? await prisma.deployment.findFirst({
         where: { id: deploymentId, projectId: id, project: { organizationId: org.organizationId } },
-        select: { status: true, coolifyBuildId: true, logsSummary: true, project: { select: { envVars: { select: { value: true } } } } },
+        select: { status: true, coolifyBuildId: true, logsSummary: true, project: { select: { name: true, envVars: { select: { value: true } } } } },
       })
     : null
   if (!deployment) return NextResponse.json({ error: 'Déploiement introuvable' }, { status: 404 })
@@ -70,7 +70,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             const changed = result.status !== deployment.status
             await prisma.deployment.update({ where: { id: deploymentId }, data: result })
             if (changed && org) {
-              await publish({ type: 'deployment.status', organizationId: org.organizationId, payload: { projectId: id, deploymentId, status: result.status } })
+              await announceDeploymentStatus({ organizationId: org.organizationId, projectId: id, projectName: deployment.project.name, deploymentId, status: result.status })
             }
           },
         })
