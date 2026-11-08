@@ -6,6 +6,7 @@ import {
   dockerfile,
   fastapi,
   laravelFull,
+  nextjsWithPnpm,
   staticSite,
   vite,
 } from '../../detector/test/fixtures.js';
@@ -59,6 +60,14 @@ describe('generateDockerfile — toutes les fixtures', () => {
     expect(out).toContain('FROM nginx:1.27-alpine');
     expect(out).toContain('COPY --from=assets /app/dist /usr/share/nginx/html');
     expect(out).toContain('EXPOSE 80');
+  });
+
+  it('exécute le build du plan dans l’image Node (Next.js)', () => {
+    const out = generateDockerfile(planOf(nextjsWithPnpm)!)!;
+    expect(out).toContain('FROM node:22-alpine');
+    expect(out).toContain('RUN pnpm install --frozen-lockfile');
+    expect(out).toContain('RUN next build');
+    expect(out).toContain('CMD next start');
   });
 
   it('génère les étapes assets + php-fpm pour Laravel', () => {

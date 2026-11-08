@@ -11,7 +11,12 @@ import { Worker, type Job } from 'bullmq'
 import type { BuildPlan } from '@eflex/detector'
 import { prisma } from '@/lib/prisma'
 import { decrypt } from '@/lib/crypto'
-import { buildProjectArtifacts } from '@/lib/deploy-plan'
+import {
+  buildProjectArtifacts,
+  buildApplicationLabels,
+  nixpacksRuntimeVariable,
+  publishDirectoryForPlan,
+} from '@/lib/deploy-plan'
 import { assertTransition, isTerminal, type DeploymentStatus } from '@/lib/deployment-state'
 import { DEPLOYMENT_QUEUE, redisConnection } from '@/lib/queue'
 import {
@@ -22,12 +27,12 @@ import {
   setEnvironmentVariable,
 } from '@/lib/coolify'
 
-const POLL_ATTEMPTS = 10
+const POLL_ATTEMPTS = 200
 const POLL_DELAY_MS = 3_000
 const MAX_LOGS = 4_000
 
 const LIVE = new Set(['finished', 'success', 'live', 'completed', 'running'])
-const FAILED = new Set(['failed', 'error', 'cancelled'])
+const FAILED = new Set(['failed', 'error', 'cancelled', 'cancelled-by-user'])
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -51,10 +56,8 @@ async function fail(id: string, message: string): Promise<void> {
 
 async function storeLogs(id: string, status: 'live' | 'deploying'): Promise<void> {
   const deployment = await prisma.deployment.findUnique({ where: { id } })
-  if (!deployment?.coolifyBuildId || !deployment.projectId) return
-  const project = await prisma.project.findUnique({ where: { id: deployment.projectId } })
-  if (!project?.coolifyAppId) return
-  const logs = await getDeploymentLogs(project.coolifyAppId, deployment.coolifyBuildId)
+  if (!deployment?.coolifyBuildId) return
+  const logs = await getDeploymentLogs(deployment.coolifyBuildId)
   const summary = 'error' in logs ? null : logs.logs.slice(-MAX_LOGS) || null
   await prisma.deployment.update({
     where: { id },
@@ -84,7 +87,27 @@ export async function processDeployment(deploymentId: string): Promise<void> {
   }
 
   await setStatus(deploymentId, 'provisioning')
-  const artifacts = buildProjectArtifacts(plan, project.slug)
+  const domain = project.domain ?? undefined
+  const artifacts = buildProjectArtifacts(plan, project.slug, domain)
+
+  // Coolify 4.6 ne déploie pas un compose brut multi-services sans fichier
+  // compose dans le dépôt. On s'arrête ici avec un message explicite plutôt
+  // que de laisser Coolify échouer.
+  if (artifacts.services.length > 1) {
+    await fail(
+      deploymentId,
+      `Ce plan nécessite plusieurs services (${artifacts.services.join(', ')}). ` +
+        'Coolify 4.6 ne déploie pas un compose brut sans docker-compose.yaml dans le dépôt. ' +
+        'Ajoutez le compose au dépôt ou choisissez un plan mono-service.',
+    )
+    return
+  }
+
+  // Dépôt avec son propre Dockerfile (framework `docker`) : Coolify clone le
+  // dépôt et utilise ce Dockerfile. Sinon, Nixpacks construit l'image avec les
+  // commandes du BuildPlan (le champ `dockerfile` de l'API ne clone pas le
+  // dépôt, il ne peut donc pas transporter notre Dockerfile généré).
+  const repoHasDockerfile = artifacts.buildPack === 'dockerfile' && artifacts.dockerfile === null
 
   let appId = project.coolifyAppId
   if (!appId) {
@@ -92,12 +115,18 @@ export async function processDeployment(deploymentId: string): Promise<void> {
       name: project.slug,
       gitRepository: project.repoUrl,
       gitBranch: project.branch,
-      buildPack: artifacts.buildPack,
+      buildPack: repoHasDockerfile ? 'dockerfile' : 'nixpacks',
       portsExposes: String(artifacts.portsExposes),
-      dockerComposeRaw: artifacts.compose
-        ? Buffer.from(artifacts.compose, 'utf8').toString('base64')
+      installCommand: repoHasDockerfile ? undefined : plan.install,
+      buildCommand: repoHasDockerfile ? undefined : plan.build,
+      startCommand: repoHasDockerfile ? undefined : plan.start,
+      publishDirectory: repoHasDockerfile ? undefined : publishDirectoryForPlan(plan),
+      fqdn: domain,
+      customLabels: domain
+        ? buildApplicationLabels(project.slug, domain, artifacts.portsExposes)
         : undefined,
-      dockerfile: artifacts.dockerfile ?? undefined,
+      postDeploymentCommand:
+        artifacts.postDeploy.length > 0 ? artifacts.postDeploy.join(' && ') : undefined,
     })
     if ('error' in created) {
       await fail(deploymentId, `Création de l'application Coolify impossible : ${created.error}`)
@@ -105,6 +134,23 @@ export async function processDeployment(deploymentId: string): Promise<void> {
     }
     appId = created.id
     await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: appId } })
+  }
+
+  // Nixpacks : force la version du runtime connue du plan (variable de build).
+  if (!repoHasDockerfile) {
+    const runtimeVariable = nixpacksRuntimeVariable(plan.runtime)
+    if (runtimeVariable) {
+      const result = await setEnvironmentVariable(
+        appId,
+        runtimeVariable.key,
+        runtimeVariable.value,
+        true,
+      )
+      if ('error' in result) {
+        await fail(deploymentId, `Version du runtime non transmise à Nixpacks : ${result.error}`)
+        return
+      }
+    }
   }
 
   // Variables d'environnement : déchiffrées juste avant l'envoi, jamais en clair
@@ -140,11 +186,13 @@ export async function processDeployment(deploymentId: string): Promise<void> {
   let outcome: 'live' | 'failed' | null = null
   for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt += 1) {
     await delay(POLL_DELAY_MS)
-    const status = await getDeploymentStatus(appId, started.deploymentId)
+    const status = await getDeploymentStatus(started.deploymentId)
     if ('error' in status) continue
     const value = status.status.toLowerCase()
     if (LIVE.has(value)) { outcome = 'live'; break }
     if (FAILED.has(value)) { outcome = 'failed'; break }
+    // Logs visibles pendant le build, pas seulement à la fin.
+    if (attempt % 5 === 0) await storeLogs(deploymentId, 'deploying')
   }
 
   if (outcome === 'failed') {
