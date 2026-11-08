@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative, resolve, sep } from 'node:path';
-import { detect, isIgnoredPath } from './detect.js';
+import { readFileSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { detect } from './detect.js';
+import { walkRepository } from './walk.js';
 
 const HELP = `Usage : pnpm detect <chemin>
 
@@ -11,31 +12,6 @@ plan de déploiement Eflex détecté au format JSON.
 Exemple :
   pnpm detect ./mon-repo
 `;
-
-function walk(target: string): string[] {
-  const files: string[] = [];
-
-  const visit = (directory: string): void => {
-    const entries = readdirSync(directory, { withFileTypes: true }).sort((a, b) =>
-      a.name.localeCompare(b.name),
-    );
-
-    for (const entry of entries) {
-      const absolute = join(directory, entry.name);
-      const relativePath = relative(target, absolute).split(sep).join('/');
-      if (isIgnoredPath(relativePath)) continue;
-
-      if (entry.isDirectory()) {
-        visit(absolute);
-      } else if (entry.isFile()) {
-        files.push(relativePath);
-      }
-    }
-  };
-
-  visit(target);
-  return files;
-}
 
 function main(): void {
   const args = process.argv.slice(2);
@@ -66,7 +42,7 @@ function main(): void {
     return;
   }
 
-  const files = walk(target);
+  const files = walkRepository(target);
   const snapshot = {
     files,
     read: (path: string): string | null => {

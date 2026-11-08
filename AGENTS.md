@@ -10,7 +10,8 @@ Ce dépôt fusionne `digitaleflex/eflex.app` (produit EFLEX, TypeScript) et `dig
 - `schemas/` (Axiom) ≠ `schema/` (Eflex `eflex.json`). Docs Axiom dans `docs/` (ADR dans `docs/adr`).
 - CI : `.github/workflows/` (Go, contrats de schémas, agent, et `ts.yml` pour les packages TS + le portail).
 
-- `packages/detector` — deterministic repo snapshot → `BuildPlan`; no network/LLM/runtime deps. Entry: `src/detect.ts` (`detect`), CLI `src/cli.ts`.
+- `packages/detector` — deterministic repo snapshot → `BuildPlan`; no network/LLM/runtime deps. Entry: `src/detect.ts` (`detect`), CLI `src/cli.ts`. `src/walk.ts` expose `walkRepository()` : **source unique** du parcours local et des segments ignorés (`IGNORED_SEGMENTS`), utilisée par le CLI et le renderer.
+- `assets/brand/` — sources de marque haute résolution (non servies). Les assets publics restent dans `portail/public/`.
 - `packages/renderer` — `BuildPlan` → docker-compose YAML + nginx/env templates. Entry: `src/render.ts`; yaml dependency. `src/dockerfile.ts` génère le Dockerfile, `src/deploy.ts` assemble les artefacts de déploiement (port réel, `build_pack`, `postDeploy` en service one-shot). Le portail les consomme via l'alias `@eflex/renderer` (`lib/deploy-plan.ts`) ; `yaml` est aussi dépendance du portail.
 - `schema/v1.json` — authoritative JSON Schema for plans; `schema/test.ts` validates every fixture plan/alternative via Ajv.
 - `config/domains.sh` — **source unique** des domaines/URLs publics (un seul `EFLEX_ROOT_DOMAIN`, aucune valeur secrète) ; `scripts/sync-domains.sh` régénère les fichiers statiques qui ne peuvent pas interpoler `${VAR}`.
@@ -79,5 +80,4 @@ Webhooks Resend : URL publique **`https://eflex.app/api/webhooks/`** (alias : `/
 ## Monorepo / workspace
 
 - `pnpm-workspace.yaml: packages/*` only; `portail/` is outside the workspace and has its own `package-lock.json`. Use `npm` in `portail/`.
-- Detector ignores `.git`, `node_modules`, `vendor`, `.next`, `dist`, `build`, etc. (`IGNORED_SEGMENTS` in detect.ts; duplicated in CLI/render walkers).
-- The walk order in CLI and renderer mirrors detector’s ignored‑segment list; keep in sync when adding directories.
+- Detector ignores `.git`, `node_modules`, `vendor`, `.next`, `dist`, `build`, etc. (`IGNORED_SEGMENTS` in `detect.ts`). Le parcours local passe par `walkRepository()` (`src/walk.ts`) : **ne plus dupliquer la liste** dans le CLI ou le renderer. Pour ajouter un segment ignoré, modifier uniquement `IGNORED_SEGMENTS`.

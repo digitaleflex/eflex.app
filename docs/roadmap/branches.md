@@ -21,7 +21,7 @@
 | 4 | `feat/06-redis-queue` | [06 — file de déploiement Redis](../issues/06-file-deploiement-redis.md) | P1 | 02 | ✅ livré (file BullMQ, worker, 202, statut/logs temps réel) |
 | 5 | `feat/07-github-app` | [07 — GitHub App, dépôts privés, webhooks](../issues/07-github-app-webhooks.md) | P1 | 06 | ✅ livré (plomberie complète ; création de l'App + secrets = étape humaine) |
 | 6 | `chore/08-ci-slug` | [08 — slug sûr, lint/build en CI](../issues/08-prisma-ci-qualite.md) | P2 | — | ✅ livré (typecheck:all, ESLint, next build, 7 tests slug) |
-| 7 | `chore/09-repo-cleanup` | [09 — nettoyage du dépôt](../issues/09-nettoyage-depot.md) | P2 | — | à faire |
+| 7 | `chore/09-repo-cleanup` | [09 — nettoyage du dépôt](../issues/09-nettoyage-depot.md) | P2 | — | ✅ livré (assets/brand, walkRepository unique, 3 tests) |
 
 ### Déjà livrés sur `main` (pas de branche dédiée)
 

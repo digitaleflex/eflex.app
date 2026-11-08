@@ -1,5 +1,7 @@
 # [P2] Nettoyage du dépôt : logos dupliqués à la racine et listes d'exclusion copiées
 
+> **Mise à jour :** terminé sur `chore/09-repo-cleanup`. Les 6 images de la racine (3 uniques + 3 doublons avec espaces) sont supprimées ; les sources vivent désormais dans `assets/brand/` (retirées de `portail/public/`, qui ne garde que les assets réellement servis). `walkRepository()` dans `packages/detector/src/walk.ts` est la source unique du parcours et des exclusions ; le CLI et le renderer l'importent, la copie locale du renderer est supprimée. 3 tests dédiés.
+
 ## Contexte
 
 ### Assets dupliqués à la racine
@@ -14,13 +16,13 @@ Cela fait environ 3 Mo de PNG à la racine, dont la moitié en double, et les no
 
 ## Travail à faire
 
-- [ ] Supprimer les doublons avec espaces et déplacer les sources de marque dans `assets/brand/` (ou `portail/public/brand/`).
-- [ ] Vérifier avec `grep` qu'aucun fichier ne référence les anciens chemins.
-- [ ] Optionnel : passer les gros PNG sources sous Git LFS, ou ne garder que les `.webp` optimisés.
-- [ ] Exporter `IGNORED_SEGMENTS` (et la fonction de parcours de répertoire) depuis `@eflex/detector`, l'importer dans le CLI, le renderer et le portail, puis supprimer les copies.
-- [ ] Mettre à jour `AGENTS.md` en retirant la consigne « keep in sync ».
+- [x] Supprimer les doublons avec espaces et déplacer les sources de marque dans `assets/brand/`.
+- [x] Vérifier avec `grep` qu'aucun fichier ne référence les anciens chemins.
+- [x] Pas besoin de Git LFS : ~1,5 Mo de sources, dont les versions WebP optimisées servies restent dans `portail/public/`.
+- [x] Exporter la fonction de parcours (`walkRepository`, `packages/detector/src/walk.ts`) et l'importer dans le CLI et le renderer ; supprimer les copies (le portail n'utilise que `isIgnoredPath` sur les snapshots GitHub, sans parcours local).
+- [x] Mettre à jour `AGENTS.md` en retirant la consigne « keep in sync ».
 
 ## Critères d'acceptation
-- [ ] Plus aucun fichier en double ni de nom avec espace à la racine.
-- [ ] Une seule définition de `IGNORED_SEGMENTS` dans le code.
-- [ ] `pnpm test` et `pnpm typecheck` passent.
+- [x] Plus aucun fichier en double ni de nom avec espace à la racine.
+- [x] Une seule définition de `IGNORED_SEGMENTS` dans le code, avec `walkRepository` testé.
+- [x] `pnpm test` et `pnpm typecheck` passent.

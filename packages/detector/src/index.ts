@@ -7,6 +7,7 @@ export {
   isIgnoredPath,
   IGNORED_SEGMENTS,
 } from './detect.js';
+export { walkRepository } from './walk.js';
 export {
   BASE_CONFIDENCE,
   clampConfidence,
