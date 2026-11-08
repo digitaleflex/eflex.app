@@ -46,6 +46,7 @@ Prisma: **une seule source de vérité**, `portail/prisma/schema.prisma` (modèl
 - Identité du portail : navy + bleu royal (pas de bascule vers l'Axiom Design DNA, réservé à `docs/design/design-dna/README.md` pour la console du moteur). Inter + JetBrains Mono via `next/font`.
 - Règles UI : pas de texte en dégradé, pas d'« eyebrow »/kicker au-dessus d'un titre, pas de `transition-all` (propriétés explicites), focus visible partout, cibles tactiles ≥ 44 px, `tabular-nums` pour les valeurs techniques, libellés et messages en français.
 - Logos : **toujours les assets originaux en couleur**, jamais de filtre monochrome. En thème sombre le logo Eflex (`img[alt^='Eflex']`) reçoit une plaque claire ; les icônes `FrameworkIcon` reçoivent une plaque teintée de leur couleur de marque (`--brand-rgb`, `color-mix`).
+- Section « Technologies reconnues » (`page.tsx` + `.stacks-grid`) : 14 SVG de marque réels, révélation **en cascade au scroll** via `animation-timeline: view()` + `--i` (CSS seul, sans JS, inactive sous `prefers-reduced-motion`) et survol avec élévation de la pastille.
 
 ## Detector / renderer rules
 

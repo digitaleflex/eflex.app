@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import {
@@ -150,11 +151,17 @@ export default function HomePage() {
             <h2 id="stacks-titre" className="text-center text-sm font-medium text-muted-foreground">
               Les technologies reconnues sans configuration
             </h2>
-            <ul className="mt-6 grid grid-cols-4 gap-x-4 gap-y-6 sm:grid-cols-7">
-              {stacks.map((stack) => (
-                <li key={stack.id} className="flex flex-col items-center gap-2 text-center">
+            <ul className="stacks-grid mt-6 grid grid-cols-4 gap-x-4 gap-y-6 sm:grid-cols-7">
+              {stacks.map((stack, i) => (
+                <li
+                  key={stack.id}
+                  style={{ '--i': i } as CSSProperties}
+                  className="group flex flex-col items-center gap-2 text-center"
+                >
                   <FrameworkIcon framework={stack.id} alt="" className="h-8 w-8" />
-                  <span className="text-xs text-muted-foreground">{stack.name}</span>
+                  <span className="text-xs text-muted-foreground transition-colors duration-200 ease-out-expo group-hover:text-foreground">
+                    {stack.name}
+                  </span>
                 </li>
               ))}
             </ul>

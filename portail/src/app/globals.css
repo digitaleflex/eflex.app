@@ -198,6 +198,29 @@
     }
   }
 
+  .framework-icon {
+    transition: transform 220ms var(--ease-out-expo), background-color 220ms var(--ease-out-expo);
+  }
+
+  /* Survol : la pastille se soulève et sature sa couleur de marque. */
+  .stacks-grid > li:hover .framework-icon {
+    transform: translateY(-3px) scale(1.06);
+    background-color: color-mix(in srgb, rgb(var(--brand-rgb, 100 116 139)) 26%, white);
+  }
+
+  /* Un seul moment orchestré : apparition en cascade au fil du scroll.
+     CSS uniquement — les navigateurs sans `animation-timeline` voient la
+     grille normalement, et `prefers-reduced-motion` désactive l'effet. */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .stacks-grid > li {
+        animation: reveal 1s var(--ease-out-expo) both;
+        animation-timeline: view();
+        animation-range: entry calc(var(--i, 0) * 2%) entry calc(60% + var(--i, 0) * 2%);
+      }
+    }
+  }
+
   /* Un seul moment d'entrée orchestré, avec décalage optionnel. */
   .animate-reveal {
     animation: reveal 0.7s var(--ease-out-expo) both;
