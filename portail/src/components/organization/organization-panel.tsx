@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { useEvents } from '@/hooks/events-provider'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 const ROLE_LABEL: Record<string, string> = { owner: 'Propriétaire', admin: 'Administrateur', member: 'Membre' }
@@ -19,6 +20,8 @@ type InviteRole = 'admin' | 'member'
 export function OrganizationPanel({ currentUserId }: { currentUserId: string }) {
   const router = useRouter()
   const { data: org, isPending, refetch } = authClient.useActiveOrganization()
+  // Temps réel : un autre onglet ou une autre personne modifie l'équipe ou les invitations.
+  useEvents(['member.added', 'member.removed', 'member.updated', 'invitation.created', 'invitation.updated'], () => void refetch())
   const [message, setMessage] = useState<{ kind: 'error' | 'ok'; text: string } | null>(null)
   const [confirm, setConfirm] = useState<null | { kind: 'remove'; memberId: string; name: string } | { kind: 'leave' }>(null)
 

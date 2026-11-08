@@ -11,6 +11,8 @@ import { AutoRefresh } from '@/components/auto-refresh'
 import { DeploymentLogs } from '@/components/deployment-logs'
 import { CoolifyClient, loadCoolifyConfig } from '@/lib/coolify'
 import { syncDeployment } from '@/lib/deployer'
+import { publish } from '@/lib/event-bus'
+import { LiveRefresh } from '@/components/live-refresh'
 import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 
 const STATUS: Record<string, { label: string; variant: 'success' | 'warning' | 'destructive' | 'outline' }> = {
@@ -65,6 +67,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       const patch = await syncDeployment(new CoolifyClient(loadCoolifyConfig(), fetch, 4_000), latest)
       if (patch) {
         await prisma.deployment.update({ where: { id: latest.id }, data: patch })
+        if (patch.status !== latest.status) {
+          await publish({ type: 'deployment.status', organizationId: org.organizationId, payload: { projectId: project.id, deploymentId: latest.id, status: patch.status } })
+        }
         deployments = [{ ...latest, ...patch, logsSummary: patch.logsSummary ?? latest.logsSummary }, ...deployments.slice(1)]
       }
     } catch {
@@ -80,6 +85,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   return (
     <div className="space-y-8 max-w-5xl">
       <AutoRefresh active={inProgress} />
+      <LiveRefresh types={['deployment.created', 'deployment.status']} projectId={project.id} />
       <Link
         href="/dashboard"
         className="inline-flex items-center gap-2 min-h-11 text-sm text-muted-foreground hover:text-foreground transition-colors"

@@ -213,3 +213,20 @@ model AuditLog {
   @@index([targetType, targetId])
   @@index([organizationId])
 }
+
+// ─── Temps réel ─────────────────────────────────────────────────────────────
+// Bus d'événements : un seul flux SSE par onglet (/api/events). Les identifiants croissent,
+// ce qui permet la reprise (Last-Event-ID). Les charges utiles ne contiennent jamais de secret.
+// audience : "org" (membres de l'organisation), "admin" (administrateurs), "user" (un utilisateur).
+model Event {
+  id             BigInt   @id @default(autoincrement())
+  type           String
+  audience       String   @default("org")
+  organizationId String?
+  userId         String?
+  payload        Json
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([organizationId, id])
+}

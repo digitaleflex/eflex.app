@@ -5,6 +5,7 @@ import { resolveOrganization } from '@/lib/organizations'
 import { CoolifyClient, loadCoolifyConfig } from '@/lib/coolify'
 import { streamDeploymentLogs } from '@/lib/deployment-stream'
 import { sseResponse } from '@/lib/sse'
+import { publish } from '@/lib/event-bus'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -66,7 +67,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           send,
           signal,
           onFinished: async (result) => {
+            const changed = result.status !== deployment.status
             await prisma.deployment.update({ where: { id: deploymentId }, data: result })
+            if (changed && org) {
+              await publish({ type: 'deployment.status', organizationId: org.organizationId, payload: { projectId: id, deploymentId, status: result.status } })
+            }
           },
         })
       } finally {

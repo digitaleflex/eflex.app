@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { signOut } from '@/lib/auth-client'
 import { OrgSwitcher } from '@/components/org-switcher'
+import { ConnectionBadge } from '@/components/connection-badge'
 
 type NavItem = {
   label: string
@@ -94,6 +95,7 @@ export function DashboardShell({
           <div className="px-3 min-w-0">
             <p className="text-sm font-medium truncate">{user.name || 'Mon compte'}</p>
             {user.email && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
+            <ConnectionBadge className="mt-2" />
           </div>
           <Button
             variant="ghost"

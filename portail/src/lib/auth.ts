@@ -5,6 +5,7 @@ import { admin, organization } from 'better-auth/plugins'
 import { compare, hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { personalOrganizationSlug } from '@/lib/organizations'
+import { publish } from '@/lib/event-bus'
 
 const googleConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
 
@@ -75,6 +76,26 @@ export const auth = betterAuth({
     organization({
       organizationLimit: 10,
       organizationHooks: {
+        // Temps réel : les listes ouvertes (équipe, invitations) se mettent à jour sans rechargement.
+        afterAddMember: async ({ member, organization }) =>
+          publish({ type: 'member.added', organizationId: organization.id, payload: { memberId: member.id, userId: member.userId } }),
+        afterRemoveMember: async ({ member, organization }) => {
+          await publish({ type: 'member.removed', organizationId: organization.id, payload: { memberId: member.id, userId: member.userId } })
+          // La personne retirée est prévenue directement : son interface change d'organisation.
+          await publish({ type: 'membership.revoked', audience: 'user', userId: member.userId, payload: { organizationId: organization.id } })
+        },
+        afterUpdateMemberRole: async ({ member, organization }) =>
+          publish({ type: 'member.updated', organizationId: organization.id, payload: { memberId: member.id, role: member.role } }),
+        afterCreateInvitation: async ({ invitation, organization }) =>
+          publish({ type: 'invitation.created', organizationId: organization.id, payload: { invitationId: invitation.id } }),
+        afterCancelInvitation: async ({ invitation, organization }) =>
+          publish({ type: 'invitation.updated', organizationId: organization.id, payload: { invitationId: invitation.id, status: 'canceled' } }),
+        afterRejectInvitation: async ({ invitation, organization }) =>
+          publish({ type: 'invitation.updated', organizationId: organization.id, payload: { invitationId: invitation.id, status: 'rejected' } }),
+        afterAcceptInvitation: async ({ invitation, member, organization }) => {
+          await publish({ type: 'invitation.updated', organizationId: organization.id, payload: { invitationId: invitation.id, status: 'accepted' } })
+          await publish({ type: 'member.added', organizationId: organization.id, payload: { memberId: member.id, userId: member.userId } })
+        },
         // Supprimer l'organisation effacerait ses projets en base sans retirer leurs applications
         // chez Coolify : on exige de supprimer d'abord les projets (qui nettoient l'infrastructure).
         beforeDeleteOrganization: async ({ organization }) => {

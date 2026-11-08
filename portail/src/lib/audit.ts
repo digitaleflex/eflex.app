@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
+import { publish } from '@/lib/event-bus'
 
 /** Clés qui ne doivent jamais entrer dans le journal, quelle que soit leur profondeur. */
 const SECRET_KEY = /pass(word)?|secret|token|cookie|authorization|api[-_]?key|value|credential/i
@@ -33,7 +34,7 @@ export type AuditEntry = {
 /** Écrit une entrée d'audit. À appeler pour **chaque** action d'administration. */
 export async function audit(entry: AuditEntry): Promise<void> {
   const headers = entry.request?.headers
-  await prisma.auditLog.create({
+  const created = await prisma.auditLog.create({
     data: {
       actorId: entry.actor.id,
       actorEmail: entry.actor.email,
@@ -45,5 +46,6 @@ export async function audit(entry: AuditEntry): Promise<void> {
       ip: headers?.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
       userAgent: headers?.get('user-agent')?.slice(0, 300) ?? null,
     },
-  })
+  })  // Les administrateurs voient l'action apparaître en direct (journal d'audit, terminal d'exploitation).
+  await publish({ type: 'audit.entry', audience: 'admin', payload: { auditId: created.id, action: entry.action, targetType: entry.target.type } })
 }

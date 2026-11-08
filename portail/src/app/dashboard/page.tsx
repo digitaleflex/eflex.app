@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEvents } from '@/hooks/events-provider'
+import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
@@ -49,16 +50,20 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  useEffect(() => {
+  const load = useCallback(() => {
     fetch('/api/projects')
       .then((r) => r.json())
       .then((data) => {
         if (data.error) setError(data.error)
-        else setProjects(data.projects || [])
+        else { setError(''); setProjects(data.projects || []) }
       })
       .catch(() => setError('Impossible de charger les projets.'))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(load, [load])
+  // Temps réel : un projet créé ou un déploiement qui change de statut met la liste à jour.
+  useEvents(['project.created', 'project.updated', 'project.deleted', 'deployment.created', 'deployment.status'], load)
 
   const stats = [
     { label: 'Projets actifs', value: projects.length.toString(), icon: <Package /> },

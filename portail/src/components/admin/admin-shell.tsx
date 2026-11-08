@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Activity, ArrowLeft, LayoutDashboard, ScrollText, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ConnectionBadge } from '@/components/connection-badge'
 
 const NAV = [
   { label: "Vue d'ensemble", href: '/admin', icon: LayoutDashboard, exact: true },
@@ -57,6 +58,7 @@ export function AdminShell({ children, email }: { children: React.ReactNode; ema
           </nav>
           <div className="hidden border-t border-border p-4 lg:block">
             <p className="truncate text-xs text-muted-foreground">{email}</p>
+            <ConnectionBadge className="mt-2" />
             <Link href="/dashboard" className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               Retour à la console

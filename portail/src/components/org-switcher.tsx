@@ -1,6 +1,6 @@
 'use client'
 
-import { useId } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Building2 } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
@@ -10,7 +10,21 @@ export function OrgSwitcher({ className }: { className?: string }) {
   const router = useRouter()
   const id = useId()
   const { data: organizations } = authClient.useListOrganizations()
-  const { data: active } = authClient.useActiveOrganization()
+  const { data: active, isPending } = authClient.useActiveOrganization()
+  const repaired = useRef(false)
+
+  // Auto-réparation : sans organisation active (membre retiré, organisation supprimée, course avec
+  // le plugin au moment du retrait) alors qu'il en reste une, on active la première.
+  useEffect(() => {
+    if (repaired.current || isPending || active || !organizations || organizations.length === 0) return
+    // Patience : une activation volontaire (invitation acceptée, changement d'organisation) peut
+    // être en cours. On n'intervient que si l'absence d'organisation active persiste.
+    const timer = setTimeout(() => {
+      repaired.current = true
+      void authClient.organization.setActive({ organizationId: organizations[0]!.id }).then(() => router.refresh())
+    }, 1_500)
+    return () => clearTimeout(timer)
+  }, [active, isPending, organizations, router])
 
   if (!organizations || organizations.length === 0) return null
 

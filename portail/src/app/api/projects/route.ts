@@ -11,6 +11,7 @@ import { CoolifyClient, loadCoolifyConfig } from '@/lib/coolify'
 import { DeployError, provisionAndDeploy, type DeployResult } from '@/lib/deployer'
 import { analyzeGitHubRepo } from '@/lib/repo-analysis'
 import { errorResponse, repoFields, resolveRepo } from '@/lib/analysis-request'
+import { publish } from '@/lib/event-bus'
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Donnez un nom au projet.').max(60, 'Le nom du projet est trop long (60 caractères maximum).'),
@@ -201,6 +202,13 @@ export async function POST(request: NextRequest) {
       coolifyBuildId: deploy?.deploymentUuid ?? null,
       logsSummary: deployError,
     },
+  })
+
+  await publish({ type: 'project.created', organizationId: org.organizationId, payload: { projectId: project.id, name: project.name } })
+  await publish({
+    type: 'deployment.created',
+    organizationId: org.organizationId,
+    payload: { projectId: project.id, deploymentId: deployment.id, status: deployment.status, name: project.name },
   })
 
   return NextResponse.json({
