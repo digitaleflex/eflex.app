@@ -8,9 +8,10 @@
 // Sécurité :
 //  - seuls api.github.com et raw.githubusercontent.com sont contactés, avec des composants
 //    d'URL déjà validés (github-url.ts) ;
-//  - les dépôts privés sont refusés : le jeton GITHUB_TOKEN sert uniquement à relever la
-//    limite de requêtes et ne doit jamais ouvrir l'accès aux dépôts de son propriétaire ;
-//  - le jeton n'est envoyé qu'à api.github.com, jamais à raw.githubusercontent.com ;
+//  - `token` (GITHUB_TOKEN) sert uniquement à relever la limite de requêtes ;
+//  - `installationToken` (jeton court de la GitHub App) donne accès aux dépôts privés
+//    autorisés ; il n'est envoyé qu'à api.github.com, jamais à raw.githubusercontent.com ;
+//  - sans jeton d'installation, un dépôt privé est refusé explicitement ;
 //  - la lecture est bornée (nombre de fichiers, taille, délais).
 
 import { detect, detectApplication, isIgnoredPath } from '@eflex/detector'
@@ -58,6 +59,11 @@ export interface AnalysisOptions {
   commitSha?: string
   /** Jeton GitHub optionnel, uniquement pour relever la limite de requêtes. */
   token?: string
+  /**
+   * Jeton d'installation GitHub App (issue 07) : autorise les dépôts privés et
+   * fait lire les fichiers via l'API Contents plutôt que le CDN public.
+   */
+  installationToken?: string
   fetchImpl?: typeof fetch
   limits?: Partial<AnalysisLimits>
 }
@@ -116,7 +122,8 @@ export async function analyzeGitHubRepo(
       'User-Agent': 'eflex-portail',
       'X-GitHub-Api-Version': '2022-11-28',
     }
-    if (options.token) headers.Authorization = `Bearer ${options.token}`
+    const apiToken = options.installationToken ?? options.token
+    if (apiToken) headers.Authorization = `Bearer ${apiToken}`
     const res = await request(`https://api.github.com${path}`, headers)
     throwIfRateLimited(res)
     return res
@@ -145,7 +152,9 @@ export async function analyzeGitHubRepo(
   const metaRes = await api(repoPath)
   if (metaRes.status === 404) {
     throw new AnalysisError(
-      "Dépôt introuvable. Vérifiez l'adresse : pour l'instant, seuls les dépôts publics sont pris en charge.",
+      options.installationToken
+        ? "Dépôt introuvable. Vérifiez l'adresse et les droits de l'installation GitHub."
+        : "Dépôt introuvable. Vérifiez l'adresse : sans connexion GitHub, seuls les dépôts publics sont pris en charge.",
       404,
     )
   }
@@ -155,8 +164,11 @@ export async function analyzeGitHubRepo(
   if (!isRecord(meta) || typeof meta.default_branch !== 'string' || typeof meta.private !== 'boolean') {
     throw new AnalysisError('Réponse inattendue de GitHub. Réessayez dans un instant.', 502)
   }
-  if (meta.private) {
-    throw new AnalysisError('Ce dépôt est privé. Pour l\'instant, seuls les dépôts publics sont pris en charge.', 422)
+  if (meta.private && !options.installationToken) {
+    throw new AnalysisError(
+      'Ce dépôt est privé. Connectez la GitHub App pour l’analyser.',
+      422,
+    )
   }
 
   const defaultBranch = meta.default_branch
@@ -215,15 +227,28 @@ export async function analyzeGitHubRepo(
   const cache = new Map<string, string | null>()
   let unreadable = 0
 
+  const analyzedSha = String(commitSha)
+
   async function fetchOne(path: string): Promise<void> {
     if ((blobs.get(path) ?? 0) > limits.maxFileBytes) {
       cache.set(path, null)
       return
     }
-    const url = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${commitSha}/${encodePath(path)}`
+    const usePrivateApi = Boolean(options.installationToken)
+    const url = usePrivateApi
+      ? `https://api.github.com${repoPath}/contents/${encodePath(path)}?ref=${encodeURIComponent(analyzedSha)}`
+      : `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${analyzedSha}/${encodePath(path)}`
+    const headers: Record<string, string> = usePrivateApi
+      ? {
+          Accept: 'application/vnd.github.raw+json',
+          Authorization: `Bearer ${options.installationToken}`,
+          'User-Agent': 'eflex-portail',
+          'X-GitHub-Api-Version': '2022-11-28',
+        }
+      : { 'User-Agent': 'eflex-portail' }
     try {
-      // Pas de jeton ici : le contenu brut d'un dépôt public est anonyme.
-      const res = await request(url, { 'User-Agent': 'eflex-portail' })
+      // Sans jeton d'installation, le contenu brut d'un dépôt public est anonyme.
+      const res = await request(url, headers)
       if (res.status === 404) {
         cache.set(path, null)
         return

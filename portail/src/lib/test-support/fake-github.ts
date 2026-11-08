@@ -66,6 +66,15 @@ export function fakeGitHub(
         return exists ? json({ ref: `refs/heads/${branch}`, object: { type: 'commit', sha: fakeSha(`${key}@${branch}`) } }) : json({ message: 'Not Found' }, 404)
       }
 
+      // API Contents utilisée pour les dépôts privés (jeton d'installation).
+      if (parts[3] === 'contents') {
+        const path = parts.slice(4).join('/')
+        const content = repo.files[path]
+        return content === undefined
+          ? new Response('404: Not Found', { status: 404 })
+          : new Response(content, { status: 200 })
+      }
+
       if (parts[3] === 'git' && parts[4] === 'trees') {
         const paths = [...Object.keys(repo.files), ...(repo.extraTreePaths ?? [])]
         return json({
