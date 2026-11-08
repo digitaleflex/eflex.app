@@ -14,7 +14,7 @@ Prouver le déploiement sur un vrai serveur et poser les bases d'exploitation.
 | [#4](https://github.com/digitaleflex/eflex.app/issues/4) | P1 | Redéployer, annuler et supprimer un projet |
 | [#5](https://github.com/digitaleflex/eflex.app/issues/5) | P1 | Journaux de build et statut en arrière-plan |
 | [#10](https://github.com/digitaleflex/eflex.app/issues/10) | P1 | CI du portail et du détecteur |
-| [#33](https://github.com/digitaleflex/eflex.app/issues/33) | P0 | Temps réel : bus d'événements unique (SSE) pour tables, statuts et notifications |
+| [#33](https://github.com/digitaleflex/eflex.app/issues/33) | P0 | Temps réel : bus d'événements unique (SSE) pour tables, statuts et notifications *(socle fait)* |
 | [#35](https://github.com/digitaleflex/eflex.app/issues/35) | P1 | Journaux d'exécution en direct (conteneurs) et métriques *(journaux de build déjà en direct)* |
 
 ### M2 · SaaS multi-tenant
@@ -27,7 +27,7 @@ Socle déjà posé (organisations Better Auth, projets rattachés à une organis
 | [#20](https://github.com/digitaleflex/eflex.app/issues/20) | P1 | Profil utilisateur et paramètres du compte |
 | [#21](https://github.com/digitaleflex/eflex.app/issues/21) | P1 | CRUD complet du projet (paramètres, variables, transfert, activité) |
 | [#22](https://github.com/digitaleflex/eflex.app/issues/22) | P1 | Isolation des locataires : quotas, limites, audit de sécurité |
-| [#34](https://github.com/digitaleflex/eflex.app/issues/34) | P1 | Notifications : centre, toasts, e-mails, préférences |
+| [#34](https://github.com/digitaleflex/eflex.app/issues/34) | P1 | Notifications : centre, toasts, e-mails, préférences *(centre, toasts et préférences faits ; e-mails à faire)* |
 | [#32](https://github.com/digitaleflex/eflex.app/issues/32) | P1 | Console client : audit d'accessibilité WCAG 2.1 AA et mobile *(en cours)* |
 
 ### M3 · Facturation et administration
