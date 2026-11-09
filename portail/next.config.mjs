@@ -7,6 +7,13 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  // Resend envoie sur https://eflex.app/api/webhooks/ (slash final) : on sert
+  // la route directement au lieu de répondre par une redirection 308 qu'un
+  // webhook POST ne suivrait pas forcément.
+  skipTrailingSlashRedirect: true,
+  // BullMQ / ioredis sont des modules Node natifs : on les laisse externes au
+  // bundle serveur (sinon webpack tente de résoudre leurs requires dynamiques).
+  serverExternalPackages: ['bullmq', 'ioredis'],
   // Le build « standalone » reste à la racine de portail/ même quand le dépôt parent
   // contient un autre lockfile (sans cela, Next remonte au dossier du monorepo).
   outputFileTracingRoot: here,
@@ -19,6 +26,12 @@ const nextConfig = {
     config.resolve.extensionAlias = {
       '.js': ['.ts', '.tsx', '.js'],
       '.mjs': ['.mts', '.mjs'],
+    }
+    // `packages/renderer` vit hors de portail/ : dans l'image Docker, `yaml`
+    // n'existe que dans portail/node_modules. On l'y résout explicitement.
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      yaml: path.resolve(here, 'node_modules/yaml'),
     }
     return config
   },

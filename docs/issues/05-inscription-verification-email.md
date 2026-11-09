@@ -1,6 +1,6 @@
 # [P0][Sécurité] Supprimer l'inscription implicite par identifiants et ajouter la vérification d'email
 
-> **Mise à jour :** l'authentification est passée à **Better Auth** (voir `portail/src/lib/auth.ts`). Sont déjà réglés : plus de création de compte implicite, page `/register`, message d'erreur unique, e-mail normalisé, limitation des tentatives (429 vérifié). **Reste à faire :** vérification de l'e-mail (`emailVerification.sendVerificationEmail` + `requireEmailVerification`, nécessite un serveur SMTP), mot de passe oublié (`sendResetPassword`), et un limiteur de débit partagé via Redis si le portail passe sur plusieurs instances.
+> **Mise à jour :** l'authentification est passée à **Better Auth** (plus de création implicite, `/register`, message d'erreur unique, e-mail normalisé, limitation des tentatives). Sur la branche `feat/05-email-verification` : envoi via **Resend** (API REST, sans dépendance), `emailVerification.sendVerificationEmail` + `requireEmailVerification`, `sendResetPassword`, pages `/verify-email`, `/forgot-password`, `/reset-password`, gabarits français. La vérification **n'est active que si `RESEND_API_KEY` est renseignée** : sans clé, aucun compte ne peut être verrouillé par un lien jamais reçu. **Reste à faire :** limiteur de débit partagé via Redis (reporté au jalon 06).
 
 ## Contexte
 
@@ -36,8 +36,8 @@ Une inscription explicite, un email vérifié et une connexion robuste.
 - Vérifier la politique de liaison des comptes Google et identifiants : `allowDangerousEmailAccountLinking` doit rester désactivé.
 
 ## Critères d'acceptation
-- [ ] Se connecter avec un email inconnu ne crée aucun compte.
-- [ ] Un compte non vérifié ne peut pas se connecter.
-- [ ] Au-delà de 5 échecs, un blocage temporaire se déclenche.
-- [ ] Les messages d'erreur ne révèlent pas l'existence d'un compte.
-- [ ] Tous les textes affichés à l'utilisateur sont en français.
+- [x] Se connecter avec un email inconnu ne crée aucun compte.
+- [x] Un compte non vérifié ne peut pas se connecter (`requireEmailVerification`, actif dès que Resend est configuré).
+- [x] Au-delà de 5 échecs, un blocage temporaire se déclenche (limiteur Better Auth, 429). Le limiteur **partagé via Redis** est reporté au jalon 06.
+- [x] Les messages d'erreur ne révèlent pas l'existence d'un compte (message générique, y compris sur `/forgot-password`).
+- [x] Tous les textes affichés à l'utilisateur sont en français (pages, gabarits d'e-mails, erreurs).

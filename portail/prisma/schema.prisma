@@ -29,6 +29,7 @@ model User {
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
   subscription            Subscription?
+  gitInstallations        GitInstallation[]
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
 }
@@ -41,7 +42,7 @@ model Session {
   userAgent            String?
   userId               String
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // Plugin organization : organisation active de la session. Plugin admin : usurpation.
+  // Plugin organization : organisation active. Plugin admin : usurpation.
   activeOrganizationId String?
   impersonatedBy       String?
   createdAt            DateTime @default(now())
@@ -78,6 +79,128 @@ model Verification {
   updatedAt  DateTime @updatedAt
 
   @@index([identifier])
+}
+
+model Project {
+  id               String       @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId           String // créateur du projet
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String
+  slug             String       @unique // ex: "mon-projet-42"
+  repoUrl          String
+  branch           String       @default("main")
+  /**
+   * Dépôt au format « proprietaire/nom » et installation GitHub App liée (issue 07).
+   */
+  repoFullName     String?
+  installationId   String?
+  productionBranch String?
+  framework        String // laravel, nextjs, node, python, static
+  runtime          String? // node@22, php@8.3, etc.
+  domain           String? // domaine client, sans protocole
+  coolifyAppId     String? // ID côté Coolify (null jusqu'au premier déploiement)
+  plan             Json? // BuildPlan retenu à la création (voir packages/detector)
+  detection        Json? // résultat de l'analyse : confiance, raisons, avertissements, commit
+  port             Int          @default(80)
+  envVars          EnvVar[]
+  deployments      Deployment[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([slug])
+}
+
+model EnvVar {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  key       String // ex: DATABASE_URL, NEXT_PUBLIC_URL
+  value     String // AES-256-GCM : v1:<nonce base64>:<ciphertext+tag base64> (voir lib/crypto.ts)
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, key])
+  @@index([projectId])
+}
+
+model Deployment {
+  id             String   @id @default(cuid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  commitSha      String
+  status         String   @default("pending") // pending, building, deploying, live, failed, rollbacked
+  coolifyBuildId String?
+  logsSummary    String?  @db.Text
+  createdAt      DateTime @default(now())
+
+  @@index([projectId])
+  @@index([status])
+}
+
+model Subscription {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status           String // active, cancelled, past_due, trialing
+  plan             String // starter, pro, agency
+  priceCents       Int      @default(0)
+  providerRef      String?
+  currentPeriodEnd DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ─── GitHub App (issue 07) ──────────────────────────────────────────────────
+model GitInstallation {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  installationId String   @unique
+  accountLogin   String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/**
+ * Idempotence des webhooks : une livraison `X-GitHub-Delivery` n'est traitée qu'une fois.
+ */
+model WebhookDelivery {
+  id        String   @id
+  createdAt DateTime @default(now())
+}
+
+// ─── Statut public / supervision ────────────────────────────────────────────
+// Un relevé par composant, écrit au plus une fois par minute (voir lib/status.ts).
+model StatusCheck {
+  id        String   @id @default(cuid())
+  checkedAt DateTime @default(now())
+  component String
+  status    String // ok | degraded | down | unknown
+  latencyMs Int?
+
+  @@index([checkedAt])
+  @@index([component, checkedAt])
+}
+
+model StatusIncident {
+  id          String    @id @default(cuid())
+  title       String
+  description String?   @db.Text
+  severity    String    @default("minor") // minor | major | critical
+  status      String    @default("investigating") // investigating | identified | monitoring | resolved
+  startedAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([startedAt])
 }
 
 // ─── Multi-tenant (plugin organization) ─────────────────────────────────────
@@ -122,75 +245,6 @@ model Invitation {
 
   @@index([organizationId])
   @@index([email])
-}
-
-model Project {
-  id             String       @id @default(cuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  userId         String // créateur du projet
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name           String
-  slug           String       @unique // ex: "mon-projet-42"
-  repoUrl        String
-  branch         String       @default("main")
-  framework      String // laravel, nextjs, node, python, static
-  runtime        String? // node@22, php@8.3, etc.
-  domain         String? // domaine client, sans protocole
-  coolifyAppId   String? // ID côté Coolify (null jusqu'au premier déploiement)
-  coolifyWorkers Json? // applications Coolify des services annexes : { "queue": "uuid", … }
-  plan           Json? // BuildPlan retenu à la création (voir packages/detector)
-  detection      Json? // résultat de l'analyse : confiance, raisons, avertissements, commit
-  port           Int          @default(80)
-  envVars        EnvVar[]
-  deployments    Deployment[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-
-  @@index([userId])
-  @@index([organizationId])
-  @@index([slug])
-}
-
-model EnvVar {
-  id        String   @id @default(cuid())
-  projectId String
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  key       String // ex: DATABASE_URL, NEXT_PUBLIC_URL
-  value     String // chiffre au repos (libsodium ou pgcrypto)
-  updatedAt DateTime @updatedAt
-
-  @@unique([projectId, key])
-  @@index([projectId])
-}
-
-model Deployment {
-  id             String   @id @default(cuid())
-  projectId      String
-  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  commitSha      String
-  status         String   @default("pending") // pending, building, deploying, live, failed, rollbacked
-  coolifyBuildId String?
-  logsSummary    String?  @db.Text
-  createdAt      DateTime @default(now())
-
-  @@index([projectId])
-  @@index([status])
-}
-
-model Subscription {
-  id               String   @id @default(cuid())
-  userId           String   @unique
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status           String // active, cancelled, past_due, trialing
-  plan             String // starter, pro, agency
-  priceCents       Int      @default(0)
-  providerRef      String?
-  currentPeriodEnd DateTime
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@index([userId])
 }
 
 // ─── Administration de la plateforme ────────────────────────────────────────

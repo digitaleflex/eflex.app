@@ -17,9 +17,12 @@ Services disponibles :
 
 ## 2. Initialiser la base
 
+Le schéma Prisma a une seule source de vérité : `portail/prisma/schema.prisma`.
+
 ```bash
+cd portail
+npx prisma generate
 npx prisma migrate dev --name init
-npx prisma db seed   # si tu crées un fichier seed
 npx prisma studio    # interface graphique pour inspecter la BDD
 ```
 
@@ -36,6 +39,10 @@ Coolify prend le contrôle total de `docker.sock` et lance son propre reverse pr
 | **Sans Coolify** | Tu développes le détecteur et le renderer (ce qu'on a fait), et tu connectes Coolify plus tard. |
 
 ## 4. Les variables d'environnement à remplir
+
+> Les domaines/URLs publics ne sont **pas** définis ici : leur source unique est
+> `config/domains.sh` (`EFLEX_ROOT_DOMAIN`). En dev, les valeurs ci-dessous
+> restent en `localhost` et surchargent ces exports.
 
 | Variable | Exemple dev |
 |---|---|
@@ -60,5 +67,5 @@ curl -s -H "Authorization: Bearer $COOLIFY_API_TOKEN" "$COOLIFY_API_URL/projects
 Chaque projet Eflex devient une ou plusieurs applications Coolify : la configuration vient du plan détecté (commandes, port, dossier, dossier publié, commandes après déploiement) ; les services annexes (queue, scheduler…) deviennent des applications du même dépôt.
 | `BETTER_AUTH_SECRET` | `openssl rand -base64 32` |
 | `BETTER_AUTH_URL` | `http://localhost:3000` |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | facultatifs : sans eux, le bouton Google reste inactif |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | facultatifs : sans eux, le bouton Google reste inactif ; en dev, déclarer l'URI de redirection `http://localhost:3000/api/auth/callback/google` |
 | `GITHUB_TOKEN` | facultatif : relève la limite de l'analyse des dépôts (60 → 5 000 requêtes/heure) ; un jeton sans aucun droit suffit |

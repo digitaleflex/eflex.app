@@ -40,6 +40,31 @@ const monorepo = {
   'apps/api/server.js': 'console.log("api")\n',
 }
 
+describe('dépôts privés (issue 07)', () => {
+  it('analyse un dépôt privé avec un jeton d’installation via l’API Contents', async () => {
+    const gh = fakeGitHub({ 'acme/private': { files: nextApp, private: true } })
+    const analysis = await analyzeGitHubRepo(ref('acme', 'private'), {
+      fetchImpl: gh.fetch,
+      installationToken: 'ghs_test',
+    })
+
+    expect(analysis.detection.framework).toBe('nextjs')
+    const apiCalls = gh.calls.filter((c) => c.host === 'api.github.com')
+    expect(apiCalls.some((c) => c.url.includes('/contents/'))).toBe(true)
+    expect(apiCalls.every((c) => c.headers.Authorization === 'Bearer ghs_test')).toBe(true)
+    // Le jeton ne doit jamais être envoyé au CDN public.
+    expect(gh.calls.some((c) => c.host === 'raw.githubusercontent.com')).toBe(false)
+  })
+
+  it('refuse un dépôt privé sans jeton d’installation', async () => {
+    const gh = fakeGitHub({ 'acme/private': { files: nextApp, private: true } })
+    await expect(analyzeGitHubRepo(ref('acme', 'private'), { fetchImpl: gh.fetch })).rejects.toMatchObject({
+      status: 422,
+      message: expect.stringContaining('privé'),
+    })
+  })
+})
+
 describe('analyzeGitHubRepo', () => {
   it('détecte une application Next.js et épingle le commit', async () => {
     const gh = fakeGitHub({ 'acme/app': { files: nextApp } })

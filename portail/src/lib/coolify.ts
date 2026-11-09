@@ -1,287 +1,411 @@
-// Client de l'API Coolify v4 (https://coolify.io/docs/api-reference).
-//
-// Chemins, champs et formes de réponse suivent la spécification OpenAPI officielle :
-//   POST /applications/public          → 201 { uuid }
-//   POST /applications/{uuid}/envs     → 201 { uuid }
-//   POST /deploy?uuid=…                → 200 { deployments: [{ deployment_uuid, … }] }
-//   GET  /deployments/{uuid}           → { status, commit, logs, … }
-//   DELETE /applications/{uuid}
-//   GET  /health                       → 200, texte « OK »
-// Les réponses ne sont PAS enveloppées dans `{ data }`.
-//
-// Variables d'environnement : voir loadCoolifyConfig().
+/**
+ * Client API Coolify v4.6 — https://coolify.io/docs/api-reference
+ *
+ * Le cycle d'un déploiement Eflex :
+ *   ensureTarget (serveur + projet + environnement)
+ *   → createApplication (compose ou Dockerfile)
+ *   → setEnvironmentVariable (une par variable)
+ *   → deployApplication (POST /deploy)
+ *   → getDeploymentStatus / getDeploymentLogs (GET /deployments/{uuid})
+ *
+ * Le projet et l'environnement sont découverts une seule fois puis mémorisés.
+ * `COOLIFY_PROJECT_NAME` (défaut « Eflex »), `COOLIFY_ENVIRONMENT` (défaut
+ * « production »), `COOLIFY_PROJECT_UUID` et `COOLIFY_SERVER_UUID` permettent
+ * de forcer la cible sans découverte.
+ */
 
-export class CoolifyError extends Error {
-  constructor(
-    message: string,
-    readonly status?: number,
-  ) {
-    super(message)
-    this.name = 'CoolifyError'
-  }
+const COOLIFY_URL = process.env.COOLIFY_API_URL || ''
+const COOLIFY_TOKEN = process.env.COOLIFY_API_TOKEN || ''
+const PROJECT_NAME = process.env.COOLIFY_PROJECT_NAME || 'Eflex'
+const ENVIRONMENT_NAME = process.env.COOLIFY_ENVIRONMENT || 'production'
+
+interface CoolifyResponse<T> {
+  data?: T
+  error?: string
 }
 
-export interface CoolifyConfig {
-  /** URL de l'API, toujours terminée par /api/v1. */
-  apiUrl: string
-  token: string
-  serverUuid: string
+interface CoolifyProject {
+  uuid: string
+  name: string
+}
+
+interface CoolifyEnvironment {
+  uuid: string
+  name: string
+}
+
+interface CoolifyServer {
+  uuid: string
+  name?: string
+  is_coolify_host?: boolean
+  is_usable?: boolean
+}
+
+interface CoolifyDeployment {
+  status?: string
+  logs?: string | null
+}
+
+interface CoolifyDeploymentSummary {
+  resource_uuid?: string
+  deployment_uuid?: string
+  message?: string
+}
+
+interface Target {
   projectUuid: string
+  serverUuid: string
   environmentName: string
-  destinationUuid?: string
-  /** Domaine parent des applications (`apps.exemple.fr` → `mon-projet.apps.exemple.fr`). */
-  appsDomain?: string
 }
 
-const HOSTNAME_RE = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i
-const UUID_RE = /^[A-Za-z0-9_-]{6,64}$/
+let targetPromise: Promise<Target> | null = null
 
-/** Lit la configuration dans l'environnement ; lève une CoolifyError claire si elle est incomplète. */
-export function loadCoolifyConfig(env: Record<string, string | undefined> = process.env): CoolifyConfig {
-  const get = (name: string): string => (env[name] ?? '').trim()
-
-  const required = ['COOLIFY_API_URL', 'COOLIFY_API_TOKEN', 'COOLIFY_SERVER_UUID', 'COOLIFY_PROJECT_UUID']
-  const missing = required.filter((name) => get(name) === '')
-  if (missing.length > 0) {
-    throw new CoolifyError(
-      `Coolify n'est pas configuré : variable${missing.length > 1 ? 's' : ''} manquante${missing.length > 1 ? 's' : ''} ${missing.join(', ')}.`,
-    )
+async function coolifyFetch<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<CoolifyResponse<T>> {
+  if (!COOLIFY_URL || !COOLIFY_TOKEN) {
+    return { error: 'Coolify API non configurée. Définissez COOLIFY_API_URL et COOLIFY_API_TOKEN.' }
   }
 
-  let url: URL
+  const url = `${COOLIFY_URL.replace(/\/$/, '')}${path}`
+  let res: Response
   try {
-    url = new URL(get('COOLIFY_API_URL'))
+    res = await fetch(url, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${COOLIFY_TOKEN}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...options.headers,
+      },
+      cache: 'no-store',
+    })
+  } catch (error) {
+    return {
+      error: `Coolify API injoignable : ${error instanceof Error ? error.message : 'erreur réseau'}`,
+    }
+  }
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    let message = text.slice(0, 300)
+    try {
+      const body = JSON.parse(text) as { message?: string }
+      if (body.message) message = body.message
+    } catch {
+      // Réponse non JSON : on garde le texte brut.
+    }
+    return { error: `Coolify API ${res.status}: ${message || res.statusText}` }
+  }
+
+  if (res.status === 204) return {}
+  try {
+    return { data: (await res.json()) as T }
   } catch {
-    throw new CoolifyError("COOLIFY_API_URL n'est pas une URL valide (ex. https://coolify.exemple.fr/api/v1).")
-  }
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    throw new CoolifyError('COOLIFY_API_URL doit commencer par https:// (ou http:// en local).')
-  }
-  const base = url.href.replace(/\/+$/, '')
-  const apiUrl = base.endsWith('/api/v1') ? base : `${base}/api/v1`
-
-  for (const name of ['COOLIFY_SERVER_UUID', 'COOLIFY_PROJECT_UUID'] as const) {
-    if (!UUID_RE.test(get(name))) throw new CoolifyError(`${name} n'a pas le format d'un identifiant Coolify.`)
-  }
-
-  const appsDomain = get('COOLIFY_APPS_DOMAIN').replace(/^\*\./, '').toLowerCase()
-  if (appsDomain !== '' && !HOSTNAME_RE.test(appsDomain)) {
-    throw new CoolifyError("COOLIFY_APPS_DOMAIN n'est pas un nom de domaine valide (ex. apps.exemple.fr).")
-  }
-
-  const destination = get('COOLIFY_DESTINATION_UUID')
-  return {
-    apiUrl,
-    token: get('COOLIFY_API_TOKEN'),
-    serverUuid: get('COOLIFY_SERVER_UUID'),
-    projectUuid: get('COOLIFY_PROJECT_UUID'),
-    environmentName: get('COOLIFY_ENVIRONMENT_NAME') || 'production',
-    ...(destination ? { destinationUuid: destination } : {}),
-    ...(appsDomain ? { appsDomain } : {}),
+    return { data: undefined }
   }
 }
 
-export interface CoolifyDeployment {
-  status: string
-  commit?: string
-  logs?: string
+/** Normalise un domaine saisi par l'utilisateur en nom d'hôte. */
+function normalizeHost(value: string): string {
+  return value.trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '')
 }
 
-type Json = Record<string, unknown>
+async function fetchServerUuid(): Promise<string> {
+  const configured = process.env.COOLIFY_SERVER_UUID
+  if (configured) return configured
 
-const isRecord = (value: unknown): value is Json => typeof value === 'object' && value !== null && !Array.isArray(value)
-
-/** Extrait un message lisible d'une erreur Coolify : `{ message, errors: { champ: [..] } }`. */
-function errorDetail(body: unknown): string {
-  if (!isRecord(body)) return ''
-  const parts: string[] = []
-  if (typeof body.message === 'string') parts.push(body.message)
-  if (isRecord(body.errors)) {
-    for (const [field, messages] of Object.entries(body.errors)) {
-      parts.push(`${field} : ${Array.isArray(messages) ? messages.join(', ') : String(messages)}`)
-    }
-  }
-  return parts.join(' — ').slice(0, 300)
+  const res = await coolifyFetch<CoolifyServer[]>('/servers')
+  if (res.error) throw new Error(res.error)
+  const servers = res.data ?? []
+  const server =
+    servers.find((item) => item.is_coolify_host) ??
+    servers.find((item) => item.is_usable) ??
+    servers[0]
+  if (!server?.uuid) throw new Error('Coolify : aucun serveur disponible.')
+  return server.uuid
 }
 
-export class CoolifyClient {
-  constructor(
-    private readonly config: CoolifyConfig,
-    private readonly doFetch: typeof fetch = fetch,
-    private readonly timeoutMs = 15_000,
-  ) {}
+async function fetchProjectUuid(): Promise<string> {
+  const configured = process.env.COOLIFY_PROJECT_UUID
+  if (configured) return configured
 
-  /** Nom d'hôte public d'un projet, ou undefined si COOLIFY_APPS_DOMAIN n'est pas défini. */
-  domainFor(slug: string): string | undefined {
-    return this.config.appsDomain ? `${slug}.${this.config.appsDomain}` : undefined
+  const list = await coolifyFetch<CoolifyProject[]>('/projects')
+  if (list.error) throw new Error(list.error)
+  const existing = (list.data ?? []).find((project) => project.name === PROJECT_NAME)
+  if (existing?.uuid) return existing.uuid
+
+  const created = await coolifyFetch<{ uuid?: string }>('/projects', {
+    method: 'POST',
+    body: JSON.stringify({ name: PROJECT_NAME }),
+  })
+  if (created.error) throw new Error(created.error)
+  if (!created.data?.uuid) throw new Error('Coolify : création du projet sans UUID.')
+  return created.data.uuid
+}
+
+async function fetchEnvironmentName(projectUuid: string): Promise<string> {
+  const path = `/projects/${encodeURIComponent(projectUuid)}/environments`
+  const res = await coolifyFetch<CoolifyEnvironment[]>(path)
+  if (res.error) throw new Error(res.error)
+
+  const environments = res.data ?? []
+  const existing = environments.find((environment) => environment.name === ENVIRONMENT_NAME)
+  if (existing) return existing.name
+  if (environments[0]) return environments[0].name
+
+  const created = await coolifyFetch<{ uuid?: string }>(path, {
+    method: 'POST',
+    body: JSON.stringify({ name: ENVIRONMENT_NAME }),
+  })
+  if (created.error) throw new Error(created.error)
+  return ENVIRONMENT_NAME
+}
+
+/**
+ * Découvre (et crée au besoin) le serveur, le projet et l'environnement cibles.
+ * La promesse est mémorisée pour éviter les créations concurrentes.
+ */
+async function resolveTarget(): Promise<Target> {
+  if (!targetPromise) {
+    targetPromise = (async () => {
+      const serverUuid = await fetchServerUuid()
+      const projectUuid = await fetchProjectUuid()
+      const environmentName = await fetchEnvironmentName(projectUuid)
+      return { projectUuid, serverUuid, environmentName }
+    })().catch((error) => {
+      targetPromise = null
+      throw error
+    })
   }
+  return targetPromise
+}
 
-  private async request(
-    method: string,
-    path: string,
-    options: { body?: Json; notFound?: string; text?: boolean } = {},
-  ): Promise<unknown> {
-    let res: Response
-    try {
-      res = await this.doFetch(`${this.config.apiUrl}${path}`, {
-        method,
-        headers: {
-          Authorization: `Bearer ${this.config.token}`,
-          Accept: 'application/json',
-          ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-        },
-        ...(options.body ? { body: JSON.stringify(options.body) } : {}),
-        cache: 'no-store',
-        signal: AbortSignal.timeout(this.timeoutMs),
-      })
-    } catch {
-      throw new CoolifyError('Coolify est injoignable. Vérifiez COOLIFY_API_URL et le réseau.')
+export interface CreateApplicationParams {
+  name: string
+  gitRepository: string
+  gitBranch?: string
+  /**
+   * `dockerfile` : le dépôt contient son Dockerfile (Coolify clone et l'utilise).
+   * `nixpacks`   : Coolify construit l'image avec Nixpacks, en utilisant les
+   *                commandes du BuildPlan (install/build/start).
+   */
+  buildPack: 'dockerfile' | 'nixpacks'
+  portsExposes: string
+  installCommand?: string
+  buildCommand?: string
+  startCommand?: string
+  publishDirectory?: string
+  /** Domaine public. */
+  fqdn?: string
+  /** Labels Traefik (le proxy existant n'est pas géré par Coolify). */
+  customLabels?: string[]
+  /** Commande exécutée après le déploiement (migrations, etc.). */
+  postDeploymentCommand?: string
+}
+
+/**
+ * Crée une application. Le domaine et les labels Traefik sont fournis par
+ * l'appelant : Coolify tourne avec `generate_exact_labels=true` et un proxy
+ * `none`, c'est le Traefik existant qui route.
+ */
+export async function createApplication(
+  params: CreateApplicationParams,
+): Promise<{ id: string } | { error: string }> {
+  try {
+    const target = await resolveTarget()
+    const host = params.fqdn ? normalizeHost(params.fqdn) : undefined
+
+    const payload: Record<string, unknown> = {
+      name: params.name,
+      project_uuid: target.projectUuid,
+      server_uuid: target.serverUuid,
+      environment_name: target.environmentName,
+      git_repository: params.gitRepository,
+      git_branch: params.gitBranch || 'main',
+      build_pack: params.buildPack,
+      ports_exposes: params.portsExposes,
+      connect_to_docker_network: true,
+      // Eflex gère les domaines : pas de domaine sslip.io généré par Coolify.
+      autogenerate_domain: false,
     }
 
-    if (options.text && res.ok) return res.text()
-
-    let body: unknown = null
-    try {
-      body = await res.json()
-    } catch {
-      // Corps absent ou non JSON : on s'en tient au code HTTP.
+    if (params.installCommand) payload.install_command = params.installCommand
+    if (params.buildCommand) payload.build_command = params.buildCommand
+    if (params.startCommand) payload.start_command = params.startCommand
+    if (params.publishDirectory) payload.publish_directory = params.publishDirectory
+    if (params.postDeploymentCommand) {
+      payload.post_deployment_command = params.postDeploymentCommand
     }
 
-    if (!res.ok) {
-      const detail = errorDetail(body)
-      switch (res.status) {
-        case 401:
-          throw new CoolifyError('Coolify a refusé le jeton (COOLIFY_API_TOKEN invalide ou expiré).', 401)
-        case 403:
-          throw new CoolifyError("Le jeton Coolify n'a pas les droits nécessaires (il faut au moins write et deploy).", 403)
-        case 404:
-          throw new CoolifyError(
-            options.notFound ??
-              'Ressource introuvable côté Coolify : vérifiez COOLIFY_SERVER_UUID, COOLIFY_PROJECT_UUID et COOLIFY_ENVIRONMENT_NAME.',
-            404,
-          )
-        case 422:
-          throw new CoolifyError(`Coolify a refusé la configuration${detail ? ` : ${detail}` : '.'}`, 422)
-        default:
-          throw new CoolifyError(`Coolify a répondu ${res.status}${detail ? ` : ${detail}` : '.'}`, res.status)
+    if (host) {
+      payload.domains = `https://${host}`
+      const labels = params.customLabels ?? []
+      if (labels.length > 0) {
+        payload.custom_labels = Buffer.from(labels.join('\n'), 'utf8').toString('base64')
       }
     }
-    return body
-  }
 
-  /** Crée une application depuis un dépôt public ; l'emplacement vient de la configuration. */
-  async createApplication(payload: Json): Promise<{ uuid: string }> {
-    const body = await this.request('POST', '/applications/public', {
-      body: {
-        ...payload,
-        project_uuid: this.config.projectUuid,
-        server_uuid: this.config.serverUuid,
-        environment_name: this.config.environmentName,
-        ...(this.config.destinationUuid ? { destination_uuid: this.config.destinationUuid } : {}),
-      },
+    const res = await coolifyFetch<{ uuid?: string }>('/applications/public', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     })
-    const uuid = isRecord(body) ? body.uuid : undefined
-    if (typeof uuid !== 'string' || !UUID_RE.test(uuid)) {
-      throw new CoolifyError("Coolify n'a pas renvoyé l'identifiant de l'application créée.")
-    }
-    return { uuid }
+    if (res.error) return { error: res.error }
+    if (!res.data?.uuid) return { error: 'Coolify n’a pas renvoyé l’UUID de l’application.' }
+    return { id: res.data.uuid }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Erreur Coolify inconnue.' }
   }
+}
 
-  /** `is_literal` : la valeur est transmise telle quelle (un « $ » n'est pas interprété). */
-  async setEnv(applicationUuid: string, variable: { key: string; value: string }): Promise<void> {
-    this.assertUuid(applicationUuid)
-    await this.request('POST', `/applications/${applicationUuid}/envs`, {
-      body: { key: variable.key, value: variable.value, is_literal: true },
-    })
-  }
+/** Déclenche un déploiement et renvoie l'UUID du déploiement Coolify. */
+export async function deployApplication(
+  appId: string,
+): Promise<{ deploymentId: string } | { error: string }> {
+  const res = await coolifyFetch<{ deployments?: CoolifyDeploymentSummary[] }>('/deploy', {
+    method: 'POST',
+    body: JSON.stringify({ uuid: appId }),
+  })
+  if (res.error) return { error: res.error }
 
-  /** Lance un déploiement et retourne son identifiant. */
-  async deploy(applicationUuid: string): Promise<{ deploymentUuid: string }> {
-    this.assertUuid(applicationUuid)
-    const body = await this.request('POST', `/deploy?uuid=${applicationUuid}`)
-    const first = isRecord(body) && Array.isArray(body.deployments) ? body.deployments[0] : undefined
-    const deploymentUuid = isRecord(first) ? first.deployment_uuid : undefined
-    if (typeof deploymentUuid !== 'string' || !UUID_RE.test(deploymentUuid)) {
-      const message = isRecord(first) && typeof first.message === 'string' ? ` (${first.message})` : ''
-      throw new CoolifyError(`Coolify n'a pas démarré de déploiement${message}.`)
-    }
-    return { deploymentUuid }
-  }
-
-  async getDeployment(deploymentUuid: string): Promise<CoolifyDeployment> {
-    this.assertUuid(deploymentUuid)
-    const body = await this.request('GET', `/deployments/${deploymentUuid}`, { notFound: 'Déploiement introuvable côté Coolify.' })
-    if (!isRecord(body) || typeof body.status !== 'string') {
-      throw new CoolifyError('Réponse inattendue de Coolify pour ce déploiement.')
-    }
+  const deployments = res.data?.deployments ?? []
+  const deployment =
+    deployments.find((item) => item.resource_uuid === appId) ?? deployments[0]
+  if (!deployment?.deployment_uuid) {
     return {
-      status: body.status,
-      ...(typeof body.commit === 'string' ? { commit: body.commit } : {}),
-      ...(typeof body.logs === 'string' ? { logs: body.logs } : {}),
+      error: deployment?.message || 'Coolify n’a pas renvoyé d’identifiant de déploiement.',
     }
   }
-
-  /** Supprime une application (nettoyage après un échec en cours de création). */
-  async deleteApplication(applicationUuid: string): Promise<void> {
-    this.assertUuid(applicationUuid)
-    await this.request(
-      'DELETE',
-      `/applications/${applicationUuid}?delete_configurations=true&delete_volumes=true&docker_cleanup=true&delete_connected_networks=true`,
-    )
-  }
-
-  /** Vrai si l'API répond. `/health` renvoie le texte « OK », pas du JSON. */
-  async ping(): Promise<boolean> {
-    try {
-      await this.request('GET', '/health', { text: true })
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  private assertUuid(value: string): void {
-    if (!UUID_RE.test(value)) throw new CoolifyError('Identifiant Coolify invalide.')
-  }
+  return { deploymentId: deployment.deployment_uuid }
 }
 
-/** Statut Coolify → statut Eflex (pending, building, live, failed, rollbacked). */
-export function mapDeploymentStatus(coolifyStatus: string): string {
-  switch (coolifyStatus) {
-    case 'queued':
-      return 'pending'
-    case 'in_progress':
-      return 'building'
-    case 'finished':
-      return 'live'
-    case 'failed':
-      return 'failed'
-    case 'cancelled-by-user':
-      return 'rollbacked'
-    default:
-      return 'pending'
-  }
+/** Statut d'un déploiement (`queued`, `in_progress`, `finished`, `failed`…). */
+export async function getDeploymentStatus(
+  deploymentId: string,
+): Promise<{ status: string } | { error: string }> {
+  const res = await coolifyFetch<CoolifyDeployment>(
+    `/deployments/${encodeURIComponent(deploymentId)}`,
+  )
+  if (res.error) return { error: res.error }
+  return { status: res.data?.status || 'unknown' }
 }
 
-/** Dernières lignes utiles des journaux d'un déploiement (JSON d'entrées, ou texte brut). */
-export function tailLogs(logs: string | undefined, lines = 12): string {
-  if (!logs) return ''
-  let outputs: string[]
+/**
+ * Décode les logs d'un déploiement. Coolify stocke un tableau JSON d'entrées
+ * `{ name, output, hidden? }` ; on restitue le texte brut, ligne par ligne.
+ */
+export function decodeDeploymentLogs(raw: string | null | undefined): string {
+  if (!raw) return ''
+
+  let parsed: unknown
   try {
-    const parsed: unknown = JSON.parse(logs)
-    outputs = Array.isArray(parsed)
-      ? parsed
-          .filter((entry): entry is Json => isRecord(entry) && entry.hidden !== true && typeof entry.output === 'string')
-          .map((entry) => entry.output as string)
-      : [logs]
+    parsed = JSON.parse(raw)
   } catch {
-    outputs = [logs]
+    return raw
   }
-  return outputs
-    .flatMap((output) => output.split('\n'))
-    .map((line) => line.trimEnd())
-    .filter((line) => line !== '')
-    .slice(-lines)
+  if (!Array.isArray(parsed)) return raw
+
+  return parsed
+    .map((entry) => {
+      if (typeof entry === 'string') return entry
+      if (!entry || typeof entry !== 'object') return ''
+      const record = entry as Record<string, unknown>
+      return typeof record.output === 'string' ? record.output : ''
+    })
+    .filter((line) => line.length > 0)
     .join('\n')
-    .slice(-2_000)
+}
+
+/** Logs de build d'un déploiement (nécessite `read:sensitive`). */
+export async function getDeploymentLogs(
+  deploymentId: string,
+): Promise<{ logs: string } | { error: string }> {
+  const res = await coolifyFetch<CoolifyDeployment>(
+    `/deployments/${encodeURIComponent(deploymentId)}`,
+  )
+  if (res.error) return { error: res.error }
+  return { logs: decodeDeploymentLogs(res.data?.logs) }
+}
+
+/** Statut et journaux bruts d'un déploiement en un seul appel (flux de journaux en direct). */
+export async function getDeploymentDetails(
+  deploymentId: string,
+): Promise<{ status: string; logs: string } | { error: string }> {
+  const res = await coolifyFetch<CoolifyDeployment>(`/deployments/${encodeURIComponent(deploymentId)}`)
+  if (res.error) return { error: res.error }
+  return { status: res.data?.status || 'unknown', logs: res.data?.logs ?? '' }
+}
+
+/**
+ * Remplace les labels du conteneur.
+ *
+ * Coolify écrase les `custom_labels` fournis à la création par ses propres
+ * labels (entrypoints `http`/`https`, qui n'existent pas dans le Traefik
+ * existant). Un PATCH après création est donc nécessaire pour imposer les
+ * labels `websecure` du proxy de l'hôte.
+ */
+export async function setApplicationLabels(
+  appId: string,
+  labels: string[],
+): Promise<{ ok: true } | { error: string }> {
+  const res = await coolifyFetch(`/applications/${encodeURIComponent(appId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      custom_labels: Buffer.from(labels.join('\n'), 'utf8').toString('base64'),
+    }),
+  })
+  if (res.error) return { error: res.error }
+  return { ok: true }
+}
+
+/** Ajoute ou met à jour une variable d'environnement d'une application. */export async function setEnvironmentVariable(
+  appId: string,
+  key: string,
+  value: string,
+  buildtime = false,
+): Promise<{ ok: boolean } | { error: string }> {
+  const path = `/applications/${encodeURIComponent(appId)}/envs`
+  const body = JSON.stringify({ key, value, ...(buildtime ? { is_buildtime: true } : {}) })
+
+  const res = await coolifyFetch(path, { method: 'POST', body })
+  if (!res.error) return { ok: true }
+
+  // Coolify renvoie 409 quand la variable existe déjà (par exemple une
+  // variable Nixpacks créée à la création de l'application) : on la met à jour.
+  if (res.error.includes('already exists')) {
+    const patched = await coolifyFetch(path, { method: 'PATCH', body })
+    if (patched.error) return { error: patched.error }
+    return { ok: true }
+  }
+
+  return { error: res.error }
+}
+
+/** Liste les applications de l'équipe. */
+export async function listApplications(): Promise<
+  { applications: Array<Record<string, unknown>> } | { error: string }
+> {
+  const res = await coolifyFetch<Array<Record<string, unknown>>>('/applications')
+  if (res.error) return { error: res.error }
+  return { applications: res.data ?? [] }
+}
+
+/**
+ * Vérifie si l'API Coolify est accessible.
+ *
+ * `/health` renvoie « OK » en texte brut, pas du JSON : on ne peut pas passer
+ * par `coolifyFetch` (qui appelle `res.json()` et lèverait une exception).
+ */
+export async function checkConnection(): Promise<boolean> {
+  if (!COOLIFY_URL || !COOLIFY_TOKEN) return false
+  try {
+    const res = await fetch(`${COOLIFY_URL.replace(/\/$/, '')}/health`, {
+      headers: { Authorization: `Bearer ${COOLIFY_TOKEN}` },
+      cache: 'no-store',
+    })
+    return res.ok
+  } catch {
+    return false
+  }
 }

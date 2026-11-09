@@ -40,15 +40,26 @@ run('multi-tenant (Better Auth organization + admin)', () => {
     expect(session?.activeOrganizationId).toBe(member.organizationId)
   })
 
-  it("n'accorde le rôle administrateur qu'aux adresses de ADMIN_EMAILS", async () => {
-    const { prisma, userId } = await signUp('Chef', 'boss@exemple.fr').catch(async () => {
-      const { prisma } = await import('@/lib/prisma')
-      const u = await prisma.user.findUniqueOrThrow({ where: { email: 'boss@exemple.fr' } })
-      return { prisma, userId: u.id }
-    })
-    expect((await prisma.user.findUniqueOrThrow({ where: { id: userId } })).role).toBe('admin')
+  it("n'accorde le rôle administrateur qu'à une adresse de ADMIN_EMAILS dont l'e-mail est vérifié", async () => {
+    const { auth } = await import('@/lib/auth')
+    const { prisma } = await import('@/lib/prisma')
+    const bossEmail = `boss-${Date.now()}@exemple.fr`
+    process.env.ADMIN_EMAILS = `${process.env.ADMIN_EMAILS ?? ''},${bossEmail}`
+
+    // 1. Inscription avec l'adresse d'un administrateur, sans la posséder : aucun privilège, même après connexion.
+    const res = await auth.api.signUpEmail({ body: { name: 'Usurpateur', email: bossEmail, password: 'motdepasse-solide' } })
+    await auth.api.signInEmail({ body: { email: bossEmail, password: 'motdepasse-solide' } })
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: res.user.id } })).role).not.toBe('admin')
+
+    // 2. Dès que l'adresse est vérifiée (lien reçu, ou connexion Google), la prochaine connexion accorde le rôle.
+    await prisma.user.update({ where: { id: res.user.id }, data: { emailVerified: true } })
+    await auth.api.signInEmail({ body: { email: bossEmail, password: 'motdepasse-solide' } })
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: res.user.id } })).role).toBe('admin')
+
+    // 3. Une adresse hors liste, même vérifiée, reste utilisateur.
     const other = await signUp('Eve', email('eve'))
-    expect((await prisma.user.findUniqueOrThrow({ where: { id: other.userId } })).role).toBe('user')
+    await prisma.user.update({ where: { id: other.userId }, data: { emailVerified: true } })
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: other.userId } })).role).not.toBe('admin')
   })
 
   it("resolveOrganization ne donne jamais l'organisation d'un autre locataire", async () => {

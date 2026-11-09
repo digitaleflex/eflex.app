@@ -62,7 +62,7 @@ run('notifications', () => {
     const { prisma } = await import('@/lib/prisma')
     await notify({ userIds: [owner], type: 'invitation.received', title: 'Direct', dedupeKey: `d-${stamp}` })
     const events = await prisma.event.findMany({ where: { type: 'notification.created', audience: 'user' }, orderBy: { id: 'desc' }, take: 5 })
-    const mine = events.find((e) => (e.payload as any).title === 'Direct')!
+    const mine = events.find((e) => (e.payload as { title?: string }).title === 'Direct')!
     expect(mine.userId).toBe(owner)
     expect(JSON.stringify(mine.payload)).not.toMatch(/password|secret|token/i)
   })

@@ -12,6 +12,10 @@ const STATUSES: Record<string, StatusInfo> = {
   building: { label: 'Build en cours', tone: 'warning', inProgress: true },
   deploying: { label: 'Mise en ligne…', tone: 'warning', inProgress: true },
   pending: { label: 'En attente', tone: 'neutral', inProgress: true },
+  queued: { label: 'En file d’attente', tone: 'neutral', inProgress: true },
+  analyzing: { label: 'Analyse du dépôt', tone: 'warning', inProgress: true },
+  provisioning: { label: 'Préparation', tone: 'warning', inProgress: true },
+  cancelled: { label: 'Annulé', tone: 'neutral', inProgress: false },
   failed: { label: 'Échec', tone: 'danger', inProgress: false },
   rollbacked: { label: 'Annulé', tone: 'neutral', inProgress: false },
 }

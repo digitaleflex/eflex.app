@@ -199,6 +199,7 @@ func TestAgentWithoutOperationKeyRefusesOperations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	app.Discoverer = capableDiscoverer()
 	defer app.Close()
 	app.Listener.log = discardLogger()
 
@@ -247,6 +248,7 @@ func TestRegistrationPersistsOperationKeyAndAcceptsSignedOperations(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
+	app.Discoverer = capableDiscoverer()
 	defer app.Close()
 	app.Listener.log = discardLogger()
 

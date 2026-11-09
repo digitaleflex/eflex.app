@@ -19,9 +19,6 @@ export function AdminShell({ children, email }: { children: React.ReactNode; ema
 
   return (
     <div className="min-h-screen">
-      <a href="#contenu" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground">
-        Aller au contenu
-      </a>
       <div role="note" className="bg-eflexnavy px-4 py-2 text-center text-xs font-medium text-white">
         Zone d&apos;administration — chaque action est enregistrée dans le journal d&apos;audit.
       </div>

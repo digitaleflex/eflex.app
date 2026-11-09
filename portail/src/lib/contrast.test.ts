@@ -12,8 +12,9 @@ function tokens(block: string): Record<string, [number, number, number]> {
   }
   return out
 }
-const light = tokens(css.slice(css.indexOf(':root'), css.indexOf('.dark')))
-const dark = tokens(css.slice(css.indexOf('.dark'), css.indexOf('@layer base')))
+const darkStart = css.indexOf('@media (prefers-color-scheme: dark)')
+const light = tokens(css.slice(css.indexOf(':root'), darkStart))
+const dark = tokens(css.slice(darkStart, css.indexOf('@layer base', darkStart)))
 
 type RGB = [number, number, number]
 function hsl([h, s, l]: [number, number, number]): RGB {

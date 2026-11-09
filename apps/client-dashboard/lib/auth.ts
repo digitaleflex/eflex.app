@@ -6,7 +6,9 @@ import { bearer } from "better-auth/plugins";
 export const auth = betterAuth({
   plugins: [bearer()],
   session: { cookieCache: { enabled: true, maxAge: 5 * 60 } },
-  baseURL: process.env.NEXT_PUBLIC_ENGINE_URL || "https://axiom.eurinhash.com/api",
+  // Aucun domaine public en dur : la valeur vient de l'environnement
+  // (voir config/domains.sh -> ENGINE_API_URL). Repli local pour le dev uniquement.
+  baseURL: process.env.NEXT_PUBLIC_ENGINE_URL || "http://localhost:8080/api",
   secret: process.env.BETTER_AUTH_SECRET || "dev-secret-change-in-production",
 });
 

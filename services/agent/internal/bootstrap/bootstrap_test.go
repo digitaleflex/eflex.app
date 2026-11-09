@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/digitaleflex/axiom/services/agent/internal/capabilities"
 	"github.com/digitaleflex/axiom/services/agent/internal/config"
 	"github.com/digitaleflex/axiom/services/agent/internal/protocol"
 )
@@ -53,6 +54,22 @@ func testConfig(t *testing.T, engineURL string) config.Config {
 
 func discardLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+// capabilityStubRunner reports every probed binary as installed.
+type capabilityStubRunner struct{}
+
+func (capabilityStubRunner) Run(context.Context, string, ...string) (string, error) {
+	return "1.0.0", nil
+}
+
+// capableDiscoverer reports a Docker/Traefik-capable host. Tests must not
+// depend on the machine actually having those binaries: without capabilities
+// the registration request is (correctly) refused by the protocol.
+func capableDiscoverer() capabilities.Discoverer {
+	d := capabilities.NewDiscoverer("0.1.0-test", "")
+	d.Runner = capabilityStubRunner{}
+	return d
 }
 
 // fakeEngine answers registration and heartbeat with the real protocol shapes.
@@ -198,6 +215,7 @@ func TestServeDispatchesOperationsAndDrains(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	app.Discoverer = capableDiscoverer()
 	// Inject a permissive authenticator to prove the dispatcher path is live;
 	// production keeps refuseInbound (asserted in TestNewMountsEveryPackage).
 	app.Listener.auth = allowInbound{}
@@ -352,6 +370,7 @@ func TestRegisteredIdentityStartsHeartbeatAtStartup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	first.Discoverer = capableDiscoverer()
 	if err := first.register(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -361,6 +380,7 @@ func TestRegisteredIdentityStartsHeartbeatAtStartup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	second.Discoverer = capableDiscoverer()
 	defer second.Close()
 	if second.Heartbeat == nil {
 		t.Fatal("a registered agent must have a heartbeat loop")

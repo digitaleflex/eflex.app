@@ -1,5 +1,7 @@
 # [P0][Sécurité] Chiffrer les variables d'environnement au repos et ne jamais les renvoyer en clair
 
+> **Mise à jour :** réalisé sur la branche `feat/04-encrypt-env-vars`. `portail/src/lib/crypto.ts` (AES-256-GCM, AAD `projectId:key`, préfixe `v1:`), clé `ENV_ENCRYPTION_KEY` hors base et hors image, `ENV_ENCRYPTION_KEY_PREVIOUS` pour la rotation, validation au démarrage (`src/instrumentation.ts`), migration `portail/scripts/encrypt-existing-env-vars.ts`. Les `GET` ne renvoient que les noms de variables.
+
 ## Contexte
 
 Dans `portail/src/app/api/projects/route.ts` :
@@ -30,7 +32,7 @@ Chiffrer chaque valeur avec un chiffrement authentifié, et garder la clé maît
 - Validation : clés conformes à `^[A-Za-z_][A-Za-z0-9_]*$`, longueur maximale des valeurs, dédoublonnage. Aujourd'hui, la contrainte `@@unique([projectId, key])` fait planter `createMany` en cas de doublon : il faut renvoyer une erreur 400 propre.
 
 ## Critères d'acceptation
-- [ ] En base, `EnvVar.value` ne contient que des valeurs `v1:…`.
-- [ ] Tests unitaires : aller-retour, altération détectée (tag invalide), AAD incorrecte rejetée.
-- [ ] Le portail refuse de démarrer en production sans `ENV_ENCRYPTION_KEY`.
-- [ ] Aucune route de l'API ne renvoie une valeur en clair.
+- [x] En base, `EnvVar.value` ne contient que des valeurs `v1:…` (les valeurs historiques sont converties par le script de migration).
+- [x] Tests unitaires : aller-retour, altération détectée (tag invalide), AAD incorrecte rejetée, nonce unique, rotation, valeurs historiques, clé absente/invalide (13 tests).
+- [x] Le portail refuse de démarrer en production sans `ENV_ENCRYPTION_KEY` (`src/instrumentation.ts`), et `deploy.sh` vérifie sa présence.
+- [x] Aucune route de l'API ne renvoie une valeur en clair (`GET /api/projects` et `GET /api/projects/[id]` ne sélectionnent que `key` / `updatedAt`).

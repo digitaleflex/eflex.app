@@ -6,7 +6,7 @@ const run = process.env.DATABASE_URL ? describe : describe.skip
 let currentSession: unknown = null
 vi.mock('@/lib/session', () => ({ getSession: async () => currentSession }))
 
-type Ev = { id: string; event: string; data: any }
+type Ev = { id: string; event: string; data: Record<string, unknown> }
 
 run('GET /api/events : bus d’événements temps réel', () => {
   process.env.BETTER_AUTH_SECRET ??= 'test-secret-test-secret-test-secret-0123'

@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import type { BuildPlan } from '@eflex/detector'
 import type { Prisma } from '@prisma/client'
 import { getSession } from '@/lib/session'
-import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { prisma } from '@/lib/prisma'
 import { allow } from '@/lib/rate-limit'
-import { CoolifyClient, loadCoolifyConfig } from '@/lib/coolify'
-import { DeployError, provisionAndDeploy, type DeployResult } from '@/lib/deployer'
 import { analyzeGitHubRepo } from '@/lib/repo-analysis'
-import { errorResponse, repoFields, resolveRepo } from '@/lib/analysis-request'
+import { errorResponse, repoFields, resolveInstallationToken, resolveRepo } from '@/lib/analysis-request'
+import { assertCryptoConfig, encrypt } from '@/lib/crypto'
+import { buildProjectArtifacts } from '@/lib/deploy-plan'
+import { enqueueDeployment } from '@/lib/queue'
+import { projectDomain, uniqueSlug } from '@/lib/project-slug'
+import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { publish } from '@/lib/event-bus'
 
 const schema = z.object({
@@ -36,31 +37,6 @@ const schema = z.object({
     .default([]),
 })
 
-function slugify(name: string): string {
-  const slug = name
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 40)
-    .replace(/-$/, '')
-  return slug || 'projet'
-}
-
-/** Slug unique : le nom seul si libre, sinon suffixé (le slug est unique pour toute la plateforme). */
-async function uniqueSlug(name: string): Promise<string> {
-  const base = slugify(name)
-  let candidate = base
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const taken = await prisma.project.findUnique({ where: { slug: candidate }, select: { id: true } })
-    if (!taken) return candidate
-    candidate = `${base}-${randomBytes(2).toString('hex')}`
-  }
-  return `${base}-${randomBytes(4).toString('hex')}`
-}
-
 export async function POST(request: NextRequest) {
   const session = await getSession()
   if (!session?.user?.id) {
@@ -68,10 +44,20 @@ export async function POST(request: NextRequest) {
   }
   const userId = session.user.id
 
+  // Multi-tenant : un projet appartient toujours à l'organisation active de la session,
+  // et seuls les propriétaires et administrateurs peuvent en créer.
   const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: "Aucune organisation active." }, { status: 403 })
+  if (!org) return NextResponse.json({ error: 'Aucune organisation active.' }, { status: 403 })
   if (!canManageProjects(org.role)) {
-    return NextResponse.json({ error: "Votre rôle dans cette organisation ne permet pas de créer des projets." }, { status: 403 })
+    return NextResponse.json({ error: 'Votre rôle dans cette organisation ne permet pas de créer des projets.' }, { status: 403 })
+  }
+
+  // Échoue clairement si la clé de chiffrement est absente, plutôt qu'au
+  // milieu de la création du projet.
+  try {
+    assertCryptoConfig()
+  } catch {
+    return NextResponse.json({ error: 'Configuration du serveur incomplète.' }, { status: 500 })
   }
 
   if (!allow(`create:${userId}`, 10, 60_000)) {
@@ -101,7 +87,13 @@ export async function POST(request: NextRequest) {
   let analysis
   try {
     const { ref, root } = resolveRepo(input)
-    analysis = await analyzeGitHubRepo(ref, { root, commitSha: input.commitSha, token: process.env.GITHUB_TOKEN })
+    const installationToken = await resolveInstallationToken(userId, input.installationId)
+    analysis = await analyzeGitHubRepo(ref, {
+      root,
+      commitSha: input.commitSha,
+      token: process.env.GITHUB_TOKEN,
+      installationToken,
+    })
   } catch (error) {
     return errorResponse(error)
   }
@@ -130,8 +122,26 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 2. Le projet et ses variables, ensemble ou pas du tout.
-  const slug = await uniqueSlug(input.name)
+  // 2. Le BuildPlan devient la source de vérité du déploiement (issue 02) :
+  //    Dockerfile, compose, port réel, services et commandes post-déploiement.
+  //    Plus aucune détection Nixpacks : Eflex garde la main.
+  const slug = await uniqueSlug(input.name, async (candidate) =>
+    Boolean(await prisma.project.findUnique({ where: { slug: candidate }, select: { id: true } })),
+  )
+  // Chaque projet reçoit un sous-domaine public (DNS wildcard *.eflex.app) :
+  // le worker génère les labels Traefik et Coolify route l'application.
+  const domain = projectDomain(slug, process.env.PORTAL_DOMAIN)
+  let artifacts: ReturnType<typeof buildProjectArtifacts>
+  try {
+    artifacts = buildProjectArtifacts(plan, slug)
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Impossible de préparer le déploiement.' },
+      { status: 422 },
+    )
+  }
+
+  // 3. Le projet et ses variables, ensemble ou pas du tout.
   const project = await prisma.$transaction(async (tx) => {
     const created = await tx.project.create({
       data: {
@@ -139,8 +149,12 @@ export async function POST(request: NextRequest) {
         organizationId: org.organizationId,
         name: input.name,
         slug,
+        domain,
         repoUrl: repo.url,
         branch: repo.branch,
+        repoFullName: `${repo.owner}/${repo.repo}`,
+        installationId: input.installationId ?? null,
+        productionBranch: repo.branch,
         framework: plan.framework,
         runtime: plan.runtime,
         port: plan.port,
@@ -157,66 +171,64 @@ export async function POST(request: NextRequest) {
     })
     if (input.envVars.length > 0) {
       await tx.envVar.createMany({
-        data: input.envVars.map((v) => ({ projectId: created.id, key: v.key, value: v.value })), // TODO: chiffrer (issue 04)
+        data: input.envVars.map((v) => ({
+          projectId: created.id,
+          key: v.key,
+          // AAD = projectId:key : une valeur chiffrée ne peut pas être
+          // déplacée vers une autre variable ou un autre projet.
+          value: encrypt(v.value, `${created.id}:${v.key}`),
+        })),
       })
     }
     return created
   })
 
-  // 3. Coolify : applications, variables, déploiement. Tout ou rien : en cas d'échec, les
-  //    applications déjà créées sont supprimées (voir lib/deployer.ts).
-  let deploy: DeployResult | null = null
-  let deployError: string | null = null
-
-  try {
-    const client = new CoolifyClient(loadCoolifyConfig())
-    deploy = await provisionAndDeploy(client, {
-      plan,
-      slug,
-      repoUrl: repo.url,
-      branch: repo.branch,
-      env: input.envVars,
-    })
-  } catch (error) {
-    deployError = error instanceof Error ? error.message : 'Erreur inconnue avec Coolify'
-    if (!(error instanceof DeployError)) console.error('[déploiement] échec avant provisionnement', error)
-  }
-
-  if (deploy) {
-    await prisma.project.update({
-      where: { id: project.id },
-      data: {
-        coolifyAppId: deploy.appId,
-        ...(Object.keys(deploy.workers).length > 0 ? { coolifyWorkers: deploy.workers } : {}),
-        ...(deploy.domain ? { domain: deploy.domain } : {}),
-        detection: { ...(project.detection as Prisma.JsonObject), deployWarnings: deploy.warnings },
-      },
-    })
-  }
-
+  // 4. Le déploiement est asynchrone (issue 06) : on crée un Deployment
+  //    `queued`, on l'enfile et on répond immédiatement. Le worker prend le
+  //    relais (Coolify, variables, build, statut, logs).
   const deployment = await prisma.deployment.create({
     data: {
       projectId: project.id,
       commitSha: repo.commitSha,
-      status: deploy ? 'building' : 'failed',
-      coolifyBuildId: deploy?.deploymentUuid ?? null,
-      logsSummary: deployError,
+      status: 'queued',
     },
   })
 
+  let warning: string | null = null
+  try {
+    await enqueueDeployment(deployment.id)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'File indisponible.'
+    await prisma.deployment.update({
+      where: { id: deployment.id },
+      data: { status: 'failed', logsSummary: `Déploiement non enfilé : ${message}` },
+    })
+    warning = `Déploiement en échec : ${message}`
+  }
+
+  // Temps réel : les listes ouvertes (accueil, activité) se mettent à jour sans rechargement.
   await publish({ type: 'project.created', organizationId: org.organizationId, payload: { projectId: project.id, name: project.name } })
   await publish({
     type: 'deployment.created',
     organizationId: org.organizationId,
-    payload: { projectId: project.id, deploymentId: deployment.id, status: deployment.status, name: project.name },
+    payload: { projectId: project.id, deploymentId: deployment.id, status: warning ? 'failed' : 'queued', name: project.name },
   })
 
-  return NextResponse.json({
-    project: { id: project.id, name: project.name, slug: project.slug },
-    deployment: { id: deployment.id, status: deployment.status },
-    coolify: { appId: deploy?.appId ?? null, deploymentId: deploy?.deploymentUuid ?? null },
-    warning: deployError,
-  })
+  return NextResponse.json(
+    {
+      project: { id: project.id, name: project.name, slug: project.slug, domain: project.domain },
+      deployment: { id: deployment.id, status: warning ? 'failed' : 'queued' },
+      plan: {
+        framework: plan.framework,
+        buildPack: artifacts.buildPack,
+        port: artifacts.portsExposes,
+        services: artifacts.services,
+        postDeploy: artifacts.postDeploy,
+      },
+      warning,
+    },
+    { status: 202 },
+  )
 }
 
 export async function GET() {

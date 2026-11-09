@@ -1,14 +1,37 @@
 import { APIError, betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { nextCookies } from 'better-auth/next-js'
-import { admin, organization } from 'better-auth/plugins'
 import { compare, hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
+import { isEmailConfigured, sendEmail } from '@/lib/email'
+import { resetPasswordEmail, verificationEmail } from '@/lib/email-templates'
+import { admin, organization } from 'better-auth/plugins'
 import { personalOrganizationSlug } from '@/lib/organizations'
 import { publish } from '@/lib/event-bus'
 import { memberIds, notify } from '@/lib/notifications'
 
 const googleConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
+
+/**
+ * La vérification d'e-mail n'est exigée que si Resend est configuré : sans
+ * fournisseur, exiger un lien impossible à recevoir verrouillerait les comptes.
+ * Dès que RESEND_API_KEY est renseignée, l'inscription envoie le lien et la
+ * connexion refuse tout compte non vérifié (issue 05).
+ */
+const emailVerificationRequired = isEmailConfigured()
+
+/** Adresses des administrateurs de la plateforme (ADMIN_EMAILS, séparées par des virgules). */
+function adminEmails(): string[] {
+  return (process.env.ADMIN_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+}
+
+/** Accorde le rôle `admin` à un compte listé dans ADMIN_EMAILS dont l'adresse est vérifiée. */
+async function promoteVerifiedAdmin(userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, emailVerified: true, role: true } })
+  if (user && user.emailVerified && user.role !== 'admin' && adminEmails().includes(user.email.toLowerCase())) {
+    await prisma.user.update({ where: { id: userId }, data: { role: 'admin' } })
+  }
+}
 
 // BETTER_AUTH_SECRET et BETTER_AUTH_URL sont lus automatiquement depuis l'environnement.
 export const auth = betterAuth({
@@ -19,12 +42,37 @@ export const auth = betterAuth({
     minPasswordLength: 8,
     // bcrypt ignore tout ce qui dépasse 72 octets : on refuse plutôt que de tronquer.
     maxPasswordLength: 72,
+    requireEmailVerification: emailVerificationRequired,
     // Garde bcrypt (et non scrypt) pour que les mots de passe créés avec l'ancien
     // système (migration 20261107120000_better_auth) restent valides.
     password: {
       hash: (password) => hash(password, 12),
       verify: ({ hash: stored, password }) => compare(password, stored),
     },
+    async sendResetPassword({ user, url }) {
+      const template = resetPasswordEmail(url)
+      await sendEmail({
+        to: user.email,
+        subject: 'Réinitialiser votre mot de passe Eflex',
+        ...template,
+      })
+    },
+    resetPasswordTokenExpiresIn: 3600,
+  },
+
+  emailVerification: {
+    async sendVerificationEmail({ user, url }) {
+      const template = verificationEmail(url)
+      await sendEmail({
+        to: user.email,
+        subject: 'Vérifiez votre adresse e-mail Eflex',
+        ...template,
+      })
+    },
+    sendOnSignUp: emailVerificationRequired,
+    sendOnSignIn: emailVerificationRequired,
+    autoSignInAfterVerification: true,
+    expiresIn: 3600,
   },
 
   // Google n'est proposé que si les identifiants OAuth sont configurés.
@@ -40,11 +88,6 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        // Plateforme : les adresses listées dans ADMIN_EMAILS deviennent administrateurs.
-        before: async (user) => {
-          const admins = (process.env.ADMIN_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
-          return { data: admins.includes(user.email.toLowerCase()) ? { ...user, role: 'admin' } : user }
-        },
         // Multi-tenant : chaque compte démarre avec son organisation personnelle.
         after: async (user) => {
           await prisma.organization.create({
@@ -60,7 +103,11 @@ export const auth = betterAuth({
     session: {
       create: {
         // Organisation active par défaut : la première dont l'utilisateur est membre.
+        // Plateforme : les adresses de ADMIN_EMAILS deviennent administrateurs, mais seulement une fois
+        // l'e-mail VÉRIFIÉ (Google, ou lien de vérification). Sinon, n'importe qui pourrait s'inscrire
+        // avec l'adresse d'un administrateur avant lui et prendre la main sur /admin.
         before: async (session) => {
+          await promoteVerifiedAdmin(session.userId)
           const member = await prisma.member.findFirst({
             where: { userId: session.userId },
             orderBy: { createdAt: 'asc' },
@@ -76,6 +123,8 @@ export const auth = betterAuth({
     // Organisations : membres, rôles (owner / admin / member) et invitations.
     organization({
       organizationLimit: 10,
+      // Une invitation ne peut être acceptée que par une adresse vérifiée (dès que l'envoi d'e-mails est actif).
+      requireEmailVerificationOnInvitation: emailVerificationRequired,
       organizationHooks: {
         // Temps réel : les listes ouvertes (équipe, invitations) se mettent à jour sans rechargement.
         afterAddMember: async ({ member, organization }) =>

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://eflex.dev/schema/v1.json",
+  "$id": "https://eflex.app/schema/v1.json",
   "title": "Eflex build plan v1",
   "description": "Plan de déploiement Eflex (version 1). Ce document ne contient JAMAIS de secrets : la clé `env` est volontairement interdite. Les variables sensibles sont fournies à la plateforme au moment du déploiement, jamais commitées dans le dépôt. Seul `buildEnv` existe et il est PUBLIC : ses valeurs finissent dans le bundle client.",
   "type": "object",

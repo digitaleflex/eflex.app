@@ -47,7 +47,7 @@ run('API notifications', () => {
     expect(first.unreadCount).toBe(25)
     expect(first.nextCursor).toBeTruthy()
     const second = await (await GET(req(`/api/notifications?limit=20&before=${first.nextCursor}`))).json()
-    expect(second.notifications.map((n: any) => n.title)).toEqual(['A5', 'A4', 'A3', 'A2', 'A1'])
+    expect(second.notifications.map((n: { title: string }) => n.title)).toEqual(['A5', 'A4', 'A3', 'A2', 'A1'])
     expect(second.nextCursor).toBeNull()
     expect(JSON.stringify([first, second])).not.toContain('Secret de B')
   })
@@ -85,7 +85,7 @@ run('API notifications', () => {
     expect(after.filter((p) => !p.enabled)).toHaveLength(1)
     // les préférences de A n'affectent pas B
     as(b)
-    expect((await (await prefs.GET()).json()).preferences.every((p: any) => p.enabled)).toBe(true)
+    expect((await (await prefs.GET()).json()).preferences.every((p: { enabled: boolean }) => p.enabled)).toBe(true)
     as(a)
     expect((await prefs.PUT(req('/x', json({ type: 'inconnu', enabled: false })))).status).toBe(400)
   })

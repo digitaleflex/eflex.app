@@ -31,10 +31,12 @@ run('API d’administration', () => {
   let victim: Acc
   let regular: Acc
 
-  async function account(name: string, email: string): Promise<Acc> {
+  async function account(name: string, email: string, verified = false): Promise<Acc> {
     const { auth } = await import('@/lib/auth')
     const { prisma } = await import('@/lib/prisma')
     const res = await auth.api.signUpEmail({ body: { name, email, password: PASSWORD } })
+    // Le rôle admin n'est accordé (à la connexion) qu'à une adresse vérifiée.
+    if (verified) await prisma.user.update({ where: { id: res.user.id }, data: { emailVerified: true } })
     const login = await auth.api.signInEmail({ body: { email, password: PASSWORD }, returnHeaders: true })
     const cookie = login.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ')
     const user = await prisma.user.findUniqueOrThrow({ where: { id: res.user.id } })
@@ -48,7 +50,7 @@ run('API d’administration', () => {
   const ctx = (id: string) => ({ params: Promise.resolve({ id }) })
 
   beforeAll(async () => {
-    admin = await account('Admin', adminEmail)
+    admin = await account('Admin', adminEmail, true)
     victim = await account('Victime', `victime-${stamp}@exemple.fr`)
     regular = await account('Simple', `simple-${stamp}@exemple.fr`)
   })

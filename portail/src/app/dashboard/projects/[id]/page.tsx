@@ -10,9 +10,8 @@ import { LiveRefresh } from '@/components/live-refresh'
 import { FrameworkTile, DeployHistory } from '@/components/dashboard/project-card'
 import { StatusPill } from '@/components/dashboard/status-pill'
 import { GithubMark } from '@/components/icons/github-mark'
-import { CoolifyClient, loadCoolifyConfig } from '@/lib/coolify'
-import { syncDeployment } from '@/lib/deployer'
-import { announceDeploymentStatus } from '@/lib/deployment-events'
+import { RedeployButton } from '@/components/redeploy-button'
+import { canManageProjects } from '@/lib/organizations'
 import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 import { statusInfo } from '@/lib/project-status'
 import { relativeTime } from '@/lib/relative-time'
@@ -61,29 +60,12 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   })
   if (!project) notFound()
 
-  // Tant que le déploiement est en cours, on demande son état à Coolify (sans bloquer la page
-  // si Coolify tarde ou n'est pas configuré : on affiche alors l'état enregistré).
-  let deployments = project.deployments
-  const latest = deployments[0]
-  if (latest) {
-    try {
-      const patch = await syncDeployment(new CoolifyClient(loadCoolifyConfig(), fetch, 4_000), latest)
-      if (patch) {
-        await prisma.deployment.update({ where: { id: latest.id }, data: patch })
-        if (patch.status !== latest.status) {
-          await announceDeploymentStatus({ organizationId: org.organizationId, projectId: project.id, projectName: project.name, deploymentId: latest.id, status: patch.status })
-        }
-        deployments = [{ ...latest, ...patch, logsSummary: patch.logsSummary ?? latest.logsSummary }, ...deployments.slice(1)]
-      }
-    } catch {
-      // Configuration Coolify absente ou incomplète.
-    }
-  }
-
+  // L'état des déploiements est écrit par le worker (file Redis) ; la page se met à jour par événements.
+  const deployments = project.deployments
   const analysis = readAnalysis(project.detection)
   const last = deployments[0]
   const production = deployments.find((d) => d.status === 'live')
-  const inProgress = last !== undefined && statusInfo(last.status).inProgress && last.coolifyBuildId !== null
+  const inProgress = last !== undefined && statusInfo(last.status).inProgress
   const tabHref = (t: Tab) => `/dashboard/projects/${project.id}${t === 'overview' ? '' : `?tab=${t}`}`
 
   return (
@@ -107,6 +89,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
+          {canManageProjects(org.role) && <RedeployButton projectId={project.id} />}
           <a
             href={project.repoUrl}
             target="_blank"

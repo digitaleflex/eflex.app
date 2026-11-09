@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { streamDeploymentLogs } from '@/lib/deployment-stream'
 
-type Evt = { event: string; data: any; id?: string | number }
+type Evt = { event: string; data: { lines: { text: string }[]; status: string; reason: string }; id?: string | number }
 const logs = (...lines: string[]) => JSON.stringify(lines.map((output) => ({ output })))
 
 /** Faux client : chaque appel renvoie l'étape suivante du scénario (la dernière se répète). */
-function script(steps: Array<{ status: string; logs?: string; commit?: string } | Error>) {
+function script(steps: Array<{ status: string; logs?: string } | Error>) {
   let i = 0
   return { calls: () => i, getDeployment: async () => { const s = steps[Math.min(i++, steps.length - 1)]!; if (s instanceof Error) throw s; return s } }
 }
@@ -25,7 +25,7 @@ async function run(steps: Parameters<typeof script>[0], extra: Partial<Parameter
   })
   return { events, finished, client }
 }
-const lines = (events: Evt[]) => events.filter((e) => e.event === 'log').flatMap((e) => e.data.lines.map((l: any) => l.text))
+const lines = (events: Evt[]) => events.filter((e) => e.event === 'log').flatMap((e) => e.data.lines.map((l) => l.text))
 
 describe('streamDeploymentLogs', () => {
   it('n’envoie que les lignes nouvelles à chaque passage, puis termine à l’état final', async () => {
@@ -33,12 +33,12 @@ describe('streamDeploymentLogs', () => {
       { status: 'in_progress', logs: logs('Clonage') },
       { status: 'in_progress', logs: logs('Clonage', 'Installation') },
       { status: 'in_progress', logs: logs('Clonage', 'Installation') },
-      { status: 'finished', logs: logs('Clonage', 'Installation', 'Terminé'), commit: 'abc1234' },
+      { status: 'finished', logs: logs('Clonage', 'Installation', 'Terminé') },
     ])
     expect(lines(events)).toEqual(['Clonage', 'Installation', 'Terminé'])
-    expect(events.filter((e) => e.event === 'status').map((e) => e.data.status)).toEqual(['building', 'live'])
+    expect(events.filter((e) => e.event === 'status').map((e) => e.data.status)).toEqual(['deploying', 'live'])
     expect(events.at(-1)).toMatchObject({ event: 'end', data: { reason: 'complete' } })
-    expect(finished).toEqual([{ status: 'live', commitSha: 'abc1234' }])
+    expect(finished).toEqual([{ status: 'live' }])
   })
 
   it('reprend après une coupure à partir du rang demandé (Last-Event-ID)', async () => {
@@ -53,9 +53,9 @@ describe('streamDeploymentLogs', () => {
     expect(JSON.stringify(events)).not.toContain('s3cretPass')
   })
 
-  it('résume l’échec pour le projet et le signale', async () => {
-    const { finished } = await run([{ status: 'failed', logs: logs('npm ERR! build failed') }])
-    expect(finished[0]).toMatchObject({ status: 'failed', logsSummary: expect.stringContaining('npm ERR!') })
+  it('signale un échec Coolify (statut failed ou annulé) comme état final', async () => {
+    expect((await run([{ status: 'failed', logs: logs('npm ERR! build failed') }])).finished).toEqual([{ status: 'failed' }])
+    expect((await run([{ status: 'cancelled-by-user' }])).finished).toEqual([{ status: 'failed' }])
   })
 
   it('tolère une panne passagère de Coolify puis reprend', async () => {
@@ -79,6 +79,31 @@ describe('streamDeploymentLogs', () => {
     expect(client.calls()).toBe(0)
     expect(lines(events)).toEqual(['Coolify non configuré'])
     expect(events.find((e) => e.event === 'status')!.data.status).toBe('failed')
+  })
+
+  it('attend que le worker démarre le build (file d’attente, analyse) puis diffuse les journaux', async () => {
+    const states = [
+      { status: 'queued', coolifyBuildId: null, logsSummary: null },
+      { status: 'provisioning', coolifyBuildId: null, logsSummary: null },
+      { status: 'building', coolifyBuildId: 'dep1', logsSummary: null },
+    ]
+    let i = 0
+    const { events, client } = await run([{ status: 'finished', logs: logs('Build', 'Fini') }], {
+      deployment: { status: 'queued', coolifyBuildId: null, logsSummary: null },
+      reload: async () => states[Math.min(++i, states.length - 1)]!,
+    })
+    expect(events.filter((e) => e.event === 'status').map((e) => e.data.status)).toEqual(['queued', 'provisioning', 'live'])
+    expect(lines(events)).toEqual(['Build', 'Fini'])
+    expect(client.calls()).toBe(1)
+  })
+
+  it('se termine si le déploiement a échoué avant l’envoi à Coolify, même avec reload', async () => {
+    const { events } = await run([], {
+      deployment: { status: 'failed', coolifyBuildId: null, logsSummary: 'Création impossible' },
+      reload: async () => { throw new Error('ne doit pas être appelé') },
+    })
+    expect(lines(events)).toEqual(['Création impossible'])
+    expect(events.at(-1)).toMatchObject({ event: 'end', data: { reason: 'complete' } })
   })
 
   it('s’arrête dès que le client se déconnecte', async () => {

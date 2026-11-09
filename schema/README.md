@@ -4,7 +4,7 @@ Ce dossier contient le schéma JSON du **plan de déploiement** Eflex ([`v1.json
 
 Le plan est produit par le détecteur, puis consommé par le builder et le runtime. Il est **déterministe**, **validable** et **sans secrets**.
 
-- `$id` : `https://eflex.dev/schema/v1.json`
+- `$id` : `https://eflex.app/schema/v1.json`
 - `$schema` : `https://json-schema.org/draft/2020-12/schema`
 - Validation : `additionalProperties: false`, `required: ["version"]`
 

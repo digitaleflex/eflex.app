@@ -11,8 +11,11 @@
 # déjà un Traefik sur le réseau Docker externe `proxy`, avec le certresolver
 # `letsencrypt`. Le portail s'y rattache uniquement via ses labels.
 # ---------------------------------------------------------------------------
+# Domaines : AUCUN domaine codé en dur. `bash deploy.sh` source
+# `config/domains.sh` (source unique) ; pour un appel direct à Compose, faire
+# `set -a; . ./config/domains.sh; set +a` au préalable.
 # Prérequis :
-#   1. cp .env.prod.example .env.prod  (puis adapter les secrets)
+#   1. cp .env.prod.example .env.prod  (puis adapter les secrets uniquement)
 #   2. un Traefik existant sur le réseau `proxy` (docker network inspect proxy)
 #   3. bash deploy.sh
 # ---------------------------------------------------------------------------
@@ -35,24 +38,34 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-      - BETTER_AUTH_URL=${BETTER_AUTH_URL}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:?sourcer config/domains.sh}
       - ADMIN_EMAILS=${ADMIN_EMAILS:-}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITHUB_APP_ID=${GITHUB_APP_ID:-}
+      - GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY:-}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-}
+      - GITHUB_APP_SLUG=${GITHUB_APP_SLUG:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - COOLIFY_API_URL=${COOLIFY_API_URL}
       - COOLIFY_API_TOKEN=${COOLIFY_API_TOKEN}
-      - COOLIFY_SERVER_UUID=${COOLIFY_SERVER_UUID:-}
-      - COOLIFY_PROJECT_UUID=${COOLIFY_PROJECT_UUID:-}
-      - COOLIFY_ENVIRONMENT_NAME=${COOLIFY_ENVIRONMENT_NAME:-production}
-      - COOLIFY_DESTINATION_UUID=${COOLIFY_DESTINATION_UUID:-}
-      - COOLIFY_APPS_DOMAIN=${COOLIFY_APPS_DOMAIN:-}
-      - PORTAL_DOMAIN=${PORTAL_DOMAIN}
-      - PORTAL_URL=${PORTAL_URL}
+      - PORTAL_DOMAIN=${PORTAL_DOMAIN:?sourcer config/domains.sh}
+      - PORTAL_URL=${PORTAL_URL:?sourcer config/domains.sh}
+      # ─── Statut public et maintenance ─────────────────────────────────────
+      # MAINTENANCE_MODE=true → 503 sur tout le site (middleware) + bannière.
+      - MAINTENANCE_MODE=${MAINTENANCE_MODE:-false}
+      - MAINTENANCE_MESSAGE=${MAINTENANCE_MESSAGE:-}
+      # Laisser vide tant que le moteur Axiom n'est pas déployé (sinon "non surveillé").
+      - STATUS_ENGINE_URL=${STATUS_ENGINE_URL:-}
+      - ENV_ENCRYPTION_KEY=${ENV_ENCRYPTION_KEY:?openssl rand -base64 32}
+      - ENV_ENCRYPTION_KEY_PREVIOUS=${ENV_ENCRYPTION_KEY_PREVIOUS:-}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - EMAIL_FROM=${EMAIL_FROM:-}
+      - RESEND_WEBHOOK_SECRET=${RESEND_WEBHOOK_SECRET:-}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.portail.rule=Host(`${PORTAL_DOMAIN}`)"
+      - "traefik.http.routers.portail.rule=Host(`${PORTAL_DOMAIN:?sourcer config/domains.sh}`)"
       - "traefik.http.routers.portail.entrypoints=websecure"
       - "traefik.http.routers.portail.tls.certresolver=letsencrypt"
       - "traefik.http.services.portail.loadbalancer.server.port=3000"

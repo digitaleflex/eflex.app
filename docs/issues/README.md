@@ -1,6 +1,8 @@
 # Feuille de route
 
-Les issues de suite sont désormais **sur GitHub** (digitaleflex/eflex.app) : c'est la référence. Les fichiers `NN-*.md` de ce dossier sont les premiers brouillons, conservés pour l'historique.
+> **État (nov. 2026) : les 9 jalons sont livrés** (01, 03 et le gros de 08 étaient déjà faits ; 02, 04, 05, 06, 07 et 09 ont été réalisés sur branches dédiées puis mergés sur `main`). Voir `docs/roadmap/branches.md` pour le détail branche → jalon.
+
+Les issues de suite sont **sur GitHub** (digitaleflex/eflex.app) : c'est la référence. Les fichiers `NN-*.md` de ce dossier sont les premiers brouillons, conservés pour l'historique.
 
 ## Backlog actuel (issues GitHub, groupées en milestones)
 
@@ -85,9 +87,9 @@ Ordre conseillé : M1 d'abord (#2 et #3). M2 peut avancer en parallèle (#17 est
 | 01 | [Intégrer le détecteur dans le portail](./01-integrer-detecteur-portail.md) | Fait |
 | 02 | [Déployer à partir du BuildPlan](./02-deployer-depuis-buildplan.md) | Fait via Coolify ; reste : voir #2, #4, #5, #6 |
 | 03 | [Renderer : couvrir tous les frameworks](./03-renderer-tous-frameworks.md) | Fait |
-| 04 | [Chiffrer les variables d'environnement](./04-chiffrer-variables-env.md) | Repris par #3 |
-| 05 | [Inscription et vérification d'e-mail](./05-inscription-verification-email.md) | Partiel (Better Auth + organisations en place) ; reste : #9 |
-| 06 | [Déploiements asynchrones via Redis](./06-file-deploiement-redis.md) | Partiel ; repris par #5 |
-| 07 | [GitHub App, dépôts privés, webhooks](./07-github-app-webhooks.md) | Repris par #7 |
+| 04 | [Chiffrer les variables d'environnement](./04-chiffrer-variables-env.md) | Fait (AES-256-GCM, `lib/crypto.ts`) ; #3 à clôturer |
+| 05 | [Inscription et vérification d'e-mail](./05-inscription-verification-email.md) | Fait (Resend : vérification, mot de passe oublié) ; reste dans #9 : durcissement et invitations par e-mail |
+| 06 | [Déploiements asynchrones via Redis](./06-file-deploiement-redis.md) | Fait (BullMQ, machine à états) |
+| 07 | [GitHub App, dépôts privés, webhooks](./07-github-app-webhooks.md) | Fait ; #7 à vérifier (dépôts privés d'une organisation) |
 | 08 | [Singleton Prisma, schéma unique, CI](./08-prisma-ci-qualite.md) | Remplacé par #10 et #16 |
-| 09 | [Nettoyage du dépôt](./09-nettoyage-depot.md) | Repris par #16 |
+| 09 | [Nettoyage du dépôt](./09-nettoyage-depot.md) | Fait en partie ; reste dans #16 |

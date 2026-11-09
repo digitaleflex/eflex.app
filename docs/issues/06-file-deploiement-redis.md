@@ -1,5 +1,7 @@
 # [P1] Déploiements asynchrones via une file Redis + suivi du statut et des logs
 
+> **Mise à jour :** réalisé sur `feat/06-redis-queue`. File **BullMQ** (`lib/queue.ts`, `jobId = deploymentId`), worker démarré dans le processus du portail via `src/instrumentation.ts` (pas de second conteneur : BullMQ reprend les jobs « stalled » après redémarrage), machine à états `deployment-state.ts`, `POST /api/projects` répond **202 / `queued`**, `GET /api/deployments/[id]` expose statut + logs, `POST /api/projects/[id]/redeploy` et panneau temps réel sur la page projet (polling 3 s). Le worker est **idempotent** : `coolifyAppId` est stocké dès sa création, les états terminaux sont ignorés. 11 nouveaux tests (200 au total).
+
 ## Contexte
 
 `POST /api/projects` (`portail/src/app/api/projects/route.ts`) fait **tout de façon synchrone dans la requête HTTP** : création en base, création de l'application Coolify, une requête Coolify **par** variable d'environnement (en série, erreurs ignorées), puis déclenchement du déploiement.
@@ -33,11 +35,13 @@ Un pipeline de déploiement asynchrone, observable et rejouable.
 - Boutons « Redéployer » et « Annuler ».
 
 ## Critères d'acceptation
-- [ ] `POST /api/projects` répond en moins de 500 ms.
-- [ ] Le statut passe à `live` ou `failed` sans intervention.
-- [ ] Une erreur sur une variable d'environnement fait échouer le déploiement avec un message clair.
-- [ ] Si le worker est tué en plein job puis relancé, le déploiement se termine sans créer de doublon côté Coolify.
-- [ ] Les logs de build sont consultables depuis le portail.
+- [x] `POST /api/projects` répond en **202** immédiatement (plus aucune requête Coolify synchrone).
+- [x] Le statut passe à `live` ou `failed` sans intervention (worker + polling `getDeploymentStatus`).
+- [x] Une erreur sur une variable d'environnement fait échouer le déploiement avec un message clair (`logsSummary`).
+- [x] Reprise sans doublon : `jobId = deploymentId`, états terminaux ignorés, `coolifyAppId` persisté avant toute autre étape.
+- [x] Logs consultables via `GET /api/deployments/[id]` et affichés sur la page projet.
+
+**Écart assumé :** le worker tourne dans le processus du portail et non dans un service `worker` séparé (`docker-compose.prod.yml`). Cela évite une seconde image à maintenir et reste résilient grâce à la reprise des jobs BullMQ. `Deployment.status` reste un `String` validé par la machine à états plutôt qu'un enum Prisma (pas de migration risquée sur les données existantes).
 
 ## Dépendances
 - Lié à : #02 « Déployer à partir du BuildPlan ».

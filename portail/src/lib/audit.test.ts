@@ -10,7 +10,7 @@ describe('redact : aucun secret dans le journal d’audit', () => {
       nested: { apiKey: 'sk_live_x', token: 't', Authorization: 'Bearer x', ok: 1 },
       list: [{ secret: 's', fine: 'oui' }],
       envVar: { key: 'DATABASE_URL', value: 'postgres://u:p@h/db' },
-    }) as Record<string, any>
+    }) as Record<string, unknown> & { nested: Record<string, unknown>; list: Record<string, unknown>[]; envVar: Record<string, unknown> }
     expect(out.reason).toBe('abus')
     expect(out.password).toBe('[masqué]')
     expect(out.nested).toEqual({ apiKey: '[masqué]', token: '[masqué]', Authorization: '[masqué]', ok: 1 })
@@ -21,14 +21,14 @@ describe('redact : aucun secret dans le journal d’audit', () => {
 
   it('tronque les textes très longs et borne la profondeur', () => {
     expect((redact('x'.repeat(2000)) as string).length).toBeLessThan(600)
-    let deep: any = { v: 1 }
+    let deep: Record<string, unknown> = { v: 1 }
     for (let i = 0; i < 10; i++) deep = { a: deep }
     expect(JSON.stringify(redact(deep))).toContain('profondeur max')
   })
 })
 
 describe('isAdmin', () => {
-  const s = (user: object) => ({ user }) as any
+  const s = (user: object) => ({ user }) as unknown as Parameters<typeof isAdmin>[0]
   it('accepte uniquement un administrateur non suspendu', () => {
     expect(isAdmin(s({ role: 'admin', banned: false }))).toBe(true)
     expect(isAdmin(s({ role: 'admin', banned: true }))).toBe(false)

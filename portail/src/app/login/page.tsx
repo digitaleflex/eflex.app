@@ -52,7 +52,7 @@ export default function LoginPage() {
         </nav>
       </header>
 
-      <main className="flex-1 flex items-center justify-center p-4">
+      <main id="contenu" className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-8 animate-fade-in">
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">Connexion</h1>
@@ -110,10 +110,22 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              <div className="flex justify-end">
+                <Link href="/forgot-password" className="text-sm font-medium text-primary hover:underline">
+                  Mot de passe oublié ?
+                </Link>
+              </div>
               <Button type="submit" size="lg" className="w-full" loading={loading}>
                 Se connecter
               </Button>
             </form>
+            {error.startsWith('Vérifiez votre adresse') && (
+              <p className="text-center text-sm text-muted-foreground">
+                <Link href={`/verify-email?email=${encodeURIComponent(email.trim())}`} className="font-medium text-primary hover:underline">
+                  Renvoyer l&apos;e-mail de vérification
+                </Link>
+              </p>
+            )}
           </Card>
 
           <p className="text-center text-sm text-muted-foreground">

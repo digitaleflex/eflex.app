@@ -1,209 +1,320 @@
-import { describe, expect, it } from 'vitest'
-import {
-  CoolifyClient,
-  CoolifyError,
-  loadCoolifyConfig,
-  mapDeploymentStatus,
-  tailLogs,
-  type CoolifyConfig,
-} from '@/lib/coolify'
-import { fakeCoolify } from '@/lib/test-support/fake-coolify'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const config: CoolifyConfig = {
-  apiUrl: 'https://coolify.exemple.fr/api/v1',
-  token: 'tok_test',
-  serverUuid: 'srv_abc123',
-  projectUuid: 'prj_abc123',
-  environmentName: 'production',
-  appsDomain: 'apps.exemple.fr',
+type Call = { url: string; init?: RequestInit }
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
 
-const validApp = { name: 'a', git_repository: 'https://github.com/o/r', git_branch: 'main', build_pack: 'nixpacks', ports_exposes: '3000' }
-const fail = (p: Promise<unknown>) => p.then(() => null, (e: unknown) => e as CoolifyError)
+function mockFetch(
+  handler: (url: string, init?: RequestInit) => Response | Promise<Response>,
+): Call[] {
+  const calls: Call[] = []
+  const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input.toString()
+    calls.push({ url, init })
+    return handler(url, init)
+  })
+  vi.stubGlobal('fetch', fn)
+  return calls
+}
 
-describe('loadCoolifyConfig', () => {
-  const base = {
-    COOLIFY_API_URL: 'https://coolify.exemple.fr/api/v1',
-    COOLIFY_API_TOKEN: 'tok',
-    COOLIFY_SERVER_UUID: 'srv_abc123',
-    COOLIFY_PROJECT_UUID: 'prj_abc123',
+async function loadModule() {
+  vi.resetModules()
+  vi.stubEnv('COOLIFY_API_URL', 'https://coolify.test/api/v1')
+  vi.stubEnv('COOLIFY_API_TOKEN', 'test-token')
+  vi.stubEnv('COOLIFY_PROJECT_NAME', 'Eflex')
+  vi.stubEnv('COOLIFY_ENVIRONMENT', 'production')
+  vi.stubEnv('COOLIFY_PROJECT_UUID', '')
+  vi.stubEnv('COOLIFY_SERVER_UUID', '')
+  return import('./coolify')
+}
+
+/** Réponses de découverte : serveur, projet (créé ou existant), environnement. */
+function targetHandler(projectExists: boolean) {
+  return (url: string, init?: RequestInit): Response => {
+    const method = init?.method ?? 'GET'
+    if (url.endsWith('/servers')) {
+      return json([{ uuid: 'srv', is_coolify_host: true, is_usable: true }])
+    }
+    if (url.endsWith('/projects') && method === 'GET') {
+      return json(projectExists ? [{ uuid: 'proj', name: 'Eflex' }] : [])
+    }
+    if (url.endsWith('/projects') && method === 'POST') {
+      return json({ uuid: 'proj' }, 201)
+    }
+    if (url.endsWith('/projects/proj/environments') && method === 'GET') {
+      return json([{ uuid: 'env', name: 'production' }])
+    }
+    throw new Error(`requête inattendue : ${method} ${url}`)
   }
+}
 
-  it('applique les valeurs par défaut', () => {
-    const c = loadCoolifyConfig(base)
-    expect(c.environmentName).toBe('production')
-    expect(c.appsDomain).toBeUndefined()
-    expect(c.destinationUuid).toBeUndefined()
-  })
-
-  it('liste précisément les variables manquantes', () => {
-    expect(() => loadCoolifyConfig({})).toThrow(/COOLIFY_API_URL, COOLIFY_API_TOKEN, COOLIFY_SERVER_UUID, COOLIFY_PROJECT_UUID/)
-    expect(() => loadCoolifyConfig({ ...base, COOLIFY_PROJECT_UUID: '  ' })).toThrow(/variable manquante COOLIFY_PROJECT_UUID/)
-  })
-
-  it.each([
-    ['https://coolify.exemple.fr', 'https://coolify.exemple.fr/api/v1'],
-    ['https://coolify.exemple.fr/', 'https://coolify.exemple.fr/api/v1'],
-    ['https://coolify.exemple.fr/api/v1', 'https://coolify.exemple.fr/api/v1'],
-    ['https://coolify.exemple.fr/api/v1/', 'https://coolify.exemple.fr/api/v1'],
-    ['http://localhost:8000', 'http://localhost:8000/api/v1'],
-  ])('normalise l’URL %s', (input, expected) => {
-    expect(loadCoolifyConfig({ ...base, COOLIFY_API_URL: input }).apiUrl).toBe(expected)
-  })
-
-  it.each(['pas une url', 'ftp://coolify.exemple.fr', 'javascript:alert(1)'])('refuse l’URL %j', (url) => {
-    expect(() => loadCoolifyConfig({ ...base, COOLIFY_API_URL: url })).toThrow(CoolifyError)
-  })
-
-  it('refuse des identifiants qui ne ressemblent pas à des UUID Coolify', () => {
-    expect(() => loadCoolifyConfig({ ...base, COOLIFY_SERVER_UUID: '../etc' })).toThrow(/COOLIFY_SERVER_UUID/)
-  })
-
-  it('accepte *.domaine et refuse un domaine invalide', () => {
-    expect(loadCoolifyConfig({ ...base, COOLIFY_APPS_DOMAIN: '*.Apps.Exemple.fr' }).appsDomain).toBe('apps.exemple.fr')
-    expect(() => loadCoolifyConfig({ ...base, COOLIFY_APPS_DOMAIN: 'apps exemple' })).toThrow(/COOLIFY_APPS_DOMAIN/)
-    expect(() => loadCoolifyConfig({ ...base, COOLIFY_APPS_DOMAIN: 'a.fr/evil' })).toThrow(/COOLIFY_APPS_DOMAIN/)
-  })
+afterEach(() => {
+  vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
-describe('CoolifyClient', () => {
-  it('crée une application avec l’emplacement et le jeton, et lit { uuid } sans enveloppe', async () => {
-    const fake = fakeCoolify()
-    const client = new CoolifyClient({ ...config, destinationUuid: 'dst_abc123' }, fake.fetch)
-    const { uuid } = await client.createApplication(validApp)
+describe('createApplication', () => {
+  it('crée une application Nixpacks avec la cible découverte et les commandes du plan', async () => {
+    const calls = mockFetch((url, init) => {
+      if (url.endsWith('/applications/public')) return json({ uuid: 'app' }, 201)
+      return targetHandler(false)(url, init)
+    })
+    const { createApplication } = await loadModule()
 
-    expect(uuid).toBe('app00001')
-    const call = fake.calls[0]!
-    expect(call).toMatchObject({ method: 'POST', path: '/applications/public', authorization: 'Bearer tok_test' })
-    expect(call.body).toMatchObject({
-      ...validApp,
-      project_uuid: 'prj_abc123',
-      server_uuid: 'srv_abc123',
+    const result = await createApplication({
+      name: 'demo',
+      gitRepository: 'https://github.com/o/r',
+      gitBranch: 'main',
+      buildPack: 'nixpacks',
+      portsExposes: '3000',
+      installCommand: 'npm ci',
+      buildCommand: 'npm run build',
+      startCommand: 'npm start',
+      publishDirectory: 'dist',
+    })
+
+    expect(result).toEqual({ id: 'app' })
+    const call = calls.find((item) => item.url.endsWith('/applications/public'))
+    expect(call).toBeDefined()
+    const body = JSON.parse(String(call?.init?.body))
+    expect(body).toMatchObject({
+      name: 'demo',
+      project_uuid: 'proj',
+      server_uuid: 'srv',
       environment_name: 'production',
-      destination_uuid: 'dst_abc123',
+      git_repository: 'https://github.com/o/r',
+      git_branch: 'main',
+      build_pack: 'nixpacks',
+      install_command: 'npm ci',
+      build_command: 'npm run build',
+      start_command: 'npm start',
+      publish_directory: 'dist',
+      ports_exposes: '3000',
+      connect_to_docker_network: true,
+      autogenerate_domain: false,
     })
+    expect(body.docker_compose_raw).toBeUndefined()
+    expect(body.dockerfile).toBeUndefined()
   })
 
-  it('transmet les variables telles quelles (is_literal) : un « $ » n’est pas interprété', async () => {
-    const fake = fakeCoolify()
-    const client = new CoolifyClient(config, fake.fetch)
-    const { uuid } = await client.createApplication(validApp)
-    await client.setEnv(uuid, { key: 'DB_PASSWORD', value: 'pa$$w0rd${X}' })
+  it('réutilise un projet existant sans en créer un nouveau', async () => {
+    const calls = mockFetch((url, init) => {
+      if (url.endsWith('/applications/public')) return json({ uuid: 'app' }, 201)
+      return targetHandler(true)(url, init)
+    })
+    const { createApplication } = await loadModule()
 
-    expect(fake.apps.get(uuid)?.envs[0]).toEqual({ key: 'DB_PASSWORD', value: 'pa$$w0rd${X}', is_literal: true })
-    expect(fake.calls.at(-1)?.path).toBe(`/applications/${uuid}/envs`)
-  })
-
-  it('déclenche un déploiement et retourne son identifiant', async () => {
-    const fake = fakeCoolify()
-    const client = new CoolifyClient(config, fake.fetch)
-    const { uuid } = await client.createApplication(validApp)
-    const { deploymentUuid } = await client.deploy(uuid)
-
-    expect(deploymentUuid).toBe('dep00001')
-    expect(fake.calls.at(-1)).toMatchObject({ method: 'POST', path: '/deploy', search: `?uuid=${uuid}` })
-  })
-
-  it('signale un déploiement que Coolify n’a pas démarré', async () => {
-    const fake = fakeCoolify({ failDeployFor: 'a' })
-    const client = new CoolifyClient(config, fake.fetch)
-    const { uuid } = await client.createApplication(validApp)
-    const err = await fail(client.deploy(uuid))
-    expect(err?.message).toMatch(/n'a pas démarré de déploiement \(Application is not ready\.\)/)
-  })
-
-  it('lit le statut, le commit et les journaux d’un déploiement', async () => {
-    const fake = fakeCoolify({ deploymentStatus: 'finished', deploymentCommit: 'abc1234', deploymentLogs: '[]' })
-    const client = new CoolifyClient(config, fake.fetch)
-    const { uuid } = await client.createApplication(validApp)
-    const { deploymentUuid } = await client.deploy(uuid)
-    expect(await client.getDeployment(deploymentUuid)).toEqual({ status: 'finished', commit: 'abc1234', logs: '[]' })
-  })
-
-  it('supprime une application', async () => {
-    const fake = fakeCoolify()
-    const client = new CoolifyClient(config, fake.fetch)
-    const { uuid } = await client.createApplication(validApp)
-    await client.deleteApplication(uuid)
-    expect(fake.apps.get(uuid)?.deleted).toBe(true)
-    expect(fake.calls.at(-1)?.search).toContain('delete_configurations=true')
-  })
-
-  it('ping : /health répond « OK » en texte, pas en JSON', async () => {
-    const client = new CoolifyClient(config, fakeCoolify().fetch)
-    expect(await client.ping()).toBe(true)
-    expect(await new CoolifyClient(config, fakeCoolify({ down: true }).fetch).ping()).toBe(false)
-    expect(await new CoolifyClient({ ...config, token: 'mauvais' }, fakeCoolify().fetch).ping()).toBe(false)
-  })
-
-  it('domainFor : sous-domaine du projet, ou rien sans COOLIFY_APPS_DOMAIN', () => {
-    expect(new CoolifyClient(config).domainFor('mon-projet')).toBe('mon-projet.apps.exemple.fr')
-    expect(new CoolifyClient({ ...config, appsDomain: undefined }).domainFor('mon-projet')).toBeUndefined()
-  })
-
-  describe('erreurs en français, sans jamais exposer le jeton', () => {
-    it('401 : jeton refusé', async () => {
-      const client = new CoolifyClient({ ...config, token: 'secret_token_xyz' }, fakeCoolify().fetch)
-      const err = await fail(client.createApplication(validApp))
-      expect(err?.status).toBe(401)
-      expect(err?.message).toMatch(/jeton/)
-      expect(err?.message).not.toContain('secret_token_xyz')
+    await createApplication({
+      name: 'demo',
+      gitRepository: 'https://github.com/o/r',
+      buildPack: 'dockerfile',
+      portsExposes: '80',
     })
 
-    it('422 : détaille le champ refusé', async () => {
-      const err = await fail(new CoolifyClient(config, fakeCoolify().fetch).createApplication({ ...validApp, fqdn: 'x.fr' }))
-      expect(err?.status).toBe(422)
-      expect(err?.message).toMatch(/Coolify a refusé la configuration.*fqdn : This field is not allowed/)
+    expect(calls.some((item) => item.init?.method === 'POST' && item.url.endsWith('/projects'))).toBe(false)
+  })
+
+  it('crée une application dockerfile avec domaine normalisé et labels Traefik', async () => {
+    const calls = mockFetch((url, init) => {
+      if (url.endsWith('/applications/public')) return json({ uuid: 'app' }, 201)
+      return targetHandler(true)(url, init)
+    })
+    const { createApplication } = await loadModule()
+    const labels = [
+      'traefik.enable=true',
+      'traefik.http.routers.demo-app.entrypoints=websecure',
+    ]
+
+    const result = await createApplication({
+      name: 'demo',
+      gitRepository: 'https://github.com/o/r',
+      buildPack: 'dockerfile',
+      portsExposes: '80',
+      fqdn: 'https://demo.example.com/',
+      customLabels: labels,
+      postDeploymentCommand: 'php artisan migrate --force',
     })
 
-    it('404 : oriente vers les variables de configuration', async () => {
-      const fake = fakeCoolify()
-      const err = await fail(new CoolifyClient(config, fake.fetch).setEnv('inconnu123', { key: 'A', value: '1' }))
-      expect(err?.status).toBe(404)
-      expect(err?.message).toMatch(/COOLIFY_SERVER_UUID/)
-    })
+    expect(result).toEqual({ id: 'app' })
+    const call = calls.find((item) => item.url.endsWith('/applications/public'))
+    const body = JSON.parse(String(call?.init?.body))
+    expect(body.domains).toBe('https://demo.example.com')
+    expect(body.custom_labels).toBe(Buffer.from(labels.join('\n'), 'utf8').toString('base64'))
+    expect(body.post_deployment_command).toBe('php artisan migrate --force')
+    expect(body.docker_compose_raw).toBeUndefined()
+  })
 
-    it('Coolify éteint', async () => {
-      const err = await fail(new CoolifyClient(config, fakeCoolify({ down: true }).fetch).createApplication(validApp))
-      expect(err?.message).toMatch(/injoignable/)
-      expect(err?.message).not.toContain('tok_test')
-    })
-
-    it('un identifiant qui ressemble à un chemin est refusé avant tout appel', async () => {
-      const fake = fakeCoolify()
-      const client = new CoolifyClient(config, fake.fetch)
-      for (const bad of ['../../servers', 'a/b', 'x?y=1', '']) {
-        expect((await fail(client.deploy(bad)))?.message).toMatch(/Identifiant Coolify invalide/)
-        expect((await fail(client.deleteApplication(bad)))?.message).toMatch(/Identifiant Coolify invalide/)
+  it('remonte le message d’erreur de l’API', async () => {
+    mockFetch((url, init) => {
+      if (url.endsWith('/applications/public')) {
+        return json({ message: 'Validation failed.' }, 422)
       }
-      expect(fake.calls).toHaveLength(0)
+      return targetHandler(true)(url, init)
+    })
+    const { createApplication } = await loadModule()
+
+    await expect(
+      createApplication({
+        name: 'demo',
+        gitRepository: 'https://github.com/o/r',
+        buildPack: 'dockerfile',
+        portsExposes: '80',
+      }),
+    ).resolves.toEqual({ error: 'Coolify API 422: Validation failed.' })
+  })
+})
+
+describe('deployApplication', () => {
+  it('déclenche POST /deploy et lit deployments[].deployment_uuid', async () => {
+    const calls = mockFetch((url) => {
+      if (url.endsWith('/deploy')) {
+        return json({
+          deployments: [{ resource_uuid: 'app', deployment_uuid: 'dep' }],
+        })
+      }
+      throw new Error(url)
+    })
+    const { deployApplication } = await loadModule()
+
+    await expect(deployApplication('app')).resolves.toEqual({ deploymentId: 'dep' })
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({ uuid: 'app' })
+  })
+
+  it('renvoie le message Coolify quand aucun déploiement n’est créé', async () => {
+    mockFetch(() => json({ deployments: [{ resource_uuid: 'app', message: 'Nothing to deploy.' }] }))
+    const { deployApplication } = await loadModule()
+
+    await expect(deployApplication('app')).resolves.toEqual({
+      error: 'Nothing to deploy.',
     })
   })
 })
 
-describe('mapDeploymentStatus', () => {
-  it.each([
-    ['queued', 'pending'],
-    ['in_progress', 'building'],
-    ['finished', 'live'],
-    ['failed', 'failed'],
-    ['cancelled-by-user', 'rollbacked'],
-    ['inconnu', 'pending'],
-  ])('%s → %s', (input, expected) => expect(mapDeploymentStatus(input)).toBe(expected))
-})
+describe('getDeploymentStatus / getDeploymentLogs', () => {
+  it('lit le statut et décode les logs JSON de Coolify', async () => {
+    mockFetch((url) => {
+      if (url.endsWith('/deployments/dep')) {
+        return json({
+          status: 'finished',
+          logs: JSON.stringify([
+            { name: 'Build', output: 'step 1' },
+            { name: 'Build', output: 'step 2' },
+          ]),
+        })
+      }
+      throw new Error(url)
+    })
+    const { getDeploymentStatus, getDeploymentLogs } = await loadModule()
 
-describe('tailLogs', () => {
-  const entry = (output: string, hidden = false) => ({ command: null, output, type: 'stdout', hidden, timestamp: 't' })
-
-  it('garde les dernières lignes visibles', () => {
-    const logs = JSON.stringify([entry('début'), entry('secret caché', true), entry('étape 2\nerreur : build cassé')])
-    expect(tailLogs(logs, 2)).toBe('étape 2\nerreur : build cassé')
-    expect(tailLogs(logs)).not.toContain('secret caché')
+    await expect(getDeploymentStatus('dep')).resolves.toEqual({ status: 'finished' })
+    await expect(getDeploymentLogs('dep')).resolves.toEqual({ logs: 'step 1\nstep 2' })
   })
 
-  it('accepte du texte brut et le tronque', () => {
-    expect(tailLogs('a\n\nb\nc', 2)).toBe('b\nc')
-    expect(tailLogs('x'.repeat(5_000)).length).toBeLessThanOrEqual(2_000)
-    expect(tailLogs(undefined)).toBe('')
+  it('laisse passer un log non JSON', async () => {
+    mockFetch(() => json({ status: 'in_progress', logs: 'texte brut' }))
+    const { getDeploymentLogs } = await loadModule()
+
+    await expect(getDeploymentLogs('dep')).resolves.toEqual({ logs: 'texte brut' })
+  })
+})
+
+describe('decodeDeploymentLogs', () => {
+  it('gère les valeurs vides et les entrées sans output', async () => {
+    const { decodeDeploymentLogs } = await loadModule()
+
+    expect(decodeDeploymentLogs(null)).toBe('')
+    expect(decodeDeploymentLogs('')).toBe('')
+    expect(decodeDeploymentLogs(JSON.stringify([{ name: 'Build' }, 'ligne']))).toBe('ligne')
+  })
+})
+
+describe('setApplicationLabels', () => {
+  it('patche les custom_labels en base64', async () => {
+    const calls = mockFetch((url) => {
+      if (url.endsWith('/applications/app')) return json({ uuid: 'app' })
+      throw new Error(url)
+    })
+    const { setApplicationLabels } = await loadModule()
+    const labels = ['traefik.enable=true', 'traefik.http.routers.x.entrypoints=websecure']
+
+    await expect(setApplicationLabels('app', labels)).resolves.toEqual({ ok: true })
+    expect(calls[0]?.init?.method).toBe('PATCH')
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      custom_labels: Buffer.from(labels.join('\n'), 'utf8').toString('base64'),
+    })
+  })
+})
+
+describe('setEnvironmentVariable', () => {
+  it('poste sur /applications/{uuid}/envs', async () => {
+    const calls = mockFetch((url) => {
+      if (url.endsWith('/applications/app/envs')) return json({ uuid: 'env-1' }, 201)
+      throw new Error(url)
+    })
+    const { setEnvironmentVariable } = await loadModule()
+
+    await expect(setEnvironmentVariable('app', 'KEY', 'value')).resolves.toEqual({ ok: true })
+    expect(calls[0]?.url).toBe('https://coolify.test/api/v1/applications/app/envs')
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({ key: 'KEY', value: 'value' })
+  })
+
+  it('met à jour la variable si elle existe déjà (409)', async () => {
+    const calls = mockFetch((url, init) => {
+      if (url.endsWith('/applications/app/envs')) {
+        if ((init?.method ?? 'GET') === 'POST') {
+          return json(
+            { message: 'Environment variable already exists. Use PATCH request to update it.' },
+            409,
+          )
+        }
+        if (init?.method === 'PATCH') return json({ uuid: 'env-1' })
+      }
+      throw new Error(url)
+    })
+    const { setEnvironmentVariable } = await loadModule()
+
+    await expect(setEnvironmentVariable('app', 'KEY', 'value', true)).resolves.toEqual({ ok: true })
+    expect(calls.map((call) => call.init?.method)).toEqual(['POST', 'PATCH'])
+    expect(JSON.parse(String(calls[1]?.init?.body))).toEqual({
+      key: 'KEY',
+      value: 'value',
+      is_buildtime: true,
+    })
+  })
+})
+
+describe('checkConnection', () => {
+  it('accepte la réponse texte « OK » de /health', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('OK', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { checkConnection } = await loadModule()
+
+    await expect(checkConnection()).resolves.toBe(true)
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://coolify.test/api/v1/health',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
+      }),
+    )
+  })
+
+  it('renvoie false quand l’API répond en erreur', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('indisponible', { status: 503 })))
+    const { checkConnection } = await loadModule()
+
+    await expect(checkConnection()).resolves.toBe(false)
+  })
+
+  it('renvoie false quand le réseau échoue', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED')))
+    const { checkConnection } = await loadModule()
+
+    await expect(checkConnection()).resolves.toBe(false)
   })
 })

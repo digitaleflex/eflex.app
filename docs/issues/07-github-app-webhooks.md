@@ -1,5 +1,7 @@
 # [P1] GitHub App : dépôts privés, sélection de dépôt et redéploiement automatique à chaque push
 
+> **Mise à jour :** réalisé sur `feat/07-github-app` (plomberie complète). `lib/github-app.ts` (JWT RS256, jetons d'installation, liste des dépôts, vérification `X-Hub-Signature-256`), modèles `GitInstallation` / `WebhookDelivery` + champs `Project`, webhook `/api/webhooks/github` (signature, idempotence par `X-GitHub-Delivery`, `push` → file Redis avec le vrai SHA), routes `/api/github/{config,installations,repositories}`, sélecteur dans « Nouveau projet », et analyse des dépôts privés via l'API Contents avec jeton court. **Reste humain :** créer l'App sur GitHub, renseigner les 4 variables et déclarer l'URL du webhook. Les previews de PR et le check run restent en phase 2 ; le déploiement Coolify d'un dépôt privé nécessitera de transmettre le jeton court à Coolify.
+
 ## Contexte
 
 - `createApplication()` dans `portail/src/lib/coolify.ts` appelle `POST /applications/public` : **seuls les dépôts publics** fonctionnent.
@@ -29,10 +31,10 @@ Connecter GitHub proprement pour que « push → déploiement » fonctionne, y c
 7. Publier un **check run** ou un commit status GitHub qui reflète l'état du déploiement.
 
 ## Critères d'acceptation
-- [ ] Un dépôt privé peut être importé et déployé.
-- [ ] Un push sur `main` déclenche un nouveau déploiement, visible dans le portail avec le bon SHA.
-- [ ] Un webhook à la signature invalide reçoit une 401 et ne met rien en file.
-- [ ] La même livraison reçue deux fois ne crée qu'un seul déploiement.
+- [x] Un dépôt privé peut être **importé et analysé** (jeton d'installation, API Contents). Le déploiement effectif via Coolify reste à brancher (voir la mise à jour).
+- [x] Un `push` sur la branche de production met en file un `Deployment` `queued` avec le SHA du webhook.
+- [x] Un webhook à la signature invalide reçoit **401** et ne crée aucune livraison.
+- [x] La même livraison (`X-GitHub-Delivery`) reçue deux fois ne crée qu'un seul déploiement (table `WebhookDelivery`).
 
 ## Dépendances
 - Dépend de : #06 « Déploiements asynchrones via une file Redis ».

@@ -8,11 +8,13 @@ Ce dépôt fusionne `digitaleflex/eflex.app` (produit EFLEX, TypeScript) et `dig
 - `services/agent`, `services/orchestrator` — modules Go séparés (chacun son `go.mod`).
 - `apps/cloud` (Vite) et `apps/client-dashboard` (Next 16) — consoles Axiom héritées, npm, hors workspace pnpm ; vouées à être remplacées par la console EFLEX.
 - `schemas/` (Axiom) ≠ `schema/` (Eflex `eflex.json`). Docs Axiom dans `docs/` (ADR dans `docs/adr`).
-- CI : `.github/workflows/` (Go, contrats de schémas, agent).
+- CI : `.github/workflows/` (Go, contrats de schémas, agent, et `ts.yml` pour les packages TS + le portail).
 
-- `packages/detector` — deterministic repo snapshot → `BuildPlan`; no network/LLM/runtime deps. Entry: `src/detect.ts` (`detect`), CLI `src/cli.ts`.
-- `packages/renderer` — `BuildPlan` → docker-compose YAML + nginx/env templates. Entry: `src/render.ts`; yaml dependency.
+- `packages/detector` — deterministic repo snapshot → `BuildPlan`; no network/LLM/runtime deps. Entry: `src/detect.ts` (`detect`), CLI `src/cli.ts`. `src/walk.ts` expose `walkRepository()` : **source unique** du parcours local et des segments ignorés (`IGNORED_SEGMENTS`), utilisée par le CLI et le renderer.
+- `assets/brand/` — sources de marque haute résolution (non servies). Les assets publics restent dans `portail/public/`.
+- `packages/renderer` — `BuildPlan` → docker-compose YAML + nginx/env templates. Entry: `src/render.ts`; yaml dependency. `src/dockerfile.ts` génère le Dockerfile, `src/deploy.ts` assemble les artefacts de déploiement (port réel, `build_pack`, `postDeploy` en service one-shot). Le portail les consomme via l'alias `@eflex/renderer` (`lib/deploy-plan.ts`) ; `yaml` est aussi dépendance du portail.
 - `schema/v1.json` — authoritative JSON Schema for plans; `schema/test.ts` validates every fixture plan/alternative via Ajv.
+- `config/domains.sh` — **source unique** des domaines/URLs publics (un seul `EFLEX_ROOT_DOMAIN`, aucune valeur secrète) ; `scripts/sync-domains.sh` régénère les fichiers statiques qui ne peuvent pas interpoler `${VAR}`.
 - `portail/` — Next.js 15 App Router portal (Better Auth, Prisma, Coolify client). **Not** in root pnpm workspace; has own `package-lock.json`; use `npm` there.
 - `README.md` (detector behavior), `DEV.md`/`PROD.md` (infra), `schema/README.md` (plan contract).
 
@@ -20,24 +22,48 @@ Ce dépôt fusionne `digitaleflex/eflex.app` (produit EFLEX, TypeScript) et `dig
 
 ```bash
 pnpm install          # pnpm@10, Node >=24
-pnpm test             # Vitest (47 tests across detector + renderer; scope set in vitest.config.ts)
+pnpm test             # Vitest (packages TS + modules du portail ; périmètre dans vitest.config.ts)
 pnpm typecheck        # tsc detector + renderer only; NOT portail
 pnpm detect <dir>     # tsx packages/detector/src/cli.ts
 pnpm render <dir>     # tsx packages/renderer/src/main.ts
 ```
 
 Single test: `pnpm vitest run packages/detector/test/detect.test.ts`; filter test: `pnpm vitest run -t "detects Next.js"`.
-Portal: `cd portail && npm install && npm run dev|build|start`. Root `typecheck` does not cover it.
+`pnpm typecheck:all` couvre détecteur + renderer + portail (avec `prisma generate`). Le portail a aussi `npm run lint` (ESLint `--max-warnings=0`, `.eslintrc.json` ; `next lint` est déprécié). La CI `ts.yml` lance tests, typechecks, garde-fou domaines, `prisma validate/generate`, lint et **`next build`** avec des variables factices.
+Portal: `cd portail && npm install && npm run dev|build|start|lint|typecheck`.
 
-Détection dans le portail : `POST /api/projects/analyze` → `lib/repo-analysis.ts` récupère l'arborescence (API GitHub, dépôts publics uniquement) puis les fichiers demandés (raw.githubusercontent.com), et appelle `@eflex/detector` en boucle. `lib/github-url.ts` valide les URL. Le portail importe le détecteur par alias (`tsconfig` paths + `experimental.externalDir` + `extensionAlias` dans `next.config.mjs`) : **n'importer que des types (`import type`) dans les composants client**. `POST /api/projects` refait l'analyse côté serveur et ne reçoit jamais le plan du client. Les tests de ces modules (`portail/src/**/*.test.ts`) tournent avec `pnpm test`.
+Détection dans le portail : `POST /api/projects/analyze` → `lib/repo-analysis.ts` récupère l'arborescence (API GitHub ; dépôts publics via raw.githubusercontent.com, dépôts privés via l'API Contents avec jeton d'installation GitHub App) puis les fichiers demandés, et appelle `@eflex/detector` en boucle. `lib/github-url.ts` valide les URL. Le portail importe le détecteur par alias (`tsconfig` paths + `experimental.externalDir` + `extensionAlias` dans `next.config.mjs`) : **n'importer que des types (`import type`) dans les composants client**. `POST /api/projects` refait l'analyse côté serveur et ne reçoit jamais le plan du client. Les tests de ces modules (`portail/src/**/*.test.ts`) tournent avec `pnpm test`.
 
-Déploiement : `lib/coolify-plan.ts` (pur) traduit un `BuildPlan` en applications Coolify (runtime `docker@*` → build pack dockerfile, `static@*` → static + `publish`, sinon nixpacks avec les commandes du plan ; chaque service annexe devient une application « worker »). `lib/coolify.ts` est le client de l'API v4 (réponses non enveloppées dans `data`, chemins `/envs` et `/deploy?uuid=`), `lib/deployer.ts` orchestre tout-ou-rien (supprime les applications créées en cas d'échec) et synchronise le statut. Les tests valident chaque charge utile contre le schéma officiel (`lib/test-support/coolify-api-schemas.json`, extrait de https://raw.githubusercontent.com/coollabsio/coolify/v4.x/openapi.json : à rafraîchir si l'API évolue) ; `fake-coolify.ts` imite le serveur. Ne pas envoyer de champ absent de ce schéma : Coolify refuse les champs inconnus (422).
+Déploiement : `POST /api/projects` crée le projet (variables chiffrées par `lib/crypto.ts`, AAD `projectId:clé`) puis un `Deployment` `queued` enfilé dans Redis (`lib/queue.ts`, BullMQ). Le worker (`src/worker.ts`, démarré par `src/instrumentation.ts` si `REDIS_URL`) fait avancer la machine à états `lib/deployment-state.ts` (`queued → analyzing → provisioning → building → deploying → live | failed | cancelled`), traduit le `BuildPlan` via `lib/deploy-plan.ts` et pilote Coolify 4.6 par `lib/coolify.ts`. Il ne gère qu'un service par projet (un plan multi-services est refusé). À chaque changement d'état il appelle `announceDeploymentStatus` (`lib/deployment-events.ts`) : événement temps réel et, aux états finals, notifications.
+
+Multi-tenant : tout projet appartient à une organisation (plugin Better Auth `organization`, organisation personnelle créée à l'inscription). Toute lecture ou écriture de projet doit passer par `resolveOrganization(session)` (`lib/organizations.ts`) ; créer ou relancer exige `canManageProjects(role)`. Administration : plugin `admin`, routes `api/admin/**` gardées par `requireAdminApi()` (404 sinon), chaque action appelle `audit()` ; le rôle `admin` vient de `ADMIN_EMAILS` mais seulement pour un e-mail vérifié.
+
+Temps réel : `lib/event-bus.ts` (table `Event`, un interrogateur par processus) alimente `/api/events` (un flux SSE par onglet, filtré par organisation) ; côté client `EventsProvider`/`useEvents`/`LiveRefresh`. Journaux de build en direct : `/api/projects/[id]/deployments/[deploymentId]/logs` (lecture seule, secrets masqués). Notifications : `lib/notifications.ts` (`notify`, préférences, anti-doublon par `dedupeKey`). Tests d'intégration (`organizations`, `events`, `notifications`, `admin`, `logs`) : `DATABASE_URL=… BETTER_AUTH_SECRET=… pnpm test` ; ils sont ignorés sans base.
 
 Docker : l'image du portail se construit avec la **racine du dépôt** comme contexte (`docker build -f portail/Dockerfile .`), car elle embarque `packages/detector` ; l'allowlist du contexte est dans `portail/Dockerfile.dockerignore`.
 
 Auth: Better Auth (`portail/src/lib/auth.ts` serveur, `auth-client.ts` client, `session.ts` pour `getSession()`). Modèles Prisma `User`/`Session`/`Account`/`Verification` imposés par Better Auth ; le mot de passe e-mail vit dans `Account.password` (hash bcrypt). Variables : `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`.
 
-Prisma: from `portail/` run `npx prisma generate` / `npx prisma migrate dev`. `prisma/schema.prisma` (racine) est synchronisé avec `portail/prisma/schema.prisma` (modèles auth + `Project`/`EnvVar`/`Deployment`/`Subscription`) ; toute dérive doit être réconciliée avant `tsc --noEmit` du portail.
+Prisma: **une seule source de vérité**, `portail/prisma/schema.prisma` (modèles Better Auth + `Project`/`EnvVar`/`Deployment`/`Subscription`). Depuis `portail/` : `npx prisma generate` / `npx prisma migrate dev` / `npx prisma validate`. Il n'existe plus de schéma Prisma à la racine ; la CI valide le schéma avant `tsc --noEmit`.
+
+Secrets des projets (issue 04) : `portail/src/lib/crypto.ts` chiffre `EnvVar.value` en AES-256-GCM (`v1:<nonce>:<ciphertext+tag>`, AAD `projectId:key`). Clé `ENV_ENCRYPTION_KEY` (32 octets base64) **hors base et hors image Docker**, `ENV_ENCRYPTION_KEY_PREVIOUS` pour la rotation, validation au démarrage via `portail/src/instrumentation.ts`, migration/rotation via `pnpm exec tsx portail/scripts/encrypt-existing-env-vars.ts`. Aucune route `GET` ne renvoie de valeur.
+
+E-mails (issue 05) : `portail/src/lib/email.ts` envoie via l'API REST **Resend** (aucune dépendance), `email-templates.ts` pour les gabarits français. `RESEND_API_KEY` + `EMAIL_FROM` (domaine vérifié dans Resend). Better Auth : `emailVerification.sendVerificationEmail`, `sendOnSignUp`/`sendOnSignIn`, `requireEmailVerification` et `sendResetPassword`. **La vérification n'est exigée que si `RESEND_API_KEY` est présente** (sinon aucun compte ne peut être verrouillé sans lien). Pages `/verify-email`, `/forgot-password`, `/reset-password` ; `/api/auth/config` expose l'état à l'interface. Le limiteur de débit **partagé** via Redis (multi-instances) reste à faire ; le limiteur actuel est en mémoire.
+GitHub App (issue 07) : `portail/src/lib/github-app.ts` (JWT RS256, jetons d'installation, `X-Hub-Signature-256`), modèles Prisma `GitInstallation` / `WebhookDelivery` et champs `Project.repoFullName` / `installationId` / `productionBranch`. Webhook **`POST https://eflex.app/api/webhooks/github`** : signature vérifiée, idempotence par `X-GitHub-Delivery`, `push` → `Deployment queued` + file BullMQ avec le SHA. Routes `/api/github/{config,installations,repositories}`, sélecteur `components/new-project/github-picker.tsx`. `repo-analysis.ts` lit les dépôts privés via l'API Contents avec le jeton court. Variables `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_APP_SLUG` (jamais commitées). Création de l'App côté GitHub = étape humaine.
+
+Déploiements asynchrones (issue 06) : file **BullMQ** `portail/src/lib/queue.ts` (`jobId = deploymentId`, `REDIS_URL`), worker `portail/src/worker.ts` démarré par `src/instrumentation.ts` (dans le processus du portail), machine à états `lib/deployment-state.ts`. `POST /api/projects` → **202 `queued`** ; `GET /api/deployments/[id]` (statut + logs), `POST /api/projects/[id]/redeploy`, panneau temps réel `components/deployment-panel.tsx` (polling 3 s). `bullmq` + `ioredis` sont dans `serverExternalPackages`. Le worker est idempotent et reprend les jobs après redémarrage.
+
+Webhooks Resend : URL publique **`https://eflex.app/api/webhooks/`** (alias : `/api/webhooks/resend`), servie avec ou sans slash final (`skipTrailingSlashRedirect`). Signature **Svix** vérifiée par `portail/src/lib/resend-webhook.ts` (`svix-id` / `svix-timestamp` / `svix-signature`, HMAC-SHA256, tolérance 5 min). Secret `RESEND_WEBHOOK_SECRET` (préfixe `whsec_`) dans `.env.prod`, jamais commité. Événements : `email.sent`, `email.delivered`, `email.bounced`, `email.complained`, `email.delivery_delayed`. Route exemptée du mode maintenance.
+
+## Design system & UI
+
+- Skills de design disponibles dans `.agents/skills/` : `tailwind-design-system`, `web-design-guidelines` (règles Vercel), `fixing-accessibility`, `responsive-design`, `improve-ui`, `frontend-ui-ux`. Les charger avant toute retouche d'interface.
+- `portail/src/app/globals.css` est la **source unique des tokens** (Tailwind v3 / HSL) : chaque surface a son `-foreground`, thèmes clair et sombre complets **via `prefers-color-scheme`** (aucun JS, `darkMode: 'media'`), élévation (`--shadow-*`), easing (`--ease-out-expo`), `color-scheme`, `::selection`, scrollbars, focus de secours et `prefers-reduced-motion`. Toutes les paires texte/fond sont ≥ 4.5:1 (AA) dans les deux thèmes.
+- `portail/tailwind.config.ts` relie ces tokens aux utilitaires : échelle fluide `text-display` / `text-display-sm` / `text-lead-lg`, `shadow-sm|md|lg|primary`, `ease-out-expo`.
+- Identité du portail : navy + bleu royal (pas de bascule vers l'Axiom Design DNA, réservé à `docs/design/design-dna/README.md` pour la console du moteur). Inter + JetBrains Mono via `next/font`.
+- Règles UI : pas de texte en dégradé, pas d'« eyebrow »/kicker au-dessus d'un titre, pas de `transition-all` (propriétés explicites), focus visible partout, cibles tactiles ≥ 44 px, `tabular-nums` pour les valeurs techniques, libellés et messages en français.
+- Logos : **toujours les assets originaux en couleur**, jamais de filtre monochrome. En thème sombre le logo Eflex (`img[alt^='Eflex']`) reçoit une plaque claire ; les icônes `FrameworkIcon` reçoivent une plaque teintée de leur couleur de marque (`--brand-rgb`, `color-mix`).
+- Section « Technologies reconnues » (`page.tsx` + `.stacks-grid`) : 14 SVG de marque réels, révélation **en cascade au scroll** via `animation-timeline: view()` + `--i` (CSS seul, sans JS, inactive sous `prefers-reduced-motion`) et survol avec élévation de la pastille.
 
 Axiom (Go) : `cd services/<engine|agent|orchestrator> && go test ./... -count=1 -p 1`. Avec PostgreSQL : `AXIOM_TEST_DATABASE_URL=postgres://axiom:axiom@127.0.0.1:5432/axiom?sslmode=disable`. Tests Docker réels : `AXIOM_TEST_DOCKER=1` (plus `AXIOM_TEST_E2E=1` pour `engine/internal/e2e`). La CI ne les lance que pour le moteur (`./internal/e2e/`, `./internal/build/`), pas pour l'agent. État vérifié du moteur (ce qui est prouvé ou non) : `docs/roadmap/parallel-plan.md`, section « Verified status ».
 
@@ -55,13 +81,14 @@ Docker dans la sandbox cloud : `dockerd` est installé mais à démarrer à la m
 
 ## Infra
 
-- Dev: `docker compose -f docker-compose.dev.yml up -d` (Postgres 5432, Redis 6379, MinIO 9000/9001). Coolify is **intentionally remote**; set `COOLIFY_API_URL`, `COOLIFY_API_TOKEN`, `COOLIFY_SERVER_UUID`, `COOLIFY_PROJECT_UUID` in `.env` (voir `DEV.md`).
+- Dev: `docker compose -f docker-compose.dev.yml up -d` (Postgres 5432, Redis 6379, MinIO 9000/9001). Coolify peut être local (c'est le cas sur ce VPS) ou distant ; renseigner `COOLIFY_API_URL`/`COOLIFY_API_TOKEN` dans `.env`.
+- Client Coolify (`portail/src/lib/coolify.ts`) : API v4.6. Il découvre/crée le projet `COOLIFY_PROJECT_NAME` (défaut `Eflex`) et l'environnement `COOLIFY_ENVIRONMENT` (défaut `production`), crée l'application avec `build_pack=dockerfile` si le dépôt a son propre Dockerfile, sinon `nixpacks` avec les commandes du `BuildPlan`, puis `POST /deploy` et `GET /deployments/{uuid}`. Chaque projet reçoit `<slug>.<PORTAL_DOMAIN>` ; les labels Traefik (`websecure`, réseau `proxy`, `letsencrypt`) sont **réappliqués par PATCH après création**, car Coolify écrase les `custom_labels` avec ses entrypoints `http`/`https`. Les plans multi-services (compose app + workers) sont refusés avec un message explicite : Coolify 4.6 ne déploie pas un compose brut sans `docker-compose.yaml` dans le dépôt. Variables optionnelles : `COOLIFY_PROJECT_NAME`, `COOLIFY_ENVIRONMENT`, `COOLIFY_PROJECT_UUID`, `COOLIFY_SERVER_UUID`.
 - Prod: `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d`; portal image from `Dockerfile.portail` (standalone) or `portail/Dockerfile`. `.env.prod` must **never** be committed.
+- Domaines/URLs publics : **source unique** `config/domains.sh` (une seule variable `EFLEX_ROOT_DOMAIN`, le reste est dérivé et exporté). Aucun domaine codé en dur dans les fichiers Compose ou les scripts : `deploy.sh` source ce fichier. Après un changement : `bash scripts/sync-domains.sh` puis `bash deploy.sh`. Les anciens hôtes `*.eurinhash.com` sont abandonnés.
 - `.next/`, `*.tsbuildinfo`, `portail/.env`, and root `.env` are local artifacts; do not commit them.
 - `.env.example` is tracked; `.env.prod.example` is tracked per the gitignore exception `!.env.prod.example`.
 
 ## Monorepo / workspace
 
 - `pnpm-workspace.yaml: packages/*` only; `portail/` is outside the workspace and has its own `package-lock.json`. Use `npm` in `portail/`.
-- Detector ignores `.git`, `node_modules`, `vendor`, `.next`, `dist`, `build`, etc. (`IGNORED_SEGMENTS` in detect.ts; duplicated in CLI/render walkers).
-- The walk order in CLI and renderer mirrors detector’s ignored‑segment list; keep in sync when adding directories.
+- Detector ignores `.git`, `node_modules`, `vendor`, `.next`, `dist`, `build`, etc. (`IGNORED_SEGMENTS` in `detect.ts`). Le parcours local passe par `walkRepository()` (`src/walk.ts`) : **ne plus dupliquer la liste** dans le CLI ou le renderer. Pour ajouter un segment ignoré, modifier uniquement `IGNORED_SEGMENTS`.

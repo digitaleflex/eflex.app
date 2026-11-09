@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { FrameworkIcon } from '@/components/framework-icon'
 import { DetectionCard } from '@/components/new-project/detection-card'
+import { GitHubPicker } from '@/components/new-project/github-picker'
 import { frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 
 interface EnvVar {
@@ -25,6 +26,7 @@ export default function NewProjectPage() {
 
   const [repoUrl, setRepoUrl] = useState('')
   const [branch, setBranch] = useState('')
+  const [installationId, setInstallationId] = useState('')
   const [name, setName] = useState('')
   const [nameEdited, setNameEdited] = useState(false)
   const [envVars, setEnvVars] = useState<EnvVar[]>([{ key: '', value: '' }])
@@ -64,7 +66,12 @@ export default function NewProjectPage() {
       const res = await fetch('/api/projects/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repoUrl, branch: branch || undefined, root: app || undefined }),
+        body: JSON.stringify({
+          repoUrl,
+          branch: branch || undefined,
+          root: app || undefined,
+          installationId: installationId || undefined,
+        }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -106,6 +113,7 @@ export default function NewProjectPage() {
           commitSha: analysis.repo.commitSha,
           root: root || undefined,
           framework: selectedPlan.framework,
+          installationId: installationId || undefined,
           envVars: envVars.filter((v) => v.key.trim() !== ''),
         }),
       })
@@ -148,11 +156,19 @@ export default function NewProjectPage() {
             <h2 className="font-semibold">1. Votre dépôt</h2>
           </CardHeader>
           <CardContent className="space-y-4">
+            <GitHubPicker
+              onSelect={(url, defaultBranch, linkedInstallationId) => {
+                setRepoUrl(url)
+                setBranch(defaultBranch)
+                setInstallationId(linkedInstallationId)
+                resetAnalysis()
+              }}
+            />
             <Input
               id="repo"
               label="Adresse du dépôt GitHub"
               placeholder="https://github.com/votre-compte/votre-depot"
-              hint="Pour l'instant, seuls les dépôts publics sont pris en charge."
+              hint="Dépôts publics, ou privés après connexion de l'application GitHub."
               inputMode="url"
               autoComplete="off"
               spellCheck={false}

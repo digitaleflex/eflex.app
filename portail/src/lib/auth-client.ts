@@ -6,6 +6,7 @@ import { adminClient, organizationClient } from 'better-auth/client/plugins'
 // Sans baseURL, le client appelle /api/auth sur l'origine courante.
 export const authClient = createAuthClient({ plugins: [organizationClient(), adminClient()] })
 
+// `authClient` reste exporté pour les méthodes de vérification et de reset.
 export const { signIn, signUp, signOut, useSession } = authClient
 
 const MESSAGES: Record<string, string> = {

@@ -1,30 +1,15 @@
 #!/usr/bin/env node
-import { readdirSync, readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { detect } from '../../detector/src/index.js';
+import { detect, walkRepository } from '../../detector/src/index.js';
 import type { RepoSnapshot } from '../../detector/src/types.js';
 import { renderStack } from './render.js';
 import type { RenderContext } from './types.js';
 
-function walk(dir: string): string[] {
-  const result: string[] = [];
-  const ignored = new Set(['.git', 'node_modules', 'vendor', '.next', 'dist', 'build', '__pycache__', '.venv', 'venv', 'target', '.turbo', '.cache']);
-  try {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = `${dir}/${entry.name}`;
-      if (ignored.has(entry.name)) continue;
-      if (entry.isDirectory()) { result.push(...walk(full)); }
-      else { result.push(full); }
-    }
-  } catch { /* skip unreadable */ }
-  return result;
-}
-
 function readSnapshot(dir: string): RepoSnapshot {
   const absDir = resolve(dir);
-  const files = walk(absDir).map((p) => p.startsWith(absDir) ? p.slice(absDir.length + 1) : p);
   return {
-    files,
+    files: walkRepository(absDir),
     read: (path: string) => {
       try { return readFileSync(resolve(absDir, path), 'utf-8'); }
       catch { return null; }

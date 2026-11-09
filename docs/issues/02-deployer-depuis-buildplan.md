@@ -1,8 +1,8 @@
 # [P0] Déployer à partir du BuildPlan (renderer) au lieu de Nixpacks par défaut
 
-> **Mise à jour :** réalisé par la voie Coolify (build packs nixpacks / static / dockerfile pilotés par le plan, plus une application « worker » par service annexe). Le client Coolify a dû être réécrit : l'ancien ne correspondait pas à l'API réelle (champs obligatoires manquants, mauvais chemins, réponses mal lues). Voir `AGENTS.md`.
+> **Mise à jour :** réalisé sur `feat/02-buildplan-deploy`. `packages/renderer/src/dockerfile.ts` génère le Dockerfile depuis le plan, `deploy.ts` assemble les artefacts (compose, nginx, `.env`, port réel, `build_pack`, `postDeploy` en service one-shot `migrate`). Le portail (`lib/deploy-plan.ts` → `POST /api/projects`) transmet tout à Coolify, qui n'utilise plus jamais `nixpacks` par défaut. Vérifié par 10 + 4 tests unitaires sur les fixtures ; **le déploiement réel reste à valider contre un Coolify distant** (volontairement non configuré dans cette infra).
 >
-> **Reste à faire :** volumes persistants (ex. `storage` de Laravel : à monter sans masquer l'arborescence du dépôt), monorepos dont l'application dépend d'autres paquets du workspace (filtre `--filter`), fallback SPA des sites statiques (`is_spa`, absent des anciennes versions de Coolify), redéploiement et annulation, mise à jour du statut en tâche de fond (issue 06), dépôts privés (issue 07), et la voie Axiom si le moteur remplace Coolify.
+> **Reste à faire (issues GitHub) :** volumes persistants et monorepos avec dépendances de workspace (#6), redéploiement et annulation (#4), statut en arrière-plan (#5), plans multi-services (le worker refuse aujourd'hui plus d'un service : Coolify 4.6 ne déploie pas un compose brut).
 
 ## Contexte
 
@@ -44,11 +44,11 @@ Deux approches, qui peuvent coexister :
 - Les secrets ne passent **jamais** par le plan ni par le compose généré : uniquement par les variables d'environnement Coolify.
 
 ## Critères d'acceptation
-- [ ] Un projet Laravel déployé lance bien `app`, `web`, `queue` et `scheduler`, et exécute `php artisan migrate --force`.
-- [ ] Un projet Python est exposé sur le port 8000, un site statique sur le port 80.
-- [ ] Plus aucun appel à Coolify avec `nixpacks` par défaut.
-- [ ] Tests unitaires `BuildPlan → Dockerfile` pour chaque framework des fixtures.
-- [ ] `README.md` et `PROD.md` décrivent le pipeline : détection → plan → rendu → déploiement.
+- [x] Un projet Laravel déployé lance bien `app`, `web`, `queue` et `scheduler`, et exécute `php artisan migrate --force` (vérifié sur le compose généré ; service one-shot `migrate`).
+- [x] Un projet Python est exposé sur le port 8000, un site statique sur le port 80.
+- [x] Plus aucun appel à Coolify avec `nixpacks` par défaut (`buildPack` et `portsExposes` obligatoires).
+- [x] Tests unitaires `BuildPlan → Dockerfile` pour chaque framework des fixtures (10 tests renderer + 4 tests portail).
+- [x] `README.md` et `PROD.md` décrivent le pipeline : détection → plan → rendu → déploiement.
 
 ## Dépendances
 - Dépend de : #01 « Intégrer le détecteur dans le flux Nouveau projet ».
