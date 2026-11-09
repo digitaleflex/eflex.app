@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowUpRight, ExternalLink, GitBranch, GitCommitHorizontal, Globe, KeyRound, Layers, Lock, Sparkles } from 'lucide-react'
+import { ArrowUpRight, ExternalLink, GitBranch, GitCommitHorizontal, Globe, KeyRound, Layers, Lock, Settings, Sparkles } from 'lucide-react'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { resolveOrganization } from '@/lib/organizations'
@@ -110,6 +110,15 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
               <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
               <span className="sr-only">{project.domain} (nouvel onglet)</span>
             </a>
+          )}
+          {canManageProjects(org.role) && (
+            <Link
+              href={`/dashboard/projects/${project.id}/settings`}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11"
+            >
+              <Settings className="h-4 w-4" aria-hidden="true" />
+              Paramètres
+            </Link>
           )}
         </div>
       </header>
@@ -293,9 +302,19 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       {tab === 'variables' && (
         <section aria-labelledby="vars-title" className="rounded-xl border border-border bg-card">
           <div className="border-b border-border px-5 py-3">
-            <h2 id="vars-title" className="flex items-center gap-2 text-sm font-semibold"><KeyRound className="h-4 w-4" aria-hidden="true" />Variables d&apos;environnement</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 id="vars-title" className="flex items-center gap-2 text-sm font-semibold"><KeyRound className="h-4 w-4" aria-hidden="true" />Variables d&apos;environnement</h2>
+              {canManageProjects(org.role) && (
+                <Link
+                  href={`/dashboard/projects/${project.id}/settings`}
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  Modifier
+                </Link>
+              )}
+            </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Les valeurs ne quittent jamais le serveur et sont masquées dans les journaux. La modification depuis la console arrive prochainement.
+              Les valeurs ne quittent jamais le serveur et sont masquées dans les journaux. Une modification s’applique au prochain déploiement.
             </p>
           </div>
           {project.envVars.length === 0 ? (

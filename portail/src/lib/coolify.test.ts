@@ -251,6 +251,35 @@ describe('setApplicationLabels', () => {
   })
 })
 
+describe('deleteApplication', () => {
+  it('envoie DELETE sur /applications/{uuid}', async () => {
+    const calls = mockFetch((url) => {
+      if (url.endsWith('/applications/app')) return new Response(null, { status: 204 })
+      throw new Error(url)
+    })
+    const { deleteApplication } = await loadModule()
+
+    await expect(deleteApplication('app')).resolves.toEqual({ ok: true })
+    expect(calls[0]?.init?.method).toBe('DELETE')
+  })
+
+  it('traite une application déjà absente comme une suppression réussie', async () => {
+    mockFetch(() => json({ message: 'Application not found.' }, 404))
+    const { deleteApplication } = await loadModule()
+
+    await expect(deleteApplication('app')).resolves.toEqual({ ok: true })
+  })
+
+  it('remonte les autres erreurs Coolify sans supprimer la trace locale', async () => {
+    mockFetch(() => json({ message: 'Internal error.' }, 500))
+    const { deleteApplication } = await loadModule()
+
+    await expect(deleteApplication('app')).resolves.toEqual({
+      error: 'Coolify API 500: Internal error.',
+    })
+  })
+})
+
 describe('setEnvironmentVariable', () => {
   it('poste sur /applications/{uuid}/envs', async () => {
     const calls = mockFetch((url) => {

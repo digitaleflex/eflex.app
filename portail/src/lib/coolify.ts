@@ -359,6 +359,26 @@ export async function setApplicationLabels(
   return { ok: true }
 }
 
+/**
+ * Supprime une application Coolify (et ses conteneurs). Utilisé quand un
+ * projet est supprimé depuis le portail : sans cet appel, l'application
+ * continuerait de tourner sans plus aucune trace en base.
+ */
+export async function deleteApplication(
+  appId: string,
+): Promise<{ ok: true } | { error: string }> {
+  const res = await coolifyFetch(`/applications/${encodeURIComponent(appId)}`, {
+    method: 'DELETE',
+  })
+  if (res.error) {
+    // Suppression idempotente : une application déjà absente côté Coolify ne
+    // doit pas empêcher la suppression de la trace locale.
+    if (res.error.includes('Coolify API 404')) return { ok: true }
+    return { error: res.error }
+  }
+  return { ok: true }
+}
+
 /** Ajoute ou met à jour une variable d'environnement d'une application. */export async function setEnvironmentVariable(
   appId: string,
   key: string,

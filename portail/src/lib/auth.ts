@@ -196,4 +196,29 @@ export const auth = betterAuth({
     // Doit rester en dernier : permet de poser les cookies depuis les Server Actions.
     nextCookies(),
   ],
+
+  user: {
+    // Changement d'adresse : Better Auth envoie un lien de vérification à la
+    // nouvelle adresse (sendVerificationEmail est configuré ci-dessus).
+    changeEmail: {
+      enabled: true,
+    },
+    // Suppression de compte depuis /dashboard/settings, avec mot de passe.
+    deleteUser: {
+      enabled: true,
+      // Même garde que pour la suppression d'organisation : des applications
+      // déployées resteraient orphelines chez Coolify si le compte disparaissait.
+      async beforeDelete(user) {
+        const deployed = await prisma.project.count({
+          where: { userId: user.id, coolifyAppId: { not: null } },
+        })
+        if (deployed > 0) {
+          throw new APIError('BAD_REQUEST', {
+            message: `Supprimez d'abord vos ${deployed} projet(s) déployé(s) avant de supprimer votre compte.`,
+            code: 'ACCOUNT_HAS_DEPLOYED_PROJECTS',
+          })
+        }
+      },
+    },
+  },
 })

@@ -14,6 +14,7 @@ const TABS = [
   { label: 'Activité', href: '/dashboard/activity', match: (p: string) => p.startsWith('/dashboard/activity') },
   { label: 'Équipe', href: '/dashboard/organization', match: (p: string) => p.startsWith('/dashboard/organization') },
   { label: 'Notifications', href: '/dashboard/notifications', match: (p: string) => p.startsWith('/dashboard/notifications') },
+  { label: 'Paramètres', href: '/dashboard/settings', match: (p: string) => p.startsWith('/dashboard/settings') },
 ]
 
 /**
