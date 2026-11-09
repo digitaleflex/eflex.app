@@ -5,6 +5,8 @@ module.exports = {
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/lib/**/*.{js,ts,tsx}',
+    './src/hooks/**/*.{js,ts,tsx}',
   ],
   theme: {
     container: {
@@ -43,6 +45,10 @@ module.exports = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        warning: {
+          DEFAULT: 'hsl(var(--warning))',
+          foreground: 'hsl(var(--warning-foreground))',
+        },
         success: {
           DEFAULT: 'hsl(var(--success))',
           foreground: 'hsl(var(--success-foreground))',
@@ -60,6 +66,7 @@ module.exports = {
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
+        display: ['var(--font-display)', 'var(--font-sans)', 'system-ui', 'sans-serif'],
       },
       // Échelle fluide : un seul réglage, lisible de 375px à 1440px.
       fontSize: {

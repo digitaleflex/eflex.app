@@ -126,6 +126,14 @@ Entier entre `1` et `65535`. Port HTTP du service principal. Valeurs par défaut
 
 Chemin HTTP commençant par `/`, par exemple `/health` ou `/api/health`. Le runtime l'utilise pour vérifier que le service répond.
 
+### `publish`
+
+Dossier des fichiers statiques produits par le build, **relatif à `root`**, sans `/` initial ni `..` (par exemple `dist`, `build`, `out/site`). Il ne concerne que les runtimes `static@1`. Le détecteur le renseigne par défaut : `dist` pour Vite et Astro, `build` pour SvelteKit (adapter-static). Absent pour un site sans étape de build : la racine est alors servie. Si votre build écrit ailleurs, fixez-le dans `eflex.json`.
+
+### `dockerfile`
+
+Chemin du Dockerfile, **relatif à `root`**, uniquement quand il n'est pas `Dockerfile` à la racine (par exemple `docker/Dockerfile`). Le détecteur le renseigne seul pour `docker/Dockerfile`.
+
 ### `buildEnv`
 
 Objet de variables d'environnement **de build**, dont les valeurs sont des chaînes (maximum 50 propriétés).

@@ -1,6 +1,8 @@
 # [P0] Déployer à partir du BuildPlan (renderer) au lieu de Nixpacks par défaut
 
 > **Mise à jour :** réalisé sur `feat/02-buildplan-deploy`. `packages/renderer/src/dockerfile.ts` génère le Dockerfile depuis le plan, `deploy.ts` assemble les artefacts (compose, nginx, `.env`, port réel, `build_pack`, `postDeploy` en service one-shot `migrate`). Le portail (`lib/deploy-plan.ts` → `POST /api/projects`) transmet tout à Coolify, qui n'utilise plus jamais `nixpacks` par défaut. Vérifié par 10 + 4 tests unitaires sur les fixtures ; **le déploiement réel reste à valider contre un Coolify distant** (volontairement non configuré dans cette infra).
+>
+> **Reste à faire (issues GitHub) :** volumes persistants et monorepos avec dépendances de workspace (#6), redéploiement et annulation (#4), statut en arrière-plan (#5), plans multi-services (le worker refuse aujourd'hui plus d'un service : Coolify 4.6 ne déploie pas un compose brut).
 
 ## Contexte
 

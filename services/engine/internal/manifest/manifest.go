@@ -210,8 +210,8 @@ func Parse(content []byte) (Manifest, error) {
 		}
 		if v, ok := sec["language"]; ok {
 			s, ok := v.(string)
-			if !ok || (s != "javascript" && s != "typescript" && s != "go") {
-				return Manifest{}, fail(CodeSchemaInvalid, "runtime.language must be one of: javascript, typescript, go")
+			if !ok || (s != "javascript" && s != "typescript" && s != "go" && s != "python") {
+				return Manifest{}, fail(CodeSchemaInvalid, "runtime.language must be one of: javascript, typescript, go, python")
 			}
 			m.Runtime.Language = s
 		}
@@ -555,7 +555,7 @@ func validCommand(s string) bool {
 
 func isStrategy(s string) bool {
 	switch s {
-	case "nextjs", "vite", "node", "go", "dockerfile", "compose":
+	case "nextjs", "vite", "node", "go", "python", "dockerfile", "compose":
 		return true
 	}
 	return false
@@ -565,7 +565,7 @@ func supportedStrategy(s string) bool { return isStrategy(s) }
 
 func isPackageManager(s string) bool {
 	switch s {
-	case "npm", "pnpm", "yarn", "bun", "go":
+	case "npm", "pnpm", "yarn", "bun", "pip", "go":
 		return true
 	}
 	return false

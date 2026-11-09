@@ -328,6 +328,15 @@ export async function getDeploymentLogs(
   return { logs: decodeDeploymentLogs(res.data?.logs) }
 }
 
+/** Statut et journaux bruts d'un déploiement en un seul appel (flux de journaux en direct). */
+export async function getDeploymentDetails(
+  deploymentId: string,
+): Promise<{ status: string; logs: string } | { error: string }> {
+  const res = await coolifyFetch<CoolifyDeployment>(`/deployments/${encodeURIComponent(deploymentId)}`)
+  if (res.error) return { error: res.error }
+  return { status: res.data?.status || 'unknown', logs: res.data?.logs ?? '' }
+}
+
 /**
  * Remplace les labels du conteneur.
  *

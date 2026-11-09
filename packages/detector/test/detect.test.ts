@@ -14,6 +14,9 @@ import {
   dockerfileVolume,
   eflexConfig,
   eflexConfigInvalid,
+  eflexConfigStatic,
+  eflexConfigUnsafePaths,
+  dockerfileInSubdir,
   express,
   fastapi,
   laravelFull,
@@ -26,6 +29,7 @@ import {
   nextjsWithPnpm,
   phpGeneric,
   staticSite,
+  staticSiteWithBuild,
   unknownRepo,
   vite,
 } from './fixtures.js';
@@ -41,6 +45,27 @@ describe('detect', () => {
     expect(result.plan?.build).toBe('next build');
     expect(result.plan?.start).toBe('next start');
     expect(result.warnings.join(' ')).toContain('standalone');
+  });
+
+  it('indique le dossier des fichiers construits des sites statiques', () => {
+    expect(detect(vite).plan?.publish).toBe('dist');
+    expect(detect(astro).plan?.publish).toBe('dist');
+    expect(detect(staticSiteWithBuild).plan?.publish).toBe('dist');
+    // Site statique sans build : la racine est servie, rien à publier à part.
+    expect(detect(staticSite).plan?.publish).toBeUndefined();
+  });
+
+  it('retient le Dockerfile situé dans docker/ et ignore celui de la racine', () => {
+    expect(detect(dockerfileInSubdir).plan?.dockerfile).toBe('docker/Dockerfile');
+    expect(detect(dockerfile).plan?.dockerfile).toBeUndefined();
+  });
+
+  it('lit publish depuis eflex.json et écarte les chemins qui sortent du dépôt', () => {
+    expect(detect(eflexConfigStatic).plan?.publish).toBe('out/site');
+
+    const unsafe = detect(eflexConfigUnsafePaths).plan;
+    expect(unsafe?.publish).toBeUndefined();
+    expect(unsafe?.dockerfile).toBeUndefined();
   });
 
   it('detects Vite as a static runtime on port 80', () => {

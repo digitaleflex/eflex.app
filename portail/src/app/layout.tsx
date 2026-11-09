@@ -1,11 +1,17 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, JetBrains_Mono } from 'next/font/google'
+import { Inter, JetBrains_Mono, Manrope } from 'next/font/google'
 import { MaintenanceBanner } from '@/components/maintenance-banner'
 import './globals.css'
 
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-sans',
+})
+
+// Chiffres et titres de la console : géométrique, chiffres tabulaires, plus de caractère qu'Inter.
+const manrope = Manrope({
+  subsets: ['latin'],
+  variable: '--font-display',
 })
 
 const jetbrainsMono = JetBrains_Mono({
@@ -31,7 +37,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="fr" className={`${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
+    <html lang="fr" className={`${inter.variable} ${jetbrainsMono.variable} ${manrope.variable}`} suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans antialiased">
         <a
           href="#contenu"

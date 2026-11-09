@@ -50,7 +50,7 @@ func Evaluate(plan planner.Plan, serverID string) Decision {
 		deny("plan integrity check failed: fingerprint does not match plan contents")
 	}
 	switch plan.Strategy {
-	case presets.NextJS, presets.Vite, presets.Node, presets.Go, presets.Dockerfile, presets.Compose:
+	case presets.NextJS, presets.Vite, presets.Node, presets.Go, presets.Python, presets.Dockerfile, presets.Compose:
 	default:
 		deny("unknown strategy %q", plan.Strategy)
 	}

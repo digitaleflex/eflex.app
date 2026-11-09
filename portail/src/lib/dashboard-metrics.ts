@@ -1,0 +1,61 @@
+import { attentionRank, statusInfo } from '@/lib/project-status'
+
+export type DeploymentLite = { id: string; status: string; createdAt: Date; commitSha?: string }
+export type ProjectLite = {
+  id: string
+  name: string
+  framework: string | null
+  domain: string | null
+  deployments: DeploymentLite[] // du plus récent au plus ancien
+}
+
+export type DayBucket = { day: string; live: number; failed: number; other: number }
+
+const dayKey = (d: Date) => d.toISOString().slice(0, 10)
+
+/** Déploiements par jour sur `days` jours (jour courant inclus), du plus ancien au plus récent. */
+export function dailySeries(deployments: readonly { status: string; createdAt: Date }[], days: number, now = new Date()): DayBucket[] {
+  const buckets = new Map<string, DayBucket>()
+  for (let i = days - 1; i >= 0; i--) {
+    const day = dayKey(new Date(now.getTime() - i * 86_400_000))
+    buckets.set(day, { day, live: 0, failed: 0, other: 0 })
+  }
+  for (const d of deployments) {
+    const bucket = buckets.get(dayKey(d.createdAt))
+    if (!bucket) continue
+    if (d.status === 'live') bucket.live += 1
+    else if (d.status === 'failed') bucket.failed += 1
+    else bucket.other += 1
+  }
+  return [...buckets.values()]
+}
+
+/** Part de déploiements réussis parmi ceux qui ont une issue (réussi ou échec) ; null s'il n'y en a aucun. */
+export function successRate(deployments: readonly { status: string }[]): number | null {
+  const finished = deployments.filter((d) => d.status === 'live' || d.status === 'failed')
+  if (finished.length === 0) return null
+  return Math.round((finished.filter((d) => d.status === 'live').length / finished.length) * 100)
+}
+
+export type Attention = { projectId: string; name: string; kind: 'failed' | 'in-progress'; status: string; deploymentId: string; at: Date }
+
+/**
+ * Ce qui demande un regard : le dernier déploiement d'un projet a échoué, ou est en cours.
+ * Un échec ancien suivi d'un succès n'apparaît pas.
+ */
+export function attentionItems(projects: readonly ProjectLite[]): Attention[] {
+  const items: Attention[] = []
+  for (const p of projects) {
+    const last = p.deployments[0]
+    if (!last) continue
+    const info = statusInfo(last.status)
+    if (info.tone === 'danger') items.push({ projectId: p.id, name: p.name, kind: 'failed', status: last.status, deploymentId: last.id, at: last.createdAt })
+    else if (info.inProgress) items.push({ projectId: p.id, name: p.name, kind: 'in-progress', status: last.status, deploymentId: last.id, at: last.createdAt })
+  }
+  return items.sort((a, b) => attentionRank(a.status) - attentionRank(b.status) || b.at.getTime() - a.at.getTime())
+}
+
+export function summarize(projects: readonly ProjectLite[]) {
+  const live = projects.filter((p) => p.deployments.length > 0 && p.deployments[0]!.status === 'live').length
+  return { total: projects.length, live, needsAttention: attentionItems(projects).length }
+}

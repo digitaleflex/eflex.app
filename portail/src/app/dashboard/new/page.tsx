@@ -257,7 +257,7 @@ export default function NewProjectPage() {
           <Card>
             <CardContent className="space-y-3 p-6">
               <h2 ref={resultHeading} tabIndex={-1} className="flex items-center gap-2 font-semibold focus:outline-none">
-                <TriangleAlert className="h-5 w-5 text-amber-600" aria-hidden="true" />
+                <TriangleAlert className="h-5 w-5 text-warning" aria-hidden="true" />
                 Stack non reconnue
               </h2>
               <ul className="space-y-1 text-sm text-muted-foreground">

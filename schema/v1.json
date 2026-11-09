@@ -5,7 +5,9 @@
   "description": "Plan de déploiement Eflex (version 1). Ce document ne contient JAMAIS de secrets : la clé `env` est volontairement interdite. Les variables sensibles sont fournies à la plateforme au moment du déploiement, jamais commitées dans le dépôt. Seul `buildEnv` existe et il est PUBLIC : ses valeurs finissent dans le bundle client.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version"],
+  "required": [
+    "version"
+  ],
   "properties": {
     "version": {
       "const": 1,
@@ -74,6 +76,16 @@
       "description": "Chemin HTTP utilisé pour vérifier la santé du service.",
       "type": "string",
       "pattern": "^/"
+    },
+    "publish": {
+      "description": "Répertoire des fichiers statiques produits par le build, relatif à `root` (ex. `dist`). Absent : la racine de l'application est servie.",
+      "type": "string",
+      "pattern": "^[^/]+(/[^/]+)*$"
+    },
+    "dockerfile": {
+      "description": "Chemin du Dockerfile relatif à `root`, uniquement s'il n'est pas `Dockerfile` à la racine (ex. `docker/Dockerfile`).",
+      "type": "string",
+      "pattern": "^[^/]+(/[^/]+)*$"
     },
     "buildEnv": {
       "description": "Variables d'environnement de BUILD, PUBLIQUES. Elles sont intégrées au bundle client : n'y mettez JAMAIS de secrets, de clés d'API ni de mots de passe. Les secrets sont fournis à la plateforme, pas au dépôt.",
@@ -144,7 +156,9 @@
     "service": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["command"],
+      "required": [
+        "command"
+      ],
       "properties": {
         "command": {
           "type": "string",

@@ -19,6 +19,8 @@ import {
 } from '@/lib/deploy-plan'
 import { assertTransition, isTerminal, type DeploymentStatus } from '@/lib/deployment-state'
 import { DEPLOYMENT_QUEUE, redisConnection } from '@/lib/queue'
+import { COOLIFY_FAILED, COOLIFY_LIVE } from '@/lib/coolify-status'
+import { announceDeploymentStatus } from '@/lib/deployment-events'
 import {
   createApplication,
   deployApplication,
@@ -32,11 +34,29 @@ const POLL_ATTEMPTS = 200
 const POLL_DELAY_MS = 3_000
 const MAX_LOGS = 4_000
 
-const LIVE = new Set(['finished', 'success', 'live', 'completed', 'running'])
-const FAILED = new Set(['failed', 'error', 'cancelled', 'cancelled-by-user'])
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/** Temps réel et notifications : prévient les membres de l'organisation (jamais bloquant). */
+async function announce(deploymentId: string, status: string): Promise<void> {
+  try {
+    const d = await prisma.deployment.findUnique({
+      where: { id: deploymentId },
+      select: { project: { select: { id: true, name: true, organizationId: true } } },
+    })
+    if (!d) return
+    await announceDeploymentStatus({
+      organizationId: d.project.organizationId,
+      projectId: d.project.id,
+      projectName: d.project.name,
+      deploymentId,
+      status,
+    })
+  } catch (error) {
+    console.error('[eflex/worker] annonce du statut impossible :', error instanceof Error ? error.message : error)
+  }
 }
 
 async function setStatus(id: string, next: DeploymentStatus): Promise<boolean> {
@@ -44,6 +64,7 @@ async function setStatus(id: string, next: DeploymentStatus): Promise<boolean> {
   if (!current || isTerminal(current.status)) return false
   assertTransition(current.status, next)
   await prisma.deployment.update({ where: { id }, data: { status: next } })
+  await announce(id, next)
   return true
 }
 
@@ -52,6 +73,7 @@ async function fail(id: string, message: string): Promise<void> {
     where: { id },
     data: { status: 'failed', logsSummary: message.slice(0, MAX_LOGS) },
   })
+  await announce(id, 'failed')
   console.error(`[eflex/worker] déploiement ${id} en échec : ${message.slice(0, 200)}`)
 }
 
@@ -64,6 +86,7 @@ async function storeLogs(id: string, status: 'live' | 'deploying'): Promise<void
     where: { id },
     data: { status, logsSummary: summary },
   })
+  if (status === 'live') await announce(id, 'live')
 }
 
 function isBuildPlan(value: unknown): value is BuildPlan {
@@ -202,8 +225,8 @@ export async function processDeployment(deploymentId: string): Promise<void> {
     const status = await getDeploymentStatus(started.deploymentId)
     if ('error' in status) continue
     const value = status.status.toLowerCase()
-    if (LIVE.has(value)) { outcome = 'live'; break }
-    if (FAILED.has(value)) { outcome = 'failed'; break }
+    if (COOLIFY_LIVE.has(value)) { outcome = 'live'; break }
+    if (COOLIFY_FAILED.has(value)) { outcome = 'failed'; break }
     // Logs visibles pendant le build, pas seulement à la fin.
     if (attempt % 5 === 0) await storeLogs(deploymentId, 'deploying')
   }
@@ -211,6 +234,7 @@ export async function processDeployment(deploymentId: string): Promise<void> {
   if (outcome === 'failed') {
     await storeLogs(deploymentId, 'deploying')
     await prisma.deployment.update({ where: { id: deploymentId }, data: { status: 'failed' } })
+    await announce(deploymentId, 'failed')
   } else if (outcome === 'live') {
     await storeLogs(deploymentId, 'live')
   } else {

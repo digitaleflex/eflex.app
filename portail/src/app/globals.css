@@ -28,8 +28,10 @@
     --accent-foreground: 215 69% 14%;
     --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
-    --success: 142 72% 30%; /* 4.8:1 avec du texte blanc */
+    --success: 142 72% 26%; /* ≥ 4,5:1 en bouton (texte blanc) et en texte sur teinte à 10 % */
     --success-foreground: 0 0% 100%;
+    --warning: 32 95% 30%;
+    --warning-foreground: 0 0% 100%;
     --border: 220 14% 89%;
     --input: 220 14% 86%;
     --ring: 221 83% 53%;
@@ -67,6 +69,8 @@
     --destructive-foreground: 215 69% 12%;
     --success: 142 60% 50%;
     --success-foreground: 215 69% 12%;
+    --warning: 38 92% 58%;
+    --warning-foreground: 215 69% 12%;
     --border: 215 22% 20%;
     --input: 215 22% 26%;
     --ring: 217 91% 65%;

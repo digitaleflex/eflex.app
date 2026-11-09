@@ -11,6 +11,8 @@ import { assertCryptoConfig, encrypt } from '@/lib/crypto'
 import { buildProjectArtifacts } from '@/lib/deploy-plan'
 import { enqueueDeployment } from '@/lib/queue'
 import { projectDomain, uniqueSlug } from '@/lib/project-slug'
+import { canManageProjects, resolveOrganization } from '@/lib/organizations'
+import { publish } from '@/lib/event-bus'
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Donnez un nom au projet.').max(60, 'Le nom du projet est trop long (60 caractères maximum).'),
@@ -41,6 +43,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
   const userId = session.user.id
+
+  // Multi-tenant : un projet appartient toujours à l'organisation active de la session,
+  // et seuls les propriétaires et administrateurs peuvent en créer.
+  const org = await resolveOrganization(session)
+  if (!org) return NextResponse.json({ error: 'Aucune organisation active.' }, { status: 403 })
+  if (!canManageProjects(org.role)) {
+    return NextResponse.json({ error: 'Votre rôle dans cette organisation ne permet pas de créer des projets.' }, { status: 403 })
+  }
 
   // Échoue clairement si la clé de chiffrement est absente, plutôt qu'au
   // milieu de la création du projet.
@@ -136,6 +146,7 @@ export async function POST(request: NextRequest) {
     const created = await tx.project.create({
       data: {
         userId,
+        organizationId: org.organizationId,
         name: input.name,
         slug,
         domain,
@@ -195,6 +206,14 @@ export async function POST(request: NextRequest) {
     warning = `Déploiement en échec : ${message}`
   }
 
+  // Temps réel : les listes ouvertes (accueil, activité) se mettent à jour sans rechargement.
+  await publish({ type: 'project.created', organizationId: org.organizationId, payload: { projectId: project.id, name: project.name } })
+  await publish({
+    type: 'deployment.created',
+    organizationId: org.organizationId,
+    payload: { projectId: project.id, deploymentId: deployment.id, status: warning ? 'failed' : 'queued', name: project.name },
+  })
+
   return NextResponse.json(
     {
       project: { id: project.id, name: project.name, slug: project.slug, domain: project.domain },
@@ -218,8 +237,11 @@ export async function GET() {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
+  const org = await resolveOrganization(session)
+  if (!org) return NextResponse.json({ projects: [] })
+
   const projects = await prisma.project.findMany({
-    where: { userId: session.user.id },
+    where: { organizationId: org.organizationId },
     // Le plan et le détail de l'analyse n'ont pas à transiter dans la liste.
     select: {
       id: true,

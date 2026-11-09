@@ -218,7 +218,7 @@ export default function HomePage() {
                       <FrameworkIcon framework="nextjs" alt="" className="h-5 w-5" />
                       Next.js · node@22
                     </span>
-                    <span className="rounded-full bg-success/10 px-2.5 py-0.5 font-sans text-xs font-medium text-emerald-700">
+                    <span className="rounded-full bg-success/10 px-2.5 py-0.5 font-sans text-xs font-medium text-success">
                       Confiance 95 %
                     </span>
                   </div>
@@ -234,7 +234,7 @@ export default function HomePage() {
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 font-sans text-xs text-amber-800">
+                  <p className="mt-4 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 font-sans text-xs text-warning">
                     Conseil : activez <code className="font-mono">output: &apos;standalone&apos;</code> dans next.config pour un démarrage plus rapide.
                   </p>
                 </div>

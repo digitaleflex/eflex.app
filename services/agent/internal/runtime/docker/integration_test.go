@@ -65,7 +65,7 @@ func TestIntegrationLifecycle(t *testing.T) {
 
 	// 3. Idempotent create returns the same container.
 	again, err := a.Create(ctx, CreateSpec{
-		DeploymentID: dep, ServerID: "srv_it", Container: name,
+		DeploymentID: dep, ApplicationID: app, ServerID: "srv_it", Container: name,
 		ImageRef: "busybox:latest", Port: 18080, Command: []string{"sleep", "300"},
 	})
 	if err != nil {

@@ -22,6 +22,10 @@ export interface BuildPlan {
   start?: string;
   port: number;
   healthcheck?: string;
+  /** Static output directory relative to `root` (e.g. "dist"); absent when `root` itself is served. */
+  publish?: string;
+  /** Dockerfile path relative to `root`, only when it is not the default "Dockerfile". */
+  dockerfile?: string;
   services?: Record<string, ServiceSpec>;
   volumes?: string[];
   postDeploy?: string[];

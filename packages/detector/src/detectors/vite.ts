@@ -19,6 +19,7 @@ export function detectVite(ctx: DetectionContext): Candidate | null {
     root: '',
     ...(pkg ? { install: installCommand(ctx) } : {}),
     build: runScriptCommand(ctx, 'build'),
+    publish: 'dist',
     port: 80,
   };
 

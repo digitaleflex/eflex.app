@@ -1,5 +1,6 @@
 'use client'
 
+import { nextFromLocation, withNext } from '@/lib/safe-next'
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -25,7 +26,7 @@ export default function LoginPage() {
       if (authError) {
         setError(authErrorMessage(authError, 'Email ou mot de passe incorrect.'))
       } else {
-        router.push('/dashboard')
+        router.push(nextFromLocation())
         router.refresh()
       }
     } catch {
@@ -37,7 +38,7 @@ export default function LoginPage() {
 
   const handleGoogle = async () => {
     setError('')
-    const { error: authError } = await signIn.social({ provider: 'google', callbackURL: '/dashboard' })
+    const { error: authError } = await signIn.social({ provider: 'google', callbackURL: nextFromLocation() })
     if (authError) setError(authErrorMessage(authError, 'La connexion avec Google est indisponible pour le moment.'))
   }
 
@@ -129,7 +130,7 @@ export default function LoginPage() {
 
           <p className="text-center text-sm text-muted-foreground">
             Pas encore de compte ?{' '}
-            <Link href="/register" className="font-medium text-primary hover:underline">
+            <Link suppressHydrationWarning href={withNext('/register')} className="font-medium text-primary hover:underline">
               Créer un compte
             </Link>
           </p>

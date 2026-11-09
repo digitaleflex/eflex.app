@@ -14,9 +14,9 @@ Action: close issues with a status comment each; keep epics (#13–#17) open unt
 - **Wave 1 — DONE** (A #76/#77 `977b0b1`, B #89/#79 `d13f3e4`, C #83 `87061f3`, D #124/#121 `0a11717`, E #119 `ffefc1d`, F #104/#129-draft `7f786d5`)
 - **Wave 2 — DONE** (G #78/#80 `5cf22ab`, H #84/#85/#86 `529244c`, I #122/#120 `36e99b9`, J #101 `220ea66`; follow-up correlation IDs `7b232de`)
 - **Wave 3 — DELIVERED** (K #81/#82 agent state + recovery, L #87/#103 metrics, M #125 auth, N #126 secrets)
-- **Wave 4 — DELIVERED** (O #88 agent network security, P #123 compose preset, Q #127/#128 authz + audit). R (#102 diagnostics API) is **NOT** delivered: `services/engine/internal/observability/diagnostics/` does not exist.
+- **Wave 4 — DELIVERED** (O #88 agent network security, P #123 compose preset, Q #127/#128 authz + audit, R #102 diagnostics API: `services/engine/internal/diagnostics/`, `GET /api/v1/deployments/{id}/diagnostics[/logs]`)
 
-Wave 3 and Wave 4 code is present and tested, and the two wiring breakpoints that kept it out of a running binary are now closed (see "Known production gap — closed" below). The remaining blockers before a real release are human-gated: reference VPS, installed agent, real credentials, then the `#110` end-to-end gate.
+Verified on 2026-11-07: the two wiring breakpoints that used to block these waves are closed in code. See "Verified status" below before concluding anything about operational state.
 
 ## Wave 1 — launch now (5 lanes, no inter-dependencies)
 
@@ -64,44 +64,37 @@ Wave 3 and Wave 4 code is present and tested, and the two wiring breakpoints tha
 - #110/#111 release gates, #112 evidence docs (parallelizable late), #113 tagging (human).
 - #69/#71 verify-and-close; close epics #13–#18.
 
-## Known production gap — closed
+## Verified status (2026-11-07)
 
-> **Mise à jour (nov. 2026) :** les deux points de rupture ci-dessous sont
-> fermés. `services/engine/internal/bootstrap/bootstrap.go` construit
-> `build.Engine`, l'`agentclient` (client et variante NAT) et
-> `executor.NewRunner(executor.New(...))`, et l'injecte dans l'API comme
-> `DeploymentRunner` ; `services/agent/cmd/agent/main.go` passe par
-> `internal/bootstrap`, qui monte identité, credentials, état, capacités,
-> adaptateurs Docker/Traefik/health, dispatcher, reprise et listener.
-> L'Engine et l'Agent compilent et passent `go test ./...` (vérifié dans
-> `golang:1.25-alpine`). Ce qui reste avant une release réellement
-> opérationnelle est **humain** : provisionner le VPS de référence,
-> installer l'agent, renseigner les credentials GitHub/Coolify, puis passer
-> la gate `#110`. Le texte historique ci-dessous est conservé pour mémoire.
+This section replaces the former "Known production gap". Both breakpoints it described are **closed in code**:
 
-**Do not read the shipped agent and build packages as an operational runtime.** Waves 1 to 4 landed a large amount of code, but the path from a deployment record to a running application is broken at two wiring points.
+- **Engine** — `bootstrap.newRunner` constructs `build.Engine`, the agent transport and `executor.Runner` (`services/engine/internal/bootstrap/bootstrap.go`). A deployment created through the API is executed in the background and reaches `LIVE` or `FAILED`.
+- **Agent** — `services/agent/cmd/agent/main.go` builds the composition root `bootstrap.New` (identity, credentials, state, capabilities, Docker/Traefik/health adapters, dispatcher, recovery, inbound listener, `/metrics`).
+- **Engine → Agent** — `agentclient.Client` (direct HTTP) and `agentclient.NewNATAgent` (the agent long-polls), with per-agent operation signing (`agentkey`, ADR-0008). Without a secret key every runtime step fails closed with `AGENT_NO_CREDENTIAL`.
+- **#102** — the diagnostics API is delivered.
 
-### Breakpoint 1 — Engine bootstrap does not construct the executor
+Measured with PostgreSQL 16 and a real Docker daemon (`AXIOM_TEST_DATABASE_URL`, `AXIOM_TEST_DOCKER=1`, `AXIOM_TEST_E2E=1`, `go test ./... -count=1 -p 1`):
 
-`services/engine/internal/bootstrap/bootstrap.go` never builds `build.Engine` (`services/engine/internal/build`) nor `executor.Runner` (`services/engine/internal/executor`). Both packages exist and are unit-tested, but nothing instantiates them at runtime.
+| Module | Result |
+| --- | --- |
+| engine | 693 pass, 0 fail, 0 skipped (43 packages with tests) |
+| agent | 270 pass (269, plus `TestIntegrationLifecycle`, fixed: its fixture lacked `ApplicationID`) |
+| orchestrator | 11 pass |
 
-Consequences:
+`internal/e2e` `TestGitHubToLive` passes: Dockerfile fixture → analysis → profile → plan → real `docker build` → real container → real health probe → `LIVE` (about 2 s).
 
-- build, image packaging, runtime start, Traefik/networking, health check and domain/SSL are **not reachable** from a running Engine (#98 secure build workspace, #99 image build pipeline, #100 execution orchestration);
-- a deployment created through the API **stays `PENDING`** — it never reaches `LIVE` or `FAILED`;
-- the SSE deployment event stream (#118) is wired but carries no execution events.
+### Still not proven (do not report as done)
 
-### Breakpoint 2 — the agent binary does not mount the M5 packages
-
-`services/agent/cmd/agent/main.go:21` instantiates only `agent.NewRuntime`, and `agent.Run` does nothing but log every 30 seconds. The M5 agent packages — `identity`, `heartbeat`, `dispatcher`, `state`, `recovery`, `docker`, `traefik`, `health`, `logs`, `capabilities`, `protocol`, `ownership`, `auth` — are delivered and tested (#75 protocol contract, #89 ownership boundary) but **never mounted in the binary**. The register → heartbeat → dispatch → recover acceptance path therefore has no production entry point. This is already recorded in `docs/architecture/agent-failure-matrix.md:91-96`.
-
-There is also **no Engine-to-Agent HTTP client**, so Engine and Agent cannot talk to each other in production.
+- The e2e test records `https://e2e-test.local`: no Traefik, DNS or certificate is involved.
+- Its agent transport is in-process: the real listener → protocol → HMAC → bridge handshake is not exercised end to end.
+- The source is a fixture: the GitHub connection (OAuth application, archive download) was never run end to end.
+- The agent CI job sets no `AXIOM_TEST_DOCKER`, so the agent's Docker integration tests never run in CI. That is how `TestIntegrationLifecycle` went stale.
+- V0.1 stack coverage: Node (Next.js, Vite, generic), Go, Python (FastAPI, Flask, Django with a `requirements.txt`), Dockerfile, compose. Laravel (PHP), Rails and Spring Boot are detected but rejected (`analyzer/evidence/decide.go`).
 
 ### What that means for the roadmap
 
-- Wave 3 (#125 auth, #126 secrets) and Wave 4 (#88 transport security, #123 compose preset, #127/#128 authz + audit) are delivered on the Engine and Agent sides, but security enforcement and preset selection are only as strong as the wiring above allows.
-- Wave 5 cannot start meaningfully before Breakpoints 1 and 2 are closed: without an executor there is no `#110` end-to-end gate to pass, and without an operational agent there is no `#109` reference dry run.
-- Nothing in Waves 1 to 4 should be reported as "the agent is operational" or "deployments go LIVE" on the basis of code presence alone.
+- Wave 5 is no longer blocked by wiring. What blocks `#109` (reference dry run) and `#110` (end-to-end gate on a real server) is the real-server run described above.
+- Nothing should be reported as "deployments go LIVE on a real server" on the basis of the in-process e2e test alone.
 
 ## Human-gated (cannot be delegated)
 

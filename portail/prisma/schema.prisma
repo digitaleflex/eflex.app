@@ -11,30 +11,42 @@ datasource db {
 // Modèles attendus par better-auth : user, session, account, verification.
 // Le mot de passe e-mail est stocké dans Account.password (providerId = "credential").
 model User {
-  id            String        @id @default(cuid())
-  name          String
-  email         String        @unique
-  emailVerified Boolean       @default(false)
-  image         String?
-  sessions      Session[]
-  accounts      Account[]
-  projects      Project[]
-  subscription  Subscription?
-  gitInstallations GitInstallation[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id                      String                   @id @default(cuid())
+  name                    String
+  email                   String                   @unique
+  emailVerified           Boolean                  @default(false)
+  image                   String?
+  // Plugin admin : rôle plateforme ("user" | "admin"), suspension.
+  role                    String?
+  banned                  Boolean                  @default(false)
+  banReason               String?
+  banExpires              DateTime?
+  sessions                Session[]
+  accounts                Account[]
+  projects                Project[]
+  members                 Member[]
+  invitations             Invitation[]             @relation("InvitationInviter")
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
+  subscription            Subscription?
+  gitInstallations        GitInstallation[]
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  expiresAt DateTime
-  token     String   @unique
-  ipAddress String?
-  userAgent String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  expiresAt            DateTime
+  token                String   @unique
+  ipAddress            String?
+  userAgent            String?
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Plugin organization : organisation active. Plugin admin : usurpation.
+  activeOrganizationId String?
+  impersonatedBy       String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   @@index([userId])
 }
@@ -70,30 +82,35 @@ model Verification {
 }
 
 model Project {
-  id            String     @id @default(cuid())
-  userId        String
-  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name          String
-  slug          String     @unique // ex: "mon-projet-42"
-  repoUrl       String
-  branch        String     @default("main")
-  /** Dépôt au format « proprietaire/nom » et installation GitHub App liée (issue 07). */
-  repoFullName  String?
-  installationId String?
+  id               String       @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId           String // créateur du projet
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String
+  slug             String       @unique // ex: "mon-projet-42"
+  repoUrl          String
+  branch           String       @default("main")
+  /**
+   * Dépôt au format « proprietaire/nom » et installation GitHub App liée (issue 07).
+   */
+  repoFullName     String?
+  installationId   String?
   productionBranch String?
-  framework     String      // laravel, nextjs, node, python, static
-  runtime       String?     // node@22, php@8.3, etc.
-  domain        String?     // domaine client, sans protocole
-  coolifyAppId  String?     // ID côté Coolify (null jusqu'au premier déploiement)
-  plan          Json?       // BuildPlan retenu à la création (voir packages/detector)
-  detection     Json?       // résultat de l'analyse : confiance, raisons, avertissements, commit
-  port          Int         @default(80)
-  envVars       EnvVar[]
-  deployments   Deployment[]
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  framework        String // laravel, nextjs, node, python, static
+  runtime          String? // node@22, php@8.3, etc.
+  domain           String? // domaine client, sans protocole
+  coolifyAppId     String? // ID côté Coolify (null jusqu'au premier déploiement)
+  plan             Json? // BuildPlan retenu à la création (voir packages/detector)
+  detection        Json? // résultat de l'analyse : confiance, raisons, avertissements, commit
+  port             Int          @default(80)
+  envVars          EnvVar[]
+  deployments      Deployment[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   @@index([userId])
+  @@index([organizationId])
   @@index([slug])
 }
 
@@ -101,12 +118,12 @@ model EnvVar {
   id        String   @id @default(cuid())
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  key       String   // ex: DATABASE_URL, NEXT_PUBLIC_URL
-  value     String   // AES-256-GCM : v1:<nonce base64>:<ciphertext+tag base64> (voir lib/crypto.ts)
+  key       String // ex: DATABASE_URL, NEXT_PUBLIC_URL
+  value     String // AES-256-GCM : v1:<nonce base64>:<ciphertext+tag base64> (voir lib/crypto.ts)
   updatedAt DateTime @updatedAt
 
-  @@index([projectId])
   @@unique([projectId, key])
+  @@index([projectId])
 }
 
 model Deployment {
@@ -127,8 +144,8 @@ model Subscription {
   id               String   @id @default(cuid())
   userId           String   @unique
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status           String   // active, cancelled, past_due, trialing
-  plan             String   // starter, pro, agency
+  status           String // active, cancelled, past_due, trialing
+  plan             String // starter, pro, agency
   priceCents       Int      @default(0)
   providerRef      String?
   currentPeriodEnd DateTime
@@ -151,7 +168,9 @@ model GitInstallation {
   @@index([userId])
 }
 
-/** Idempotence des webhooks : une livraison `X-GitHub-Delivery` n'est traitée qu'une fois. */
+/**
+ * Idempotence des webhooks : une livraison `X-GitHub-Delivery` n'est traitée qu'une fois.
+ */
 model WebhookDelivery {
   id        String   @id
   createdAt DateTime @default(now())
@@ -163,7 +182,7 @@ model StatusCheck {
   id        String   @id @default(cuid())
   checkedAt DateTime @default(now())
   component String
-  status    String   // ok | degraded | down | unknown
+  status    String // ok | degraded | down | unknown
   latencyMs Int?
 
   @@index([checkedAt])
@@ -174,7 +193,7 @@ model StatusIncident {
   id          String    @id @default(cuid())
   title       String
   description String?   @db.Text
-  severity    String    @default("minor")        // minor | major | critical
+  severity    String    @default("minor") // minor | major | critical
   status      String    @default("investigating") // investigating | identified | monitoring | resolved
   startedAt   DateTime  @default(now())
   resolvedAt  DateTime?
@@ -182,4 +201,119 @@ model StatusIncident {
   updatedAt   DateTime  @updatedAt
 
   @@index([startedAt])
+}
+
+// ─── Multi-tenant (plugin organization) ─────────────────────────────────────
+// Tout projet appartient à une organisation. Chaque utilisateur a une organisation
+// personnelle créée à l'inscription. Rôles : owner, admin, member.
+model Organization {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  logo        String?
+  metadata    String?      @db.Text
+  createdAt   DateTime     @default(now())
+  members     Member[]
+  invitations Invitation[]
+  projects    Project[]
+}
+
+model Member {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String       @default("member")
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+model Invitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           String?
+  status         String       @default("pending")
+  expiresAt      DateTime
+  inviterId      String
+  inviter        User         @relation("InvitationInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([email])
+}
+
+// ─── Administration de la plateforme ────────────────────────────────────────
+// Journal d'audit en ajout seul : aucune route ne le modifie ni ne le supprime.
+// `details` ne contient jamais de secret (valeurs de variables, jetons, mots de passe).
+model AuditLog {
+  id             String   @id @default(cuid())
+  actorId        String?
+  actorEmail     String // dénormalisé : l'entrée reste lisible si le compte est supprimé
+  action         String // ex: "user.ban", "user.unban"
+  targetType     String // user | organization | project | deployment | …
+  targetId       String
+  organizationId String?
+  details        Json?
+  ip             String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId])
+  @@index([targetType, targetId])
+  @@index([organizationId])
+}
+
+// ─── Temps réel ─────────────────────────────────────────────────────────────
+// Bus d'événements : un seul flux SSE par onglet (/api/events). Les identifiants croissent,
+// ce qui permet la reprise (Last-Event-ID). Les charges utiles ne contiennent jamais de secret.
+// audience : "org" (membres de l'organisation), "admin" (administrateurs), "user" (un utilisateur).
+model Event {
+  id             BigInt   @id @default(autoincrement())
+  type           String
+  audience       String   @default("org")
+  organizationId String?
+  userId         String?
+  payload        Json
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([organizationId, id])
+}
+
+// ─── Notifications ──────────────────────────────────────────────────────────
+// `dedupeKey` rend l'envoi idempotent : deux chemins qui constatent le même changement de statut
+// ne créent qu'une notification. Les textes ne contiennent jamais de secret.
+model Notification {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String?
+  type           String
+  title          String
+  body           String?   @db.Text
+  href           String?
+  dedupeKey      String?
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt, createdAt])
+}
+
+// On ne stocke que les choix explicites : l'absence de ligne signifie « activé ».
+model NotificationPreference {
+  id      String  @id @default(cuid())
+  userId  String
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type    String
+  channel String  @default("app") // app (e-mail : voir issue sur les e-mails transactionnels)
+  enabled Boolean
+
+  @@unique([userId, type, channel])
 }

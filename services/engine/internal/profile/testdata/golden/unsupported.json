@@ -9,15 +9,15 @@
     "root": ""
   },
   "status": "unsupported",
-  "summary": "Axiom can't deploy this repository in V0.1: FastAPI is not supported in V0.1.",
+  "summary": "Axiom can't deploy this repository in V0.1: no requirements.txt was found, so Axiom cannot install the Python dependencies.",
   "unsupported": {
-    "code": "UNSUPPORTED_FRAMEWORK",
-    "message": "FastAPI is not supported in V0.1",
-    "detected": "FastAPI",
+    "code": "PYTHON_REQUIREMENTS_MISSING",
+    "message": "no requirements.txt was found, so Axiom cannot install the Python dependencies",
+    "detected": "Python (FastAPI)",
     "alternatives": [
-      "Add a Dockerfile to the repository to deploy any stack as a container",
-      "Add an axiom.yaml manifest with explicit build and start commands",
-      "Supported in V0.1: Next.js, Vite, Node.js, Go, Dockerfile, Docker Compose"
+      "Add a requirements.txt listing the dependencies (pip freeze \u003e requirements.txt)",
+      "Add a Dockerfile",
+      "Poetry, uv and Pipenv projects are not supported yet"
     ]
   },
   "blocking": [],

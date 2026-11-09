@@ -151,11 +151,16 @@ func TestDockerOnlyProject(t *testing.T) {
 		t.Fatalf("port evidence = %+v", port.Evidence)
 	}
 	assertFinding(t, r, KindLanguage, StateDetected, "Python")
-	if f := get(t, r, KindFramework); f.State != StateUnsupported || f.Value != "Flask" || f.Reason == "" {
-		t.Fatalf("unsupported framework must be explicit: %+v", f)
-	}
+	assertFinding(t, r, KindFramework, StateDetected, "Flask")
 	if f := get(t, r, KindBuildScript); f.State != StateNotApplicable {
 		t.Fatalf("scripts not applicable for Python: %+v", f)
+	}
+}
+
+func TestUnsupportedFrameworkIsExplicit(t *testing.T) {
+	r := Analyze(snap(map[string]string{"Gemfile": "gem 'rails', '~> 7.1'\n"}), Options{})
+	if f := get(t, r, KindFramework); f.State != StateUnsupported || f.Value != "Rails" || f.Reason == "" {
+		t.Fatalf("unsupported framework must be explicit: %+v", f)
 	}
 }
 

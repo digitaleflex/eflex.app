@@ -17,6 +17,7 @@ export function detectStaticBuild(ctx: DetectionContext): Candidate | null {
     root: '',
     install: installCommand(ctx),
     build: `${pm} run build`,
+    publish: 'dist',
     port: 80,
   };
 

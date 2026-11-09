@@ -210,6 +210,12 @@ export function detectEflexConfig(ctx: DetectionContext): EflexConfigOutcome | n
   const start = stringField(config.start);
   if (start) plan.start = start;
 
+  const publish = sanitizeRoot(config.publish);
+  if (publish !== '') plan.publish = publish;
+
+  const dockerfile = sanitizeRoot(config.dockerfile);
+  if (dockerfile !== '') plan.dockerfile = dockerfile;
+
   const healthcheck = stringField(config.healthcheck);
   if (healthcheck && healthcheck.startsWith('/')) plan.healthcheck = healthcheck;
 

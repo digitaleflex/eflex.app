@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { STATUS_LABELS, isDeploymentStatus } from '@/lib/deployment-state'
+import { resolveOrganization } from '@/lib/organizations'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,10 +14,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params
-  // Le filtre relationnel garantit qu'un utilisateur ne lit que ses propres
-  // déploiements, sans avoir à sélectionner (puis jeter) le projet.
+  // Le filtre relationnel garantit qu'on ne lit que les déploiements de son organisation,
+  // sans avoir à sélectionner (puis jeter) le projet.
+  const org = await resolveOrganization(session)
+  if (!org) return NextResponse.json({ error: 'Déploiement introuvable' }, { status: 404 })
   const deployment = await prisma.deployment.findFirst({
-    where: { id, project: { userId: session.user.id } },
+    where: { id, project: { organizationId: org.organizationId } },
     select: {
       id: true,
       status: true,

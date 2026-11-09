@@ -192,6 +192,13 @@ export const staticSite = makeSnapshot({
   'index.html': '<!doctype html><h1>Bonjour</h1>\n',
 });
 
+/** package.json avec un script build et un index.html, sans framework reconnu. */
+export const staticSiteWithBuild = makeSnapshot({
+  'index.html': '<!doctype html><div id="app"></div>\n',
+  'package.json': json({ scripts: { build: 'webpack --mode production' } }),
+  'package-lock.json': '{}',
+});
+
 export const dockerfile = makeSnapshot({
   'Dockerfile': 'FROM node:22-alpine\nWORKDIR /app\nCOPY . .\n',
 });
@@ -215,6 +222,33 @@ export const eflexConfig = makeSnapshot({
       PUBLIC_URL: 'https://example.com',
     },
   }),
+});
+
+export const eflexConfigStatic = makeSnapshot({
+  'eflex.json': json({
+    version: 1,
+    framework: 'vite',
+    runtime: 'static@1',
+    build: 'npm run build',
+    publish: 'out/site',
+    port: 80,
+  }),
+});
+
+/** Chemins piégés : ils doivent être ignorés plutôt que transmis au déploiement. */
+export const eflexConfigUnsafePaths = makeSnapshot({
+  'eflex.json': json({
+    version: 1,
+    framework: 'docker',
+    runtime: 'docker@1',
+    publish: '../../etc',
+    dockerfile: '../Dockerfile',
+    port: 3000,
+  }),
+});
+
+export const dockerfileInSubdir = makeSnapshot({
+  'docker/Dockerfile': 'FROM node:22-alpine\nWORKDIR /app\nEXPOSE 8080\nCOPY . .\n',
 });
 
 export const eflexConfigInvalid = makeSnapshot({
@@ -298,9 +332,13 @@ export function allFixtures(): Fixture[] {
     { name: 'fastapi', snapshot: fastapi },
     { name: 'django', snapshot: django },
     { name: 'static', snapshot: staticSite },
+    { name: 'static-with-build', snapshot: staticSiteWithBuild },
     { name: 'dockerfile', snapshot: dockerfile },
     { name: 'dockerfile-expose', snapshot: dockerfileExpose },
     { name: 'eflex-config', snapshot: eflexConfig },
+    { name: 'eflex-config-static', snapshot: eflexConfigStatic },
+    { name: 'eflex-config-unsafe-paths', snapshot: eflexConfigUnsafePaths },
+    { name: 'dockerfile-in-subdir', snapshot: dockerfileInSubdir },
     { name: 'dockerfile-arg-required', snapshot: dockerfileArgRequired },
     { name: 'dockerfile-arg-default', snapshot: dockerfileArgDefault },
     { name: 'dockerfile-arg-before-from', snapshot: dockerfileArgBeforeFrom },

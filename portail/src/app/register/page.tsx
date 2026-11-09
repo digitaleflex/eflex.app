@@ -1,5 +1,6 @@
 'use client'
 
+import { nextFromLocation, withNext } from '@/lib/safe-next'
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -40,7 +41,7 @@ export default function RegisterPage() {
         // En cas d'indisponibilité de ce petit endpoint, on garde le parcours
         // historique plutôt que de bloquer l'inscription.
       }
-      router.push('/dashboard')
+      router.push(nextFromLocation())
       router.refresh()
     } catch {
       setError('Impossible de contacter le serveur. Vérifiez votre connexion et réessayez.')
@@ -73,7 +74,7 @@ export default function RegisterPage() {
               className="w-full justify-center gap-3 font-normal"
               onClick={async () => {
                 setError('')
-                const { error: authError } = await signIn.social({ provider: 'google', callbackURL: '/dashboard' })
+                const { error: authError } = await signIn.social({ provider: 'google', callbackURL: nextFromLocation() })
                 if (authError) setError(authErrorMessage(authError, 'La connexion avec Google est indisponible pour le moment.'))
               }}
               disabled={loading}
@@ -123,7 +124,7 @@ export default function RegisterPage() {
 
           <p className="text-center text-sm text-muted-foreground">
             Déjà un compte ?{' '}
-            <Link href="/login" className="font-medium text-primary hover:underline">
+            <Link suppressHydrationWarning href={withNext('/login')} className="font-medium text-primary hover:underline">
               Se connecter
             </Link>
           </p>

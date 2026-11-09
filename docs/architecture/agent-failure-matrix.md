@@ -95,6 +95,8 @@ Scenario coverage: **14 / 14** from issue #90, plus one gap-documentation test
    (register → heartbeat → dispatch → recover) a donc un point d'entrée de
    production. Les tests de bootstrap injectent un discoverer factice pour
    rester hermétiques (pas de dépendance à Docker/Traefik de l'hôte).
+   Reste à prouver : le parcours complet register → heartbeat → dispatch → recover contre un
+   vrai moteur sur un vrai serveur.
 
 ## Running the suite
 
