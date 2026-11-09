@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, it } from 'vitest'
 
-// Test d'intégration : nécessite une base PostgreSQL migrée (DATABASE_URL).
-// Lancé avec : DATABASE_URL=… BETTER_AUTH_SECRET=… npx vitest run src/lib/organizations.test.ts
-const run = process.env.DATABASE_URL ? describe : describe.skip
+// Test d'intégration : actif avec EFLEX_TEST_DB=1 et une base PostgreSQL migrée (DATABASE_URL).
+// Lancé avec : EFLEX_TEST_DB=1 DATABASE_URL=… BETTER_AUTH_SECRET=… npx vitest run portail/src/lib/organizations.test.ts
+const run = process.env.EFLEX_TEST_DB === '1' ? describe : describe.skip
 
 run('multi-tenant (Better Auth organization + admin)', () => {
   process.env.BETTER_AUTH_SECRET ??= 'test-secret-test-secret-test-secret-0123'

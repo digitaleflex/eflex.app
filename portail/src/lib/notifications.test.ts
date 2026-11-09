@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-// Intégration : base PostgreSQL migrée requise (DATABASE_URL).
-const run = process.env.DATABASE_URL ? describe : describe.skip
+// Intégration : actif avec EFLEX_TEST_DB=1 et une base PostgreSQL migrée (DATABASE_URL).
+const run = process.env.EFLEX_TEST_DB === '1' ? describe : describe.skip
 
 run('notifications', () => {
   process.env.BETTER_AUTH_SECRET ??= 'test-secret-test-secret-test-secret-0123'

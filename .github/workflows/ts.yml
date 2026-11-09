@@ -37,9 +37,23 @@ jobs:
     name: Tests, schémas et typecheck
     runs-on: ubuntu-latest
     env:
-      # Prisma résout env("DATABASE_URL") même pour validate/generate. Aucune
-      # connexion n'est ouverte : une valeur factice suffit en CI.
       DATABASE_URL: postgresql://eflex:eflex@localhost:5432/eflex?schema=public
+    # PostgreSQL pour les tests d'intégration du portail (organisations, temps réel, notifications,
+    # administration, journaux). Sans EFLEX_TEST_DB=1 ces tests sont ignorés.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: eflex
+          POSTGRES_PASSWORD: eflex
+          POSTGRES_DB: eflex
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U eflex"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -52,8 +66,24 @@ jobs:
 
       - name: Install (workspace pnpm)
         run: pnpm install --frozen-lockfile
-      - name: Tests (détecteur, renderer, modules du portail)
+      # Les tests du portail importent ses dépendances (bullmq, @prisma/client…) : on les installe,
+      # on génère le client Prisma et on migre la base de test avant de lancer la suite racine.
+      - name: Install (portail, npm)
+        working-directory: portail
+        run: npm ci
+      - name: Prisma — generate
+        working-directory: portail
+        run: npx prisma generate
+      - name: Prisma — migrate (base de test)
+        working-directory: portail
+        run: npx prisma migrate deploy
+      - name: Tests (détecteur, renderer, portail dont intégration PostgreSQL)
         run: pnpm test
+        env:
+          EFLEX_TEST_DB: "1"
+          BETTER_AUTH_SECRET: ci-test-secret-ci-test-secret-ci-test-0123
+          BETTER_AUTH_URL: http://localhost:3000
+          ENV_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
       - name: Typecheck (détecteur + renderer)
         run: pnpm typecheck
       - name: Domaines — fichiers générés à jour
@@ -61,15 +91,9 @@ jobs:
           bash scripts/sync-domains.sh
           git diff --exit-code -- services/engine/traefik/dynamic/axiom-console.yml schema/v1.json schema/README.md
 
-      - name: Install (portail, npm)
-        working-directory: portail
-        run: npm ci
       - name: Prisma — validate
         working-directory: portail
         run: npx prisma validate
-      - name: Prisma — generate
-        working-directory: portail
-        run: npx prisma generate
       - name: Typecheck (portail)
         working-directory: portail
         run: npm run typecheck

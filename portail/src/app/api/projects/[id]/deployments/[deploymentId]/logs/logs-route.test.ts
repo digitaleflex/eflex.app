@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
-// Intégration : base PostgreSQL migrée requise (DATABASE_URL).
-const run = process.env.DATABASE_URL ? describe : describe.skip
+// Intégration : actif avec EFLEX_TEST_DB=1 et une base PostgreSQL migrée (DATABASE_URL).
+const run = process.env.EFLEX_TEST_DB === '1' ? describe : describe.skip
 
 let currentSession: unknown = null
 vi.mock('@/lib/session', () => ({ getSession: async () => currentSession }))
