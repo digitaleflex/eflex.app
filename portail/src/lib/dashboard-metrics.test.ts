@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { attentionItems, dailySeries, successRate, summarize, type ProjectLite } from '@/lib/dashboard-metrics'
+import { attentionItems, dailySeries, successRate, summarize, windowStart, type ProjectLite, type StatusCount } from '@/lib/dashboard-metrics'
 import { attentionRank, statusInfo } from '@/lib/project-status'
 
 const now = new Date('2026-11-08T12:00:00Z')
 const at = (daysAgo: number) => new Date(now.getTime() - daysAgo * 86_400_000)
 const dep = (status: string, daysAgo = 0, id = `${status}${daysAgo}`) => ({ id, status, createdAt: at(daysAgo) })
+/** Ligne d'agrégation SQL : `count` déploiements de ce statut ce jour-là. */
+const row = (status: string, daysAgo: number, count = 1): StatusCount => ({ day: at(daysAgo).toISOString().slice(0, 10), status, count })
 
 describe('statusInfo', () => {
   it('décrit chaque statut et reste lisible pour un statut inconnu', () => {
@@ -20,21 +22,33 @@ describe('statusInfo', () => {
 })
 
 describe('dailySeries', () => {
-  it('compte par jour sur la fenêtre, jours vides inclus, du plus ancien au plus récent', () => {
-    const s = dailySeries([dep('live', 0), dep('live', 0), dep('failed', 0), dep('building', 1), dep('live', 3), dep('live', 40)], 5, now)
+  it('additionne les comptes par jour sur la fenêtre, jours vides inclus, du plus ancien au plus récent', () => {
+    const s = dailySeries([row('live', 0, 2), row('failed', 0), row('building', 1), row('live', 3), row('live', 40)], 5, now)
     expect(s).toHaveLength(5)
     expect(s.map((d) => d.day)).toEqual(['2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08'])
     expect(s[4]).toMatchObject({ live: 2, failed: 1, other: 0 })
     expect(s[3]).toMatchObject({ live: 0, failed: 0, other: 1 })
     expect(s[1]).toMatchObject({ live: 1 }) // il y a 3 jours
-    expect(s.reduce((n, d) => n + d.live + d.failed + d.other, 0)).toBe(5) // le déploiement d'il y a 40 jours est ignoré
+    expect(s.reduce((n, d) => n + d.live + d.failed + d.other, 0)).toBe(5) // le jour d'il y a 40 jours est ignoré
+  })
+
+  it('compte les statuts du worker (queued, analyzing…) comme « en cours »', () => {
+    const s = dailySeries([row('queued', 0), row('analyzing', 0, 2), row('cancelled', 0)], 3, now)
+    expect(s[2]).toMatchObject({ live: 0, failed: 0, other: 4 })
+  })
+})
+
+describe('windowStart', () => {
+  it('commence à minuit UTC, `days` jours civils avant la fin (jour courant inclus)', () => {
+    expect(windowStart(14, now).toISOString()).toBe('2026-10-26T00:00:00.000Z')
+    expect(windowStart(1, now).toISOString()).toBe('2026-11-08T00:00:00.000Z')
   })
 })
 
 describe('successRate', () => {
   it('ne compte que les déploiements qui ont une issue', () => {
-    expect(successRate([{ status: 'live' }, { status: 'live' }, { status: 'failed' }, { status: 'building' }])).toBe(67)
-    expect(successRate([{ status: 'building' }])).toBeNull()
+    expect(successRate([{ status: 'live', count: 2 }, { status: 'failed', count: 1 }, { status: 'building', count: 5 }])).toBe(67)
+    expect(successRate([{ status: 'building', count: 3 }])).toBeNull()
     expect(successRate([])).toBeNull()
   })
 })

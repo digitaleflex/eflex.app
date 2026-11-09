@@ -27,6 +27,8 @@ type Listener = (event: PlatformEvent) => void
 type BusState = {
   listeners: Set<Listener>
   cursor: number | null
+  /** Identifiants déjà distribués dans la fenêtre de relecture (voir LOOKBACK). */
+  seen: Set<number>
   timer: ReturnType<typeof setInterval> | null
   polling: boolean
   again: boolean
@@ -35,10 +37,17 @@ type BusState = {
 
 // État partagé par processus (survit au rechargement à chaud en développement).
 const g = globalThis as unknown as { __eflexBus?: BusState }
-const state: BusState = (g.__eflexBus ??= { listeners: new Set(), cursor: null, timer: null, polling: false, again: false, lastPurge: 0 })
+const state: BusState = (g.__eflexBus ??= { listeners: new Set(), cursor: null, seen: new Set(), timer: null, polling: false, again: false, lastPurge: 0 })
 
 const POLL_MS = 1_000
 const BATCH = 500
+/**
+ * Les identifiants sont attribués à l'insertion, pas à la validation : deux publications concurrentes
+ * peuvent être validées dans l'ordre inverse (42 visible avant 41). Un curseur « id > dernier vu » sauterait
+ * alors 41 pour toujours. On relit donc les LOOKBACK derniers identifiants à chaque passage et on
+ * déduplique.
+ */
+const LOOKBACK = 100
 const RETENTION_MS = 24 * 3600 * 1000
 
 type Row = { id: bigint; type: string; audience: string; organizationId: string | null; userId: string | null; payload: Prisma.JsonValue; createdAt: Date }
@@ -95,10 +104,13 @@ async function poll(): Promise<void> {
     do {
       state.again = false
       if (state.cursor === null) state.cursor = await latestEventId()
-      const rows = await prisma.event.findMany({ where: { id: { gt: BigInt(state.cursor) } }, orderBy: { id: 'asc' }, take: BATCH })
+      const from = Math.max(0, state.cursor - LOOKBACK)
+      const rows = await prisma.event.findMany({ where: { id: { gt: BigInt(from) } }, orderBy: { id: 'asc' }, take: BATCH })
       for (const row of rows) {
         const event = toEvent(row)
-        state.cursor = event.id
+        if (state.seen.has(event.id)) continue
+        state.seen.add(event.id)
+        state.cursor = Math.max(state.cursor, event.id)
         for (const listener of state.listeners) {
           try {
             listener(event)
@@ -107,6 +119,8 @@ async function poll(): Promise<void> {
           }
         }
       }
+      // Mémoire bornée : on n'oublie que ce qui est sorti de la fenêtre de relecture.
+      for (const id of state.seen) if (id < state.cursor - LOOKBACK) state.seen.delete(id)
       if (rows.length === BATCH) state.again = true
     } while (state.again)
     await purgeOccasionally()
@@ -137,6 +151,7 @@ export function subscribe(listener: Listener): () => void {
       clearInterval(state.timer)
       state.timer = null
       state.cursor = null // le prochain abonné repartira du dernier événement connu
+      state.seen.clear()
     }
   }
 }

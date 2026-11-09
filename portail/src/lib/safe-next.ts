@@ -1,10 +1,24 @@
 /**
- * Destination après connexion, lue dans `?next=`. Seuls les chemins internes sont acceptés
- * (pas de `//hôte` ni de `\`), pour éviter une redirection ouverte vers un site tiers.
+ * Vrai pour un chemin interne au site (`/dashboard`, `/invitations/abc?x=1`), faux pour tout ce qui
+ * pourrait mener ailleurs. Les navigateurs suppriment tabulations et sauts de ligne dans une URL :
+ * `/\t/hôte` devient `//hôte` (protocole-relatif). On refuse donc tout caractère de contrôle et on
+ * vérifie, avec l'analyseur d'URL lui-même, que le résultat reste sur la même origine.
  */
+export function isInternalPath(value: string | null | undefined): value is string {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return false
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f\\]/.test(value)) return false
+  try {
+    const base = 'http://eflex.invalid'
+    return new URL(value, base).origin === base
+  } catch {
+    return false
+  }
+}
+
+/** Destination après connexion, lue dans `?next=` : un chemin interne, sinon le repli. */
 export function safeNext(value: string | null | undefined, fallback = '/dashboard'): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return fallback
-  return value
+  return isInternalPath(value) ? value : fallback
 }
 
 /** Variante côté navigateur, à appeler au moment de la soumission. */

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { attentionItems, dailySeries, successRate, summarize, type ProjectLite } from '@/lib/dashboard-metrics'
+import { attentionItems, dailySeries, successRate, summarize, windowStart, type ProjectLite, type StatusCount } from '@/lib/dashboard-metrics'
 
 const DAYS = 14
 
@@ -34,8 +34,8 @@ export type DashboardActivity = {
  * (jamais pour un autre locataire) et sérialisé en types simples (dates en ISO).
  */
 export async function loadDashboard(organizationId: string, now = new Date()) {
-  const since = new Date(now.getTime() - DAYS * 86_400_000)
-  const [projects, recent, activity] = await Promise.all([
+  const since = windowStart(DAYS, now)
+  const [projects, counts, activity] = await Promise.all([
     prisma.project.findMany({
       where: { organizationId },
       orderBy: { updatedAt: 'desc' },
@@ -44,11 +44,13 @@ export async function loadDashboard(organizationId: string, now = new Date()) {
         deployments: { orderBy: { createdAt: 'desc' }, take: 8, select: { id: true, status: true, commitSha: true, createdAt: true } },
       },
     }),
-    prisma.deployment.findMany({
-      where: { project: { organizationId }, createdAt: { gte: since } },
-      select: { status: true, createdAt: true },
-      take: 5_000,
-    }),
+    // Agrégation côté base (par jour UTC et statut) : quelques lignes quel que soit le volume, jamais tronquée.
+    prisma.$queryRaw<StatusCount[]>`
+      SELECT to_char(d."createdAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, d."status" AS status, count(*)::int AS count
+      FROM "Deployment" d
+      JOIN "Project" p ON p."id" = d."projectId"
+      WHERE p."organizationId" = ${organizationId} AND d."createdAt" >= ${since}
+      GROUP BY 1, 2`,
     prisma.deployment.findMany({
       where: { project: { organizationId } },
       orderBy: { createdAt: 'desc' },
@@ -74,9 +76,9 @@ export async function loadDashboard(organizationId: string, now = new Date()) {
     projects: cards,
     summary: summarize(lite),
     attention: attentionItems(lite).map((a) => ({ ...a, at: a.at.toISOString() })),
-    series: dailySeries(recent, DAYS, now),
-    deploymentsInWindow: recent.length,
-    successRate: successRate(recent),
+    series: dailySeries(counts, DAYS, now),
+    deploymentsInWindow: counts.reduce((n, c) => n + c.count, 0),
+    successRate: successRate(counts),
     activity: activity.map<DashboardActivity>((d) => ({
       id: d.id, status: d.status, commitSha: d.commitSha === 'pending' ? '' : d.commitSha.slice(0, 7), createdAt: d.createdAt.toISOString(),
       projectId: d.project.id, projectName: d.project.name, framework: d.project.framework,

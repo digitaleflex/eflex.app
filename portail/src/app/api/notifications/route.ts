@@ -15,9 +15,15 @@ export async function GET(request: Request) {
   const before = url.searchParams.get('before')
   const unreadOnly = url.searchParams.get('unread') === '1'
 
-  const cursor = before ? await prisma.notification.findFirst({ where: { id: before, userId }, select: { createdAt: true } }) : null
+  const cursor = before ? await prisma.notification.findFirst({ where: { id: before, userId }, select: { id: true, createdAt: true } }) : null
   const rows = await prisma.notification.findMany({
-    where: { userId, ...(unreadOnly ? { readAt: null } : {}), ...(cursor ? { createdAt: { lt: cursor.createdAt } } : {}) },
+    where: {
+      userId,
+      ...(unreadOnly ? { readAt: null } : {}),
+      // Curseur composite (date, identifiant) : avec la date seule, les notifications créées au même
+      // instant que la dernière d'une page seraient sautées à la page suivante.
+      ...(cursor ? { OR: [{ createdAt: { lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { lt: cursor.id } }] } : {}),
+    },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: limit + 1,
     select: { id: true, type: true, title: true, body: true, href: true, readAt: true, createdAt: true },

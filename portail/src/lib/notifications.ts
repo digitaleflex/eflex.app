@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { publish } from '@/lib/event-bus'
+import { isInternalPath } from '@/lib/safe-next'
 
 /** Types de notification connus, avec le libellé affiché dans les préférences. */
 export const NOTIFICATION_TYPES = {
@@ -32,7 +33,7 @@ export type NotifyInput = {
  */
 export async function notify(input: NotifyInput): Promise<string[]> {
   try {
-    if (input.href && !input.href.startsWith('/')) throw new Error('href doit être un chemin interne')
+    if (input.href && !isInternalPath(input.href)) throw new Error('href doit être un chemin interne')
     const userIds = [...new Set(input.userIds)]
     if (userIds.length === 0) return []
 

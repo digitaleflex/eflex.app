@@ -46,8 +46,15 @@ export function Terminal({ url, label, onFinished, className }: TerminalProps) {
     if (follow && el) el.scrollTop = el.scrollHeight
   }, [visible, follow])
 
+  // La page n'a besoin d'être rafraîchie que si le déploiement a changé d'état PENDANT qu'on le suit.
+  // Ouvrir les journaux d'un déploiement déjà terminé reçoit tout de suite un statut final : rien à recharger.
+  const firstStatus = useRef<string | null>(null)
   useEffect(() => {
-    if (status && status in STATUS_LABEL) onFinished?.(status)
+    if (!status) return
+    if (firstStatus.current === null) firstStatus.current = status
+    const final = status in STATUS_LABEL
+    const wasAlreadyFinal = firstStatus.current in STATUS_LABEL
+    if (final && !wasAlreadyFinal) onFinished?.(status)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])
 

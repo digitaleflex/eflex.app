@@ -11,30 +11,39 @@ export type ProjectLite = {
 
 export type DayBucket = { day: string; live: number; failed: number; other: number }
 
+/** Nombre de déploiements d'un statut pour un jour UTC (« AAAA-MM-JJ »), tel que renvoyé par l'agrégation SQL. */
+export type StatusCount = { day: string; status: string; count: number }
+
 const dayKey = (d: Date) => d.toISOString().slice(0, 10)
 
+/** Premier jour (UTC, à minuit) de la fenêtre de `days` jours qui se termine aujourd'hui. */
+export function windowStart(days: number, now = new Date()): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - (days - 1)))
+}
+
 /** Déploiements par jour sur `days` jours (jour courant inclus), du plus ancien au plus récent. */
-export function dailySeries(deployments: readonly { status: string; createdAt: Date }[], days: number, now = new Date()): DayBucket[] {
+export function dailySeries(counts: readonly StatusCount[], days: number, now = new Date()): DayBucket[] {
   const buckets = new Map<string, DayBucket>()
   for (let i = days - 1; i >= 0; i--) {
     const day = dayKey(new Date(now.getTime() - i * 86_400_000))
     buckets.set(day, { day, live: 0, failed: 0, other: 0 })
   }
-  for (const d of deployments) {
-    const bucket = buckets.get(dayKey(d.createdAt))
+  for (const c of counts) {
+    const bucket = buckets.get(c.day)
     if (!bucket) continue
-    if (d.status === 'live') bucket.live += 1
-    else if (d.status === 'failed') bucket.failed += 1
-    else bucket.other += 1
+    if (c.status === 'live') bucket.live += c.count
+    else if (c.status === 'failed') bucket.failed += c.count
+    else bucket.other += c.count
   }
   return [...buckets.values()]
 }
 
 /** Part de déploiements réussis parmi ceux qui ont une issue (réussi ou échec) ; null s'il n'y en a aucun. */
-export function successRate(deployments: readonly { status: string }[]): number | null {
-  const finished = deployments.filter((d) => d.status === 'live' || d.status === 'failed')
-  if (finished.length === 0) return null
-  return Math.round((finished.filter((d) => d.status === 'live').length / finished.length) * 100)
+export function successRate(counts: readonly { status: string; count: number }[]): number | null {
+  const sum = (status: string) => counts.filter((c) => c.status === status).reduce((n, c) => n + c.count, 0)
+  const live = sum('live')
+  const finished = live + sum('failed')
+  return finished === 0 ? null : Math.round((live / finished) * 100)
 }
 
 export type Attention = { projectId: string; name: string; kind: 'failed' | 'in-progress'; status: string; deploymentId: string; at: Date }

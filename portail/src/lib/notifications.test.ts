@@ -50,11 +50,16 @@ run('notifications', () => {
     expect(await notify({ userIds: [member], type: 'deployment.failed', title: 'Échec', dedupeKey: `f-${stamp}` })).toEqual([member])
   })
 
-  it('refuse un lien externe (redirection ouverte) sans rien créer', async () => {
+  it('refuse tout lien qui sortirait du site (absolu, protocole-relatif, caractères de contrôle) sans rien créer', async () => {
     const { notify } = await import('@/lib/notifications')
     const { prisma } = await import('@/lib/prisma')
-    expect(await notify({ userIds: [owner], type: 'invitation.received', title: 'x', href: 'https://evil.fr', dedupeKey: `e-${stamp}` })).toEqual([])
-    expect(await prisma.notification.count({ where: { dedupeKey: `e-${stamp}` } })).toBe(0)
+    const bad = ['https://evil.fr', '//evil.fr', '/\t/evil.fr', '/\n/evil.fr', '/\\evil.fr']
+    for (const [i, href] of bad.entries()) {
+      expect(await notify({ userIds: [owner], type: 'invitation.received', title: 'x', href, dedupeKey: `e${i}-${stamp}` }), href).toEqual([])
+    }
+    expect(await prisma.notification.count({ where: { dedupeKey: { startsWith: 'e', endsWith: stamp } } })).toBe(0)
+    // un chemin interne valide passe
+    expect(await notify({ userIds: [owner], type: 'invitation.received', title: 'ok', href: '/dashboard/notifications', dedupeKey: `ok-${stamp}` })).toEqual([owner])
   })
 
   it('pousse la notification en direct à son destinataire uniquement', async () => {

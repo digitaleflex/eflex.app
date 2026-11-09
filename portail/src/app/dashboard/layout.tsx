@@ -27,7 +27,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     // Thème propre à la console : `dark` posé côté serveur si choisi, sinon par le script (mode système).
     <div id={THEME_ROOT_ID} className={`${theme === 'dark' ? 'dark ' : ''}min-h-screen bg-background text-foreground`} suppressHydrationWarning>
       <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
-    <EventsProvider>
+    <EventsProvider scope={org?.organizationId ?? null}>
       <ToastProvider>
         <MembershipWatcher />
         <NotificationToaster />

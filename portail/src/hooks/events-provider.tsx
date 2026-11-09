@@ -15,14 +15,19 @@ type Ctx = {
 const EventsContext = createContext<Ctx | null>(null)
 
 /**
+ * `scope` identifie ce à quoi le flux est lié côté serveur (l'organisation active) : quand il change,
+ * la connexion est rouverte, sinon l'onglet continuerait de recevoir les événements de l'ancienne
+ * organisation et jamais ceux de la nouvelle.
+ *
  * Une seule connexion SSE par onglet (`/api/events`), partagée par tous les composants.
  * EventSource se reconnecte seul avec `Last-Event-ID` : aucun événement n'est perdu ni rejoué deux fois.
  */
-export function EventsProvider({ children }: { children: React.ReactNode }) {
+export function EventsProvider({ children, scope }: { children: React.ReactNode; scope?: string | null }) {
   const [state, setState] = useState<ConnectionState>('connecting')
   const handlers = useRef(new Set<{ types: readonly string[]; handler: Handler }>())
 
   useEffect(() => {
+    setState('connecting')
     const source = new EventSource('/api/events')
     source.addEventListener('open', () => setState('live'))
     source.addEventListener('event', (e) => {
@@ -43,7 +48,7 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     })
     source.onerror = () => setState(source.readyState === EventSource.CLOSED ? 'ended' : 'reconnecting')
     return () => source.close()
-  }, [])
+  }, [scope])
 
   const subscribe = useCallback((types: readonly string[], handler: Handler) => {
     const entry = { types, handler }

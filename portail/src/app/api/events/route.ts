@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 const MAX_STREAMS_PER_USER = 5
+const REPLAY_BATCH = Number(process.env.EVENTS_REPLAY_BATCH) || 1_000
 const RECHECK_MS = Number(process.env.EVENTS_RECHECK_MS) || 30_000
 const open = new Map<string, number>()
 
@@ -44,10 +45,14 @@ export async function GET(request: Request) {
       let lastSent = startAfter
       let replaying = true
       const pending: PlatformEvent[] = []
+      // Rejeu et temps réel se chevauchent : on déduplique par identifiant (et non par « plus grand vu »,
+      // qui jetterait un événement validé en retard avec un identifiant plus petit).
+      const sent = new Set<number>()
 
       const deliver = (event: PlatformEvent) => {
-        if (event.id <= lastSent) return // déjà envoyé (rejeu et temps réel peuvent se chevaucher)
-        lastSent = event.id
+        if (event.id <= startAfter || sent.has(event.id)) return
+        sent.add(event.id)
+        lastSent = Math.max(lastSent, event.id)
         if (!isVisibleTo(event, viewer)) return
         send('event', { type: event.type, organizationId: event.organizationId, ...event.payload, at: event.createdAt }, event.id)
       }
@@ -56,7 +61,14 @@ export async function GET(request: Request) {
       const unsubscribe = subscribe((event) => (replaying ? pending.push(event) : deliver(event)))
       try {
         send('ready', { organizationId: viewer.organizationId, lastEventId: startAfter })
-        for (const event of await eventsSince(startAfter)) deliver(event)
+        // Rejeu par lots jusqu'à épuisement : s'arrêter au premier lot perdrait en silence ce qui suit.
+        let cursor = startAfter
+        for (;;) {
+          const batch = await eventsSince(cursor, REPLAY_BATCH)
+          for (const event of batch) deliver(event)
+          if (batch.length < REPLAY_BATCH) break
+          cursor = batch[batch.length - 1]!.id
+        }
         replaying = false
         for (const event of pending.splice(0)) deliver(event)
 

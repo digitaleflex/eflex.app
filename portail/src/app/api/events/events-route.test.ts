@@ -12,6 +12,7 @@ run('GET /api/events : bus d’événements temps réel', () => {
   process.env.BETTER_AUTH_SECRET ??= 'test-secret-test-secret-test-secret-0123'
   process.env.BETTER_AUTH_URL ??= 'http://localhost:3000'
   process.env.EVENTS_RECHECK_MS = '200' // revérification rapide des droits pour le test
+  process.env.EVENTS_REPLAY_BATCH = '3' // petit lot : le rejeu doit boucler pour tout rendre
 
   const stamp = `${Date.now()}`
   type U = { id: string; orgId: string; sessionId: string; admin: boolean }
@@ -117,6 +118,36 @@ run('GET /api/events : bus d’événements temps réel', () => {
     await until(() => resumed.named('project.updated').length >= 3)
     expect(resumed.named('project.updated').map((e) => e.data.n)).toEqual([2, 3, 4])
     resumed.close()
+  })
+
+  it('rejoue tout ce qui manque même quand il y en a plus qu’un lot (aucun trou, aucun doublon)', async () => {
+    const { publish, latestEventId } = await import('@/lib/event-bus')
+    const before = await latestEventId()
+    for (let n = 1; n <= 8; n++) await publish({ type: 'project.updated', organizationId: a.orgId, payload: { n } })
+    const resumed = await connect(a, String(before))
+    await until(() => resumed.named('project.updated').length >= 8)
+    await new Promise((r) => setTimeout(r, 300))
+    expect(resumed.named('project.updated').map((e) => e.data.n)).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
+    resumed.close()
+  })
+
+  it('distribue un événement validé en retard avec un identifiant plus petit (sans doublon)', async () => {
+    const { subscribe } = await import('@/lib/event-bus')
+    const { prisma } = await import('@/lib/prisma')
+    const got: number[] = []
+    const unsubscribe = subscribe((e) => got.push(e.id))
+    await new Promise((r) => setTimeout(r, 1_200)) // laisse l'interrogateur s'initialiser
+    // Deux identifiants consécutifs de la vraie séquence (aucune pollution : les suivants restent cohérents).
+    const ids = await prisma.$queryRaw<{ id: bigint }[]>`SELECT nextval(pg_get_serial_sequence('"Event"', 'id')) AS id FROM generate_series(1, 2)`
+    const [low, high] = ids.map((r) => Number(r.id)) as [number, number]
+    // La publication « high » est validée avant « low » (deux transactions concurrentes).
+    await prisma.event.create({ data: { id: BigInt(high), type: 'test.late', audience: 'admin', payload: {} } })
+    expect(await until(() => got.includes(high), 4_000)).toBe(true)
+    await prisma.event.create({ data: { id: BigInt(low), type: 'test.late', audience: 'admin', payload: {} } })
+    expect(await until(() => got.includes(low), 4_000)).toBe(true)
+    await new Promise((r) => setTimeout(r, 1_500)) // plusieurs passages de l'interrogateur : pas de redistribution
+    unsubscribe()
+    expect(got.filter((id) => id === low || id === high)).toEqual([high, low])
   })
 
   it('un nouveau flux ne rejoue pas l’historique', async () => {

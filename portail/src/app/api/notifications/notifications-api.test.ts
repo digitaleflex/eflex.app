@@ -52,6 +52,25 @@ run('API notifications', () => {
     expect(JSON.stringify([first, second])).not.toContain('Secret de B')
   })
 
+  it('pagine sans perdre ni répéter de notifications créées au même instant', async () => {
+    const { prisma } = await import('@/lib/prisma')
+    const { GET } = await import('./route')
+    const user = (await prisma.user.create({ data: { name: 'C', email: `c-${stamp}@exemple.fr` } })).id
+    const same = new Date('2026-11-01T10:00:00.000Z')
+    await prisma.notification.createMany({ data: Array.from({ length: 30 }, (_, i) => ({ userId: user, type: 'deployment.succeeded', title: `T${i}`, createdAt: same })) })
+    as(user)
+    const seen: string[] = []
+    let before: string | null = null
+    for (let page = 0; page < 10; page++) {
+      const res: { notifications: { id: string }[]; nextCursor: string | null } = await (await GET(req(`/api/notifications?limit=7${before ? `&before=${before}` : ''}`))).json()
+      seen.push(...res.notifications.map((n) => n.id))
+      before = res.nextCursor
+      if (!before) break
+    }
+    expect(seen).toHaveLength(30)
+    expect(new Set(seen).size).toBe(30)
+  })
+
   it('un utilisateur ne peut pas marquer comme lue la notification d’un autre', async () => {
     const { prisma } = await import('@/lib/prisma')
     const { POST } = await import('./read/route')
