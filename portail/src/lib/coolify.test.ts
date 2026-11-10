@@ -521,15 +521,27 @@ describe('setApplicationLabels', () => {
 })
 
 describe('deleteApplication', () => {
-  it('envoie DELETE sur /applications/{uuid}', async () => {
+  it('envoie DELETE sur /applications/{uuid} en conservant les volumes par défaut', async () => {
     const calls = mockFetch((url) => {
-      if (url.endsWith('/applications/app')) return new Response(null, { status: 204 })
+      if (url.includes('/applications/app')) return new Response(null, { status: 204 })
       throw new Error(url)
     })
     const { deleteApplication } = await loadModule()
 
     await expect(deleteApplication('app')).resolves.toEqual({ ok: true })
     expect(calls[0]?.init?.method).toBe('DELETE')
+    expect(calls[0]?.url).toContain('delete_volumes=false')
+  })
+
+  it('supprime explicitement les volumes quand demandé', async () => {
+    const calls = mockFetch((url) => {
+      if (url.includes('/applications/app')) return new Response(null, { status: 204 })
+      throw new Error(url)
+    })
+    const { deleteApplication } = await loadModule()
+
+    await expect(deleteApplication('app', { deleteVolumes: true })).resolves.toEqual({ ok: true })
+    expect(calls[0]?.url).toContain('delete_volumes=true')
   })
 
   it('traite une application déjà absente comme une suppression réussie', async () => {

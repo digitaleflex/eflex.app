@@ -272,8 +272,11 @@ de l'hôte.
 - Le volume Laravel est monté sur `/app/storage` (Nixpacks) pour le chemin
   mono-service. Un montage plus fin (`storage/app` seul) sera à décider lors de
   l'implémentation du multi-services.
-- Les volumes ne sont jamais supprimés automatiquement : la suppression d'une
-  application laisse ses volumes côté Coolify (choix conservateur).
+- Les volumes sont **conservés par défaut** à la suppression d'une application
+  (`DELETE /applications/{uuid}?delete_volumes=false`). Une suppression
+  explicitement destructive doit demander `{ deleteVolumes: true }` ; sinon les
+  données persistent côté Coolify (choix conservateur, mais à nettoyer
+  manuellement).
 - Le renderer généré (`pnpm render`) reste destiné au compose/Dockerfile ; le
   déploiement Coolify utilise Nixpacks pour les frameworks non-Docker, et le
   fichier du dépôt pour `compose`. Les commandes préfixées `cd` du plan ne
