@@ -42,8 +42,18 @@ export function deploymentsQueue(): Queue {
   return queue
 }
 
-export async function enqueueDeployment(deploymentId: string): Promise<void> {
-  await deploymentsQueue().add('deploy', { deploymentId }, { jobId: deploymentId })
+export async function enqueueDeployment(
+  deploymentId: string,
+  options: { rollback?: boolean } = {},
+): Promise<void> {
+  // L'intention « retour arrière » voyage avec le job : BullMQ conserve les
+  // données du job à travers les reprises, et le worker choisit l'endpoint
+  // Coolify en conséquence (voir `worker.ts` et `lib/deployment-rollback.ts`).
+  await deploymentsQueue().add(
+    'deploy',
+    { deploymentId, ...(options.rollback ? { rollback: true } : {}) },
+    { jobId: deploymentId },
+  )
 }
 
 /**

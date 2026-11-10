@@ -52,6 +52,7 @@ const AUDIT_LABEL: Record<string, string> = {
   'project.runtime': 'Application pilotée',
   'project.infrastructure.delete': 'Infrastructure supprimée',
   'deployment.cancel': 'Déploiement annulé',
+  'deployment.rollback': 'Retour à une version précédente',
   'deployment.unblock': 'Déploiement débloqué',
   'deployment.logs.view': 'Journaux consultés',
   'metrics.export': 'Indicateurs exportés',
