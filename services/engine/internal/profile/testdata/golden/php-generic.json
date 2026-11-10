@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "version": 0,
+  "analyzerVersion": "evidence/1.1.0",
+  "source": {
+    "repositoryId": "repo_1",
+    "ref": "main",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "root": ""
+  },
+  "status": "ready",
+  "preset": "php",
+  "summary": "Axiom will install this PHP app with Composer and run PHP-FPM with Nginx in one container on port 8080.",
+  "blocking": [],
+  "language": {
+    "value": "PHP",
+    "provenance": "detected",
+    "confidence": 1
+  },
+  "runtimeVersion": {
+    "value": "php 8.3",
+    "provenance": "detected",
+    "confidence": 1
+  },
+  "framework": {
+    "value": ""
+  },
+  "packageManager": {
+    "value": "composer",
+    "provenance": "detected",
+    "confidence": 1
+  },
+  "buildCommand": {
+    "value": "composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts",
+    "provenance": "default"
+  },
+  "startCommand": {
+    "value": "sh /usr/local/bin/axiom-start",
+    "provenance": "default"
+  },
+  "port": {
+    "value": 8080,
+    "provenance": "default"
+  },
+  "containerStrategy": {
+    "value": "source",
+    "provenance": "default"
+  },
+  "healthCheck": {
+    "value": {
+      "type": "http",
+      "path": "/"
+    },
+    "provenance": "default"
+  },
+  "services": [],
+  "configuration": [
+    {
+      "name": "APP_ENV",
+      "required": true,
+      "secret": true
+    }
+  ],
+  "confidence": 1
+}

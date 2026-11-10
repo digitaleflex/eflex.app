@@ -455,10 +455,18 @@
         "preset": {
           "enum": [
             "nextjs",
+            "nuxt",
+            "remix",
+            "solidstart",
+            "redwoodjs",
+            "astro",
+            "sveltekit",
             "vite",
             "node",
             "go",
             "python",
+            "php",
+            "laravel",
             "dockerfile",
             "compose"
           ]

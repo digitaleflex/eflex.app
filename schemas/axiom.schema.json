@@ -15,13 +15,13 @@
         "root": {"type": "string", "description": "Application directory relative to repository root (monorepos)", "pattern": "^(?!/)(?!.*\\.\\.)[^\\0]*$"}
       }
     },
-    "strategy": {"enum": ["nextjs", "vite", "node", "go", "python", "dockerfile", "compose"], "description": "Preset hint (#96). Must be supported by Axiom 0.1.x."},
+    "strategy": {"enum": ["nextjs", "nuxt", "remix", "solidstart", "redwoodjs", "astro", "sveltekit", "vite", "node", "go", "python", "php", "laravel", "dockerfile", "compose"], "description": "Preset hint (#96). Must be supported by Axiom 0.1.x."},
     "runtime": {
       "type": "object", "additionalProperties": false,
       "properties": {
-        "language": {"enum": ["javascript", "typescript", "go", "python"]},
+        "language": {"enum": ["javascript", "typescript", "go", "python", "php"]},
         "version": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]+){0,2}$"},
-        "packageManager": {"enum": ["npm", "pnpm", "yarn", "bun", "pip", "go"]}
+        "packageManager": {"enum": ["npm", "pnpm", "yarn", "bun", "pip", "composer", "go"]}
       }
     },
     "build": {

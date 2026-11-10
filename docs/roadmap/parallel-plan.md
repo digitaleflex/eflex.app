@@ -26,7 +26,7 @@ Verified on 2026-11-07: the two wiring breakpoints that used to block these wave
 | B — Agent ownership + capabilities | #89 then #79 (sequential) | `services/agent/internal/security/ownership/`, `services/agent/internal/capabilities/` | M | #89 first (label scheme + naming constraints that #83/#84 will consume). No Docker/exec yet. |
 | C — Docker adapter | #83 | `services/agent/internal/runtime/docker/` | L | Biggest single task. Constraint: stdlib only (agent `go.mod` has no deps) → Docker CLI via bounded argv (same pattern as engine `ExecBuilder`), never shell. Reads `ownership` (#89, Wave-1 output) and `protocol` (done). |
 | D — axiom.yaml parser + Node presets | #124 (axiom.yaml parser, `internal/manifest/`) then #121 (Node/Next presets, `internal/runtime/presets/node/`) (sequential) | `services/engine/internal/manifest/` (new), `services/engine/internal/runtime/presets/` (new), `services/engine/internal/build/dockerfile.go` (templates only) | M | Manifest parser vs JSON schema (#31, frozen); precedence Override › manifest › detected › default. Wiring into `analysis.Service` = small, in-lane touch of `internal/analysis/service.go` (declare it). |
-| E — Console shell | #119 | `apps/cloud/**` (shell, routing, API client, auth boundary, tokens→CSS) | L | Greenfield (80-line bootstrap today). Zero collision with Go work. Uses interim `AXIOM_API_TOKEN` until #125. |
+| E — Console shell | #119 | `portail/**` (shell, routing, API client, auth boundary, tokens→CSS) | L | Replaces the removed `apps/cloud` console (#16). Zero collision with Go work. Uses interim `AXIOM_API_TOKEN` until #125. |
 | F — Docs (runbook + threat draft) | #104, #129-draft | `docs/operations/`, `docs/security/` | S | Zero code collision. #129 finalized after #88/#89. |
 
 ## Wave 2 — starts when Wave 1 lanes land (dependencies in brackets)
@@ -35,7 +35,7 @@ Verified on 2026-11-07: the two wiring breakpoints that used to block these wave
 |---|---|---|---|---|
 | G — Heartbeat & dispatcher | #78 then #80 | `services/agent/internal/heartbeat/`, `services/agent/internal/dispatcher/` (+ engine liveness query: `internal/server/` read-side only) | L | #76 (identity), #77 (auth), #79 (caps) |
 | H — Traefik + health + logs | #84, #85, #86 (one agent, sequential) | `services/agent/internal/runtime/traefik/`, `services/agent/internal/health/`, `services/agent/internal/logs/` | L | #89 labels, #80 interface (read protocol doc if #80 late; program to `protocol.Operation`) |
-| I — Docker preset + console workflow | #122, #120 | `services/engine/internal/runtime/presets/docker/`, `apps/cloud/features/deploy/` | M | #83 (build semantics), #119 (shell) |
+| I — Docker preset + console workflow | #122, #120 | `services/engine/internal/runtime/presets/docker/`, `portail/src/app/dashboard/new/` | M | #83 (build semantics), #119 (shell) |
 | J — Structured logging | #101 | `services/engine/internal/observability/logging/`, logging convention doc | S | none (engine-only; agent adopts later) |
 
 ## Wave 3
@@ -89,7 +89,7 @@ Measured with PostgreSQL 16 and a real Docker daemon (`AXIOM_TEST_DATABASE_URL`,
 - Its agent transport is in-process: the real listener → protocol → HMAC → bridge handshake is not exercised end to end.
 - The source is a fixture: the GitHub connection (OAuth application, archive download) was never run end to end.
 - The agent CI job sets no `AXIOM_TEST_DOCKER`, so the agent's Docker integration tests never run in CI. That is how `TestIntegrationLifecycle` went stale.
-- V0.1 stack coverage: Node (Next.js, Vite, generic), Go, Python (FastAPI, Flask, Django with a `requirements.txt`), Dockerfile, compose. Laravel (PHP), Rails and Spring Boot are detected but rejected (`analyzer/evidence/decide.go`).
+- V0.1 stack coverage: Node (Next.js, Nuxt, Remix, SolidStart, RedwoodJS, Astro, SvelteKit, Vite, generic), Go, Python (FastAPI, Flask, Django with a `requirements.txt`), PHP and Laravel (Composer, single php-fpm+nginx container), Dockerfile, compose. Rails (Ruby) and Spring Boot (Java) are detected but rejected (`analyzer/evidence/decide.go`); queue/scheduler workers and persistent volumes are not modelled by the planner.
 
 ### What that means for the roadmap
 

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "version": 0,
+  "analyzerVersion": "evidence/1.1.0",
+  "source": {
+    "repositoryId": "repo_1",
+    "ref": "main",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "root": ""
+  },
+  "status": "ready",
+  "preset": "solidstart",
+  "summary": "Axiom will build this SolidStart app with npm and run it as a container on port 3000.",
+  "blocking": [],
+  "language": {
+    "value": "JavaScript",
+    "provenance": "detected",
+    "confidence": 0.8
+  },
+  "runtimeVersion": {
+    "value": ""
+  },
+  "framework": {
+    "value": "SolidStart",
+    "provenance": "detected",
+    "confidence": 0.8
+  },
+  "packageManager": {
+    "value": "npm",
+    "provenance": "detected",
+    "confidence": 0.9
+  },
+  "buildCommand": {
+    "value": "npm run build",
+    "provenance": "detected",
+    "confidence": 0.95
+  },
+  "startCommand": {
+    "value": "npm start",
+    "provenance": "detected",
+    "confidence": 0.95
+  },
+  "port": {
+    "value": 3000,
+    "provenance": "default"
+  },
+  "containerStrategy": {
+    "value": "source",
+    "provenance": "default"
+  },
+  "healthCheck": {
+    "value": {
+      "type": "http",
+      "path": "/"
+    },
+    "provenance": "default"
+  },
+  "services": [],
+  "configuration": [],
+  "confidence": 0.8
+}

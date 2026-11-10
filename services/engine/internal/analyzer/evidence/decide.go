@@ -7,8 +7,8 @@ import (
 
 // Unsupported frameworks for V0.1 (detected, never deployable by preset).
 var unsupportedFrameworks = map[string]string{
-	"Rails":   "Ruby frameworks are not supported in V0.1",
-	"Laravel": "PHP frameworks are not supported in V0.1", "Spring Boot": "Java frameworks are not supported in V0.1",
+	"Rails":       "Ruby frameworks are not supported yet; add a Dockerfile to deploy this repository",
+	"Spring Boot": "Java frameworks are not supported yet; add a Dockerfile to deploy this repository",
 }
 
 // decide combines votes for a single-valued kind into one finding.

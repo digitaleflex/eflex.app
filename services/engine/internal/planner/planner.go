@@ -126,22 +126,37 @@ func toInput(p Plan, s ServerProfile) validation.Input {
 }
 
 func outputDir(p ApplicationProfile) string {
-	if p.Preset == "vite" {
+	// The build output directory each framework produces. Whether the image
+	// copies only that directory or the whole project depends on the start
+	// script and is decided by the runtime preset.
+	switch p.Preset {
+	case "vite", "astro":
 		return "dist"
+	case "sveltekit", "remix":
+		return "build"
+	case "nuxt":
+		return ".output"
 	}
 	return ""
 }
 
 func runtimeType(p ApplicationProfile) string {
 	switch p.Preset {
-	case "nextjs", "node":
+	case "nextjs", "nuxt", "remix", "solidstart", "redwoodjs", "node":
 		return "node"
 	case "vite":
 		return "static"
+	case "astro", "sveltekit":
+		if p.StartCommand.Value == "" {
+			return "static"
+		}
+		return "node"
 	case "go":
 		return "go"
 	case "python":
 		return "python"
+	case "php", "laravel":
+		return "php"
 	case "dockerfile":
 		return "image"
 	case "compose":

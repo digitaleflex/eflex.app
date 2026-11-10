@@ -56,7 +56,9 @@ var (
 	shaRe     = regexp.MustCompile(`^[0-9a-f]{40}$`)
 	domainRe  = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
 	envNameRe = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
-	presetSet = map[string]string{presets.NextJS: "source", presets.Vite: "source", presets.Node: "source", presets.Go: "source", presets.Python: "source",
+	presetSet = map[string]string{presets.NextJS: "source", presets.Nuxt: "source", presets.Remix: "source", presets.SolidStart: "source",
+		presets.RedwoodJS: "source", presets.Astro: "source", presets.SvelteKit: "source", presets.Vite: "source", presets.Node: "source",
+		presets.Go: "source", presets.Python: "source", presets.PHP: "source", presets.Laravel: "source",
 		presets.Dockerfile: "dockerfile", presets.Compose: "compose"}
 )
 
@@ -91,7 +93,7 @@ func Validate(in Input) Errors {
 	} else if in.BuildStrategy != strategy {
 		add("build.strategy", "does not match the preset")
 	}
-	if in.BuildStrategy == "source" && in.Preset != presets.Vite && in.StartCommand == "" {
+	if in.BuildStrategy == "source" && !staticPreset(in.Preset) && in.StartCommand == "" {
 		add("runtime.startCommand", "required for source builds")
 	}
 	for field, cmd := range map[string]string{"build.command": in.BuildCommand, "runtime.startCommand": in.StartCommand} {
@@ -142,6 +144,12 @@ func Validate(in Input) Errors {
 		}
 	}
 	return errs
+}
+
+// staticPreset reports presets whose source build may have no start command
+// because the output is served statically (the mode is resolved upstream).
+func staticPreset(name string) bool {
+	return name == presets.Vite || name == presets.Astro || name == presets.SvelteKit
 }
 
 // validateSteps enforces known names, canonical order, no duplicates,

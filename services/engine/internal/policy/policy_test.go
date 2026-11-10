@@ -40,6 +40,29 @@ func TestAllowValidPlan(t *testing.T) {
 	}
 }
 
+func TestAllowNewFrameworkPresets(t *testing.T) {
+	cases := []struct {
+		strategy string
+		start    string
+	}{
+		{"nuxt", "node .output/server/index.mjs"},
+		{"remix", "npx remix-serve ./build/server/index.js"},
+		{"astro", ""},
+		{"sveltekit", ""},
+		{"php", "sh /usr/local/bin/axiom-start"},
+		{"laravel", "sh /usr/local/bin/axiom-start"},
+	}
+	for _, c := range cases {
+		p := validPlan()
+		p.Strategy = c.strategy
+		p.Runtime.StartCommand = c.start
+		p.Fingerprint = planner.Fingerprint(p)
+		if d := Evaluate(p, "srv_1"); !d.Allow {
+			t.Errorf("%s denied: %v", c.strategy, d.Reasons)
+		}
+	}
+}
+
 func TestDenyCases(t *testing.T) {
 	cases := map[string]func(*planner.Plan) string{
 		"unready":      func(p *planner.Plan) string { p.Status = "INVALID"; return "srv_1" },

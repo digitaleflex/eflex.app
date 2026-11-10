@@ -12,6 +12,7 @@ RUN npm run build
 
 FROM node:20-alpine
 ENV NODE_ENV=production
+ENV PORT=3000
 WORKDIR /app
 COPY --from=build /app/package.json ./
 COPY --from=build /app/package-lock.json ./

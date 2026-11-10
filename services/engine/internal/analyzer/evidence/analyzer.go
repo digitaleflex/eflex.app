@@ -50,6 +50,7 @@ func Analyze(s snapshot.Snapshot, opts Options) Result {
 	a.detectGo()
 	a.detectOtherLanguages()
 	a.detectPython()
+	a.detectPHP()
 	a.detectFrameworkConfigs(pkg)
 	a.detectContainers()
 	a.detectConfiguration()
@@ -244,6 +245,18 @@ func (p *packageJSON) has(dep string) bool {
 	return a || b
 }
 
+// hasHigherFramework reports whether package.json declares a framework that
+// uses Vite as its build tool. In that case a "vite" dependency or a
+// vite.config file is a tool, not a competing framework.
+func (p *packageJSON) hasHigherFramework() bool {
+	for _, dep := range []string{"next", "nuxt", "astro", "@sveltejs/kit", "@remix-run/node", "remix", "solid-start", "@solidjs/start", "@redwoodjs/api", "@redwoodjs/db", "@redwoodjs/core", "laravel-vite-plugin"} {
+		if p.has(dep) {
+			return true
+		}
+	}
+	return false
+}
+
 func (a *analysis) detectNode() *packageJSON {
 	f, ok := a.file("package.json")
 	if !ok {
@@ -305,18 +318,32 @@ func (a *analysis) detectNode() *packageJSON {
 
 	// Framework from dependencies.
 	for _, fw := range []struct{ dep, name string }{
-		{"next", "Next.js"}, {"vite", "Vite"}, {"@remix-run/node", "Remix"}, {"nuxt", "Nuxt"}, {"astro", "Astro"},
-		{"@sveltejs/kit", "SvelteKit"}, {"@nestjs/core", "NestJS"}, {"express", "Express"}, {"fastify", "Fastify"}, {"koa", "Koa"},
+		{"next", "Next.js"}, {"vite", "Vite"}, {"@remix-run/node", "Remix"}, {"remix", "Remix"}, {"nuxt", "Nuxt"}, {"astro", "Astro"},
+		{"@sveltejs/kit", "SvelteKit"}, {"solid-start", "SolidStart"}, {"@solidjs/start", "SolidStart"},
+		{"@redwoodjs/api", "RedwoodJS"}, {"@redwoodjs/db", "RedwoodJS"}, {"@redwoodjs/core", "RedwoodJS"},
+		{"@nestjs/core", "NestJS"}, {"express", "Express"}, {"fastify", "Fastify"}, {"koa", "Koa"},
 	} {
 		if pkg.has(fw.dep) {
 			w := 0.8
-			if fw.name == "Vite" && pkg.has("next") {
-				w = 0.3 // vite as a tool inside another framework
+			if fw.name == "Vite" && pkg.hasHigherFramework() {
+				continue // vite is the build tool of the detected framework
 			}
 			if (fw.name == "Express" || fw.name == "Fastify" || fw.name == "Koa") && (pkg.has("next") || pkg.has("@nestjs/core")) {
 				continue // server library used by a higher-level framework
 			}
 			a.vote(KindFramework, fw.name, w, Evidence{Source: SourceManifest, Path: pkgPath, Lines: lineOf(f.Content, `"`+fw.dep+`"`), Rule: "node.framework.dependency", Explanation: fw.dep + " is a dependency"})
+		}
+	}
+
+	// Rendering adapters decide whether Astro/SvelteKit are served by Node or as
+	// static files. The analyzer records them; the profile picks the mode.
+	for _, ad := range []struct{ dep, mode string }{
+		{"@astrojs/node", "node"},
+		{"@sveltejs/adapter-node", "node"},
+		{"@sveltejs/adapter-static", "static"},
+	} {
+		if pkg.has(ad.dep) {
+			a.addMulti(KindAdapter, ad.mode, Evidence{Source: SourceManifest, Path: pkgPath, Lines: lineOf(f.Content, `"`+ad.dep+`"`), Rule: "node.adapter.dependency", Explanation: ad.dep + " selects the " + ad.mode + " output"})
 		}
 	}
 
@@ -402,7 +429,7 @@ func (a *analysis) detectGo() {
 func (a *analysis) detectOtherLanguages() {
 	for _, l := range []struct{ file, lang string }{
 		{"pyproject.toml", "Python"}, {"requirements.txt", "Python"}, {"setup.py", "Python"}, {"Pipfile", "Python"},
-		{"Gemfile", "Ruby"}, {"composer.json", "PHP"}, {"pom.xml", "Java"}, {"build.gradle", "Java"}, {"build.gradle.kts", "Kotlin"},
+		{"Gemfile", "Ruby"}, {"pom.xml", "Java"}, {"build.gradle", "Java"}, {"build.gradle.kts", "Kotlin"},
 		{"Cargo.toml", "Rust"}, {"mix.exs", "Elixir"},
 	} {
 		if a.exists(l.file) {
@@ -412,7 +439,7 @@ func (a *analysis) detectOtherLanguages() {
 	for _, fw := range []struct{ file, needle, name string }{
 		{"requirements.txt", "django", "Django"}, {"requirements.txt", "flask", "Flask"}, {"requirements.txt", "fastapi", "FastAPI"},
 		{"pyproject.toml", "django", "Django"}, {"pyproject.toml", "fastapi", "FastAPI"}, {"Gemfile", "rails", "Rails"},
-		{"composer.json", "laravel/framework", "Laravel"}, {"pom.xml", "spring-boot", "Spring Boot"},
+		{"pom.xml", "spring-boot", "Spring Boot"},
 	} {
 		if f, ok := a.file(fw.file); ok && f.Retained {
 			if l := lineOf(bytes.ToLower(f.Content), fw.needle); l != "" {
@@ -429,13 +456,15 @@ func (a *analysis) detectFrameworkConfigs(pkg *packageJSON) {
 		for _, ext := range []string{"js", "mjs", "cjs", "ts", "mts"} {
 			name := c.prefix + ext
 			if a.existsAny(name) {
-				w := 0.9
-				if c.name == "Vite" && pkg.has("next") {
-					w = 0.3
+				if c.name == "Vite" && pkg.hasHigherFramework() {
+					continue // vite.config is the framework's build tool, not a framework
 				}
-				a.vote(KindFramework, c.name, w, Evidence{Source: SourceFrameworkConfig, Path: a.abs(name), Rule: "framework.config_file", Explanation: name + " configures " + c.name})
+				a.vote(KindFramework, c.name, 0.9, Evidence{Source: SourceFrameworkConfig, Path: a.abs(name), Rule: "framework.config_file", Explanation: name + " configures " + c.name})
 			}
 		}
+	}
+	if a.existsAny("redwood.toml") {
+		a.vote(KindFramework, "RedwoodJS", 0.9, Evidence{Source: SourceFrameworkConfig, Path: a.abs("redwood.toml"), Rule: "framework.config_file", Explanation: "redwood.toml configures RedwoodJS"})
 	}
 }
 
@@ -551,12 +580,20 @@ func (a *analysis) notApplicable(kind string) string {
 		if !a.hasVote(KindLanguage, "Go") && !a.hasVote(KindLanguage, "Python") {
 			return "entrypoints are detected for Go and Python projects"
 		}
+	case KindAdapter:
+		if !hasNode {
+			return "adapters apply to Node.js projects"
+		}
+	case KindPHP:
+		if !a.hasVote(KindLanguage, "PHP") {
+			return "PHP facts apply to PHP projects"
+		}
 	case KindPublicService:
 		if !a.hasVote(KindContainer, "compose") {
 			return "applies to Compose projects"
 		}
 	case KindPackageManager:
-		if len(a.votes[KindLanguage]) > 0 && !hasNode && !a.hasVote(KindLanguage, "Go") && !a.hasVote(KindLanguage, "Python") {
+		if len(a.votes[KindLanguage]) > 0 && !hasNode && !a.hasVote(KindLanguage, "Go") && !a.hasVote(KindLanguage, "Python") && !a.hasVote(KindLanguage, "PHP") {
 			return "no supported package manager for this language"
 		}
 	}

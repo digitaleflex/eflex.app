@@ -245,17 +245,69 @@ func TestRealDockerBuild(t *testing.T) {
 }
 
 func TestDockerfileTemplates(t *testing.T) {
-	for _, preset := range []string{"nextjs", "node", "vite", "go"} {
-		df, err := dockerfileForPreset(preset, "pnpm run build", "pnpm start", 3000, "dist")
+	dir := t.TempDir()
+	for _, preset := range []string{"nextjs", "node", "go"} {
+		df, err := dockerfileForPreset(preset, "pnpm run build", "pnpm start", 3000, "dist", dir)
 		if err != nil || !strings.Contains(df, "pnpm run build") {
 			t.Fatalf("%s: %v %q", preset, err, df)
 		}
 	}
-	if _, err := dockerfileForPreset("rails", "x", "y", 3000, ""); err == nil {
+	if _, err := dockerfileForPreset("rails", "x", "y", 3000, "", dir); err == nil {
 		t.Fatal("unknown preset must fail")
 	}
-	df, _ := dockerfileForPreset("vite", "npm run build", "", 8080, "")
-	if !strings.Contains(df, "nginx") || !strings.Contains(df, "dist") {
-		t.Fatalf("vite template = %q", df)
+	df, err := dockerfileForPreset("vite", "npm run build", "", 8080, "", dir)
+	if err != nil || !strings.Contains(df, "nginx") || !strings.Contains(df, "dist") {
+		t.Fatalf("vite template = %v %q", err, df)
+	}
+}
+
+func TestNodeFrameworkTemplates(t *testing.T) {
+	dir := t.TempDir()
+	cases := map[string]struct {
+		build, start string
+		want         string
+	}{
+		"nuxt":      {"npm run build", "", "COPY --from=build /app/.output ./.output"},
+		"remix":     {"npm run build", "", "COPY --from=build /app/build ./build"},
+		"astro":     {"npm run build", "", "COPY --from=build /app/dist /usr/share/nginx/html"},
+		"sveltekit": {"npm run build", "", "COPY --from=build /app/build /usr/share/nginx/html"},
+		"redwoodjs": {"yarn rw build", "yarn rw serve", "COPY --from=build /app ./"},
+	}
+	for preset, c := range cases {
+		df, err := dockerfileForPreset(preset, c.build, c.start, 3000, "", dir)
+		if err != nil {
+			t.Fatalf("%s: %v", preset, err)
+		}
+		if !strings.Contains(df, c.want) {
+			t.Fatalf("%s: dockerfile missing %q:\n%s", preset, c.want, df)
+		}
+	}
+}
+
+func TestPHPGeneratedDockerfile(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"composer.json":    `{"require":{"laravel/framework":"^11"}}`,
+		"composer.lock":    "{}",
+		"artisan":          "php",
+		"public/index.php": "<?php",
+	}
+	for name, content := range files {
+		path := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	df, err := dockerfileForPreset("laravel", "composer install --no-dev --no-scripts", "sh /usr/local/bin/axiom-start", 8080, "", dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"FROM php:8.3-fpm-bookworm", "COPY composer.lock ./", "php artisan migrate --force", "EXPOSE 8080"} {
+		if !strings.Contains(df, want) {
+			t.Fatalf("laravel dockerfile missing %q:\n%s", want, df)
+		}
 	}
 }

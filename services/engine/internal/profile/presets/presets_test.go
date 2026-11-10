@@ -65,6 +65,160 @@ func TestMultipleGoEntrypointsNeedChoice(t *testing.T) {
 	}
 }
 
+func TestNodeFrameworkPresets(t *testing.T) {
+	cases := []struct {
+		name       string
+		facts      Facts
+		wantName   string
+		wantBuild  string
+		wantStart  string
+		wantOut    string
+		wantPort   int
+		wantReject string
+	}{
+		{
+			name:      "nuxt with scripts",
+			facts:     Facts{Language: "TypeScript", Framework: "Nuxt", PackageManager: "pnpm", HasBuildScript: true, HasStartScript: true},
+			wantName:  Nuxt,
+			wantBuild: "pnpm run build",
+			wantStart: "pnpm start",
+			wantPort:  3000,
+		},
+		{
+			name:      "nuxt without scripts",
+			facts:     Facts{Language: "JavaScript", Framework: "Nuxt", PackageManager: "npm"},
+			wantName:  Nuxt,
+			wantBuild: "npx nuxt build",
+			wantStart: "node .output/server/index.mjs",
+			wantOut:   ".output",
+			wantPort:  3000,
+		},
+		{
+			name:      "remix without scripts",
+			facts:     Facts{Language: "JavaScript", Framework: "Remix", PackageManager: "npm"},
+			wantName:  Remix,
+			wantBuild: "npx remix build",
+			wantStart: "npx remix-serve ./build/server/index.js",
+			wantOut:   "build",
+			wantPort:  3000,
+		},
+		{
+			name:      "redwoodjs with scripts",
+			facts:     Facts{Language: "JavaScript", Framework: "RedwoodJS", PackageManager: "yarn", HasBuildScript: true, HasStartScript: true},
+			wantName:  RedwoodJS,
+			wantBuild: "yarn run build",
+			wantStart: "yarn start",
+			wantPort:  8910,
+		},
+		{
+			name:       "solidstart without a start script",
+			facts:      Facts{Language: "JavaScript", Framework: "SolidStart", PackageManager: "npm", HasBuildScript: true},
+			wantReject: ReasonMissingStart,
+		},
+		{
+			name:      "astro static",
+			facts:     Facts{Language: "JavaScript", Framework: "Astro", PackageManager: "npm", HasBuildScript: true},
+			wantName:  Astro,
+			wantBuild: "npm run build",
+			wantOut:   "dist",
+			wantPort:  8080,
+		},
+		{
+			name:      "astro node adapter",
+			facts:     Facts{Language: "JavaScript", Framework: "Astro", PackageManager: "npm", NodeAdapters: []string{"node"}, HasBuildScript: true},
+			wantName:  Astro,
+			wantBuild: "npm run build",
+			wantStart: "node ./dist/server/entry.mjs",
+			wantOut:   "dist",
+			wantPort:  3000,
+		},
+		{
+			name:      "sveltekit static adapter",
+			facts:     Facts{Language: "JavaScript", Framework: "SvelteKit", PackageManager: "npm", NodeAdapters: []string{"static"}, HasBuildScript: true},
+			wantName:  SvelteKit,
+			wantBuild: "npm run build",
+			wantOut:   "build",
+			wantPort:  8080,
+		},
+		{
+			name:      "sveltekit node adapter",
+			facts:     Facts{Language: "JavaScript", Framework: "SvelteKit", PackageManager: "npm", NodeAdapters: []string{"node"}, HasBuildScript: true},
+			wantName:  SvelteKit,
+			wantBuild: "npm run build",
+			wantStart: "node build/index.js",
+			wantOut:   "build",
+			wantPort:  3000,
+		},
+		{
+			name:       "sveltekit without adapter",
+			facts:      Facts{Language: "JavaScript", Framework: "SvelteKit", PackageManager: "npm", HasBuildScript: true},
+			wantReject: ReasonSvelteKitAdapter,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p, rej := Resolve(c.facts)
+			if c.wantReject != "" {
+				if rej == nil || rej.Code != c.wantReject || len(rej.Alternatives) == 0 {
+					t.Fatalf("rejection = %+v", rej)
+				}
+				return
+			}
+			if rej != nil {
+				t.Fatalf("unexpected rejection %+v", rej)
+			}
+			if p.Name != c.wantName || p.BuildCommand != c.wantBuild || p.StartCommand != c.wantStart ||
+				p.OutputDir != c.wantOut || p.DefaultPort != c.wantPort {
+				t.Fatalf("preset = %+v", p)
+			}
+			for _, cmd := range []string{p.BuildCommand, p.StartCommand} {
+				if cmd != "" && ValidateCommand(cmd) != nil {
+					t.Errorf("preset command refused: %q", cmd)
+				}
+			}
+		})
+	}
+}
+
+func TestPHPPresets(t *testing.T) {
+	laravel := Facts{Language: "PHP", Framework: "Laravel", PackageManager: "composer", PHPHasArtisan: true, PHPDocumentRoot: true, PHPBuildAssets: true}
+	p, rej := Resolve(laravel)
+	if rej != nil {
+		t.Fatalf("laravel: %+v", rej)
+	}
+	if p.Name != Laravel || p.Runtime != "php" || p.Strategy != StrategySource || p.DefaultPort != 8080 ||
+		p.BuildCommand != ComposerInstall || p.StartCommand != PHPStart {
+		t.Fatalf("laravel preset = %+v", p)
+	}
+	if ValidateCommand(p.BuildCommand) != nil || ValidateCommand(p.StartCommand) != nil {
+		t.Fatalf("laravel commands refused: %+v", p)
+	}
+
+	p, rej = Resolve(Facts{Language: "PHP", PackageManager: "composer", PHPDocumentRoot: true})
+	if rej != nil || p.Name != PHP || p.Runtime != "php" {
+		t.Fatalf("generic php = %+v %+v", p, rej)
+	}
+
+	if _, rej = Resolve(Facts{Language: "PHP", PHPDocumentRoot: true}); rej == nil || rej.Code != ReasonPHPManifest {
+		t.Fatalf("missing composer = %+v", rej)
+	}
+	if _, rej = Resolve(Facts{Language: "PHP", PackageManager: "composer"}); rej == nil || rej.Code != ReasonPHPEntrypoint {
+		t.Fatalf("missing entrypoint = %+v", rej)
+	}
+	if _, rej = Resolve(Facts{Language: "PHP", PackageManager: "composer", HasStartScript: true}); rej == nil || rej.Code != ReasonPHPEntrypoint {
+		t.Fatalf("an npm start script must not make generic PHP deployable: %+v", rej)
+	}
+	if _, rej = Resolve(Facts{Language: "PHP", PackageManager: "composer", StartCommandHint: true}); rej != nil {
+		t.Fatalf("explicit start command must make generic PHP deployable: %+v", rej)
+	}
+}
+
+func TestPackageManagerValidationAcceptsComposer(t *testing.T) {
+	if err := ValidatePackageManager("composer"); err != nil {
+		t.Fatalf("composer refused: %v", err)
+	}
+}
+
 func TestValidateCommand(t *testing.T) {
 	for _, ok := range []string{"pnpm build", "npm run build && npm run postbuild", "./server --port 8080", "go build -o app ./cmd/x"} {
 		if err := ValidateCommand(ok); err != nil {

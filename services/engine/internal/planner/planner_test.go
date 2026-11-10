@@ -31,6 +31,40 @@ func request() Request {
 	return Request{ApplicationID: "app_1", Profile: readyProfile(), Server: readyServer(), Environment: "production", Domain: "App.Example.com"}
 }
 
+func TestRuntimeTypesForFrameworkPresets(t *testing.T) {
+	cases := []struct {
+		preset   string
+		start    string
+		wantType string
+		wantOut  string
+	}{
+		{"nuxt", "node .output/server/index.mjs", "node", ".output"},
+		{"remix", "npx remix-serve ./build/server/index.js", "node", "build"},
+		{"astro", "", "static", "dist"},
+		{"astro", "node ./dist/server/entry.mjs", "node", "dist"},
+		{"sveltekit", "", "static", "build"},
+		{"sveltekit", "node build/index.js", "node", "build"},
+		{"laravel", "sh /usr/local/bin/axiom-start", "php", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.preset+"/"+c.wantType, func(t *testing.T) {
+			req := request()
+			req.Profile.Preset = c.preset
+			req.Profile.StartCommand = profile.Field[string]{}
+			if c.start != "" {
+				req.Profile.StartCommand = profile.Field[string]{Value: c.start, Provenance: profile.ProvenanceDefault}
+			}
+			plan, err := New().Generate(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if plan.Runtime.Type != c.wantType || plan.Build.OutputDir != c.wantOut {
+				t.Fatalf("plan runtime=%q outputDir=%q", plan.Runtime.Type, plan.Build.OutputDir)
+			}
+		})
+	}
+}
+
 func TestGeneratePlan(t *testing.T) {
 	plan, err := New().Generate(request())
 	if err != nil {

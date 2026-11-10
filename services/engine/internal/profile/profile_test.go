@@ -67,6 +67,48 @@ var fixtures = map[string]map[string]string{
 		"app.py":           "from flask import Flask\napp = Flask(__name__)\n",
 		"worker.py":        "from flask import Flask\nworker = Flask(__name__)\n",
 	},
+	"nuxt": {
+		"package.json":   `{"packageManager":"pnpm@9.1.0","scripts":{"build":"nuxt build"},"dependencies":{"nuxt":"3.13.0"},"devDependencies":{"vite":"5"}}`,
+		"pnpm-lock.yaml": "x", "nuxt.config.ts": "export default {}", "vite.config.ts": "export default {}",
+	},
+	"remix": {
+		"package.json":      `{"scripts":{"build":"remix build"},"dependencies":{"remix":"2.12.0","@remix-run/serve":"2.12.0"}}`,
+		"package-lock.json": "{}", "remix.config.js": "module.exports = {}",
+	},
+	"solidstart": {
+		"package.json":      `{"scripts":{"build":"vinxi build","start":"vinxi start"},"dependencies":{"solid-start":"1.0.0"}}`,
+		"package-lock.json": "{}",
+	},
+	"redwoodjs": {
+		"package.json":      `{"scripts":{"build":"rw build","start":"rw serve"},"dependencies":{"@redwoodjs/api":"7.0.0"}}`,
+		"package-lock.json": "{}", "redwood.toml": "[web]",
+	},
+	"astro": {
+		"package.json":      `{"scripts":{"build":"astro build"},"dependencies":{"astro":"4.15.0","@astrojs/node":"9.0.0"}}`,
+		"package-lock.json": "{}", "astro.config.mjs": "export default {}",
+	},
+	"sveltekit-static": {
+		"package.json":      `{"scripts":{"build":"vite build"},"devDependencies":{"@sveltejs/kit":"2.5.0","@sveltejs/adapter-static":"3.0.0","vite":"5"}}`,
+		"package-lock.json": "{}", "svelte.config.js": "export default {}", "vite.config.ts": "export default {}",
+	},
+	"sveltekit-node": {
+		"package.json":      `{"scripts":{"build":"vite build"},"devDependencies":{"@sveltejs/kit":"2.5.0","@sveltejs/adapter-node":"5.0.0","vite":"5"}}`,
+		"package-lock.json": "{}", "svelte.config.js": "export default {}", "vite.config.ts": "export default {}",
+	},
+	"php-generic": {
+		"composer.json":    `{"require":{"php":"^8.3","monolog/monolog":"^3"}}`,
+		"public/index.php": "<?php\n",
+		".env.example":     "APP_ENV=\n",
+	},
+	"laravel": {
+		"composer.json":    `{"require":{"php":"^8.2","laravel/framework":"^11.0"},"scripts":{"post-autoload-dump":["@php artisan package:discover --ansi"]}}`,
+		"composer.lock":    "{}",
+		"artisan":          "#!/usr/bin/env php\n",
+		"public/index.php": "<?php\n",
+		"package.json":     `{"devDependencies":{"laravel-vite-plugin":"1","vite":"5"},"scripts":{"build":"vite build"}}`,
+		"vite.config.js":   "export default {}\n",
+		".env.example":     "APP_KEY=\nDB_CONNECTION=\n",
+	},
 }
 
 func TestGoldenProfiles(t *testing.T) {
@@ -196,5 +238,81 @@ func TestMonorepoRequiresRoot(t *testing.T) {
 	p := build(map[string]string{"apps/web/package.json": `{"dependencies":{"next":"14"}}`, "apps/api/go.mod": "module m\n"}, Inputs{})
 	if p.Status != StatusUnsupported || p.Unsupported.Code != "AMBIGUOUS_APPLICATION_ROOT" {
 		t.Fatalf("monorepo: %+v", p.Unsupported)
+	}
+}
+
+func TestStaticPresetRejectsStartCommand(t *testing.T) {
+	start := "node server.js"
+	p := build(fixtures["vite"], Inputs{Overrides: Hints{StartCommand: &start}})
+	if p.Status != StatusNeedsReview || p.StartCommand.Set() || p.Blocking[0].Field != "startCommand" || p.Blocking[0].Code != "invalid_override" {
+		t.Fatalf("static preset start override: %+v %+v", p.StartCommand, p.Blocking)
+	}
+}
+
+func TestNodeFrameworkProfiles(t *testing.T) {
+	cases := []struct {
+		name   string
+		preset string
+		start  string
+		port   int
+	}{
+		{"nuxt", "nuxt", "node .output/server/index.mjs", 3000},
+		{"remix", "remix", "npx remix-serve ./build/server/index.js", 3000},
+		{"solidstart", "solidstart", "npm start", 3000},
+		{"redwoodjs", "redwoodjs", "npm start", 8910},
+		{"astro", "astro", "node ./dist/server/entry.mjs", 3000},
+		{"sveltekit-static", "sveltekit", "", 8080},
+		{"sveltekit-node", "sveltekit", "node build/index.js", 3000},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p := build(fixtures[c.name], Inputs{})
+			if p.Status != StatusReady || p.Preset != c.preset {
+				t.Fatalf("profile = %+v", p)
+			}
+			if p.StartCommand.Value != c.start || p.Port.Value != c.port {
+				t.Fatalf("start=%q port=%d (want %q/%d)", p.StartCommand.Value, p.Port.Value, c.start, c.port)
+			}
+			if c.start == "" && p.StartCommand.Set() {
+				t.Fatalf("static preset must have no start command: %+v", p.StartCommand)
+			}
+		})
+	}
+}
+
+func TestPHPProfiles(t *testing.T) {
+	generic := build(fixtures["php-generic"], Inputs{})
+	if generic.Status != StatusReady || generic.Preset != "php" || generic.PackageManager.Value != "composer" {
+		t.Fatalf("generic php = %+v", generic)
+	}
+	if generic.Port.Value != 8080 || generic.Port.Provenance != ProvenanceDefault {
+		t.Fatalf("php port = %+v", generic.Port)
+	}
+	if !strings.Contains(generic.Summary, "Composer") || !strings.Contains(generic.Summary, "PHP-FPM") {
+		t.Fatalf("summary = %q", generic.Summary)
+	}
+
+	laravel := build(fixtures["laravel"], Inputs{})
+	if laravel.Status != StatusReady || laravel.Preset != "laravel" || laravel.Framework.Value != "Laravel" {
+		t.Fatalf("laravel = %+v", laravel)
+	}
+	if !strings.Contains(laravel.BuildCommand.Value, "--no-scripts") || laravel.StartCommand.Value != "sh /usr/local/bin/axiom-start" {
+		t.Fatalf("laravel commands = %+v / %+v", laravel.BuildCommand, laravel.StartCommand)
+	}
+	if len(laravel.Configuration) != 2 {
+		t.Fatalf("configuration = %+v", laravel.Configuration)
+	}
+	if !laravel.Deployable() {
+		t.Fatalf("laravel must be deployable: %+v", laravel.Blocking)
+	}
+
+	// A frontend tool is not the application framework of a PHP app.
+	tools := build(map[string]string{
+		"composer.json":    `{"require":{"php":"^8.3"}}`,
+		"public/index.php": "<?php",
+		"package.json":     `{"devDependencies":{"vite":"5"},"scripts":{"build":"vite build"}}`,
+	}, Inputs{})
+	if tools.Preset != "php" || tools.Framework.Set() || tools.Status != StatusReady {
+		t.Fatalf("generic php with Vite = %+v (framework %+v)", tools, tools.Framework)
 	}
 }
