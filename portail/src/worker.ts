@@ -20,6 +20,7 @@ import {
 } from '@/lib/deploy-plan'
 import { assertTransition, isTerminal, TERMINAL_STATUSES, type DeploymentStatus } from '@/lib/deployment-state'
 import { expireStaleDeployments, WATCHDOG_INTERVAL_MS } from '@/lib/deployment-watchdog'
+import { startBillingMaintenance } from '@/lib/billing-renewal'
 import { DEPLOYMENT_QUEUE, redisConnection } from '@/lib/queue'
 import { COOLIFY_FAILED, COOLIFY_LIVE } from '@/lib/coolify-status'
 import { announceDeploymentStatus } from '@/lib/deployment-events'
@@ -516,6 +517,11 @@ export function startDeploymentWorker(): Worker {
   // Après un redémarrage, les déploiements bloqués doivent expirer sans attendre
   // la première minute ni l'arrivée d'un job.
   void runDeploymentWatchdog()
+
+  // Maintenance des abonnements (relance de #18) : passe immédiate puis toutes
+  // les 6 h. Aucun paiement n'est déclenché, seules les échéances sont
+  // constatées. Voir `docs/operations/billing.md`.
+  startBillingMaintenance()
 
   worker.on('completed', (job) => {
     console.info(`[eflex/worker] déploiement ${job.id} traité`)
