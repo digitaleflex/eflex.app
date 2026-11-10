@@ -230,6 +230,13 @@ export interface CreateApplicationParams {
   dockerfileLocation?: string
   /** Compose relatif à `baseDirectory` (framework `compose`). */
   dockerComposeLocation?: string
+  /**
+   * Contenu du compose lu dans le dépôt, uniquement pour l'**initialisation**
+   * de l'application. Coolify relit ensuite le fichier du dépôt à chaque
+   * déploiement. Nécessaire pour pouvoir fournir `docker_compose_domains`
+   * (sinon l'API répond « reload the compose file first »).
+   */
+  dockerComposeRaw?: string
   /** Domaines par service compose ; interdit `domains` pour `dockercompose`. */
   dockerComposeDomains?: readonly ComposeDomain[]
   /** Domaine public principal (ignoré pour `dockercompose`). */
@@ -286,8 +293,11 @@ export async function createApplication(
     if (isCompose) {
       // Champs réels de Coolify 4.7.3 pour une Application `dockercompose` :
       // `domains` est refusé (422) et `ports_exposes` est forcé à 80 côté
-      // serveur. Le compose est lu dans le dépôt, jamais transmis ici.
+      // serveur. Le compose est relu dans le dépôt à chaque déploiement ; on
+      // fournit néanmoins son contenu à la création, sinon Coolify refuse
+      // `docker_compose_domains` (« reload the compose file first »).
       payload.docker_compose_location = params.dockerComposeLocation || '/docker-compose.yaml'
+      if (params.dockerComposeRaw) payload.docker_compose_raw = params.dockerComposeRaw
       const composeDomains = (params.dockerComposeDomains ?? []).filter(
         (entry) => entry.name.length > 0 && entry.domain.length > 0,
       )

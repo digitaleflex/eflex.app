@@ -242,6 +242,24 @@ Pour activer :
 3. valider sur un projet de test qu'un fichier écrit dans le volume survit à un
    redéploiement, puis généraliser.
 
+## Validation réelle (staging)
+
+Le 10 novembre 2026, un dépôt jetable contenant un `docker-compose.yml` (service
+`web` nginx) a été déployé depuis le portail de staging :
+
+- détection `compose`, plan `dockercompose` et application Coolify créée ;
+- le contenu initial du compose est transmis à la création (`docker_compose_raw`)
+  pour que Coolify accepte `docker_compose_domains` ; il relit ensuite le dépôt ;
+- déploiement `live`, HTTP 200 et page nginx servie via HTTPS ;
+- routeur Traefik porté par les labels du compose (`Host(...)`, `websecure`,
+  `letsencrypt`).
+
+**Conséquence pratique** : le domaine du projet (`<slug>.staging.eflex.app`)
+n'est pas suffisant à lui seul. Le compose doit déclarer un routeur Traefik
+`Host(...)` pour le domaine réellement utilisé, ou réutiliser le domaine du
+projet. Sans labels, l'application démarre mais n'est pas routée par le Traefik
+de l'hôte.
+
 ## Limites connues
 
 - **Multi-services généré refusé.** Un plan Laravel (`app`, `web`, `queue`,
