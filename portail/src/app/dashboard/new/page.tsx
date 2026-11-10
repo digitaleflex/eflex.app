@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { FrameworkIcon } from '@/components/framework-icon'
 import { DetectionCard } from '@/components/new-project/detection-card'
+import { ApplicationPicker } from '@/components/new-project/application-picker'
 import { GitHubPicker } from '@/components/new-project/github-picker'
 import { frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 
@@ -45,6 +46,7 @@ export default function NewProjectPage() {
   const detection = analysis?.detection ?? null
   const plans: BuildPlan[] = detection?.plan ? [detection.plan, ...detection.alternatives] : []
   const selectedPlan = plans.find((p) => p.framework === chosen) ?? plans[0] ?? null
+  const applications = analysis?.apps ?? []
 
   // Place le focus sur le résultat dès qu'il arrive, pour les lecteurs d'écran et le clavier.
   useEffect(() => {
@@ -234,7 +236,17 @@ export default function NewProjectPage() {
           </p>
         )}
 
-        {appOptions.length > 0 && (
+        {applications.length > 1 && (
+          <ApplicationPicker
+            apps={applications}
+            selectedRoot={root}
+            analyzing={analyzing}
+            onSelect={(appRoot) => void analyze(appRoot)}
+            headingRef={selectedPlan ? undefined : resultHeading}
+          />
+        )}
+
+        {applications.length <= 1 && appOptions.length > 0 && (
           <Card>
             <CardHeader>
               <h2 ref={selectedPlan ? undefined : resultHeading} tabIndex={-1} className="font-semibold focus:outline-none">

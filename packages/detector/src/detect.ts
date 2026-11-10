@@ -47,7 +47,11 @@ export const IGNORED_SEGMENTS = new Set([
 
 const STACK_OPTIONS = ['Next.js', 'Vite', 'Node', 'Laravel', 'PHP', 'Python', 'Site statique'];
 
-interface RepoView {
+/**
+ * Vue normalisée d'un `RepoSnapshot`, partagée par `detect()` et
+ * `detectApplications()` (export interne, non ré-exporté par `index.ts`).
+ */
+export interface RepoView {
   files: string[];
   read: (path: string) => string | null;
 }
@@ -89,7 +93,8 @@ function parseJsonObject(text: string | null): Record<string, unknown> | null {
   }
 }
 
-function createView(snapshot: RepoSnapshot): RepoView {
+/** Export interne : construit la vue normalisée (fichiers triés, chemins ignorés retirés). */
+export function createView(snapshot: RepoSnapshot): RepoView {
   const files = normalizeFiles(snapshot.files);
   const originalByNormalized = new Map<string, string>();
 
@@ -114,7 +119,8 @@ function createView(snapshot: RepoSnapshot): RepoView {
   };
 }
 
-function createContext(view: RepoView, root: string): DetectionContext {
+/** Export interne : contexte de détection d'une application (chemins relatifs à `root`). */
+export function createContext(view: RepoView, root: string): DetectionContext {
   const fileSet = new Set(view.files);
   const prefix = root === '' ? '' : `${root}/`;
   const full = (path: string): string => `${prefix}${normalizePath(path)}`;
@@ -363,10 +369,10 @@ function workspaceContext(
 }
 
 /**
- * Detect one application of a monorepo: runs the detectors at `app` and records its
- * location (`root`) and the way back to the repository root (`repoRoot`).
+ * Export interne : détecte une application de monorepo à un dossier donné, en
+ * ajoutant `root`, `repoRoot` et le contexte de workspace (build filtré).
  */
-function resolveApplication(view: RepoView, app: string): DetectionResult {
+export function resolveApplication(view: RepoView, app: string): DetectionResult {
   const subResult = detectAt(view, app, false);
   if (!subResult.plan) return subResult;
 
@@ -391,7 +397,11 @@ function resolveApplication(view: RepoView, app: string): DetectionResult {
   };
 }
 
-function detectAt(view: RepoView, root: string, allowMonorepo: boolean): DetectionResult {
+/**
+ * Export interne : détection à un dossier précis. `allowMonorepo` reste faux
+ * pour les applications d'un monorepo (on ne redescend pas récursivement).
+ */
+export function detectAt(view: RepoView, root: string, allowMonorepo: boolean): DetectionResult {
   const ctx = createContext(view, root);
 
   // Step 0: explicit configuration always wins.

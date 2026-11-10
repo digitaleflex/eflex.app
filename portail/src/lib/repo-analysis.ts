@@ -14,8 +14,8 @@
 //  - sans jeton d'installation, un dépôt privé est refusé explicitement ;
 //  - la lecture est bornée (nombre de fichiers, taille, délais).
 
-import { detect, detectApplication, isIgnoredPath } from '@eflex/detector'
-import type { DetectionResult, RepoSnapshot } from '@eflex/detector'
+import { detect, detectApplication, detectApplications, isIgnoredPath } from '@eflex/detector'
+import type { DetectedApplication, DetectionResult, RepoSnapshot } from '@eflex/detector'
 import { canonicalRepoUrl, type GitHubRepoRef } from '@/lib/github-url'
 
 export class AnalysisError extends Error {
@@ -84,6 +84,14 @@ export interface RepoAnalysis {
     private: boolean
   }
   detection: DetectionResult
+  /**
+   * Toutes les applications déployables du dépôt (lot A de D2). Toujours
+   * renseigné, même quand l'utilisateur a choisi un `root` : l'interface peut
+   * afficher la liste complète et changer d'application sans réanalyser le
+   * dépôt autrement. Champ additif : `detection`, `repo` et `incomplete`
+   * gardent leur contrat.
+   */
+  apps: DetectedApplication[]
   /** Vrai si l'analyse a pu rester partielle (dépôt énorme, fichiers illisibles…). */
   incomplete: boolean
 }
@@ -290,10 +298,10 @@ export async function analyzeGitHubRepo(
   }
 
   const root = options.root?.trim() ?? ''
-  let detection: DetectionResult
-  for (let round = 1; ; round += 1) {
-    const missing = new Set<string>()
-    const snapshot: RepoSnapshot = {
+
+  /** Snapshot partagé : note les chemins demandés mais pas encore téléchargés. */
+  function snapshotWithMissing(missing: Set<string>): RepoSnapshot {
+    return {
       files,
       read: (path) => {
         if (cache.has(path)) return cache.get(path) ?? null
@@ -301,11 +309,40 @@ export async function analyzeGitHubRepo(
         return null
       },
     }
+  }
 
-    detection = root === '' ? detect(snapshot) : detectApplication(snapshot, root)
+  function overBudget(round: number, missing: Set<string>): boolean {
+    return (
+      round >= limits.maxRounds ||
+      cache.size + missing.size > limits.maxFilesRead ||
+      Date.now() > deadline
+    )
+  }
+
+  // Phase 1 : détection principale, contrat et budget inchangés (l'analyse
+  // choisie ne dépend pas de la liste des applications).
+  let detection: DetectionResult
+  for (let round = 1; ; round += 1) {
+    const missing = new Set<string>()
+    detection = root === '' ? detect(snapshotWithMissing(missing)) : detectApplication(snapshotWithMissing(missing), root)
     if (missing.size === 0) break
+    if (overBudget(round, missing)) {
+      incomplete = true
+      break
+    }
+    await fetchMany([...missing])
+  }
 
-    if (round >= limits.maxRounds || cache.size + missing.size > limits.maxFilesRead || Date.now() > deadline) {
+  // Phase 2 : liste complète des applications (lot A de D2). Elle demande des
+  // fichiers supplémentaires (package.json de chaque application), téléchargés
+  // avec le budget restant. Un dépassement rend l'analyse partielle sans
+  // invalider la détection principale.
+  let applications: DetectedApplication[] = []
+  for (let round = 1; ; round += 1) {
+    const missing = new Set<string>()
+    applications = detectApplications(snapshotWithMissing(missing), { rootName: repo })
+    if (missing.size === 0) break
+    if (overBudget(round, missing)) {
       incomplete = true
       break
     }
@@ -331,6 +368,7 @@ export async function analyzeGitHubRepo(
       private: meta.private,
     },
     detection: { ...detection, warnings: unique(warnings) },
+    apps: applications,
     incomplete: incomplete || unreadable > 0,
   }
 }

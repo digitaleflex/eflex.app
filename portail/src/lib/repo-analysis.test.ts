@@ -200,6 +200,51 @@ describe('analyzeGitHubRepo', () => {
       const { detection } = await analyzeGitHubRepo(ref(), { fetchImpl: gh.fetch, root: 'apps/ghost' })
       expect(detection.plan).toBeNull()
     })
+
+    it('renvoie la liste complète des applications détectées (lot A)', async () => {
+      const gh = fakeGitHub({ 'acme/app': { files: monorepo } })
+      const { apps } = await analyzeGitHubRepo(ref(), { fetchImpl: gh.fetch })
+
+      expect(apps.map(({ root, name, framework }) => ({ root, name, framework }))).toEqual([
+        { root: 'apps/api', name: 'api', framework: 'node' },
+        { root: 'apps/web', name: 'web', framework: 'nextjs' },
+      ])
+      expect(apps[1]?.plan?.root).toBe('apps/web')
+    })
+
+    it('conserve toutes les applications quand une application est choisie', async () => {
+      const gh = fakeGitHub({ 'acme/app': { files: monorepo } })
+      const { detection, apps } = await analyzeGitHubRepo(ref(), { fetchImpl: gh.fetch, root: 'apps/web' })
+
+      // L'analyse principale reste celle du `root` choisi…
+      expect(detection.framework).toBe('nextjs')
+      expect(detection.plan?.root).toBe('apps/web')
+      // …et la liste n'est pas réduite à l'application choisie.
+      expect(apps.map((app) => app.root)).toEqual(['apps/api', 'apps/web'])
+    })
+
+    it('nomme l’application racine avec le nom du dépôt', async () => {
+      const gh = fakeGitHub({ 'acme/shop': { files: nextApp } })
+      const { apps } = await analyzeGitHubRepo(ref('acme', 'shop'), { fetchImpl: gh.fetch })
+
+      expect(apps).toHaveLength(1)
+      expect(apps[0]).toMatchObject({ root: '', name: 'shop', framework: 'nextjs' })
+    })
+
+    it('n’invente pas d’application dans node_modules', async () => {
+      const gh = fakeGitHub({
+        'acme/app': {
+          files: {
+            ...monorepo,
+            'node_modules/dep/package.json': json({ name: 'dep', scripts: { start: 'node index.js' } }),
+          },
+        },
+      })
+      const { apps } = await analyzeGitHubRepo(ref(), { fetchImpl: gh.fetch })
+
+      expect(apps.map((app) => app.name)).toEqual(['api', 'web'])
+      expect(apps.some((app) => app.root.includes('node_modules'))).toBe(false)
+    })
   })
 
   describe('erreurs', () => {
