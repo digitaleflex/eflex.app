@@ -6,12 +6,15 @@ import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { allow } from '@/lib/rate-limit'
 import { analyzeGitHubRepo } from '@/lib/repo-analysis'
-import { errorResponse, repoFields, resolveInstallationToken, resolveRepo } from '@/lib/analysis-request'
+import { errorResponse, repoFields, resolveRepo } from '@/lib/analysis-request'
+import { resolveUserRepoToken } from '@/lib/git-credentials'
 import { assertCryptoConfig, encrypt } from '@/lib/crypto'
 import { buildProjectArtifacts } from '@/lib/deploy-plan'
 import { enqueueDeployment } from '@/lib/queue'
 import { projectDomain, uniqueSlug } from '@/lib/project-slug'
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
+import { MAINTENANCE_DEPLOYMENT_MESSAGE, isMaintenanceActive } from '@/lib/platform-settings'
+import { assertDeploymentAllowed, assertProjectQuota } from '@/lib/billing'
 import { publish } from '@/lib/event-bus'
 
 const schema = z.object({
@@ -52,6 +55,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Votre rôle dans cette organisation ne permet pas de créer des projets.' }, { status: 403 })
   }
 
+  // Maintenance (issue 31) : la création d'un projet déclenche un déploiement,
+  // on refuse donc avant toute analyse ou écriture.
+  if (await isMaintenanceActive()) {
+    return NextResponse.json(
+      { error: MAINTENANCE_DEPLOYMENT_MESSAGE, code: 'maintenance' },
+      { status: 503 },
+    )
+  }
+
+  // Facturation : organisation suspendue ou impayé hors grâce. La création
+  // déclenche un déploiement ; on refuse avant toute analyse ou écriture.
+  const billing = await assertDeploymentAllowed(org.organizationId)
+  if (!billing.ok) {
+    return NextResponse.json({ error: billing.error, code: billing.code }, { status: billing.status })
+  }
+
+  const quota = await assertProjectQuota(org.organizationId)
+  if ('error' in quota) {
+    return NextResponse.json({ error: quota.error, code: 'plan_limit', plan: quota.plan.id }, { status: 403 })
+  }
+
   // Échoue clairement si la clé de chiffrement est absente, plutôt qu'au
   // milieu de la création du projet.
   try {
@@ -60,7 +84,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Configuration du serveur incomplète.' }, { status: 500 })
   }
 
-  if (!allow(`create:${userId}`, 10, 60_000)) {
+  if (!(await allow(`create:${userId}`, 10, 60_000))) {
     return NextResponse.json({ error: 'Trop de créations en peu de temps. Patientez une minute.' }, { status: 429 })
   }
 
@@ -87,12 +111,13 @@ export async function POST(request: NextRequest) {
   let analysis
   try {
     const { ref, root } = resolveRepo(input)
-    const installationToken = await resolveInstallationToken(userId, input.installationId)
+    const credential = await resolveUserRepoToken(userId, input)
     analysis = await analyzeGitHubRepo(ref, {
       root,
       commitSha: input.commitSha,
       token: process.env.GITHUB_TOKEN,
-      installationToken,
+      installationToken: credential?.source === 'app' ? credential.token : undefined,
+      userToken: credential?.source === 'pat' ? credential.token : undefined,
     })
   } catch (error) {
     return errorResponse(error)
@@ -154,6 +179,7 @@ export async function POST(request: NextRequest) {
         branch: repo.branch,
         repoFullName: `${repo.owner}/${repo.repo}`,
         installationId: input.installationId ?? null,
+        repoPrivate: repo.private,
         productionBranch: repo.branch,
         framework: plan.framework,
         runtime: plan.runtime,

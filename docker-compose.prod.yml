@@ -28,6 +28,8 @@ services:
     build:
       context: .
       dockerfile: portail/Dockerfile
+      args:
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
     container_name: eflex-portail
     restart: unless-stopped
     environment:
@@ -37,6 +39,8 @@ services:
       - HOSTNAME=0.0.0.0
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
+      # Délai maximal d'un déploiement avant que le watchdog ne le passe en échec.
+      - DEPLOYMENT_TIMEOUT_MINUTES=${DEPLOYMENT_TIMEOUT_MINUTES:-30}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:?sourcer config/domains.sh}
       - ADMIN_EMAILS=${ADMIN_EMAILS:-}
@@ -45,8 +49,12 @@ services:
       - GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY:-}
       - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-}
       - GITHUB_APP_SLUG=${GITHUB_APP_SLUG:-}
+      - GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID:-}
+      - GITHUB_APP_CLIENT_SECRET=${GITHUB_APP_CLIENT_SECRET:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      # Captcha Turnstile (facultatif) : les deux clés doivent être fournies.
+      - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY:-}
       - COOLIFY_API_URL=${COOLIFY_API_URL}
       - COOLIFY_API_TOKEN=${COOLIFY_API_TOKEN}
       - PORTAL_DOMAIN=${PORTAL_DOMAIN:?sourcer config/domains.sh}
@@ -62,6 +70,18 @@ services:
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - EMAIL_FROM=${EMAIL_FROM:-}
       - RESEND_WEBHOOK_SECRET=${RESEND_WEBHOOK_SECRET:-}
+      - KKIAPAY_PUBLIC_KEY=${KKIAPAY_PUBLIC_KEY:-}
+      - KKIAPAY_PRIVATE_KEY=${KKIAPAY_PRIVATE_KEY:-}
+      - KKIAPAY_SECRET_KEY=${KKIAPAY_SECRET_KEY:-}
+      - KKIAPAY_SANDBOX=${KKIAPAY_SANDBOX:-false}
+      - KKIAPAY_WEBHOOK_SECRET=${KKIAPAY_WEBHOOK_SECRET:-}
+      - FEDAPAY_SECRET_KEY=${FEDAPAY_SECRET_KEY:-}
+      - FEDAPAY_SANDBOX=${FEDAPAY_SANDBOX:-false}
+      - FEDAPAY_WEBHOOK_SECRET=${FEDAPAY_WEBHOOK_SECRET:-}
+      - INVOICE_COMPANY_NAME=${INVOICE_COMPANY_NAME:-Eflex}
+      - INVOICE_COMPANY_ADDRESS=${INVOICE_COMPANY_ADDRESS:-}
+      - INVOICE_COMPANY_EMAIL=${INVOICE_COMPANY_EMAIL:-admin@eflex.app}
+      - INVOICE_TAX_ID=${INVOICE_TAX_ID:-}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"

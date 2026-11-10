@@ -1,17 +1,27 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { enqueueDeployment } from '@/lib/queue'
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
-import { publish } from '@/lib/event-bus'
+import { enqueueProjectDeployment } from '@/lib/project-deployments'
+import { allow } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
-/** Relance un déploiement : nouveau Deployment `queued` + job (issue 06). */
+/**
+ * Relance un déploiement : nouveau Deployment `queued` + job (issue 06).
+ * Un seul déploiement actif à la fois par projet (issue 04) : 409 sinon.
+ */
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  }
+
+  if (!(await allow(`redeploy:${session.user.id}`, 10, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop de redéploiements en peu de temps. Patientez une minute.' },
+      { status: 429 },
+    )
   }
 
   const { id } = await params
@@ -23,38 +33,33 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
   const project = await prisma.project.findFirst({
     where: { id, organizationId: org.organizationId },
-    select: {
-      id: true,
-      name: true,
-      deployments: { orderBy: { createdAt: 'desc' }, take: 1, select: { commitSha: true } },
-    },
+    select: { id: true, name: true, organizationId: true },
   })
   if (!project) {
     return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
   }
 
-  const deployment = await prisma.deployment.create({
-    data: {
-      projectId: project.id,
-      commitSha: project.deployments[0]?.commitSha || 'pending',
-      status: 'queued',
-    },
-  })
-
-  try {
-    await enqueueDeployment(deployment.id)
-  } catch (error) {
-    await prisma.deployment.update({
-      where: { id: deployment.id },
-      data: { status: 'failed', logsSummary: 'File de déploiement indisponible.' },
-    })
-    return NextResponse.json({ error: 'File de déploiement indisponible.' }, { status: 503 })
+  const queued = await enqueueProjectDeployment(project, { exclusive: true })
+  if ('error' in queued) {
+    // Un déploiement tourne déjà : message explicite plutôt qu'une file qui
+    // écraserait le build en cours. La facturation renvoie 402/403 pour que le
+    // client distingue un blocage d'abonnement d'une panne de file.
+    const status =
+      queued.code === 'deployment_in_progress'
+        ? 409
+        : queued.status ?? (queued.code === 'organization_suspended' ? 403 : queued.code === 'payment_past_due' ? 402 : 503)
+    return NextResponse.json(
+      {
+        error: queued.error,
+        ...(queued.code ? { code: queued.code } : {}),
+        ...(queued.activeDeploymentId ? { deploymentId: queued.activeDeploymentId } : {}),
+      },
+      { status },
+    )
   }
 
-  await publish({ type: 'deployment.created', organizationId: org.organizationId, payload: { projectId: project.id, deploymentId: deployment.id, status: 'queued', name: project.name } })
-
   return NextResponse.json(
-    { deployment: { id: deployment.id, status: 'queued' } },
+    { deployment: { id: queued.deploymentId, status: 'queued' } },
     { status: 202 },
   )
 }

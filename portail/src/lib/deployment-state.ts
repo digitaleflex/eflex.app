@@ -27,7 +27,19 @@ const TRANSITIONS: Record<DeploymentStatus, readonly DeploymentStatus[]> = {
   cancelled: [],
 }
 
-const TERMINAL: ReadonlySet<DeploymentStatus> = new Set(['live', 'failed', 'cancelled'])
+/** États sans retour possible : plus aucune transition n'est autorisée. */
+export const TERMINAL_STATUSES = ['live', 'failed', 'cancelled'] as const
+
+/** États d'un déploiement qui n'a pas encore d'issue (verrou « un seul à la fois »). */
+export const ACTIVE_DEPLOYMENT_STATUSES = [
+  'queued',
+  'analyzing',
+  'provisioning',
+  'building',
+  'deploying',
+] as const
+
+const TERMINAL: ReadonlySet<DeploymentStatus> = new Set(TERMINAL_STATUSES)
 
 export const STATUS_LABELS: Record<DeploymentStatus, string> = {
   queued: 'En file d’attente',

@@ -1,19 +1,23 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowUpRight, ExternalLink, GitBranch, GitCommitHorizontal, Globe, KeyRound, Layers, Lock, Settings, Sparkles } from 'lucide-react'
+import { ArrowUpRight, ExternalLink, GitBranch, GitCommitHorizontal, Globe, KeyRound, Layers, Lock, Settings, ShieldAlert, ShieldCheck, Sparkles, Activity } from 'lucide-react'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { resolveOrganization } from '@/lib/organizations'
 import { AutoRefresh } from '@/components/auto-refresh'
 import { DeploymentLogs } from '@/components/deployment-logs'
+import { RuntimeLogs } from '@/components/runtime-logs'
 import { LiveRefresh } from '@/components/live-refresh'
 import { FrameworkTile, DeployHistory } from '@/components/dashboard/project-card'
 import { StatusPill } from '@/components/dashboard/status-pill'
 import { GithubMark } from '@/components/icons/github-mark'
 import { RedeployButton } from '@/components/redeploy-button'
+import { CancelDeploymentButton } from '@/components/cancel-deployment-button'
 import { canManageProjects } from '@/lib/organizations'
 import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 import { statusInfo } from '@/lib/project-status'
+import { applicationHealth, tlsHealth } from '@/lib/project-health'
+import { getApplicationRuntime } from '@/lib/coolify'
 import { relativeTime } from '@/lib/relative-time'
 import { repoLabel } from '@/lib/repo'
 import { cn } from '@/lib/utils'
@@ -39,6 +43,7 @@ const TABS = [
   { id: 'overview', label: "Vue d'ensemble" },
   { id: 'deployments', label: 'Déploiements' },
   { id: 'variables', label: 'Variables' },
+  { id: 'logs', label: 'Logs' },
 ] as const
 type Tab = (typeof TABS)[number]['id']
 
@@ -56,9 +61,19 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
     include: {
       envVars: { select: { key: true, updatedAt: true }, orderBy: { key: 'asc' } },
       deployments: { orderBy: { createdAt: 'desc' }, take: 20 },
+      domains: { orderBy: { createdAt: 'asc' } },
     },
   })
   if (!project) notFound()
+
+  // Statut runtime Coolify (lecture courte : une page ne doit jamais attendre l'API).
+  const runtime = project.coolifyAppId ? await getApplicationRuntime(project.coolifyAppId, 3_000) : null
+  const runtimeStatus = project.coolifyAppId ? (runtime && !('error' in runtime) ? runtime.status : null) : null
+  const runtimeError = runtime && 'error' in runtime ? runtime.error : null
+  const appHealth = project.coolifyAppId
+    ? applicationHealth(runtimeStatus)
+    : { label: 'Pas encore déployé', detail: 'Le statut sera disponible après le premier déploiement.', tone: 'muted' as const }
+  const certificateHealth = tlsHealth(project.tlsValid, project.tlsExpiresAt, project.tlsCheckedAt)
 
   // L'état des déploiements est écrit par le worker (file Redis) ; la page se met à jour par événements.
   const deployments = project.deployments
@@ -89,6 +104,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
+          {canManageProjects(org.role) && last && statusInfo(last.status).inProgress && (
+            <CancelDeploymentButton projectId={project.id} deploymentId={last.id} />
+          )}
           {canManageProjects(org.role) && <RedeployButton projectId={project.id} />}
           <a
             href={project.repoUrl}
@@ -141,6 +159,11 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         ))}
       </nav>
 
+      {/* Statut du dernier déploiement : annoncé après chaque mise à jour temps réel. */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {last ? `Dernier déploiement : ${statusInfo(last.status).label}.` : 'Aucun déploiement pour ce projet.'}
+      </p>
+
       {tab === 'overview' && (
         <div className="space-y-6">
           {/* Production : ce qui est en ligne maintenant. */}
@@ -169,6 +192,23 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                           ? 'Aucun déploiement réussi pour l’instant.'
                           : 'Ce projet n’a pas encore été déployé.'}
                   </p>
+                  {project.domains.filter((item) => item.verifiedAt).length > 0 && (
+                    <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Domaines personnalisés">
+                      {project.domains.filter((item) => item.verifiedAt).map((item) => (
+                        <li key={item.id}>
+                          <a
+                            href={`https://${item.hostname}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 font-mono text-xs text-white/85 hover:bg-white/20"
+                          >
+                            {item.hostname}
+                            <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
               <dl className="grid grid-cols-1 gap-px bg-border sm:grid-cols-2">
@@ -203,6 +243,53 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 ))}
               </dl>
             </div>
+          </section>
+
+          <section aria-labelledby="health-title" className="rounded-xl border border-border bg-card">
+            <div className="border-b border-border px-5 py-3">
+              <h2 id="health-title" className="flex items-center gap-2 text-sm font-semibold">
+                <Activity className="h-4 w-4 text-primary" aria-hidden="true" />
+                Santé & sécurité
+              </h2>
+            </div>
+            <dl className="grid divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+              <div className="p-4">
+                <dt className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'h-2 w-2 shrink-0 rounded-full',
+                      appHealth.tone === 'success' && 'bg-success',
+                      appHealth.tone === 'warning' && 'bg-warning',
+                      appHealth.tone === 'danger' && 'bg-destructive',
+                      appHealth.tone === 'muted' && 'bg-muted-foreground/50',
+                    )}
+                  />
+                  Application
+                </dt>
+                <dd className="mt-1 text-sm font-medium">
+                  {appHealth.label}
+                  {appHealth.detail && <span className="mt-0.5 block text-xs font-normal text-muted-foreground">{appHealth.detail}</span>}
+                  {runtimeError && <span className="mt-1 block text-xs font-normal text-warning">Hébergement : {runtimeError}</span>}
+                </dd>
+              </div>
+              <div className="p-4">
+                <dt className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  {certificateHealth.tone === 'success' ? (
+                    <ShieldCheck className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />
+                  ) : certificateHealth.tone === 'danger' ? (
+                    <ShieldAlert className="h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
+                  ) : (
+                    <ShieldAlert className="h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+                  )}
+                  Certificat HTTPS
+                </dt>
+                <dd className="mt-1 text-sm font-medium">
+                  {certificateHealth.label}
+                  {certificateHealth.detail && <span className="mt-0.5 block text-xs font-normal text-muted-foreground">{certificateHealth.detail}</span>}
+                </dd>
+              </div>
+            </dl>
           </section>
 
           <div className={cn('grid gap-6', analysis && 'lg:grid-cols-2')}>
@@ -275,7 +362,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           {deployments.length === 0 ? (
             <p className="px-5 py-10 text-center text-sm text-muted-foreground">Aucun déploiement pour ce projet.</p>
           ) : (
-            <ul aria-live="polite" className="divide-y divide-border">
+            <ul className="divide-y divide-border">
               {deployments.map((d, i) => (
                 <li key={d.id} className="px-5 py-4">
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -290,6 +377,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                       {d.status === 'failed' && d.logsSummary && <p className="mt-1 line-clamp-2 break-words text-xs text-destructive">{d.logsSummary}</p>}
                     </div>
                     <time dateTime={d.createdAt.toISOString()} className="text-xs text-muted-foreground">{dateFormat.format(d.createdAt)}</time>
+                    {canManageProjects(org.role) && statusInfo(d.status).inProgress && (
+                      <CancelDeploymentButton projectId={project.id} deploymentId={d.id} />
+                    )}
                   </div>
                   <DeploymentLogs projectId={project.id} deploymentId={d.id} defaultOpen={d.id === last?.id && inProgress} />
                 </li>
@@ -334,6 +424,18 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           )}
         </section>
       )}
+
+      {tab === 'logs' &&
+        (project.coolifyAppId ? (
+          <RuntimeLogs projectId={project.id} />
+        ) : (
+          <section aria-labelledby="logs-title" className="rounded-xl border border-border bg-card p-6">
+            <h2 id="logs-title" className="font-semibold">Journaux d’exécution</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Les journaux seront disponibles après le premier déploiement du projet.
+            </p>
+          </section>
+        ))}
     </div>
   )
 }

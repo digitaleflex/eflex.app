@@ -30,6 +30,54 @@ export const nextjsWithPnpm = makeSnapshot({
   'pnpm-lock.yaml': 'lockfileVersion: "9.0"\n',
 });
 
+/** Yarn Berry : lockfile avec métadonnées et version déclarée via Corepack. */
+export const nextjsWithYarnBerry = makeSnapshot({
+  'package.json': json({
+    name: 'next-app',
+    scripts: { build: 'next build', start: 'next start' },
+    dependencies: { next: '14.2.0' },
+    packageManager: 'yarn@4.5.0',
+  }),
+  'next.config.js': 'module.exports = {};\n',
+  'yarn.lock': '__metadata:\n  version: 8\n  cacheKey: 10c0\n',
+  '.yarnrc.yml': 'nodeLinker: node-modules\n',
+});
+
+/** Bun : lockfile binaire reconnu par Nixpacks. */
+export const nextjsWithBun = makeSnapshot({
+  'package.json': json({
+    name: 'next-app',
+    scripts: { build: 'next build', start: 'next start' },
+    dependencies: { next: '14.2.0' },
+    packageManager: 'bun@1.1.0',
+  }),
+  'next.config.js': 'module.exports = {};\n',
+  'bun.lockb': 'binary-placeholder\n',
+});
+
+/** pnpm déclaré sans lockfile : installation sans --frozen-lockfile. */
+export const nextjsWithDeclaredPnpm = makeSnapshot({
+  'package.json': json({
+    name: 'next-app',
+    scripts: { build: 'next build', start: 'next start' },
+    dependencies: { next: '14.2.0' },
+    packageManager: 'pnpm@9.12.0',
+  }),
+  'next.config.js': 'module.exports = {};\n',
+});
+
+/** pnpm-workspace.yaml utilisé pour des réglages, sans champ `packages`. */
+export const nextjsWithPnpmSettingsOnly = makeSnapshot({
+  'package.json': json({
+    name: 'next-app',
+    scripts: { build: 'next build', start: 'next start' },
+    dependencies: { next: '14.2.0' },
+  }),
+  'next.config.js': 'module.exports = {};\n',
+  'pnpm-lock.yaml': 'lockfileVersion: "9.0"\n',
+  'pnpm-workspace.yaml': "ignoredBuiltDependencies:\n  - '@tailwindcss/oxide'\n",
+});
+
 export const nextjsWithEngines = makeSnapshot({
   'package.json': json({
     name: 'next-app',
@@ -272,11 +320,32 @@ export const monorepoMultiple = makeSnapshot({
 
 export const monorepoSingle = makeSnapshot({
   'pnpm-workspace.yaml': 'packages:\n  - "apps/*"\n',
+  'pnpm-lock.yaml': 'lockfileVersion: "9.0"\n',
   'apps/web/package.json': json({
-    name: 'web',
+    name: '@acme/web',
     scripts: { build: 'next build', start: 'next start' },
     dependencies: { next: '14.2.0' },
   }),
+});
+
+/** Monorepo pnpm avec Turborepo et une dépendance interne au workspace. */
+export const monorepoWorkspace = makeSnapshot({
+  'pnpm-workspace.yaml': 'packages:\n  - "apps/*"\n  - "packages/*"\n',
+  'turbo.json': json({ pipeline: { build: { dependsOn: ['^build'] } } }),
+  'package.json': json({ name: 'acme', private: true, packageManager: 'pnpm@9.12.0' }),
+  'pnpm-lock.yaml': 'lockfileVersion: "9.0"\n',
+  'apps/web/package.json': json({
+    name: '@acme/web',
+    scripts: { build: 'next build', start: 'next start' },
+    dependencies: { next: '14.2.0', '@acme/ui': 'workspace:*' },
+  }),
+  'apps/web/next.config.js': 'module.exports = {};\n',
+  'packages/ui/package.json': json({
+    name: '@acme/ui',
+    scripts: { build: 'tsc -p tsconfig.json' },
+    devDependencies: { typescript: '^5.6.0' },
+  }),
+  'packages/ui/src/index.ts': 'export const Button = (): string => "ok";\n',
 });
 
 export const dockerfileArgRequired = makeSnapshot({
@@ -316,6 +385,10 @@ export function allFixtures(): Fixture[] {
   return [
     { name: 'nextjs', snapshot: nextjs },
     { name: 'nextjs-with-pnpm', snapshot: nextjsWithPnpm },
+    { name: 'nextjs-with-yarn-berry', snapshot: nextjsWithYarnBerry },
+    { name: 'nextjs-with-bun', snapshot: nextjsWithBun },
+    { name: 'nextjs-with-declared-pnpm', snapshot: nextjsWithDeclaredPnpm },
+    { name: 'nextjs-with-pnpm-settings-only', snapshot: nextjsWithPnpmSettingsOnly },
     { name: 'nextjs-with-engines', snapshot: nextjsWithEngines },
     { name: 'vite', snapshot: vite },
     { name: 'astro', snapshot: astro },
@@ -348,6 +421,7 @@ export function allFixtures(): Fixture[] {
     { name: 'eflex-config-invalid', snapshot: eflexConfigInvalid },
     { name: 'monorepo-multiple', snapshot: monorepoMultiple },
     { name: 'monorepo-single', snapshot: monorepoSingle },
+    { name: 'monorepo-workspace', snapshot: monorepoWorkspace },
     { name: 'unknown', snapshot: unknownRepo },
   ];
 }

@@ -24,9 +24,14 @@ import {
   laravelVite,
   monorepoMultiple,
   monorepoSingle,
+  monorepoWorkspace,
   nextjs,
+  nextjsWithBun,
+  nextjsWithDeclaredPnpm,
   nextjsWithEngines,
   nextjsWithPnpm,
+  nextjsWithPnpmSettingsOnly,
+  nextjsWithYarnBerry,
   phpGeneric,
   staticSite,
   staticSiteWithBuild,
@@ -104,7 +109,7 @@ describe('detect', () => {
     expect(result.plan?.services?.queue?.replicas).toBe(1);
     expect(result.plan?.volumes).toEqual(['storage']);
     expect(result.plan?.postDeploy).toContain('php artisan migrate --force');
-    expect(result.plan?.build).toBe('npm ci && npm run build');
+    expect(result.plan?.build).toBe('npm install && npm run build');
   });
 
   it('detects Laravel (not static Vite) when Vite compiles the front-end assets', () => {
@@ -279,6 +284,24 @@ describe('detect', () => {
     expect(result.framework).toBe('nextjs');
     expect(result.confidence).toBeLessThan(0.92);
     expect(result.confidence).toBeGreaterThan(0);
+    expect(result.plan?.workspace).toEqual({
+      manager: 'pnpm',
+      name: '@acme/web',
+      buildScript: 'build',
+    });
+  });
+
+  it('expose le paquet du workspace pour un monorepo Turborepo', () => {
+    const result = detectApplication(monorepoWorkspace, 'apps/web');
+
+    expect(result.plan?.root).toBe('apps/web');
+    expect(result.plan?.workspace).toEqual({
+      manager: 'pnpm',
+      name: '@acme/web',
+      buildScript: 'build',
+    });
+    // Le paquet partagé n'est pas déployable seul, mais reste une alternative.
+    expect(detect(monorepoWorkspace).questions[0]?.options).toContain('packages/ui');
   });
 
   it('returns a null plan and a stack question for an unknown repository', () => {
@@ -294,6 +317,36 @@ describe('detect', () => {
     const result = detect(nextjsWithPnpm);
 
     expect(result.plan?.install).toBe('pnpm install --frozen-lockfile');
+  });
+
+  it('utilise --immutable pour Yarn Berry et active Corepack', () => {
+    const result = detect(nextjsWithYarnBerry);
+
+    expect(result.plan?.install).toBe('corepack enable && yarn install --immutable');
+  });
+
+  it('utilise bun install quand le dépôt déclare Bun', () => {
+    const result = detect(nextjsWithBun);
+
+    expect(result.plan?.install).toBe('bun install --frozen-lockfile');
+  });
+
+  it('n’impose pas --frozen-lockfile quand pnpm est déclaré sans lockfile', () => {
+    const result = detect(nextjsWithDeclaredPnpm);
+
+    expect(result.plan?.install).toBe('corepack enable && pnpm install');
+  });
+
+  it('ajoute --ignore-workspace quand pnpm-workspace.yaml n’a pas de champ packages', () => {
+    const result = detect(nextjsWithPnpmSettingsOnly);
+
+    expect(result.plan?.install).toBe('pnpm install --frozen-lockfile --ignore-workspace');
+  });
+
+  it('utilise npm install (et non npm ci) sans lockfile', () => {
+    const result = detect(nextjs);
+
+    expect(result.plan?.install).toBe('npm install');
   });
 
   it('derives node@20 from engines.node ">=20"', () => {

@@ -139,6 +139,8 @@ describe('createApplication', () => {
       fqdn: 'https://demo.example.com/',
       customLabels: labels,
       postDeploymentCommand: 'php artisan migrate --force',
+      baseDirectory: '/apps/api',
+      dockerfileLocation: '/docker/Dockerfile',
     })
 
     expect(result).toEqual({ id: 'app' })
@@ -147,7 +149,30 @@ describe('createApplication', () => {
     expect(body.domains).toBe('https://demo.example.com')
     expect(body.custom_labels).toBe(Buffer.from(labels.join('\n'), 'utf8').toString('base64'))
     expect(body.post_deployment_command).toBe('php artisan migrate --force')
+    expect(body.base_directory).toBe('/apps/api')
+    expect(body.dockerfile_location).toBe('/docker/Dockerfile')
     expect(body.docker_compose_raw).toBeUndefined()
+  })
+
+  it('n’envoie pas de dossier de travail pour un dépôt déployé à la racine', async () => {
+    const calls = mockFetch((url, init) => {
+      if (url.endsWith('/applications/public')) return json({ uuid: 'app' }, 201)
+      return targetHandler(true)(url, init)
+    })
+    const { createApplication } = await loadModule()
+
+    await createApplication({
+      name: 'demo',
+      gitRepository: 'https://github.com/o/r',
+      buildPack: 'nixpacks',
+      portsExposes: '3000',
+    })
+
+    const body = JSON.parse(
+      String(calls.find((item) => item.url.endsWith('/applications/public'))?.init?.body),
+    )
+    expect(body.base_directory).toBeUndefined()
+    expect(body.dockerfile_location).toBeUndefined()
   })
 
   it('remonte le message d’erreur de l’API', async () => {
@@ -166,7 +191,39 @@ describe('createApplication', () => {
         buildPack: 'dockerfile',
         portsExposes: '80',
       }),
-    ).resolves.toEqual({ error: 'Coolify API 422: Validation failed.' })
+    ).resolves.toEqual({ error: 'Hébergement API 422: Validation failed.' })
+  })
+})
+
+describe('updateApplication', () => {
+  it('réapplique les commandes du plan sur une application existante', async () => {
+    const calls = mockFetch((url, init) => {
+      if (url.endsWith('/applications/app') && init?.method === 'PATCH') return json({ uuid: 'app' })
+      throw new Error(`requête inattendue : ${init?.method ?? 'GET'} ${url}`)
+    })
+    const { updateApplication } = await loadModule()
+
+    await expect(
+      updateApplication('app', {
+        baseDirectory: '/',
+        dockerfileLocation: '/docker/Dockerfile',
+        installCommand: 'pnpm install --frozen-lockfile --ignore-workspace',
+        buildCommand: 'next build',
+        startCommand: 'next start',
+        publishDirectory: '/',
+        portsExposes: '3000',
+      }),
+    ).resolves.toEqual({ ok: true })
+
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      base_directory: '/',
+      dockerfile_location: '/docker/Dockerfile',
+      install_command: 'pnpm install --frozen-lockfile --ignore-workspace',
+      build_command: 'next build',
+      start_command: 'next start',
+      publish_directory: '/',
+      ports_exposes: '3000',
+    })
   })
 })
 
@@ -234,6 +291,35 @@ describe('decodeDeploymentLogs', () => {
   })
 })
 
+describe('cancelDeployment', () => {
+  it('poste sur /deployments/{uuid}/cancel', async () => {
+    const calls = mockFetch((url) => {
+      if (url.endsWith('/deployments/dep-1/cancel')) return json({ message: 'Deployment cancelled.' })
+      throw new Error(url)
+    })
+    const { cancelDeployment } = await loadModule()
+
+    await expect(cancelDeployment('dep-1')).resolves.toEqual({ ok: true })
+    expect(calls[0]?.init?.method).toBe('POST')
+  })
+
+  it('traite un déploiement déjà terminé comme « rien à annuler »', async () => {
+    mockFetch(() => json({ message: 'Deployment cannot be cancelled. Current status: finished' }, 400))
+    const { cancelDeployment } = await loadModule()
+
+    await expect(cancelDeployment('dep-1')).resolves.toEqual({ ok: true, alreadyFinished: true })
+  })
+
+  it('remonte les autres erreurs d’infrastructure', async () => {
+    mockFetch(() => json({ message: 'Internal error.' }, 500))
+    const { cancelDeployment } = await loadModule()
+
+    await expect(cancelDeployment('dep-1')).resolves.toEqual({
+      error: 'Hébergement API 500: Internal error.',
+    })
+  })
+})
+
 describe('setApplicationLabels', () => {
   it('patche les custom_labels en base64', async () => {
     const calls = mockFetch((url) => {
@@ -247,6 +333,8 @@ describe('setApplicationLabels', () => {
     expect(calls[0]?.init?.method).toBe('PATCH')
     expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
       custom_labels: Buffer.from(labels.join('\n'), 'utf8').toString('base64'),
+      is_container_label_readonly_enabled: false,
+      is_auto_deploy_enabled: false,
     })
   })
 })
@@ -275,7 +363,7 @@ describe('deleteApplication', () => {
     const { deleteApplication } = await loadModule()
 
     await expect(deleteApplication('app')).resolves.toEqual({
-      error: 'Coolify API 500: Internal error.',
+      error: 'Hébergement API 500: Internal error.',
     })
   })
 })
@@ -315,6 +403,69 @@ describe('setEnvironmentVariable', () => {
       value: 'value',
       is_buildtime: true,
     })
+  })
+})
+
+describe('ensureApplicationStorages', () => {
+  it('ne crée que les volumes absents et laisse les existants intacts', async () => {
+    const calls = mockFetch((url, init) => {
+      if (url.endsWith('/applications/app/storages') && (init?.method ?? 'GET') === 'GET') {
+        return json({ persistent_storages: [{ uuid: 's1', mount_path: '/app/storage' }] })
+      }
+      if (url.endsWith('/applications/app/storages') && init?.method === 'POST') {
+        return json({ uuid: 's2', mount_path: '/app/data' }, 201)
+      }
+      throw new Error(`${init?.method ?? 'GET'} ${url}`)
+    })
+    const { ensureApplicationStorages } = await loadModule()
+
+    await expect(
+      ensureApplicationStorages('app', [
+        { name: 'eflex-storage', mountPath: '/app/storage' },
+        { name: 'eflex-data', mountPath: '/app/data' },
+      ]),
+    ).resolves.toEqual({ created: 1, existing: 1 })
+
+    const writes = calls.filter((call) => call.init?.method === 'POST')
+    expect(writes).toHaveLength(1)
+    expect(JSON.parse(String(writes[0]?.init?.body))).toEqual({
+      type: 'persistent',
+      name: 'eflex-data',
+      mount_path: '/app/data',
+    })
+  })
+
+  it('échoue explicitement quand l’API de stockage est indisponible', async () => {
+    mockFetch(() => json({ message: 'Application not found.' }, 404))
+    const { ensureApplicationStorages } = await loadModule()
+
+    await expect(
+      ensureApplicationStorages('app', [{ name: 'eflex-storage', mountPath: '/app/storage' }]),
+    ).resolves.toEqual({
+      error: 'Stockages de l’application illisibles : Hébergement API 404: Application not found.',
+    })
+  })
+
+  it('échoue explicitement quand la création d’un volume est refusée', async () => {
+    mockFetch((url, init) => {
+      if ((init?.method ?? 'GET') === 'GET') return json({ persistent_storages: [] })
+      return json({ message: 'Validation failed.' }, 422)
+    })
+    const { ensureApplicationStorages } = await loadModule()
+
+    await expect(
+      ensureApplicationStorages('app', [{ name: 'eflex-storage', mountPath: '/app/storage' }]),
+    ).resolves.toEqual({
+      error: 'Volume « /app/storage » non créé : Hébergement API 422: Validation failed.',
+    })
+  })
+
+  it('ne fait aucun appel sans volume déclaré', async () => {
+    const calls = mockFetch(() => json({}, 500))
+    const { ensureApplicationStorages } = await loadModule()
+
+    await expect(ensureApplicationStorages('app', [])).resolves.toEqual({ created: 0, existing: 0 })
+    expect(calls).toHaveLength(0)
   })
 })
 

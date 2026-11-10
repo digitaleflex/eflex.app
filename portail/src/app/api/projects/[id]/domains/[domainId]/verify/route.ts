@@ -1,0 +1,69 @@
+import { NextResponse } from 'next/server'
+import { getSession } from '@/lib/session'
+import { prisma } from '@/lib/prisma'
+import { canManageProjects, resolveOrganization } from '@/lib/organizations'
+import { checkDomainDns } from '@/lib/custom-domain'
+import { enqueueProjectDeployment } from '@/lib/project-deployments'
+
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
+/** Vérifie le DNS puis programme un déploiement pour appliquer les labels/SSL. */
+export async function POST(
+  _request: Request,
+  { params }: { params: Promise<{ id: string; domainId: string }> },
+) {
+  const session = await getSession()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+
+  const org = await resolveOrganization(session)
+  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  if (!canManageProjects(org.role)) {
+    return NextResponse.json({ error: 'Votre rôle ne permet pas de vérifier ce domaine.' }, { status: 403 })
+  }
+
+  const { id, domainId } = await params
+  const domain = await prisma.projectDomain.findFirst({
+    where: { id: domainId, projectId: id, project: { organizationId: org.organizationId } },
+    select: {
+      id: true,
+      hostname: true,
+      project: { select: { id: true, name: true, organizationId: true, coolifyAppId: true } },
+    },
+  })
+  if (!domain) return NextResponse.json({ error: 'Domaine introuvable.' }, { status: 404 })
+
+  const dns = await checkDomainDns(domain.hostname)
+  if (!dns.ok) {
+    return NextResponse.json(
+      { error: dns.error ?? 'Le domaine ne pointe pas encore vers la plateforme.', dns },
+      { status: 422 },
+    )
+  }
+
+  await prisma.projectDomain.update({
+    where: { id: domain.id },
+    data: { verifiedAt: new Date() },
+  })
+
+  let deploymentId: string | null = null
+  if (domain.project.coolifyAppId) {
+    const queued = await enqueueProjectDeployment(domain.project)
+    if ('error' in queued) {
+      return NextResponse.json(
+        { error: `DNS vérifié, mais le déploiement n’a pas pu démarrer : ${queued.error}` },
+        { status: 503 },
+      )
+    }
+    deploymentId = queued.deploymentId
+  }
+
+  return NextResponse.json({
+    ok: true,
+    dns,
+    deploymentId,
+    message: deploymentId
+      ? 'DNS vérifié. Un déploiement applique le domaine et prépare le certificat.'
+      : 'DNS vérifié. Le domaine sera actif au premier déploiement.',
+  })
+}

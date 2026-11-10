@@ -2,18 +2,39 @@ import type { BuildPlan, Candidate, DetectionContext } from '../types.js';
 import { BASE_CONFIDENCE, scoreConfidence } from '../confidence.js';
 import { nodeRuntime } from '../versions.js';
 
-/** Install command matching the lockfile-derived package manager. */
+/** `pnpm-workspace.yaml` sans `packages` : pnpm le traite comme un workspace vide et échoue. */
+function pnpmWorkspaceWithoutPackages(ctx: DetectionContext): boolean {
+  const content = ctx.read('pnpm-workspace.yaml') ?? ctx.readRepo('pnpm-workspace.yaml')
+  if (content === null) return false
+  return !/^\s*packages\s*:/m.test(content)
+}
+
+/** Install command matching the declared/lockfile-derived package manager. */
 export function installCommand(ctx: DetectionContext): string {
-  switch (ctx.packageManager()) {
-    case 'pnpm':
-      return 'pnpm install --frozen-lockfile';
-    case 'yarn':
-      return 'yarn install --frozen-lockfile';
+  const pm = ctx.packageManager();
+  const hasLockfile = ctx.hasJsLockfile();
+  const declaresManager = typeof ctx.packageJson()?.packageManager === 'string';
+  // Corepack active la version exacte demandée par `packageManager` (pnpm, yarn,
+  // npm). Bun n'est pas géré par Corepack.
+  const corepack = declaresManager && pm !== 'bun' ? 'corepack enable && ' : '';
+
+  switch (pm) {
+    case 'pnpm': {
+      // Certains dépôts utilisent pnpm-workspace.yaml uniquement pour des
+      // réglages (ignoredBuiltDependencies) sans champ `packages`. Sans ce
+      // drapeau, `pnpm install` échoue avec « packages field missing or empty ».
+      const ignoreWorkspace = pnpmWorkspaceWithoutPackages(ctx) ? ' --ignore-workspace' : '';
+      return `${corepack}pnpm install${hasLockfile ? ' --frozen-lockfile' : ''}${ignoreWorkspace}`;
+    }
+    case 'yarn': {
+      const berry = ctx.has('.yarnrc.yml') || (ctx.read('yarn.lock') ?? '').includes('__metadata:');
+      return `${corepack}yarn install${hasLockfile ? (berry ? ' --immutable' : ' --frozen-lockfile') : ''}`;
+    }
     case 'bun':
-      return 'bun install --frozen-lockfile';
+      return `bun install${hasLockfile ? ' --frozen-lockfile' : ''}`;
     case 'npm':
     default:
-      return 'npm ci';
+      return `${corepack}${hasLockfile ? 'npm ci' : 'npm install'}`;
   }
 }
 

@@ -28,7 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Configuration du serveur incomplète.' }, { status: 500 })
   }
 
-  if (!allow(`env:${session.user.id}`, 60, 60_000)) {
+  if (!(await allow(`env:${session.user.id}`, 60, 60_000))) {
     return NextResponse.json(
       { error: 'Trop de modifications en peu de temps. Patientez une minute.' },
       { status: 429 },

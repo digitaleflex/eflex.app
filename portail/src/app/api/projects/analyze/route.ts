@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { allow } from '@/lib/rate-limit'
 import { analyzeGitHubRepo } from '@/lib/repo-analysis'
-import { errorResponse, repoFields, resolveInstallationToken, resolveRepo } from '@/lib/analysis-request'
+import { errorResponse, repoFields, resolveRepo } from '@/lib/analysis-request'
+import { resolveUserRepoToken } from '@/lib/git-credentials'
 
 const schema = z.object(repoFields)
 
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Chaque analyse consomme des requêtes GitHub : on limite par utilisateur.
-  if (!allow(`analyze:${session.user.id}`, 10, 60_000)) {
+  if (!(await allow(`analyze:${session.user.id}`, 10, 60_000))) {
     return NextResponse.json(
       { error: "Trop d'analyses en peu de temps. Patientez une minute avant de réessayer." },
       { status: 429 },
@@ -35,11 +36,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const { ref, root } = resolveRepo(parsed.data)
-    const installationToken = await resolveInstallationToken(session.user.id, parsed.data.installationId)
+    const credential = await resolveUserRepoToken(session.user.id, parsed.data)
     const analysis = await analyzeGitHubRepo(ref, {
       root,
       token: process.env.GITHUB_TOKEN,
-      installationToken,
+      installationToken: credential?.source === 'app' ? credential.token : undefined,
+      userToken: credential?.source === 'pat' ? credential.token : undefined,
     })
     return NextResponse.json(analysis)
   } catch (error) {

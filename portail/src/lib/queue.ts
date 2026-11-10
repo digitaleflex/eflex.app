@@ -45,3 +45,23 @@ export function deploymentsQueue(): Queue {
 export async function enqueueDeployment(deploymentId: string): Promise<void> {
   await deploymentsQueue().add('deploy', { deploymentId }, { jobId: deploymentId })
 }
+
+/**
+ * Retire un job encore en attente (annulation d'un déploiement `queued`).
+ * Un job déjà pris par le worker ne peut pas être supprimé : `active` est
+ * renvoyé pour que l'appelant tente l'annulation côté Coolify.
+ */
+export async function removeQueuedDeployment(
+  deploymentId: string,
+): Promise<'removed' | 'active' | 'missing' | 'error'> {
+  try {
+    const job = await deploymentsQueue().getJob(deploymentId)
+    if (!job) return 'missing'
+    const state = await job.getState()
+    if (state !== 'waiting' && state !== 'delayed' && state !== 'prioritized') return 'active'
+    await job.remove()
+    return 'removed'
+  } catch {
+    return 'error'
+  }
+}

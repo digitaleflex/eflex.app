@@ -64,6 +64,11 @@ export interface AnalysisOptions {
    * fait lire les fichiers via l'API Contents plutôt que le CDN public.
    */
   installationToken?: string
+  /**
+   * Jeton personnel GitHub (PAT) : alternative à l'installation App pour les
+   * dépôts privés, avec les mêmes garanties de lecture via l'API Contents.
+   */
+  userToken?: string
   fetchImpl?: typeof fetch
   limits?: Partial<AnalysisLimits>
 }
@@ -76,6 +81,7 @@ export interface RepoAnalysis {
     branch: string
     defaultBranch: string
     commitSha: string
+    private: boolean
   }
   detection: DetectionResult
   /** Vrai si l'analyse a pu rester partielle (dépôt énorme, fichiers illisibles…). */
@@ -122,7 +128,7 @@ export async function analyzeGitHubRepo(
       'User-Agent': 'eflex-portail',
       'X-GitHub-Api-Version': '2022-11-28',
     }
-    const apiToken = options.installationToken ?? options.token
+    const apiToken = options.installationToken ?? options.userToken ?? options.token
     if (apiToken) headers.Authorization = `Bearer ${apiToken}`
     const res = await request(`https://api.github.com${path}`, headers)
     throwIfRateLimited(res)
@@ -158,15 +164,27 @@ export async function analyzeGitHubRepo(
       404,
     )
   }
+  if (metaRes.status === 401) {
+    throw new AnalysisError(
+      'Votre connexion GitHub est expirée ou révoquée. Reconnectez la GitHub App ou enregistrez un nouveau jeton personnel.',
+      401,
+    )
+  }
+  if (metaRes.status === 403 && (options.installationToken || options.userToken)) {
+    throw new AnalysisError(
+      'GitHub a refusé l’accès à ce dépôt. Vérifiez que la GitHub App ou le jeton personnel couvre bien ce dépôt.',
+      403,
+    )
+  }
   if (!metaRes.ok) throw new AnalysisError("GitHub n'a pas pu répondre. Réessayez dans un instant.", 502)
 
   const meta = await json(metaRes)
   if (!isRecord(meta) || typeof meta.default_branch !== 'string' || typeof meta.private !== 'boolean') {
     throw new AnalysisError('Réponse inattendue de GitHub. Réessayez dans un instant.', 502)
   }
-  if (meta.private && !options.installationToken) {
+  if (meta.private && !options.installationToken && !options.userToken) {
     throw new AnalysisError(
-      'Ce dépôt est privé. Connectez la GitHub App pour l’analyser.',
+      'Ce dépôt est privé. Sélectionnez-le dans la liste GitHub (Paramètres → Connexion GitHub) afin d’utiliser votre jeton.',
       422,
     )
   }
@@ -234,14 +252,15 @@ export async function analyzeGitHubRepo(
       cache.set(path, null)
       return
     }
-    const usePrivateApi = Boolean(options.installationToken)
+    const usePrivateApi = Boolean(options.installationToken || options.userToken)
+    const privateToken = options.installationToken ?? options.userToken
     const url = usePrivateApi
       ? `https://api.github.com${repoPath}/contents/${encodePath(path)}?ref=${encodeURIComponent(analyzedSha)}`
       : `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${analyzedSha}/${encodePath(path)}`
     const headers: Record<string, string> = usePrivateApi
       ? {
           Accept: 'application/vnd.github.raw+json',
-          Authorization: `Bearer ${options.installationToken}`,
+          Authorization: `Bearer ${privateToken}`,
           'User-Agent': 'eflex-portail',
           'X-GitHub-Api-Version': '2022-11-28',
         }
@@ -309,6 +328,7 @@ export async function analyzeGitHubRepo(
       branch,
       defaultBranch,
       commitSha,
+      private: meta.private,
     },
     detection: { ...detection, warnings: unique(warnings) },
     incomplete: incomplete || unreadable > 0,

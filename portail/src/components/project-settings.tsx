@@ -3,10 +3,14 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Globe, KeyRound, Plus, Trash2, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, Activity, ArrowRightLeft, Database, Globe, KeyRound, Plus, Trash2, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { ProjectRuntimeControls } from '@/components/project-runtime-controls'
+import { ProjectDomains } from '@/components/project-domains'
+import { ProjectDatabases } from '@/components/project-databases'
+import { ProjectTransfer, type TransferTarget } from '@/components/project-transfer'
 
 const NETWORK_ERROR = 'Impossible de contacter le serveur. Vérifiez votre connexion et réessayez.'
 
@@ -27,19 +31,20 @@ interface ProjectSettingsProps {
     coolifyAppId: string | null
   }
   envVars: EnvVarKey[]
+  transferTargets: TransferTarget[]
 }
 
-function FeedbackMessage({ feedback }: { feedback: Feedback }) {
+function FeedbackMessage({ feedback, id }: { feedback: Feedback; id: string }) {
   if (!feedback) return null
   if (feedback.tone === 'success') {
     return (
-      <p role="status" className="rounded-lg bg-success/10 border border-success/20 p-3 text-sm text-foreground">
+      <p id={id} role="status" className="rounded-lg bg-success/10 border border-success/20 p-3 text-sm text-foreground">
         {feedback.message}
       </p>
     )
   }
   return (
-    <p role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+    <p id={id} role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
       {feedback.message}
     </p>
   )
@@ -50,7 +55,7 @@ const dateFormat = new Intl.DateTimeFormat('fr-FR', {
   timeStyle: 'short',
 })
 
-export function ProjectSettings({ project, envVars: initialEnvVars }: ProjectSettingsProps) {
+export function ProjectSettings({ project, envVars: initialEnvVars, transferTargets }: ProjectSettingsProps) {
   const router = useRouter()
 
   const [name, setName] = useState(project.name)
@@ -212,7 +217,7 @@ export function ProjectSettings({ project, envVars: initialEnvVars }: ProjectSet
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <FeedbackMessage feedback={generalFeedback} />
+          <FeedbackMessage feedback={generalFeedback} id="project-general-feedback" />
           <form onSubmit={saveGeneral} className="space-y-4">
             <Input
               id="project-name"
@@ -220,6 +225,8 @@ export function ProjectSettings({ project, envVars: initialEnvVars }: ProjectSet
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={60}
+              aria-invalid={generalFeedback?.tone === 'error' ? true : undefined}
+              aria-describedby={generalFeedback?.tone === 'error' ? 'project-general-feedback' : undefined}
               required
             />
             <Input
@@ -229,6 +236,8 @@ export function ProjectSettings({ project, envVars: initialEnvVars }: ProjectSet
               onChange={(e) => setBranch(e.target.value)}
               hint="Les push sur cette branche déclenchent un déploiement."
               spellCheck={false}
+              aria-invalid={generalFeedback?.tone === 'error' ? true : undefined}
+              aria-describedby={generalFeedback?.tone === 'error' ? 'project-general-feedback' : undefined}
               required
             />
             <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground flex items-start gap-2">
@@ -265,6 +274,76 @@ export function ProjectSettings({ project, envVars: initialEnvVars }: ProjectSet
       <Card>
         <CardHeader>
           <h2 className="font-semibold flex items-center gap-2">
+            <ArrowRightLeft className="w-4 h-4" aria-hidden="true" />
+            Transfert
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Déplacez le projet vers une autre organisation dont vous êtes propriétaire ou administrateur.
+            Le transfert est immédiat et modifie l’accès, la facturation et les quotas.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ProjectTransfer
+            projectId={project.id}
+            projectName={project.name}
+            targets={transferTargets}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <h2 className="font-semibold flex items-center gap-2">
+            <Globe className="w-4 h-4" aria-hidden="true" />
+            Domaines
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Le domaine Eflex reste stable. Ajoutez vos propres domaines avec un CNAME ; le certificat
+            SSL est émis automatiquement après vérification.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ProjectDomains projectId={project.id} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <h2 className="font-semibold flex items-center gap-2">
+            <Database className="w-4 h-4" aria-hidden="true" />
+            Bases de données
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Créez une base PostgreSQL ou un cache Redis privé sur l’infrastructure. La variable
+            <code className="mx-1 font-mono">DATABASE_URL</code> ou
+            <code className="mx-1 font-mono">REDIS_URL</code>
+            est injectée automatiquement au déploiement.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ProjectDatabases projectId={project.id} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <h2 className="font-semibold flex items-center gap-2">
+            <Activity className="w-4 h-4" aria-hidden="true" />
+            Disponibilité & actions
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Statut du conteneur sur la plateforme et actions immédiates. Le redéploiement complet reste
+            disponible depuis la page du projet.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ProjectRuntimeControls projectId={project.id} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <h2 className="font-semibold flex items-center gap-2">
             <KeyRound className="w-4 h-4" aria-hidden="true" />
             Variables d’environnement
           </h2>
@@ -274,7 +353,7 @@ export function ProjectSettings({ project, envVars: initialEnvVars }: ProjectSet
           </p>
         </CardHeader>
         <CardContent className="space-y-5">
-          <FeedbackMessage feedback={envFeedback} />
+          <FeedbackMessage feedback={envFeedback} id="project-env-feedback" />
 
           {envVars.length === 0 ? (
             <p className="text-sm text-muted-foreground">Aucune variable définie.</p>
@@ -328,6 +407,8 @@ export function ProjectSettings({ project, envVars: initialEnvVars }: ProjectSet
                 onChange={(e) => setNewKey(e.target.value)}
                 spellCheck={false}
                 autoComplete="off"
+                aria-invalid={envFeedback?.tone === 'error' ? true : undefined}
+                aria-describedby={envFeedback?.tone === 'error' ? 'project-env-feedback' : undefined}
                 required
               />
               <Input
@@ -338,6 +419,8 @@ export function ProjectSettings({ project, envVars: initialEnvVars }: ProjectSet
                 onChange={(e) => setNewValue(e.target.value)}
                 spellCheck={false}
                 autoComplete="off"
+                aria-invalid={envFeedback?.tone === 'error' ? true : undefined}
+                aria-describedby={envFeedback?.tone === 'error' ? 'project-env-feedback' : undefined}
               />
             </div>
             <div className="flex justify-end">
@@ -359,14 +442,14 @@ export function ProjectSettings({ project, envVars: initialEnvVars }: ProjectSet
           <p className="text-sm text-muted-foreground mt-1">
             Le projet, ses variables et son historique de déploiements sont supprimés.
             {project.coolifyAppId
-              ? ' L’application Coolify et ses conteneurs sont arrêtés au passage.'
+              ? ' L’application et ses conteneurs sont arrêtés au passage.'
               : ' Aucune application n’a encore été déployée.'}
           </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={deleteProject} className="space-y-4">
             {deleteError && (
-              <p role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+              <p id="project-delete-feedback" role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
                 {deleteError}
               </p>
             )}
@@ -376,6 +459,8 @@ export function ProjectSettings({ project, envVars: initialEnvVars }: ProjectSet
               value={deleteConfirm}
               onChange={(e) => setDeleteConfirm(e.target.value)}
               autoComplete="off"
+              aria-invalid={deleteError ? true : undefined}
+              aria-describedby={deleteError ? 'project-delete-feedback' : undefined}
               required
             />
             <div className="flex justify-end">

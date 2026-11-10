@@ -56,7 +56,22 @@ describe('dépôts privés (issue 07)', () => {
     expect(gh.calls.some((c) => c.host === 'raw.githubusercontent.com')).toBe(false)
   })
 
-  it('refuse un dépôt privé sans jeton d’installation', async () => {
+  it('analyse un dépôt privé avec un jeton personnel via l’API Contents', async () => {
+    const gh = fakeGitHub({ 'acme/private': { files: nextApp, private: true } })
+    const analysis = await analyzeGitHubRepo(ref('acme', 'private'), {
+      fetchImpl: gh.fetch,
+      userToken: 'ghp_test',
+    })
+
+    expect(analysis.detection.framework).toBe('nextjs')
+    expect(analysis.repo.private).toBe(true)
+    const apiCalls = gh.calls.filter((c) => c.host === 'api.github.com')
+    expect(apiCalls.some((c) => c.url.includes('/contents/'))).toBe(true)
+    expect(apiCalls.every((c) => c.headers.Authorization === 'Bearer ghp_test')).toBe(true)
+    expect(gh.calls.some((c) => c.host === 'raw.githubusercontent.com')).toBe(false)
+  })
+
+  it('refuse un dépôt privé sans jeton', async () => {
     const gh = fakeGitHub({ 'acme/private': { files: nextApp, private: true } })
     await expect(analyzeGitHubRepo(ref('acme', 'private'), { fetchImpl: gh.fetch })).rejects.toMatchObject({
       status: 422,
@@ -79,6 +94,7 @@ describe('analyzeGitHubRepo', () => {
       branch: 'main',
       defaultBranch: 'main',
       commitSha: fakeSha('acme/app@main'),
+      private: false,
     })
     expect(analysis.incomplete).toBe(false)
   })

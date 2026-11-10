@@ -21,7 +21,7 @@ export const COMPONENT_LABELS: Record<ComponentKey, string> = {
   portal: 'Portail EFLEX',
   database: 'Base de données',
   redis: 'Cache / files',
-  coolify: 'Déploiement (Coolify)',
+  coolify: 'Déploiement',
   engine: 'Moteur Axiom',
 }
 
@@ -132,7 +132,7 @@ function probeRedis(): Promise<Probe> {
 
 async function probeCoolify(): Promise<Probe> {
   if (!process.env.COOLIFY_API_URL || !process.env.COOLIFY_API_TOKEN) {
-    return { state: 'unknown', latencyMs: null, detail: 'Coolify non configuré' }
+    return { state: 'unknown', latencyMs: null, detail: 'Service de déploiement non configuré' }
   }
   const start = Date.now()
   try {
@@ -140,11 +140,11 @@ async function probeCoolify(): Promise<Probe> {
     return {
       state: ok ? 'ok' : 'down',
       latencyMs: Date.now() - start,
-      detail: ok ? 'API Coolify' : 'API Coolify injoignable',
+      detail: ok ? 'Service de déploiement' : 'Service de déploiement injoignable',
     }
   } catch (error) {
     logProbeFailure('coolify', error)
-    return { state: 'down', latencyMs: null, detail: 'API Coolify injoignable' }
+    return { state: 'down', latencyMs: null, detail: 'Service de déploiement injoignable' }
   }
 }
 

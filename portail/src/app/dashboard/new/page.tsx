@@ -27,6 +27,7 @@ export default function NewProjectPage() {
   const [repoUrl, setRepoUrl] = useState('')
   const [branch, setBranch] = useState('')
   const [installationId, setInstallationId] = useState('')
+  const [usePat, setUsePat] = useState(false)
   const [name, setName] = useState('')
   const [nameEdited, setNameEdited] = useState(false)
   const [envVars, setEnvVars] = useState<EnvVar[]>([{ key: '', value: '' }])
@@ -71,6 +72,7 @@ export default function NewProjectPage() {
           branch: branch || undefined,
           root: app || undefined,
           installationId: installationId || undefined,
+          usePat: usePat || undefined,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -114,6 +116,7 @@ export default function NewProjectPage() {
           root: root || undefined,
           framework: selectedPlan.framework,
           installationId: installationId || undefined,
+          usePat: usePat || undefined,
           envVars: envVars.filter((v) => v.key.trim() !== ''),
         }),
       })
@@ -157,10 +160,11 @@ export default function NewProjectPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <GitHubPicker
-              onSelect={(url, defaultBranch, linkedInstallationId) => {
+              onSelect={({ url, branch: defaultBranch, installationId: linkedInstallationId, usePat: fromPat }) => {
                 setRepoUrl(url)
                 setBranch(defaultBranch)
-                setInstallationId(linkedInstallationId)
+                setInstallationId(linkedInstallationId ?? '')
+                setUsePat(Boolean(fromPat))
                 resetAnalysis()
               }}
             />
@@ -175,6 +179,8 @@ export default function NewProjectPage() {
               value={repoUrl}
               onChange={(e) => {
                 setRepoUrl(e.target.value)
+                setUsePat(false)
+                setInstallationId('')
                 resetAnalysis()
               }}
               required
@@ -204,8 +210,17 @@ export default function NewProjectPage() {
         </Card>
       </form>
 
-      {/* 2. Ce qu'Eflex a compris */}
-      <div aria-live="polite" className="space-y-6">
+      {/* Annonce le résultat de l'analyse aux lecteurs d'écran, sans dupliquer le contenu visible. */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {analyzing
+          ? 'Analyse du dépôt en cours.'
+          : analysis
+            ? 'Analyse terminée. Le résultat est affiché ci-dessous.'
+            : ''}
+      </p>
+
+      {/* 2. Ce qu'Eflex a compris (le statut ci-dessus annonce le résultat ; pas de double annonce). */}
+      <div className="space-y-6">
         {analysis && (
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
             <span className="font-medium text-foreground">
