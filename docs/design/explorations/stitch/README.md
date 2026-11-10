@@ -12,7 +12,7 @@
 ## Repository Policy
 
 1. Stitch exports (HTML, PNG, ZIP) are stored only under `explorations/stitch/v{N}/exports/`.
-2. Exports are never imported by `apps/cloud` and never referenced by frontend code.
+2. Exports are never imported by the portal (`portail/`) and never referenced by frontend code.
 3. A generated screen becomes a **validated reference** only after passing the V2 validation procedure (`v2/README.md` §4); it is then linked from `docs/design/handoff/README.md` §7.
 4. If a generated screen contradicts a validated spec, the spec wins and the discrepancy is recorded in the version's findings table — the spec is not silently changed.
 5. Explorations must not redefine architecture, API, states or runtime model.

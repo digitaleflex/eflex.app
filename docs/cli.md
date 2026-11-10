@@ -27,4 +27,4 @@ go build ./...
 
 - `flag` standard (pas de `cobra` — absent du `go.sum` du module engine).
 - Ne lance aucun conteneur lourd (docker-compose uniquement en lecture `ps`).
-- Aucun autre module touché (pas d'agent, pas de internal/protocol, pas de docs/security, pas d'apps/cloud).
+- Aucun autre module touché (pas d'agent, pas de internal/protocol, pas de docs/security, pas de `portail/`).

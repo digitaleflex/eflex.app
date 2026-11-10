@@ -43,8 +43,8 @@ This map is the canonical ownership matrix for parallel autonomous work.
 | #116 | Deployment persistence | services/engine/internal/database/deployment/ | #115 | Agent |
 | #117 | REST API | services/engine/internal/api/ | #71,#116 | Agent runtime |
 | #118 | SSE | services/engine/internal/api/sse/ | #75,#117 | Agent transport |
-| #119 | Cloud shell | apps/cloud/ | #117,#125 | Engine internals |
-| #120 | Cloud workflow | apps/cloud/features/deploy/ | #119,#117 | Agent implementation |
+| #119 | Console shell | portail/src/app/dashboard/ (replaces the removed `apps/cloud`) | #117,#125 | Engine internals |
+| #120 | Console deploy workflow | portail/src/app/dashboard/new/ | #119,#117 | Agent implementation |
 | #121 | Node/Next presets | services/engine/internal/runtime/presets/node/ | #95,#96 | Agent adapters |
 | #122 | Docker preset | services/engine/internal/runtime/presets/docker/ | #83,#97 | Engine core |
 | #123 | Compose preset | services/engine/internal/runtime/presets/compose/ | #83,#89 | Engine API |
