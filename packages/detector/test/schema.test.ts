@@ -42,4 +42,17 @@ describe('schema v1', () => {
     ).toBe(true);
     expect(validate({ version: 1, buildEnv: { RETRIES: 3 } })).toBe(false);
   });
+
+  it('exige un fichier compose quand le framework vaut compose', () => {
+    const base = { version: 1, framework: 'compose', runtime: 'docker@1', root: '', port: 80 };
+    expect(validate(base)).toBe(false);
+    expect(validate({ ...base, compose: { location: '/compose.yaml' } })).toBe(true);
+    expect(validate({ ...base, compose: { location: '../compose.yaml' } })).toBe(false);
+    expect(
+      validate({
+        ...base,
+        compose: { location: '/compose.yaml', services: ['app', 'web'], service: 'web' },
+      }),
+    ).toBe(true);
+  });
 });

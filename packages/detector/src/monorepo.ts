@@ -3,7 +3,17 @@ import type { DetectionContext } from './types.js';
 const MONOREPO_MARKERS = ['pnpm-workspace.yaml', 'turbo.json', 'nx.json', 'lerna.json'];
 
 /** Manifests that identify a deployable application directory. */
-export const APP_MANIFESTS = ['package.json', 'composer.json', 'pyproject.toml', 'requirements.txt'];
+export const APP_MANIFESTS = [
+  'package.json',
+  'composer.json',
+  'pyproject.toml',
+  'requirements.txt',
+  // Un sous-dossier qui ne contient qu'un compose reste déployable (D1).
+  'docker-compose.yml',
+  'docker-compose.yaml',
+  'compose.yml',
+  'compose.yaml',
+];
 
 export function isMonorepo(ctx: DetectionContext): boolean {
   if (MONOREPO_MARKERS.some((file) => ctx.hasRepo(file))) return true;

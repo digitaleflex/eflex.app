@@ -15,6 +15,7 @@ const FRAMEWORK_LOGOS: Record<string, string> = {
   python: '/logos/python.svg',
   static: '/logos/html5.svg',
   docker: '/logos/docker.svg',
+  compose: '/logos/docker.svg',
   'eflex-config': '/logo-mark.png',
 }
 
@@ -34,6 +35,7 @@ const FRAMEWORK_COLORS: Record<string, string> = {
   python: '55 118 171',
   static: '227 79 38',
   docker: '36 150 237',
+  compose: '36 150 237',
   'eflex-config': '37 99 235',
 }
 

@@ -1,8 +1,8 @@
-# Déploiements : retour arrière
+# Déploiements : compose fourni et retour arrière
 
-Ce document décrit le comportement du retour arrière (« redéployer cette
-version ») et ses limites. Il complète `AGENTS.md` et le code du worker
-(`portail/src/worker.ts`).
+Ce document décrit le déploiement d'un compose fourni par le dépôt et le
+comportement du retour arrière (« redéployer cette version »), avec ses limites.
+Il complète `AGENTS.md` et le code du worker (`portail/src/worker.ts`).
 
 ## Déploiement normal
 
@@ -13,6 +13,70 @@ la tête de la branche suivie (`Project.branch`) au moment du build. Le SHA
 affiché dans l'historique est celui connu au moment de la demande (webhook ou
 analyse), pas nécessairement celui construit si un autre push arrive entre
 les deux.
+
+## Compose fourni par le dépôt
+
+Un dépôt avec `docker-compose.yml` / `docker-compose.yaml` / `compose.yml` /
+`compose.yaml` à la racine de l'application est déployé comme **Application
+Coolify `dockercompose`**. Le fichier est lu par Coolify dans le dépôt à chaque
+déploiement : le portail ne l'envoie pas et ne le réécrit pas.
+
+### Prérequis
+
+- Le compose doit être **commité** et présent à la racine de l'application (ou
+  du sous-dossier choisi dans un monorepo).
+- Il doit contenir une section `services:` non vide.
+- Pour être accessible, le service public doit déclarer ses propres labels
+  Traefik avec l'entrypoint `websecure` et le réseau `proxy` externe : les
+  labels générés par Coolify utilisent `https`, absent du Traefik de l'hôte, et
+  les `custom_labels` ne s'appliquent pas aux applications compose.
+- Les migrations ne sont pas exécutées par la plateforme. Utilisez un service
+  one-shot (`restart: "no"`, `depends_on` avec `condition: service_healthy`).
+- Les secrets restent dans les variables du projet (Coolify écrit un `.env`
+  commun à tous les services du compose) ; jamais dans le fichier.
+
+### Refus de sécurité
+
+Le worker relit le compose avant tout appel Coolify et refuse :
+
+| Clause | Message |
+| --- | --- |
+| `privileged: true` | `privileged: true` |
+| `network_mode: host` | `network_mode: host` |
+| `/var/run/docker.sock` monté | « le montage de la socket Docker… est interdit » |
+| montage absolu ou remontée `..` de l'hôte (`/etc`, `/home`, `~…`) | « le montage de l'hôte … est interdit » |
+
+Un bind relatif au dépôt (`./storage:/app/storage`) est accepté.
+
+### Domaines et TLS
+
+Le domaine principal et les domaines personnalisés vérifiés sont attachés au
+service public via `docker_compose_domains`. Le service est choisi d'après les
+ports conteneur (80, 8080, 8000, 3000…) puis son nom (`web`, `nginx`, `app`…).
+Sans service reconnu, aucun domaine n'est attaché et le journal le signale.
+La vérification TLS après déploiement (`waitForTls`) reste la même.
+
+### Logs par service
+
+L'onglet **Logs** propose un sélecteur quand le plan est un compose. Il appelle
+`GET /applications/{uuid}/logs?service_name=<service>` (Coolify 4.7.3) ; le
+service doit figurer dans le plan. Les secrets connus sont masqués côté serveur.
+
+### Volumes, annulation, retour arrière
+
+- Les volumes du compose sont conservés par Docker Compose sous le projet de
+  l'application. La plateforme ne crée aucun stockage Coolify et ne supprime
+  jamais ces volumes.
+- L'annulation (`POST /deployments/{uuid}/cancel`) et les logs de build suivent
+  le chemin commun.
+- Le retour arrière (`POST /applications/{uuid}/rollback`) fonctionne, mais
+  Coolify relit le compose de la branche suivie : un retour arrière ne restaure
+  ni les volumes, ni les variables, ni une ancienne version du compose.
+- Un plan multi-services **sans** compose reste refusé avant tout appel Coolify.
+- La validation de sécurité lit la tête de branche au début du job ; un push
+  concurrent peut modifier le compose avant le clone de Coolify. Pour une
+  sécurité stricte, protégez la branche de production et relancez le
+  déploiement après revue.
 
 ## Retour arrière
 

@@ -81,6 +81,35 @@ describe('dépôts privés (issue 07)', () => {
 })
 
 describe('analyzeGitHubRepo', () => {
+  it('détecte un compose fourni par le dépôt et lit son contenu', async () => {
+    const gh = fakeGitHub({
+      'acme/app': {
+        files: {
+          'docker-compose.yml': [
+            'services:',
+            '  app:',
+            '    build: .',
+            '    ports: ["3000:3000"]',
+            '  web:',
+            '    image: nginx:1.27-alpine',
+            '    ports: ["80:80"]',
+          ].join('\n'),
+          'Dockerfile': 'FROM node:22-alpine\nEXPOSE 3000\n',
+        },
+      },
+    })
+    const analysis = await analyzeGitHubRepo(ref(), { fetchImpl: gh.fetch })
+
+    expect(analysis.detection.framework).toBe('compose')
+    expect(analysis.detection.plan?.compose).toMatchObject({
+      location: '/docker-compose.yml',
+      services: ['app', 'web'],
+      service: 'web',
+    })
+    // Le fichier a bien été demandé au dépôt, pas seulement son nom.
+    expect(gh.calls.some((c) => c.url.includes('docker-compose.yml'))).toBe(true)
+  })
+
   it('détecte une application Next.js et épingle le commit', async () => {
     const gh = fakeGitHub({ 'acme/app': { files: nextApp } })
     const analysis = await analyzeGitHubRepo(ref(), { fetchImpl: gh.fetch })

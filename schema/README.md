@@ -8,13 +8,16 @@ Le plan est produit par le détecteur, puis consommé par le builder et le runti
 - `$schema` : `https://json-schema.org/draft/2020-12/schema`
 - Validation : `additionalProperties: false`, `required: ["version"]`
 
-## Les trois niveaux
+## Les niveaux de détection
 
 Eflex applique une hiérarchie stricte. Le premier niveau disponible gagne.
 
 1. **Convention** — le détecteur inspecte les fichiers (`package.json`, `composer.json`, `pyproject.toml`, `artisan`, `index.html`, lockfiles, etc.) et produit un plan avec un score de confiance. C'est le comportement par défaut, sans configuration.
 2. **`eflex.json`** — un fichier explicite à la racine du dépôt (ou de l'application) **remplace** la détection. Il est validé contre ce schéma, puis complété par des valeurs par défaut. Sa confiance vaut `1.0`. Les plans conventionnels restent visibles dans `alternatives`.
-3. **`Dockerfile`** — un `Dockerfile` (ou `docker/Dockerfile`) désactive la détection de framework. Le plan reste minimal (`docker@1`, port `EXPOSE` ou `3000`) car vous contrôlez le build.
+3. **Compose fourni** — un `docker-compose.yml` / `docker-compose.yaml` / `compose.yml` / `compose.yaml` à la racine de l'application produit un plan `framework: "compose"`. Le fichier fait foi : la plateforme ne le génère pas et ne le réécrit pas. Il passe avant un `Dockerfile` présent au même endroit, car il décrit l'application et ses services voisins (et référence souvent ce Dockerfile).
+4. **`Dockerfile`** — un `Dockerfile` (ou `docker/Dockerfile`) désactive la détection de framework. Le plan reste minimal (`docker@1`, port `EXPOSE` ou `3000`) car vous contrôlez le build.
+
+> Pour un dépôt qui contient un compose réservé au développement local (par exemple une base de données seule) à côté d'un `Dockerfile` de production, utilisez `eflex.json` pour fixer `framework: "docker"` : la configuration explicite reste prioritaire sur le compose.
 
 > Un `eflex.json` invalide ne retombe **pas** sur la convention : le détecteur renvoie `plan: null`, une confiance `0` et un avertissement nommant l'erreur d'analyse. Mieux vaut échouer explicitement que déployer autre chose que ce qui est demandé.
 
@@ -57,6 +60,28 @@ Eflex applique une hiérarchie stricte. Le premier niveau disponible gagne.
 }
 ```
 
+## Exemple compose fourni par le dépôt
+
+```json
+{
+  "version": 1,
+  "framework": "compose",
+  "runtime": "docker@1",
+  "root": "",
+  "port": 80,
+  "compose": {
+    "location": "/docker-compose.yaml",
+    "services": ["app", "web", "queue"],
+    "service": "web"
+  }
+}
+```
+
+Le champ `compose` est **obligatoire** quand `framework` vaut `compose`. Il ne
+contient aucun service inventé : `services` recopie les clés du fichier, dans
+l'ordre, et `service` désigne celui qui portera le domaine public (absent si
+aucun port HTTP n'est reconnu).
+
 ## Référence des clés
 
 ### `version` (obligatoire)
@@ -65,7 +90,7 @@ Eflex applique une hiérarchie stricte. Le premier niveau disponible gagne.
 
 ### `framework`
 
-Enum : `docker`, `eflex-config`, `nextjs`, `nuxt`, `astro`, `vite`, `node`, `laravel`, `php`, `python`, `static`.
+Enum : `docker`, `compose`, `eflex-config`, `nextjs`, `nuxt`, `astro`, `vite`, `node`, `laravel`, `php`, `python`, `static`.
 
 Indique le framework retenu. Dans un plan produit depuis `eflex.json`, cette valeur peut venir du fichier ; le `framework` du `DetectionResult` vaut alors `eflex-config`.
 
@@ -151,6 +176,23 @@ Dossier des fichiers statiques produits par le build, **relatif à `root`**, san
 ### `dockerfile`
 
 Chemin du Dockerfile, **relatif à `root`**, uniquement quand il n'est pas `Dockerfile` à la racine (par exemple `docker/Dockerfile`). Le détecteur le renseigne seul pour `docker/Dockerfile`.
+
+### `compose`
+
+Présent uniquement quand `framework` vaut `compose`. Objet :
+
+| Champ | Type | Contraintes |
+| --- | --- | --- |
+| `location` | string | **obligatoire**, chemin relatif à `root`, `/` initial, sans `..` (ex. `/docker-compose.yaml`) |
+| `services` | string[] | noms des services du fichier, 50 maximum, sans doublon |
+| `service` | string | service qui porte le domaine public ; doit figurer dans `services` |
+
+Le plan est **descriptif** : Eflex ne génère ni service, ni commande, ni volume.
+Coolify lit le fichier du dépôt à chaque déploiement (`build_pack=dockercompose`)
+et refuse `domains` : les domaines passent par `docker_compose_domains`, un
+service à la fois. Les volumes, les migrations et l'ordre de démarrage restent
+la responsabilité du compose. Voir
+`docs/architecture/deployment-monorepos-volumes.md`.
 
 ### `buildEnv`
 

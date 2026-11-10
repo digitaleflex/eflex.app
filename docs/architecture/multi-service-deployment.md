@@ -4,6 +4,14 @@
 plusieurs processus (Laravel `app` + `web` + `queue` + `scheduler`), plusieurs
 applications dans un monorepo, ou des sidecars.
 
+> **D1 est implémenté** : un dépôt qui fournit son propre
+> `docker-compose.y(a)ml` / `compose.y(a)ml` est déployé comme Application
+> Coolify `dockercompose` (détection, artefacts, client, worker, refus de
+> sécurité, logs par service, documentation d'exploitation). Voir
+> `docs/architecture/deployment-monorepos-volumes.md` (section « Compose fourni
+> par le dépôt ») et `docs/operations/deployments.md`. D2 (monorepo
+> multi-applications) et D3 (Axiom) restent ouverts.
+
 Ce document complète `docs/architecture/deployment-monorepos-volumes.md`
 (volumes et monorepos, déjà livrés), `docs/adr/0011-coolify-then-axiom.md`
 (Coolify reste le backend) et `docs/architecture/compose-preset.md` (preset
@@ -26,7 +34,7 @@ application n'a été créée, modifiée ou déployée, aucun secret n'est repro
 
 | Élément | Comportement | Source |
 | --- | --- | --- |
-| Garde-fou multi-services | tout plan dont `artifacts.services.length > 1` est refusé avec un message explicite, avant tout appel Coolify | `worker.ts`, `processDeployment` |
+| Garde-fou multi-services | tout plan **généré** dont `artifacts.services.length > 1` est refusé avec un message explicite, avant tout appel Coolify ; un plan `compose` fourni par le dépôt passe par une Application `dockercompose` | `worker.ts`, `processDeployment`, `lib/deploy-plan.ts` (`deploymentKind`) |
 | Laravel | le renderer produit déjà `app` (php-fpm, volume `storage`), `web` (nginx + `nginx/default.conf`), `queue`, `scheduler` et un service one-shot `migrate` | `packages/renderer/src/render.ts`, `deploy.ts` |
 | Port réel | `portsExposes` vient du plan (`ports.web ?? ports.app ?? plan.port`) | `deploy-plan.ts`, `buildDeploymentArtifacts` |
 | Volumes | traduits en `persistentVolumes`, créés via `POST /applications/{uuid}/storages` seulement si `EFLEX_PERSISTENT_VOLUMES=1` | `deploy-plan.ts`, `coolify.ts` |

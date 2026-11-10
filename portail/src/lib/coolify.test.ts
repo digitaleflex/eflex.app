@@ -154,6 +154,63 @@ describe('createApplication', () => {
     expect(body.docker_compose_raw).toBeUndefined()
   })
 
+  it('crée une application compose 4.7.3 sans domains ni ports_exposes', async () => {
+    const calls = mockFetch((url, init) => {
+      if (url.endsWith('/applications/public')) return json({ uuid: 'app-compose' }, 201)
+      return targetHandler(true)(url, init)
+    })
+    const { createApplication } = await loadModule()
+
+    const result = await createApplication({
+      name: 'demo',
+      gitRepository: 'https://github.com/o/r',
+      buildPack: 'dockercompose',
+      baseDirectory: '/apps/api',
+      dockerComposeLocation: '/compose.yml',
+      dockerComposeDomains: [
+        {
+          name: 'web',
+          domain: 'https://demo.example.com,https://custom.example.com',
+        },
+      ],
+      // Ces valeurs ne doivent jamais être envoyées pour un compose.
+      portsExposes: '3000',
+      fqdn: 'demo.example.com',
+      domains: ['demo.example.com'],
+      customLabels: ['traefik.enable=true'],
+      installCommand: 'npm ci',
+      buildCommand: 'npm run build',
+      startCommand: 'npm start',
+      postDeploymentCommand: 'php artisan migrate --force',
+    })
+
+    expect(result).toEqual({ id: 'app-compose' })
+    const body = JSON.parse(
+      String(calls.find((item) => item.url.endsWith('/applications/public'))?.init?.body),
+    )
+    expect(body).toMatchObject({
+      build_pack: 'dockercompose',
+      base_directory: '/apps/api',
+      docker_compose_location: '/compose.yml',
+      docker_compose_domains: [
+        {
+          name: 'web',
+          domain: 'https://demo.example.com,https://custom.example.com',
+        },
+      ],
+      connect_to_docker_network: true,
+      autogenerate_domain: false,
+    })
+    expect(body.domains).toBeUndefined()
+    expect(body.ports_exposes).toBeUndefined()
+    expect(body.custom_labels).toBeUndefined()
+    expect(body.install_command).toBeUndefined()
+    expect(body.build_command).toBeUndefined()
+    expect(body.start_command).toBeUndefined()
+    expect(body.post_deployment_command).toBeUndefined()
+    expect(body.docker_compose_raw).toBeUndefined()
+  })
+
   it('n’envoie pas de dossier de travail pour un dépôt déployé à la racine', async () => {
     const calls = mockFetch((url, init) => {
       if (url.endsWith('/applications/public')) return json({ uuid: 'app' }, 201)
@@ -224,6 +281,33 @@ describe('updateApplication', () => {
       publish_directory: '/',
       ports_exposes: '3000',
     })
+  })
+
+  it('met à jour une application compose (build_pack, chemin, domaines par service)', async () => {
+    const calls = mockFetch((url, init) => {
+      if (url.endsWith('/applications/app') && init?.method === 'PATCH') return json({ uuid: 'app' })
+      throw new Error(`requête inattendue : ${init?.method ?? 'GET'} ${url}`)
+    })
+    const { updateApplication } = await loadModule()
+
+    await expect(
+      updateApplication('app', {
+        buildPack: 'dockercompose',
+        baseDirectory: '/apps/api',
+        dockerComposeLocation: '/compose.yml',
+        dockerComposeDomains: [{ name: 'web', domain: 'https://demo.example.com' }],
+      }),
+    ).resolves.toEqual({ ok: true })
+
+    const body = JSON.parse(String(calls[0]?.init?.body))
+    expect(body).toEqual({
+      build_pack: 'dockercompose',
+      base_directory: '/apps/api',
+      docker_compose_location: '/compose.yml',
+      docker_compose_domains: [{ name: 'web', domain: 'https://demo.example.com' }],
+    })
+    expect(body.domains).toBeUndefined()
+    expect(body.ports_exposes).toBeUndefined()
   })
 })
 
@@ -349,6 +433,41 @@ describe('decodeDeploymentLogs', () => {
     expect(decodeDeploymentLogs(null)).toBe('')
     expect(decodeDeploymentLogs('')).toBe('')
     expect(decodeDeploymentLogs(JSON.stringify([{ name: 'Build' }, 'ligne']))).toBe('ligne')
+  })
+})
+
+describe('getApplicationLogs', () => {
+  it('transmet service_name pour les logs d’un service compose', async () => {
+    const calls = mockFetch((url) => {
+      if (url.includes('/applications/app/logs')) return json({ logs: 'ligne queue' })
+      throw new Error(url)
+    })
+    const { getApplicationLogs } = await loadModule()
+
+    await expect(getApplicationLogs('app', 120, 'queue')).resolves.toEqual({ logs: 'ligne queue' })
+    expect(calls[0]?.url).toContain('lines=120')
+    expect(calls[0]?.url).toContain('service_name=queue')
+    expect(calls[0]?.url).toContain('show_timestamps=true')
+  })
+})
+
+describe('setComposeApplicationDomains', () => {
+  it('n’envoie que docker_compose_domains, jamais domains', async () => {
+    const calls = mockFetch((url) => {
+      if (url.endsWith('/applications/app')) return json({ uuid: 'app' })
+      throw new Error(url)
+    })
+    const { setComposeApplicationDomains } = await loadModule()
+
+    await expect(
+      setComposeApplicationDomains('app', [
+        { name: 'web', domain: 'https://demo.example.com' },
+      ]),
+    ).resolves.toEqual({ ok: true })
+    expect(calls[0]?.init?.method).toBe('PATCH')
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      docker_compose_domains: [{ name: 'web', domain: 'https://demo.example.com' }],
+    })
   })
 })
 

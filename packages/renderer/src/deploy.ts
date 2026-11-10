@@ -1,5 +1,5 @@
 import { parse, stringify } from 'yaml';
-import type { BuildPlan } from '../../detector/src/types.js';
+import type { BuildPlan, ComposeContext } from '../../detector/src/types.js';
 import { generateDockerfile } from './dockerfile.js';
 import { renderStack } from './render.js';
 import type { ComposeDocument, RenderContext } from './types.js';
@@ -27,9 +27,21 @@ export interface DeploymentArtifacts {
   buildPack: 'dockercompose' | 'dockerfile';
   postDeploy: string[];
   services: string[];
+  /**
+   * Compose fourni par le dépôt (framework `compose`). `null` pour un compose
+   * généré : la distinction évite de déployer un faux compose ou de créer des
+   * volumes Coolify qui contrediraient ceux du fichier.
+   */
+  repositoryCompose: RepositoryCompose | null;
   /** Volumes persistants à créer côté orchestrateur (nom + chemin conteneur). */
   persistentVolumes: PersistentVolume[];
   warnings: string[];
+}
+
+/** Compose du dépôt, tel qu'il sera lu par Coolify (chemin relatif à `root`). */
+export interface RepositoryCompose extends ComposeContext {
+  /** Chemin complet dans le dépôt (`apps/api/docker-compose.yml`). */
+  repoPath: string;
 }
 
 /** Spécification d'un stockage persistant dérivée de `BuildPlan.volumes`. */
@@ -88,6 +100,25 @@ export function persistentVolumesForPlan(plan: BuildPlan): PersistentVolume[] {
   }
 
   return volumes;
+}
+
+/**
+ * Compose fourni par le dépôt, avec le chemin réellement présent dans le
+ * dépôt (utile au worker pour relire et valider le fichier avant envoi).
+ */
+export function repositoryComposeForPlan(plan: BuildPlan): RepositoryCompose | null {
+  if (plan.framework !== 'compose' || !plan.compose) return null;
+  const location = `/${plan.compose.location.replace(/^\/+/, '')}`;
+  const segments = location.split('/').filter(Boolean);
+  if (segments.length === 0 || segments.includes('..')) return null;
+  const root = (plan.root ?? '').trim().replace(/^\/+|\/+$/g, '');
+  const repoPath = root === '' ? location.slice(1) : `${root}${location}`;
+  return {
+    location,
+    repoPath,
+    services: plan.compose.services ?? [],
+    ...(plan.compose.service ? { service: plan.compose.service } : {}),
+  };
 }
 
 export function buildDeploymentArtifacts(
@@ -153,7 +184,9 @@ export function buildDeploymentArtifacts(
     buildPack,
     postDeploy: plan.postDeploy ?? [],
     services: rendered.metadata.services,
-    persistentVolumes: persistentVolumesForPlan(plan),
+    repositoryCompose: repositoryComposeForPlan(plan),
+    persistentVolumes:
+      plan.framework === 'compose' ? [] : persistentVolumesForPlan(plan),
     warnings: rendered.metadata.warnings,
   };
 }

@@ -251,6 +251,86 @@ export const dockerfile = makeSnapshot({
   'Dockerfile': 'FROM node:22-alpine\nWORKDIR /app\nCOPY . .\n',
 });
 
+/** Compose fourni par le dépôt : il gagne sur le Dockerfile et le manifeste. */
+export const composeRoot = makeSnapshot({
+  'docker-compose.yml': [
+    'services:',
+    '  app:',
+    '    build: .',
+    '    ports:',
+    '      - "3000:3000"',
+    '    environment:',
+    '      APP_ENV: production',
+    '  web:',
+    '    image: nginx:1.27-alpine',
+    '    ports:',
+    '      - "80:80"',
+    '    labels:',
+    '      - "traefik.http.routers.demo.entrypoints=websecure"',
+    '  queue:',
+    '    build: .',
+    '    command: node worker.js',
+    '    depends_on:',
+    '      - app',
+    'volumes:',
+    '  storage:',
+    '',
+  ].join('\n'),
+  'Dockerfile': 'FROM node:22-alpine\nWORKDIR /app\nEXPOSE 3000\nCOPY . .\n',
+  'package.json': json({
+    name: 'compose-app',
+    scripts: { build: 'next build', start: 'next start' },
+    dependencies: { next: '14.2.0' },
+  }),
+  'next.config.js': 'module.exports = {};\n',
+});
+
+/** Nom standard `compose.yaml`, sans manifeste applicatif. */
+export const composeYaml = makeSnapshot({
+  'compose.yaml': [
+    'services:',
+    '  api:',
+    '    image: ghcr.io/acme/api:latest',
+    '    ports:',
+    '      - "8080:8080"',
+    '  db:',
+    '    image: postgres:16-alpine',
+    '    ports:',
+    '      - "5432:5432"',
+    '',
+  ].join('\n'),
+});
+
+/** Compose dans un sous-dossier de monorepo, à côté d'un Dockerfile. */
+export const composeMonorepoApp = makeSnapshot({
+  'pnpm-workspace.yaml': 'packages:\n  - "apps/*"\n',
+  'apps/api/compose.yml': [
+    'services:',
+    '  app:',
+    '    build: .',
+    '    ports:',
+    '      - "8000:8000"',
+    '',
+  ].join('\n'),
+  'apps/api/Dockerfile': 'FROM python:3.12-slim\nEXPOSE 8000\n',
+});
+
+/** `eflex.json` explicite qui pointe vers un compose. */
+export const eflexConfigCompose = makeSnapshot({
+  'eflex.json': json({
+    version: 1,
+    framework: 'compose',
+    runtime: 'docker@1',
+    port: 80,
+    compose: {
+      location: 'docker/compose.yaml',
+      services: ['app', 'worker'],
+      service: 'app',
+    },
+  }),
+  'docker/compose.yaml': 'services:\n  app:\n    build: .\n  worker:\n    build: .\n',
+});
+
 export const dockerfileExpose = makeSnapshot({
   'Dockerfile': 'FROM nginx:alpine\nEXPOSE 8080\nCOPY . /usr/share/nginx/html\n',
 });
@@ -407,6 +487,10 @@ export function allFixtures(): Fixture[] {
     { name: 'static', snapshot: staticSite },
     { name: 'static-with-build', snapshot: staticSiteWithBuild },
     { name: 'dockerfile', snapshot: dockerfile },
+    { name: 'compose-root', snapshot: composeRoot },
+    { name: 'compose-yaml', snapshot: composeYaml },
+    { name: 'compose-monorepo-app', snapshot: composeMonorepoApp },
+    { name: 'eflex-config-compose', snapshot: eflexConfigCompose },
     { name: 'dockerfile-expose', snapshot: dockerfileExpose },
     { name: 'eflex-config', snapshot: eflexConfig },
     { name: 'eflex-config-static', snapshot: eflexConfigStatic },

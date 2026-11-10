@@ -1,5 +1,4 @@
-import type { BuildPlan } from '../../detector/src/types.js';
-
+import type { BuildPlan, ComposeContext } from '../../detector/src/types.js';
 export interface RenderContext {
   projectId: string;
   image: string;
@@ -81,4 +80,4 @@ export interface ComposeDocument {
   volumes?: Record<string, unknown>;
 }
 
-export type { BuildPlan };
+export type { BuildPlan, ComposeContext };

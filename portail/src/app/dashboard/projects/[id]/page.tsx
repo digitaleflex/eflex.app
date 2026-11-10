@@ -80,6 +80,14 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   // L'état des déploiements est écrit par le worker (file Redis) ; la page se met à jour par événements.
   const deployments = project.deployments
   const analysis = readAnalysis(project.detection)
+  const storedPlan = project.plan as unknown as {
+    framework?: string
+    compose?: { services?: unknown }
+  } | null
+  const composeServices =
+    storedPlan?.framework === 'compose' && Array.isArray(storedPlan.compose?.services)
+      ? storedPlan.compose.services.filter((name): name is string => typeof name === 'string')
+      : []
   const last = deployments[0]
   const production = deployments.find((d) => d.status === 'live')
   const inProgress = last !== undefined && statusInfo(last.status).inProgress
@@ -445,7 +453,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
       {tab === 'logs' &&
         (project.coolifyAppId ? (
-          <RuntimeLogs projectId={project.id} />
+          <RuntimeLogs projectId={project.id} services={composeServices} />
         ) : (
           <section aria-labelledby="logs-title" className="rounded-xl border border-border bg-card p-6">
             <h2 id="logs-title" className="font-semibold">Journaux d’exécution</h2>

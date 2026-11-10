@@ -48,6 +48,8 @@ export function DetectionCard({
   const level = confidenceLevel(detection.confidence)
   const isPrimary = plan.framework === detection.plan?.framework
   const services = Object.entries(plan.services ?? {})
+  const compose = plan.framework === 'compose' ? plan.compose : undefined
+  const composeServices = compose?.services ?? []
   const questions = detection.questions.filter((q) => q.id !== 'app')
   const packageManager = packageManagerLabel(plan.install)
 
@@ -83,25 +85,60 @@ export function DetectionCard({
         <p className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <span>
-            Installation, build et démarrage sont configurés automatiquement
-            {packageManager ? ` avec ${packageManager}` : ''}. Aucun choix technique n’est nécessaire.
+            {compose
+              ? 'Le fichier compose du dépôt sera déployé tel quel. La plateforme ne génère ni service, ni commande, ni volume : les migrations et les tâches de démarrage doivent être prévues dans le compose.'
+              : `Installation, build et démarrage sont configurés automatiquement${packageManager ? ` avec ${packageManager}` : ''}. Aucun choix technique n’est nécessaire.`}
           </span>
         </p>
 
         <details className="group rounded-lg border border-border px-3 py-2">
           <summary className="cursor-pointer text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
-            Voir les commandes techniques
+            {compose ? 'Voir le fichier retenu' : 'Voir les commandes techniques'}
           </summary>
           <dl className="mt-3 space-y-3">
-            <Command label="Installation" value={plan.install} />
-            <Command label="Build" value={plan.build} />
-            <Command label="Démarrage" value={plan.start} fallback={services.length > 0 ? 'Assuré par les services ci-dessous' : undefined} />
-            <div className="grid gap-1 sm:grid-cols-[8rem_1fr] sm:gap-4">
-              <dt className="text-sm text-muted-foreground">Port</dt>
-              <dd className="text-sm font-mono">{plan.port}</dd>
-            </div>
+            {compose ? (
+              <>
+                <Command label="Fichier compose" value={compose.location} />
+                <div className="grid gap-1 sm:grid-cols-[8rem_1fr] sm:gap-4">
+                  <dt className="text-sm text-muted-foreground">Service public</dt>
+                  <dd className="text-sm font-mono">{compose.service ?? 'Non identifié'}</dd>
+                </div>
+              </>
+            ) : (
+              <>
+                <Command label="Installation" value={plan.install} />
+                <Command label="Build" value={plan.build} />
+                <Command label="Démarrage" value={plan.start} fallback={services.length > 0 ? 'Assuré par les services ci-dessous' : undefined} />
+                <div className="grid gap-1 sm:grid-cols-[8rem_1fr] sm:gap-4">
+                  <dt className="text-sm text-muted-foreground">Port</dt>
+                  <dd className="text-sm font-mono">{plan.port}</dd>
+                </div>
+              </>
+            )}
           </dl>
         </details>
+
+        {composeServices.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium">Services déclarés dans le compose</h3>
+            <p className="text-sm text-muted-foreground">
+              Déjà décrits dans le fichier : la plateforme ne les recrée pas et ne les modifie pas.
+            </p>
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {composeServices.map((name) => (
+                <li key={name} className="rounded-lg border border-border px-3 py-2">
+                  <p className="flex items-center gap-2 text-sm font-medium">
+                    <Terminal className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    {name}
+                    {compose?.service === name && (
+                      <Badge variant="outline">Domaine public</Badge>
+                    )}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {services.length > 0 && (
           <div className="space-y-2">

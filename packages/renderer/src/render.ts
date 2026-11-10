@@ -28,6 +28,25 @@ function composeOptions(ctx: RenderContext): ComposeOptions {
 export function renderStack(plan: BuildPlan, ctx: RenderContext): RenderedStack {
   validateProjectId(ctx.projectId);
 
+  // Compose fourni par le dépôt : rien n'est généré. Le compose fait foi et
+  // Coolify le relit dans le dépôt à chaque déploiement ; générer un faux
+  // compose ici donnerait une fausse impression de contrôle.
+  if (plan.framework === 'compose') {
+    return {
+      compose: '',
+      files: {},
+      envTemplate: '',
+      metadata: {
+        services: plan.compose?.services ?? [],
+        ports: {},
+        volumes: [],
+        warnings: plan.compose
+          ? [`Le fichier compose \`${plan.compose.location}\` est déployé tel quel.`]
+          : ['Aucun fichier compose décrit dans le plan.'],
+      },
+    };
+  }
+
   const opts = composeOptions(ctx);
   const doc = newCompose(`eflex-${ctx.projectId}`);
   const files: Record<string, string> = {};

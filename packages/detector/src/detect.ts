@@ -13,6 +13,7 @@ import type {
 import { clampConfidence, scaleConfidence } from './confidence.js';
 import { discoverApps, isMonorepo, repoRootFromApp } from './monorepo.js';
 import { detectDocker } from './detectors/dockerfile.js';
+import { detectCompose } from './detectors/compose.js';
 import { detectEflexConfig } from './detectors/eflex-config.js';
 import { detectLaravel } from './detectors/laravel.js';
 import { detectPhp } from './detectors/php.js';
@@ -261,6 +262,12 @@ function collectCandidates(ctx: DetectionContext): Candidate[] {
     if (candidate) candidates.push(candidate);
   };
 
+  // Un compose fourni par le dépôt est le contrat de déploiement le plus
+  // complet : il décrit l'application et ses voisins, et c'est la seule voie
+  // Coolify pour un vrai multi-services. Il passe donc avant le Dockerfile,
+  // qu'il référence souvent lui-même. `eflex.json` reste l'échappatoire
+  // explicite pour un compose réservé au développement local.
+  add(detectCompose(ctx));
   // Laravel d'abord : il exige `laravel/framework` ET `artisan`, donc aucun faux positif
   // possible, et un projet Laravel embarque presque toujours un `package.json` avec Vite
   // (assets front) qui serait sinon pris pour un site statique.
@@ -413,6 +420,15 @@ function detectAt(view: RepoView, root: string, allowMonorepo: boolean): Detecti
       questions: [],
       alternatives: selectAlternatives(eflex.candidate.plan, manifestPlans),
     };
+  }
+
+  // Step 0.5: a compose file supplied by the repository wins over a lone
+  // Dockerfile (the compose usually builds it) and over monorepo discovery (a
+  // root compose describes the whole stack). It stays descriptive: no service
+  // is invented, the file is deployed as-is by Coolify.
+  const compose = detectCompose(ctx);
+  if (compose) {
+    return finalizeCandidate(compose, collectCandidates(ctx).map((candidate) => candidate.plan));
   }
 
   // Step 1: an explicit Dockerfile is an opaque build.

@@ -3,6 +3,7 @@ import YAML from 'yaml';
 import { detect } from '@eflex/detector';
 import {
   allFixtures,
+  composeRoot,
   dockerfile,
   dockerfileVolume,
   fastapi,
@@ -28,7 +29,7 @@ describe('generateDockerfile — toutes les fixtures', () => {
       if (!plan) continue; // dépôts sans plan (inconnu, eflex.json invalide, monorepo ambigu)
 
       const result = generateDockerfile(plan);
-      if (plan.framework === 'docker') {
+      if (plan.framework === 'docker' || plan.framework === 'compose') {
         expect(result, fixture.name).toBeNull();
         continue;
       }
@@ -161,6 +162,24 @@ describe('buildDeploymentArtifacts', () => {
       const artifacts = buildDeploymentArtifacts(plan, { projectId: 'test-proj' });
       expect(`${artifacts.compose}${artifacts.dockerfile ?? ''}`, fixture.name).not.toMatch(/nixpacks/i);
     }
+  });
+
+  it('ne génère aucun compose ni Dockerfile pour un compose du dépôt', () => {
+    const plan = planOf(composeRoot)!;
+    const artifacts = buildDeploymentArtifacts(plan, { projectId: 'compose-proj' });
+
+    expect(artifacts.buildPack).toBe('dockercompose');
+    expect(artifacts.compose).toBe('');
+    expect(artifacts.dockerfile).toBeNull();
+    expect(artifacts.files).toEqual({});
+    expect(artifacts.services).toEqual(['app', 'web', 'queue']);
+    expect(artifacts.repositoryCompose).toEqual({
+      location: '/docker-compose.yml',
+      repoPath: 'docker-compose.yml',
+      services: ['app', 'web', 'queue'],
+      service: 'web',
+    });
+    expect(artifacts.persistentVolumes).toEqual([]);
   });
 
   it('les services du plan utilisent le contexte de build du dépôt', () => {

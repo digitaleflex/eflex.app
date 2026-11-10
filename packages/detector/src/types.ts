@@ -20,12 +20,33 @@ export interface WorkspaceContext {
   buildScript?: string;
 }
 
+/**
+ * Compose fourni par le dépôt (framework `compose`).
+ *
+ * Le plan est **descriptif** : Eflex ne génère, ne fusionne et ne réécrit aucun
+ * service. `location` est relatif à la racine de l'application (donc à
+ * `base_directory` côté Coolify) et commence toujours par `/`.
+ */
+export interface ComposeContext {
+  /** Chemin du fichier compose, relatif à `root` (ex. `/docker-compose.yaml`). */
+  location: string;
+  /** Services déclarés par le fichier, dans l'ordre du compose. */
+  services: string[];
+  /** Service qui porte le domaine public, quand un port HTTP a été identifié. */
+  service?: string;
+}
+
 export interface BuildPlan {
   version: 1;
   framework: Framework;
   runtime: string; // "node@22" | "php@8.3" | "python@3.12" | "static@1" | "docker@1"
   root: string; // "" for repo root, else "apps/web"
   repoRoot?: string; // set when root !== ""
+  /**
+   * Fichier compose fourni par le dépôt. Présent uniquement pour
+   * `framework: "compose"` : le compose fait foi, le portail ne le génère pas.
+   */
+  compose?: ComposeContext;
   /**
    * Contexte de workspace JavaScript, présent seulement quand `root` est une
    * application d'un monorepo (marqueurs de workspace à la racine du dépôt).
@@ -57,6 +78,7 @@ export interface BuildPlan {
 
 export type Framework =
   | 'docker'
+  | 'compose'
   | 'eflex-config'
   | 'nextjs'
   | 'nuxt'
