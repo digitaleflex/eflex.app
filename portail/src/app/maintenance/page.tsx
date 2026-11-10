@@ -13,7 +13,7 @@ export default function MaintenancePage() {
   const message = process.env.MAINTENANCE_MESSAGE
 
   return (
-    <main id="contenu" className="min-h-screen flex flex-col items-center justify-center gap-8 bg-background px-4 text-center">
+    <main id="contenu" tabIndex={-1} className="min-h-screen flex flex-col items-center justify-center gap-8 bg-background px-4 text-center">
       <Image src="/logo-horizontal.webp" alt="Eflex" width={1200} height={312} className="h-8 w-auto" priority />
 
       <div className="max-w-lg space-y-4">

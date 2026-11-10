@@ -1,50 +1,117 @@
-import { prisma } from '@/lib/prisma'
-import { Card, CardContent } from '@/components/ui/card'
+import { loadAdminMetricsCached } from '@/lib/admin-metrics-cache'
+import {
+  formatDuration,
+  formatFcfa,
+  formatInteger,
+  formatPercent,
+  parsePeriodDays,
+} from '@/lib/admin-metrics'
+import {
+  AlertsPanel,
+  DeploymentChart,
+  ExportCsvLink,
+  PeriodSelector,
+  StackTable,
+  StatCard,
+} from '@/components/admin/metrics'
 
-const number = new Intl.NumberFormat('fr-FR')
+export const metadata = { title: 'Vue d’ensemble — Administration Eflex' }
+export const dynamic = 'force-dynamic'
 
-export default async function AdminOverview() {
-  const since = new Date(Date.now() - 7 * 24 * 3600 * 1000)
-  const [users, newUsers, banned, organizations, projects, failed, live] = await Promise.all([
-    prisma.user.count(),
-    prisma.user.count({ where: { createdAt: { gte: since } } }),
-    prisma.user.count({ where: { banned: true } }),
-    prisma.organization.count(),
-    prisma.project.count(),
-    prisma.deployment.count({ where: { status: 'failed', createdAt: { gte: since } } }),
-    prisma.deployment.count({ where: { status: 'live', createdAt: { gte: since } } }),
-  ])
-  const deployed = failed + live
+export default async function AdminOverview({
+  searchParams,
+}: {
+  searchParams: Promise<{ days?: string | string[] }>
+}) {
+  const params = await searchParams
+  const days = parsePeriodDays(params.days)
+  const metrics = await loadAdminMetricsCached(days)
 
-  const stats = [
-    { label: 'Utilisateurs', value: number.format(users), hint: `${number.format(newUsers)} inscrits ces 7 jours` },
-    { label: 'Suspendus', value: number.format(banned), hint: banned === 0 ? 'Aucun compte suspendu' : 'Comptes bloqués' },
-    { label: 'Organisations', value: number.format(organizations), hint: 'Personnelles et d’équipe' },
-    { label: 'Projets', value: number.format(projects), hint: 'Toutes organisations' },
-    {
-      label: 'Réussite des déploiements',
-      value: deployed === 0 ? '—' : `${Math.round((live / deployed) * 100)} %`,
-      hint: deployed === 0 ? 'Aucun déploiement terminé ces 7 jours' : `${number.format(live)} réussis, ${number.format(failed)} en échec (7 jours)`,
-    },
-  ]
+  const finished = metrics.deployments.live + metrics.deployments.failed
+  const unpaidTotal = metrics.unpaid.pendingAmountFcfa + metrics.unpaid.pastDueAmountFcfa
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Vue d&apos;ensemble</h1>
-        <p className="mt-1 text-sm text-muted-foreground">État de la plateforme. Les indicateurs détaillés arrivent avec le tableau de bord.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Vue d&apos;ensemble</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Indicateurs agrégés côté serveur et mis en cache 30 secondes.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <PeriodSelector days={days} />
+          <ExportCsvLink days={days} />
+        </div>
       </div>
-      <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {stats.map((s) => (
-          <Card key={s.label}>
-            <CardContent className="space-y-1 p-5">
-              <dt className="text-sm text-muted-foreground">{s.label}</dt>
-              <dd className="text-3xl font-bold tracking-tight">{s.value}</dd>
-              <p className="text-xs text-muted-foreground">{s.hint}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </dl>
+
+      <AlertsPanel alerts={metrics.alerts} />
+
+      <section aria-labelledby="admin-kpis-title">
+        <h2 id="admin-kpis-title" className="sr-only">
+          Indicateurs clés
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label="Inscriptions · 7 jours"
+            value={formatInteger(metrics.users.new7)}
+            hint={`+${formatInteger(metrics.users.new30)} sur 30 jours · ${formatInteger(metrics.users.total)} comptes au total · ${formatInteger(metrics.users.banned)} suspendu${metrics.users.banned > 1 ? 's' : ''}`}
+          />
+          <StatCard
+            label="Organisations actives"
+            value={formatInteger(metrics.organizations.activeInPeriod)}
+            hint={`Ayant déployé sur ${days} jours, sur ${formatInteger(metrics.organizations.total)} organisations`}
+          />
+          <StatCard
+            label="Projets"
+            value={formatInteger(metrics.projects.total)}
+            hint="Toutes organisations confondues"
+          />
+          <StatCard
+            label="MRR"
+            value={formatFcfa(metrics.revenue.mrrFcfa)}
+            hint={`${formatInteger(metrics.revenue.activeSubscriptions)} abonnement${metrics.revenue.activeSubscriptions > 1 ? 's' : ''} actif${metrics.revenue.activeSubscriptions > 1 ? 's' : ''}`}
+          />
+          <StatCard
+            label="Impayés"
+            value={formatFcfa(unpaidTotal)}
+            hint={`${formatInteger(metrics.unpaid.pendingPayments)} paiement${metrics.unpaid.pendingPayments > 1 ? 's' : ''} en attente · ${formatInteger(metrics.unpaid.pastDueSubscriptions)} abonnement${metrics.unpaid.pastDueSubscriptions > 1 ? 's' : ''} en retard`}
+          />
+          <StatCard
+            label={`Déploiements · ${days} jours`}
+            value={formatInteger(metrics.deployments.total)}
+            hint={`${formatInteger(metrics.deployments.live)} réussis · ${formatInteger(metrics.deployments.failed)} en échec`}
+          />
+          <StatCard
+            label="Taux de réussite"
+            value={formatPercent(metrics.deployments.successRate)}
+            hint={
+              finished === 0
+                ? 'Aucun déploiement terminé sur la période'
+                : `${formatInteger(finished)} terminés · ${formatInteger(metrics.deployments.other)} en cours ou annulés`
+            }
+          />
+          <StatCard
+            label="Durée médiane de build"
+            value={formatDuration(metrics.buildDuration.medianSeconds)}
+            hint={
+              metrics.buildDuration.available
+                ? `Sur ${formatInteger(metrics.buildDuration.sampleCount)} déploiements`
+                : 'Non mesurée : les déploiements ne conservent pas d’horodatage de fin'
+            }
+          />
+        </div>
+      </section>
+
+      <DeploymentChart daily={metrics.deployments.daily} days={days} />
+
+      <StackTable stacks={metrics.deployments.stacks} days={days} />
+
+      <p className="text-xs text-muted-foreground">
+        Quotas vérifiés sur {formatInteger(metrics.quotas.checkedOrganizations)} organisation
+        {metrics.quotas.checkedOrganizations > 1 ? 's' : ''} ayant des projets ou des membres. Un
+        déploiement est signalé comme bloqué après 30 minutes sans changement d’état.
+      </p>
     </div>
   )
 }

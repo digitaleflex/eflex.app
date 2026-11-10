@@ -11,6 +11,7 @@ export function UserActions({ id, name, banned }: { id: string; name: string; ba
   const [reason, setReason] = useState('')
   const [days, setDays] = useState('')
   const [error, setError] = useState('')
+  const [impersonating, setImpersonating] = useState(false)
   const reasonId = useId()
   const daysId = useId()
 
@@ -29,8 +30,32 @@ export function UserActions({ id, name, banned }: { id: string; name: string; ba
     return true
   }
 
+  const impersonate = async () => {
+    setError('')
+    setImpersonating(true)
+    try {
+      const res = await fetch(`/api/admin/users/${id}/impersonate`, { method: 'POST' })
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string }
+        setError(data.error ?? "Impossible d'ouvrir ce compte pour le moment.")
+        return
+      }
+      router.push('/dashboard')
+      router.refresh()
+    } catch {
+      setError('Impossible de contacter le serveur.')
+    } finally {
+      setImpersonating(false)
+    }
+  }
+
   return (
     <div className="flex flex-col items-start gap-1 sm:items-end">
+      {!banned && (
+        <Button variant="ghost" size="sm" loading={impersonating} onClick={() => void impersonate()}>
+          Prendre la main<span className="sr-only"> sur le compte de {name}</span>
+        </Button>
+      )}
       {banned ? (
         <Button variant="outline" size="sm" onClick={() => void call({ method: 'DELETE' })}>
           Réactiver<span className="sr-only"> le compte de {name}</span>
@@ -75,7 +100,7 @@ export function UserActions({ id, name, banned }: { id: string; name: string; ba
             max={365}
             value={days}
             onChange={(e) => setDays(e.target.value)}
-            className="flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex h-11 w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
