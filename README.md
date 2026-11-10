@@ -26,13 +26,11 @@ Clients ──► Console EFLEX (eflex.app)
 | `services/engine/` | Moteur Go : API, analyse, planification, build, déploiements, GitHub, secrets, auth, migrations PostgreSQL | Axiom |
 | `services/agent/` | Agent installé sur les serveurs : Docker, Traefik, health, logs | Axiom |
 | `services/orchestrator/` | Cadre d'orchestration (voir ADR-0010) | Axiom |
-| `schemas/` | Contrats (`axiom.yaml`, schémas JSON) | Axiom |
-| `apps/cloud/` | Console React + Vite (à remplacer par la console EFLEX) | Axiom |
-| `apps/client-dashboard/` | Ébauche de tableau de bord Next.js 16 | Axiom |
-| `portail/` | Portail Next.js EFLEX actuel (branché sur Coolify, à rebrancher sur le moteur) | Eflex |
+| `schemas/` | Contrats Axiom (`axiom.yaml`, schémas JSON) — distinct de `schema/` | Axiom |
+| `portail/` | Console et portail Next.js EFLEX (branché sur Coolify, à rebrancher sur le moteur) | Eflex |
 | `packages/detector/` | Détecteur TypeScript déterministe (Laravel, PHP, Python, monorepos…), à porter dans le moteur | Eflex |
 | `packages/renderer/` | Plan → docker-compose / nginx | Eflex |
-| `schema/` | Schéma `eflex.json` v1 | Eflex |
+| `schema/` | Schéma `eflex.json` v1 (produit EFLEX) — distinct de `schemas/` | Eflex |
 | `docs/` | ADR, architecture, produit, sécurité (Axiom) + `docs/issues/` (feuille de route Eflex) | Les deux |
 | `tests/` | Contrats, scénarios d'orchestrateur | Axiom |
 
@@ -73,7 +71,7 @@ Points clés :
 
 1. **Un seul moteur** : porter les règles du détecteur Eflex (Laravel, PHP, Python, Svelte, Remix, SolidStart, RedwoodJS, monorepos) dans l'analyseur Go (`services/engine/internal/analyzer`), puis ajouter les presets d'exécution correspondants (Laravel : php-fpm + nginx + queue + scheduler). **Python (FastAPI, Flask, Django avec `requirements.txt`) est fait et testé de bout en bout** ; restent Laravel/PHP et le reste de la liste (voir `docs/axiom-engine.md`, « Python preset »).
 2. **Un seul manifeste** : converger `eflex.json` et `axiom.yaml`.
-3. **Une seule console** : la console client EFLEX (charte EFLEX, en français) construite sur l'API du moteur ; retrait de Coolify, de `apps/cloud` et de `apps/client-dashboard`.
+3. **Une seule console** : la console client EFLEX (`portail/`, charte EFLEX, en français) construite sur l'API du moteur ; retrait de Coolify. Les anciennes consoles Axiom (`apps/cloud`, `apps/client-dashboard`) ont été supprimées (#16).
 4. Ensuite seulement, retrait de `packages/detector`, `packages/renderer` et `schema/`.
 
 État vérifié du moteur Axiom (tests exécutés, ce qui est prouvé et ce qui ne l'est pas encore) : [`docs/roadmap/parallel-plan.md`](./docs/roadmap/parallel-plan.md), section « Verified status ».

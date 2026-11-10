@@ -24,6 +24,15 @@ export function emailFrom(): string {
   return process.env.EMAIL_FROM?.trim() || DEFAULT_FROM
 }
 
+/**
+ * URL absolue du portail, pour les liens envoyés hors de l'application (e-mails).
+ * `BETTER_AUTH_URL` en production, `https://eflex.app` par défaut.
+ */
+export function appUrl(path = '/'): string {
+  const origin = (process.env.BETTER_AUTH_URL?.trim() || 'https://eflex.app').replace(/\/+$/, '')
+  return `${origin}${path.startsWith('/') ? path : `/${path}`}`
+}
+
 export async function sendEmail({ to, subject, html, text }: SendEmailInput): Promise<void> {
   const key = process.env.RESEND_API_KEY
 

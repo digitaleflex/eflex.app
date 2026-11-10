@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "version": 0,
-  "analyzerVersion": "evidence/1.0.0",
+  "analyzerVersion": "evidence/1.1.0",
   "source": {
     "repositoryId": "repo_1",
     "ref": "main",

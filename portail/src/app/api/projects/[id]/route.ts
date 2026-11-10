@@ -4,7 +4,10 @@ import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { publish } from '@/lib/event-bus'
-import { deleteApplication } from '@/lib/coolify'
+import { deleteApplication, deletePrivateKey, deleteManagedDatabase } from '@/lib/coolify'
+import { resolveProjectToken } from '@/lib/git-credentials'
+import { deleteDeployKey } from '@/lib/github-app'
+import { parseGitHubUrl } from '@/lib/github-url'
 import { firstIssue, projectUpdateSchema } from '@/lib/project-settings'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -143,7 +146,18 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
   const project = await prisma.project.findFirst({
     where: { id, organizationId: org.organizationId },
-    select: { id: true, name: true, coolifyAppId: true },
+    select: {
+      id: true,
+      name: true,
+      userId: true,
+      coolifyAppId: true,
+      installationId: true,
+      repoUrl: true,
+      repoFullName: true,
+      githubDeployKeyId: true,
+      coolifyPrivateKeyUuid: true,
+      databases: { select: { coolifyId: true, kind: true } },
+    },
   })
   if (!project) {
     return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
@@ -154,10 +168,36 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     if ('error' in deleted) {
       return NextResponse.json(
         {
-          error: `L'application n'a pas pu être supprimée côté Coolify : ${deleted.error}`,
+          error: `L'application n'a pas pu être supprimée côté hébergement : ${deleted.error}`,
         },
         { status: 502 },
       )
+    }
+  }
+
+  // Les bases managées sont des ressources facturées : on refuse la suppression
+  // du projet si l'une d'elles ne peut pas être supprimée.
+  for (const database of project.databases) {
+    const deleted = await deleteManagedDatabase(database.coolifyId)
+    if ('error' in deleted) {
+      return NextResponse.json(
+        { error: `La base ${database.kind} n'a pas pu être supprimée : ${deleted.error}` },
+        { status: 502 },
+      )
+    }
+  }
+
+  // Nettoyage des accès au dépôt privé : deploy key GitHub et clé privée Coolify.
+  // Au mieux : une clé orpheline ne doit pas empêcher la suppression du projet.
+  if (project.coolifyPrivateKeyUuid) {
+    await deletePrivateKey(project.coolifyPrivateKeyUuid).catch(() => undefined)
+  }
+  if (project.githubDeployKeyId) {
+    const token = await resolveProjectToken({ userId: project.userId, installationId: project.installationId })
+    const [owner, repo] = project.repoFullName?.split('/') ?? []
+    const ref = owner && repo ? { owner, repo } : parseGitHubUrl(project.repoUrl)
+    if (token && ref) {
+      await deleteDeployKey(token, ref.owner, ref.repo, project.githubDeployKeyId).catch(() => undefined)
     }
   }
 

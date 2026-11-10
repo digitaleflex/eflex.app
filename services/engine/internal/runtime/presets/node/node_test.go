@@ -108,4 +108,99 @@ func TestResolve(t *testing.T) {
 			t.Fatal("static output cannot have a start command")
 		}
 	})
+
+	t.Run("nuxt without a start script", func(t *testing.T) {
+		p, err := Resolve(Facts{PackageManager: "npm", Framework: presets.FrameworkNuxt})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.BuildCommand != "npx nuxt build" || p.StartCommand != "node .output/server/index.mjs" || p.OutputDir != ".output" || p.Port != 3000 {
+			t.Fatalf("preset = %+v", p)
+		}
+	})
+
+	t.Run("nuxt start script keeps the project", func(t *testing.T) {
+		p, err := Resolve(Facts{PackageManager: "pnpm", Framework: presets.FrameworkNuxt, HasBuildScript: true, HasStartScript: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.StartCommand != "pnpm start" || p.OutputDir != "" {
+			t.Fatalf("preset = %+v", p)
+		}
+	})
+
+	t.Run("remix without scripts", func(t *testing.T) {
+		p, err := Resolve(Facts{PackageManager: "npm", Framework: presets.FrameworkRemix})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.StartCommand != "npx remix-serve ./build/server/index.js" || p.OutputDir != "build" {
+			t.Fatalf("preset = %+v", p)
+		}
+	})
+
+	t.Run("solidstart requires a start command", func(t *testing.T) {
+		if _, err := Resolve(Facts{PackageManager: "npm", Framework: presets.FrameworkSolidStart, HasBuildScript: true}); err == nil {
+			t.Fatal("SolidStart without a start script must fail")
+		}
+	})
+
+	t.Run("redwoodjs requires scripts and keeps dev dependencies", func(t *testing.T) {
+		if _, err := Resolve(Facts{PackageManager: "yarn", Framework: presets.FrameworkRedwoodJS, HasStartScript: true}); err == nil {
+			t.Fatal("RedwoodJS without a build script must fail")
+		}
+		p, err := Resolve(Facts{PackageManager: "yarn", Framework: presets.FrameworkRedwoodJS, HasBuildScript: true, HasStartScript: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.StartCommand != "yarn start" || p.Port != 8910 || !p.KeepDevDependencies {
+			t.Fatalf("preset = %+v", p)
+		}
+	})
+
+	t.Run("astro defaults to static", func(t *testing.T) {
+		p, err := Resolve(Facts{PackageManager: "npm", Framework: presets.FrameworkAstro, HasBuildScript: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.Runtime != RuntimeStatic || p.OutputDir != "dist" || p.Port != 8080 || p.StartCommand != "" {
+			t.Fatalf("preset = %+v", p)
+		}
+	})
+
+	t.Run("astro with the node adapter", func(t *testing.T) {
+		p, err := Resolve(Facts{PackageManager: "npm", Framework: presets.FrameworkAstro, Adapter: presets.AdapterNode, HasBuildScript: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.Runtime != RuntimeNode || p.StartCommand != "node ./dist/server/entry.mjs" || p.Port != 3000 {
+			t.Fatalf("preset = %+v", p)
+		}
+	})
+
+	t.Run("sveltekit static adapter", func(t *testing.T) {
+		p, err := Resolve(Facts{PackageManager: "npm", Framework: presets.FrameworkSvelteKit, Adapter: presets.AdapterStatic, HasBuildScript: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.Runtime != RuntimeStatic || p.OutputDir != "build" || p.Port != 8080 {
+			t.Fatalf("preset = %+v", p)
+		}
+	})
+
+	t.Run("sveltekit node adapter", func(t *testing.T) {
+		p, err := Resolve(Facts{PackageManager: "npm", Framework: presets.FrameworkSvelteKit, Adapter: presets.AdapterNode, HasBuildScript: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.StartCommand != "node build/index.js" || p.OutputDir != "build" || p.Port != 3000 {
+			t.Fatalf("preset = %+v", p)
+		}
+	})
+
+	t.Run("sveltekit without an adapter", func(t *testing.T) {
+		if _, err := Resolve(Facts{PackageManager: "npm", Framework: presets.FrameworkSvelteKit, HasBuildScript: true}); err == nil {
+			t.Fatal("SvelteKit without an adapter must fail")
+		}
+	})
 }

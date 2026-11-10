@@ -8,6 +8,7 @@ import type {
   PackageManager,
   Question,
   RepoSnapshot,
+  WorkspaceContext,
 } from './types.js';
 import { clampConfidence, scaleConfidence } from './confidence.js';
 import { discoverApps, isMonorepo, repoRootFromApp } from './monorepo.js';
@@ -156,6 +157,13 @@ function createContext(view: RepoView, root: string): DetectionContext {
     ['composer.lock', 'poetry.lock', 'Pipfile.lock', 'uv.lock'].some(hasAny);
 
   const packageManager = (): PackageManager => {
+    // Champ `packageManager` (Corepack) prioritaire : il décrit l'outil que le
+    // dépôt attend, même sans lockfile ou avec plusieurs lockfiles résiduels.
+    const declared = packageJson()?.packageManager;
+    if (typeof declared === 'string') {
+      const name = declared.split('@')[0]?.trim().toLowerCase();
+      if (name === 'pnpm' || name === 'yarn' || name === 'bun' || name === 'npm') return name;
+    }
     if (hasAny('pnpm-lock.yaml')) return 'pnpm';
     if (hasAny('yarn.lock')) return 'yarn';
     if (hasAny('bun.lockb') || hasAny('bun.lock')) return 'bun';
@@ -312,6 +320,42 @@ function unknownResult(): DetectionResult {
 }
 
 /**
+ * Contexte de workspace d'une application : présent uniquement quand le dépôt
+ * déclare un workspace à sa racine (pnpm/turbo/nx/lerna ou `workspaces`) et que
+ * l'application a un `package.json`. Le script de build n'est retenu que s'il
+ * correspond exactement à la commande du plan, pour ne jamais remplacer une
+ * commande personnalisée par `run build`.
+ */
+function workspaceContext(
+  view: RepoView,
+  app: string,
+  plan: BuildPlan,
+): WorkspaceContext | undefined {
+  if (app === '') return undefined;
+  if (!isMonorepo(createContext(view, ''))) return undefined;
+
+  const ctx = createContext(view, app);
+  const pkg = ctx.packageJson();
+  if (!pkg) return undefined;
+
+  const manager = ctx.packageManager();
+  const name = typeof pkg.name === 'string' ? pkg.name.trim() : '';
+  const declaredBuild =
+    typeof pkg.scripts?.build === 'string' ? pkg.scripts.build.trim() : '';
+  const buildScript =
+    declaredBuild !== '' &&
+    (plan.build === declaredBuild || plan.build === `${manager} run build`)
+      ? 'build'
+      : '';
+
+  return {
+    manager,
+    ...(name !== '' ? { name } : {}),
+    ...(buildScript !== '' ? { buildScript } : {}),
+  };
+}
+
+/**
  * Detect one application of a monorepo: runs the detectors at `app` and records its
  * location (`root`) and the way back to the repository root (`repoRoot`).
  */
@@ -322,6 +366,8 @@ function resolveApplication(view: RepoView, app: string): DetectionResult {
   const repoRoot = repoRootFromApp(app);
   const confidence = scaleConfidence(subResult.confidence, 0.95);
   const plan: BuildPlan = { ...subResult.plan, root: app, repoRoot };
+  const workspace = workspaceContext(view, app, plan);
+  if (workspace) plan.workspace = workspace;
 
   return {
     plan,
@@ -389,7 +435,10 @@ function detectAt(view: RepoView, root: string, allowMonorepo: boolean): Detecti
       for (const app of apps) {
         const result = detectAt(view, app, false);
         if (!result.plan) continue;
-        alternatives.push({ ...result.plan, root: app, repoRoot: repoRootFromApp(app) });
+        const alternative: BuildPlan = { ...result.plan, root: app, repoRoot: repoRootFromApp(app) };
+        const workspace = workspaceContext(view, app, alternative);
+        if (workspace) alternative.workspace = workspace;
+        alternatives.push(alternative);
         if (alternatives.length === 2) break;
       }
 

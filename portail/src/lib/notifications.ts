@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { publish } from '@/lib/event-bus'
+import { appUrl, isEmailConfigured, sendEmail } from '@/lib/email'
+import { notificationEmail, notificationEmailSubject } from '@/lib/email-templates'
 
 /** Types de notification connus, avec le libellé affiché dans les préférences. */
 export const NOTIFICATION_TYPES = {
@@ -36,11 +38,24 @@ export async function notify(input: NotifyInput): Promise<string[]> {
     const userIds = [...new Set(input.userIds)]
     if (userIds.length === 0) return []
 
-    const optedOut = await prisma.notificationPreference.findMany({
-      where: { userId: { in: userIds }, type: input.type, channel: 'app', enabled: false },
-      select: { userId: true },
-    })
+    const emailConfigured = isEmailConfigured()
+    // Les deux canaux ont leurs propres préférences et l'absence de ligne signifie « activé ».
+    // Une notification coupée dans l'application n'est pas créée : elle ne produit donc pas
+    // non plus d'e-mail, et c'est cette ligne qui sert de garde anti-doublon.
+    const [optedOut, emailOptedOut] = await Promise.all([
+      prisma.notificationPreference.findMany({
+        where: { userId: { in: userIds }, type: input.type, channel: 'app', enabled: false },
+        select: { userId: true },
+      }),
+      emailConfigured
+        ? prisma.notificationPreference.findMany({
+            where: { userId: { in: userIds }, type: input.type, channel: 'email', enabled: false },
+            select: { userId: true },
+          })
+        : Promise.resolve([] as { userId: string }[]),
+    ])
     const muted = new Set(optedOut.map((p) => p.userId))
+    const emailMuted = new Set(emailOptedOut.map((p) => p.userId))
     const notified: string[] = []
 
     for (const userId of userIds.filter((id) => !muted.has(id))) {
@@ -68,10 +83,46 @@ export async function notify(input: NotifyInput): Promise<string[]> {
         if ((error as { code?: string }).code !== 'P2002') throw error
       }
     }
+
+    // Un e-mail par notification réellement créée : les doublons écartés par `dedupeKey`
+    // n'atteignent jamais cette étape. L'échec d'un envoi ne remet pas en cause la notification.
+    if (emailConfigured) {
+      await sendNotificationEmails(input, notified.filter((userId) => !emailMuted.has(userId)))
+    }
+
     return notified
   } catch (error) {
     console.error('[notifications] envoi impossible', input.type, error)
     return []
+  }
+}
+
+/** Envoie l'e-mail d'une notification aux destinataires retenus, sans jamais lever d'erreur. */
+async function sendNotificationEmails(input: NotifyInput, userIds: readonly string[]): Promise<void> {
+  if (userIds.length === 0) return
+  try {
+    const recipients = await prisma.user.findMany({
+      where: { id: { in: [...userIds] } },
+      select: { id: true, email: true },
+    })
+    if (recipients.length === 0) return
+
+    const template = notificationEmail({
+      title: input.title,
+      body: input.body,
+      url: appUrl(input.href ?? '/dashboard/notifications'),
+      preferencesUrl: appUrl('/dashboard/settings'),
+    })
+    const subject = notificationEmailSubject(input.title)
+
+    const results = await Promise.allSettled(
+      recipients.map((recipient) => sendEmail({ to: recipient.email, subject, html: template.html, text: template.text })),
+    )
+    const failed = results.filter((result) => result.status === 'rejected').length
+    // Ni adresse ni contenu dans les journaux : uniquement le type et le nombre d'échecs.
+    if (failed > 0) console.error('[notifications] e-mail non envoyé', input.type, `${failed}/${recipients.length}`)
+  } catch (error) {
+    console.error('[notifications] e-mail non envoyé', input.type, error instanceof Error ? error.message : 'erreur inconnue')
   }
 }
 

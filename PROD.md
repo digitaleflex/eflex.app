@@ -124,6 +124,26 @@ Sans ces variables, `/api/github/config` annonce l'App non configurée et le sé
 - Suivi : `GET /api/deployments/[id]`, bouton « Redéployer » et panneau à polling 3 s sur `/dashboard/projects/[id]`.
 - Sans `REDIS_URL`, le worker ne démarre pas et les créations de projet échouent explicitement (plutôt que de rester bloquées).
 
+### Un seul déploiement à la fois
+
+`POST /api/projects/[id]/redeploy` répond **409** (`code: deployment_in_progress`) tant qu'un déploiement du même projet est dans un état non terminal (`queued`, `analyzing`, `provisioning`, `building`, `deploying`). Le message indique l'état en cours et invite à attendre ou à annuler. La vérification est refaite juste après la création du `Deployment` : en cas de course entre deux requêtes, le second est annulé (`cancelled`) et son job BullMQ retiré. Le redéploiement est limité à 10 appels par minute et par utilisateur (`lib/rate-limit.ts`).
+
+### Annulation
+
+`POST /api/projects/[id]/deployments/[deploymentId]/cancel` (session + organisation active + rôle autorisé, 10 appels/minute) :
+
+1. déploiement `queued` : le job BullMQ est retiré, il ne sera jamais traité ;
+2. déploiement déjà démarré : le portail appelle **`POST /deployments/{uuid}/cancel`** sur Coolify (endpoint réel de l'API v4.7, vérifié dans `routes/api.php` ; Coolify n'accepte que `queued`/`in_progress` et renvoie 400 sinon) ;
+3. dans tous les cas, l'état local passe à `cancelled` par une mise à jour **conditionnelle** (`status NOT IN (live, failed, cancelled)`), avec la ligne `Déploiement annulé à la demande de l’utilisateur.` ajoutée au journal.
+
+Si Coolify ne confirme pas l'annulation, l'état local est tout de même `cancelled` et l'API renvoie `warning` : le build distant peut se terminer seul, mais le portail ne le suit plus. L'ancienne version en ligne reste servie. Le worker vérifie l'état en base avant chaque transition et avant chaque étape de la boucle de suivi ; il n'écrit **jamais** `live`/`failed` par-dessus `cancelled`.
+
+### Délai maximal (chien de garde)
+
+Le worker exécute un watchdog au démarrage, à chaque job et toutes les minutes (`lib/deployment-watchdog.ts`) : tout déploiement **non terminal** créé il y a plus de **30 minutes** passe en `failed` avec, dans `logsSummary`, un message commençant par « Délai dépassé : … ». Les états `live`, `failed` et `cancelled` ne sont jamais touchés, et la transition est conditionnelle (une annulation concurrente gagne). Cela couvre le cas d'un déploiement bloqué sans aucun job en attente (worker arrêté, Coolify muet, job perdu).
+
+Pour allonger le délai (builds très lourds), définir `DEPLOYMENT_TIMEOUT_MINUTES` dans `.env.prod` puis redémarrer le portail. La valeur par défaut est **30**.
+
 ## Sécurité
 
 - Ne commitez **jamais** `.env.prod` (déjà couvert par `.env.*` dans `.gitignore`).

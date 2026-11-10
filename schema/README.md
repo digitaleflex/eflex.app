@@ -99,6 +99,24 @@ Présent uniquement quand `root` n'est pas vide. Chemin relatif permettant de re
 
 Il sert au builder pour localiser les fichiers partagés (lockfile, configuration, etc.).
 
+### `workspace`
+
+Présent uniquement quand `root` est une application d'un monorepo JavaScript (marqueur de workspace à la racine : `pnpm-workspace.yaml`, `turbo.json`, `nx.json`, `lerna.json`, ou champ `workspaces` du `package.json` racine). Il décrit le paquet applicatif pour construire depuis la racine du dépôt :
+
+```json
+{
+  "manager": "pnpm",
+  "name": "@acme/web",
+  "buildScript": "build"
+}
+```
+
+- `manager` (obligatoire) : `pnpm`, `yarn`, `npm` ou `bun` ;
+- `name` : nom du paquet (`package.json#name`), omis s'il n'est pas déclaré ;
+- `buildScript` : script de build exécutable via le filtre du gestionnaire, omis si la commande du plan ne correspond pas exactement au script du paquet.
+
+Le déploiement construit alors le paquet et ses dépendances internes depuis la racine, puis démarre l'application depuis `root`.
+
 ### `install`
 
 Commande d'installation des dépendances, 1 à 500 caractères. Exemples :

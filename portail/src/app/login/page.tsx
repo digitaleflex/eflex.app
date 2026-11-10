@@ -1,14 +1,17 @@
 'use client'
 
 import { nextFromLocation, withNext } from '@/lib/safe-next'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { ThemeToggle } from '@/components/theme-switcher'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
-import { authErrorMessage, signIn } from '@/lib/auth-client'
+import { CAPTCHA_ENABLED, Turnstile, captchaHeaders } from '@/components/auth/turnstile'
+import { authClient, authErrorMessage, signIn } from '@/lib/auth-client'
+import { Fingerprint } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -16,21 +19,70 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [twoFactor, setTwoFactor] = useState(false)
+  const [code, setCode] = useState('')
+  const [useBackupCode, setUseBackupCode] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const [passkeyLoading, setPasskeyLoading] = useState(false)
+  const [passkeySupported, setPasskeySupported] = useState(false)
+  const errorId = 'login-error'
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('two-factor') === '1') {
+      setTwoFactor(true)
+    }
+    setPasskeySupported(typeof window !== 'undefined' && 'PublicKeyCredential' in window)
+  }, [])
+
+  const finish = () => {
+    router.push(nextFromLocation())
+    router.refresh()
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
     try {
-      const { error: authError } = await signIn.email({ email: email.trim(), password })
-      if (authError) {
-        setError(authErrorMessage(authError, 'Email ou mot de passe incorrect.'))
-      } else {
-        router.push(nextFromLocation())
-        router.refresh()
+      if (CAPTCHA_ENABLED && !captchaToken) {
+        setError('Complétez la vérification anti-robot avant de continuer.')
+        return
       }
+      const result = await signIn.email(
+        { email: email.trim(), password },
+        captchaHeaders(captchaToken),
+      )
+      if (result.error) {
+        setError(authErrorMessage(result.error, 'Email ou mot de passe incorrect.'))
+        return
+      }
+      if ((result.data as { twoFactorRedirect?: boolean } | null)?.twoFactorRedirect) {
+        setTwoFactor(true)
+        return
+      }
+      finish()
     } catch {
       setError('Impossible de contacter le serveur. Vérifiez votre connexion et réessayez.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const verifyTwoFactor = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    try {
+      const result = useBackupCode
+        ? await authClient.twoFactor.verifyBackupCode({ code: code.trim() })
+        : await authClient.twoFactor.verifyTotp({ code: code.trim() })
+      if (result.error) {
+        setError(authErrorMessage(result.error, 'Code incorrect.'))
+        return
+      }
+      finish()
+    } catch {
+      setError('Impossible de contacter le serveur. Réessayez.')
     } finally {
       setLoading(false)
     }
@@ -42,17 +94,35 @@ export default function LoginPage() {
     if (authError) setError(authErrorMessage(authError, 'La connexion avec Google est indisponible pour le moment.'))
   }
 
+  const handlePasskey = async () => {
+    setPasskeyLoading(true)
+    setError('')
+    try {
+      const result = await authClient.signIn.passkey()
+      if (result.error) {
+        setError(authErrorMessage(result.error, 'Connexion par passkey impossible sur cet appareil.'))
+        return
+      }
+      finish()
+    } catch {
+      setError('Connexion par passkey impossible sur cet appareil. Utilisez votre mot de passe.')
+    } finally {
+      setPasskeyLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="sticky top-0 z-50 glass">
-        <nav className="container flex h-16 items-center">
+        <nav className="container flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center gap-2 font-bold text-xl tracking-tight">
             <Image src="/logo-horizontal.webp" alt="Eflex — accueil" width={1200} height={312} className="h-8 w-auto" priority />
           </Link>
+          <ThemeToggle />
         </nav>
       </header>
 
-      <main id="contenu" className="flex-1 flex items-center justify-center p-4">
+      <main id="contenu" tabIndex={-1} className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-8 animate-fade-in">
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">Connexion</h1>
@@ -60,6 +130,56 @@ export default function LoginPage() {
           </div>
 
           <Card className="p-6 space-y-6">
+            {twoFactor ? (
+              <form onSubmit={verifyTwoFactor} className="space-y-4">
+                <div className="space-y-1.5 text-center">
+                  <h2 className="text-lg font-semibold">Vérification en deux étapes</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {useBackupCode
+                      ? 'Saisissez l’un de vos codes de secours.'
+                      : 'Saisissez le code à 6 chiffres de votre application d’authentification.'}
+                  </p>
+                </div>
+                {error && (
+                  <div id={errorId} role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+                    {error}
+                  </div>
+                )}
+                <Input
+                  id="two-factor-code"
+                  label={useBackupCode ? 'Code de secours' : 'Code à 6 chiffres'}
+                  inputMode={useBackupCode ? 'text' : 'numeric'}
+                  autoComplete="one-time-code"
+                  autoFocus
+                  value={code}
+                  onChange={(e) => setCode(useBackupCode ? e.target.value : e.target.value.replace(/\D/g, ''))}
+                  maxLength={useBackupCode ? 32 : 6}
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? errorId : undefined}
+                  required
+                />
+                <Button type="submit" size="lg" className="w-full" loading={loading}>
+                  Vérifier
+                </Button>
+                <div className="flex flex-col gap-2 text-center text-sm">
+                  <button
+                    type="button"
+                    className="min-h-11 font-medium text-primary hover:underline"
+                    onClick={() => { setUseBackupCode((v) => !v); setCode(''); setError('') }}
+                  >
+                    {useBackupCode ? 'Utiliser un code TOTP' : 'Utiliser un code de secours'}
+                  </button>
+                  <button
+                    type="button"
+                    className="min-h-11 text-muted-foreground hover:text-foreground"
+                    onClick={() => { setTwoFactor(false); setCode(''); setError(''); setUseBackupCode(false) }}
+                  >
+                    Revenir à la connexion
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
             <Button
               variant="outline"
               size="lg"
@@ -84,7 +204,7 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+              <div id={errorId} role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
                 {error}
               </div>
             )}
@@ -98,6 +218,8 @@ export default function LoginPage() {
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? errorId : undefined}
                 required
               />
               <Input
@@ -108,6 +230,8 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? errorId : undefined}
                 required
               />
               <div className="flex justify-end">
@@ -115,16 +239,32 @@ export default function LoginPage() {
                   Mot de passe oublié ?
                 </Link>
               </div>
+              {CAPTCHA_ENABLED && <Turnstile onToken={setCaptchaToken} />}
               <Button type="submit" size="lg" className="w-full" loading={loading}>
                 Se connecter
               </Button>
             </form>
+            {passkeySupported && (
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className="w-full justify-center gap-2"
+                onClick={() => void handlePasskey()}
+                loading={passkeyLoading}
+              >
+                <Fingerprint className="h-5 w-5" aria-hidden="true" />
+                Se connecter avec une passkey
+              </Button>
+            )}
             {error.startsWith('Vérifiez votre adresse') && (
               <p className="text-center text-sm text-muted-foreground">
                 <Link href={`/verify-email?email=${encodeURIComponent(email.trim())}`} className="font-medium text-primary hover:underline">
                   Renvoyer l&apos;e-mail de vérification
                 </Link>
               </p>
+            )}
+              </>
             )}
           </Card>
 

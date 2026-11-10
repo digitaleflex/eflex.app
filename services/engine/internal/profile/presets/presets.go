@@ -13,10 +13,18 @@ import (
 // Preset names (V0.1).
 const (
 	NextJS     = "nextjs"
+	Nuxt       = "nuxt"
+	Remix      = "remix"
+	SolidStart = "solidstart"
+	RedwoodJS  = "redwoodjs"
+	Astro      = "astro"
+	SvelteKit  = "sveltekit"
 	Vite       = "vite"
 	Node       = "node"
 	Go         = "go"
 	Python     = "python"
+	PHP        = "php"
+	Laravel    = "laravel"
 	Dockerfile = "dockerfile"
 	Compose    = "compose"
 )
@@ -30,15 +38,18 @@ const (
 
 // Unsupported reason codes (machine-readable, surfaced to the UI).
 const (
-	ReasonNoApplication   = "NO_APPLICATION_DETECTED"
-	ReasonAmbiguousRoot   = "AMBIGUOUS_APPLICATION_ROOT"
-	ReasonLanguage        = "UNSUPPORTED_LANGUAGE"
-	ReasonFramework       = "UNSUPPORTED_FRAMEWORK"
-	ReasonMissingStart    = "MISSING_START_COMMAND"
-	ReasonNoGoEntrypoint  = "NO_GO_ENTRYPOINT"
-	ReasonComposeServices = "COMPOSE_WITHOUT_SERVICES"
-	ReasonPythonManifest  = "PYTHON_REQUIREMENTS_MISSING"
-	ReasonNoPythonEntry   = "NO_PYTHON_ENTRYPOINT"
+	ReasonNoApplication    = "NO_APPLICATION_DETECTED"
+	ReasonAmbiguousRoot    = "AMBIGUOUS_APPLICATION_ROOT"
+	ReasonLanguage         = "UNSUPPORTED_LANGUAGE"
+	ReasonFramework        = "UNSUPPORTED_FRAMEWORK"
+	ReasonMissingStart     = "MISSING_START_COMMAND"
+	ReasonNoGoEntrypoint   = "NO_GO_ENTRYPOINT"
+	ReasonComposeServices  = "COMPOSE_WITHOUT_SERVICES"
+	ReasonPythonManifest   = "PYTHON_REQUIREMENTS_MISSING"
+	ReasonNoPythonEntry    = "NO_PYTHON_ENTRYPOINT"
+	ReasonPHPManifest      = "PHP_COMPOSER_MISSING"
+	ReasonPHPEntrypoint    = "NO_PHP_ENTRYPOINT"
+	ReasonSvelteKitAdapter = "SVELTEKIT_ADAPTER_MISSING"
 )
 
 // Facts are the analyzer conclusions presets depend on ("" when unknown).
@@ -51,12 +62,24 @@ type Facts struct {
 	ContainerState string
 	HasBuildScript bool
 	HasStartScript bool
-	GoEntrypoints  []string
+	// StartCommandHint is set when the manifest or the user provides an
+	// explicit start command (used by presets where a package.json "start"
+	// script would mean something else, e.g. frontend assets for PHP).
+	StartCommandHint bool
+	GoEntrypoints    []string
 	// PythonEntrypoints are "module:attribute" application objects found in the code.
 	PythonEntrypoints []string
-	ComposeServices   []string
-	RootAmbiguous     bool
-	RootCandidates    []string
+	// NodeAdapters are the rendering adapters found in package.json
+	// ("node" or "static"): they select the Astro/SvelteKit runtime.
+	NodeAdapters []string
+	// PHP facts (see analyzer/evidence/php.go). PHPVersion is informational.
+	PHPVersion      string
+	PHPHasArtisan   bool
+	PHPDocumentRoot bool
+	PHPBuildAssets  bool
+	ComposeServices []string
+	RootAmbiguous   bool
+	RootCandidates  []string
 }
 
 // Preset is a resolved build/runtime strategy with safe defaults.
@@ -85,7 +108,7 @@ type Rejection struct {
 var alternatives = []string{
 	"Add a Dockerfile to the repository to deploy any stack as a container",
 	"Add an axiom.yaml manifest with explicit build and start commands",
-	"Supported in V0.1: Next.js, Vite, Node.js, Go, Python (FastAPI, Flask, Django with a requirements.txt), Dockerfile, Docker Compose",
+	"Supported in V0.1: Next.js, Nuxt, Remix, SolidStart, RedwoodJS, Astro, SvelteKit, Vite, Node.js, Go, Python (FastAPI, Flask, Django with a requirements.txt), PHP and Laravel (Composer), Dockerfile, Docker Compose",
 }
 
 // Resolve selects the preset. Precedence: explicit container definitions
@@ -124,9 +147,41 @@ func Resolve(f Facts) (Preset, *Rejection) {
 				p.BuildCommand = exec(pm, "next build")
 			}
 			return p, nil
+		case "Nuxt":
+			return nodeServerPreset(Nuxt, f, pm, "nuxt build", "node .output/server/index.mjs", ".output", 3000)
+		case "Remix":
+			return nodeServerPreset(Remix, f, pm, "remix build", exec(pm, "remix-serve ./build/server/index.js"), "build", 3000)
+		case "SolidStart":
+			if !f.HasStartScript {
+				return Preset{}, &Rejection{Code: ReasonMissingStart, Message: "SolidStart does not have one stable start command across versions, so package.json must declare a start script",
+					Detected: "SolidStart", Alternatives: []string{"Add a \"start\" script to package.json", "Set start.command in axiom.yaml", "Add a Dockerfile"}}
+			}
+			return nodeServerPreset(SolidStart, f, pm, "vinxi build", "", "", 3000)
+		case "RedwoodJS":
+			if !f.HasBuildScript || !f.HasStartScript {
+				return Preset{}, &Rejection{Code: ReasonMissingStart, Message: "RedwoodJS requires package.json build and start scripts (typically \"rw build\" and \"rw serve\")",
+					Detected: "RedwoodJS", Alternatives: []string{"Add build and start scripts to package.json", "Set build.command and start.command in axiom.yaml", "Add a Dockerfile"}}
+			}
+			return nodeServerPreset(RedwoodJS, f, pm, "", "", "", 8910)
+		case "Astro":
+			if hasAdapter(f.NodeAdapters, "node") {
+				return nodeServerPreset(Astro, f, pm, "astro build", "node ./dist/server/entry.mjs", "dist", 3000)
+			}
+			return staticPreset(Astro, f, pm, "astro build", "dist")
+		case "SvelteKit":
+			switch {
+			case hasAdapter(f.NodeAdapters, "node"):
+				return nodeServerPreset(SvelteKit, f, pm, "vite build", "node build/index.js", "build", 3000)
+			case hasAdapter(f.NodeAdapters, "static"):
+				return staticPreset(SvelteKit, f, pm, "vite build", "build")
+			case f.HasStartScript:
+				return nodeServerPreset(SvelteKit, f, pm, "vite build", "", "", 3000)
+			default:
+				return Preset{}, &Rejection{Code: ReasonSvelteKitAdapter, Message: "SvelteKit needs an adapter (adapter-node or adapter-static) or a start script so Axiom knows how to serve it",
+					Detected: "SvelteKit", Alternatives: []string{"Add @sveltejs/adapter-node or @sveltejs/adapter-static", "Add a \"start\" script to package.json", "Add a Dockerfile"}}
+			}
 		case "Vite":
-			return Preset{Name: Vite, Strategy: StrategySource, Runtime: "static", DefaultPort: 8080, HealthType: "http", HealthPath: "/",
-				BuildCommand: run(pm, "build"), OutputDir: "dist"}, nil
+			return staticPreset(Vite, f, pm, "vite build", "dist")
 		}
 		if !f.HasStartScript {
 			return Preset{}, &Rejection{Code: ReasonMissingStart, Message: "package.json has no start script, so Axiom cannot know how to run the application",
@@ -151,6 +206,8 @@ func Resolve(f Facts) (Preset, *Rejection) {
 		}
 	case "Python":
 		return pythonPreset(f)
+	case "PHP":
+		return phpPreset(f)
 	case "":
 		return Preset{}, &Rejection{Code: ReasonNoApplication, Message: "no supported application manifest was found", Alternatives: alternatives}
 	default:
@@ -164,6 +221,92 @@ func GoBuild(entrypoint string) string { return "go build -trimpath -o ./axiom-a
 func goPreset(entry string) Preset {
 	return Preset{Name: Go, Strategy: StrategySource, Runtime: "go", DefaultPort: 8080, HealthType: "http", HealthPath: "/",
 		BuildCommand: GoBuild(entry), StartCommand: "./axiom-app"}
+}
+
+// Node framework presets ---------------------------------------------------------
+
+// nodeServerPreset builds the preset of a Node.js framework served by a Node
+// process. When package.json declares a start script it is used and the whole
+// project is kept in the image; otherwise the framework's canonical start
+// command and output directory are used.
+func nodeServerPreset(name string, f Facts, pm, defaultBuild, fallbackStart, outputDir string, port int) (Preset, *Rejection) {
+	p := Preset{Name: name, Strategy: StrategySource, Runtime: "node", DefaultPort: port, HealthType: "http", HealthPath: "/", OutputDir: outputDir}
+	switch {
+	case f.HasBuildScript:
+		p.BuildCommand = run(pm, "build")
+	case defaultBuild != "":
+		p.BuildCommand = exec(pm, defaultBuild)
+	}
+	switch {
+	case f.HasStartScript:
+		p.StartCommand = run(pm, "start")
+		p.OutputDir = ""
+	case fallbackStart != "":
+		p.StartCommand = fallbackStart
+	default:
+		return Preset{}, &Rejection{Code: ReasonMissingStart, Message: "package.json has no start script and Axiom has no canonical start command for " + name,
+			Detected: name, Alternatives: []string{"Add a \"start\" script to package.json", "Set start.command in axiom.yaml", "Add a Dockerfile"}}
+	}
+	return p, nil
+}
+
+// staticPreset builds the preset of a framework whose build output is served
+// statically by nginx.
+func staticPreset(name string, f Facts, pm, defaultBuild, outputDir string) (Preset, *Rejection) {
+	p := Preset{Name: name, Strategy: StrategySource, Runtime: "static", DefaultPort: 8080, HealthType: "http", HealthPath: "/", OutputDir: outputDir}
+	if f.HasBuildScript {
+		p.BuildCommand = run(pm, "build")
+	} else {
+		p.BuildCommand = exec(pm, defaultBuild)
+	}
+	// A package.json start script does not change a static deployment: nginx
+	// serves the build output (Vite/Astro/SvelteKit static adapter).
+	return p, nil
+}
+
+func hasAdapter(adapters []string, want string) bool {
+	for _, a := range adapters {
+		if a == want {
+			return true
+		}
+	}
+	return false
+}
+
+// PHP preset ---------------------------------------------------------------------
+
+// ComposerInstall installs the production dependencies from composer.json.
+// --no-scripts is required: the install runs before the application code is
+// copied, and Laravel scripts such as post-autoload-dump call artisan.
+const ComposerInstall = "composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts"
+
+// PHPStart runs the generated entrypoint (nginx + php-fpm under supervisor, and
+// Laravel migrations). A start.command override replaces it entirely.
+const PHPStart = "sh /usr/local/bin/axiom-start"
+
+func phpPreset(f Facts) (Preset, *Rejection) {
+	detected := "PHP (" + nonEmpty(f.Framework, "no framework") + ")"
+	if f.PackageManager != "composer" {
+		return Preset{}, &Rejection{Code: ReasonPHPManifest, Message: "no composer.json was found, so Axiom cannot install the PHP dependencies",
+			Detected: detected, Alternatives: []string{
+				"Add a composer.json with the dependencies (composer require ...)",
+				"Add a Dockerfile",
+			}}
+	}
+	if f.Framework != "Laravel" && !f.PHPDocumentRoot && !f.StartCommandHint {
+		return Preset{}, &Rejection{Code: ReasonPHPEntrypoint, Message: "Axiom found no public/index.php front controller and no start script, so it cannot know which PHP file serves the application",
+			Detected: detected, Alternatives: []string{
+				"Expose a public/index.php front controller",
+				"Set start.command in axiom.yaml",
+				"Add a Dockerfile",
+			}}
+	}
+	name := PHP
+	if f.Framework == "Laravel" {
+		name = Laravel
+	}
+	return Preset{Name: name, Strategy: StrategySource, Runtime: "php", DefaultPort: 8080, HealthType: "http", HealthPath: "/",
+		BuildCommand: ComposerInstall, StartCommand: PHPStart}, nil
 }
 
 // Python preset ------------------------------------------------------------------
@@ -302,8 +445,8 @@ func ValidateCommand(cmd string) error {
 
 // ValidatePackageManager checks an override value.
 func ValidatePackageManager(pm string) error {
-	if validPM(pm) || pm == "go" || pm == "pip" {
+	if validPM(pm) || pm == "go" || pm == "pip" || pm == "composer" {
 		return nil
 	}
-	return fmt.Errorf("%w: package manager must be npm, pnpm, yarn, bun, pip or go", ErrUnsafeCommand)
+	return fmt.Errorf("%w: package manager must be npm, pnpm, yarn, bun, pip, composer or go", ErrUnsafeCommand)
 }

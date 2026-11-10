@@ -10,7 +10,7 @@ Status reflects the repository on 2026-10-07: **implemented** (working code + te
 
 | Component | Responsibility | Location | Status |
 |---|---|---|---|
-| Cloud Console | user interface; talks only to Engine API | `apps/cloud` | partial (Vite/React bootstrap) |
+| Console (portail EFLEX) | user interface; talks only to Engine API | `portail/` | active (Next.js). The legacy Axiom consoles `apps/cloud` and `apps/client-dashboard` were removed (#16). |
 | Go Engine / Control Plane | HTTP API `/api/v1`, auth, config, persistence, SSE | `services/engine/cmd/engine`, `internal/api`, `internal/httpserver`, `internal/config` | partial (subset of endpoints) |
 | Deployment Engine | deployment state machine, stage sequencing, events | `services/engine/internal/deployment`, `internal/executor` | partial |
 | Repository Analyzer / Stack Detector | read-only detection with evidence/confidence | `services/engine/internal/analyzer`, `internal/profile` | partial |
@@ -29,7 +29,7 @@ Status reflects the repository on 2026-10-07: **implemented** (working code + te
 
 ```mermaid
 flowchart TD
-  Dev[Developer] --> Console[Cloud Console<br/>apps/cloud]
+  Dev[Developer] --> Console[Console EFLEX<br/>portail]
   Console -->|HTTPS /api/v1 + SSE| Engine
 
   subgraph Engine[Go Engine / Control Plane — services/engine]

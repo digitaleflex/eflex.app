@@ -42,7 +42,8 @@ const BATCH = 500
 const RETENTION_MS = 24 * 3600 * 1000
 
 type Row = { id: bigint; type: string; audience: string; organizationId: string | null; userId: string | null; payload: Prisma.JsonValue; createdAt: Date }
-const toEvent = (r: Row): PlatformEvent => ({
+/** Convertit une ligne `Event` en événement public (aussi utilisé par le terminal d'exploitation). */
+export const toEvent = (r: Row): PlatformEvent => ({
   id: Number(r.id),
   type: r.type,
   audience: r.audience as Audience,

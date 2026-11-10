@@ -52,6 +52,12 @@ func Build(res evidence.Result, src Source, in Inputs) Profile {
 	p.Language = b.detected(evidence.KindLanguage)
 	p.RuntimeVersion = b.detected(evidence.KindRuntimeVersion)
 	p.Framework = b.detected(evidence.KindFramework)
+	// The PHP preset is selected by composer.json + laravel/framework. A
+	// frontend tool detected in package.json (Vite, Express…) is not the
+	// application framework and must not be presented as one.
+	if preset.Runtime == "php" && p.Framework.Value != "Laravel" {
+		p.Framework = Field[string]{}
+	}
 	if f, ok := res.Get(evidence.KindServices); ok && f.State == evidence.StateDetected {
 		p.Services = append(p.Services, f.Values...)
 	}
@@ -92,6 +98,8 @@ func Build(res evidence.Result, src Source, in Inputs) Profile {
 		p.PackageManager = Field[string]{Value: "go", Provenance: ProvenanceDetected, Confidence: 1}
 	} else if preset.Runtime == "python" {
 		p.PackageManager = Field[string]{Value: "pip", Provenance: ProvenanceDetected, Confidence: 1}
+	} else if preset.Runtime == "php" {
+		p.PackageManager = Field[string]{Value: "composer", Provenance: ProvenanceDetected, Confidence: 1}
 	}
 
 	// Go entrypoint choice.
@@ -121,11 +129,13 @@ func Build(res evidence.Result, src Source, in Inputs) Profile {
 	}
 
 	// Commands: detected scripts map to preset templates (detected provenance),
-	// otherwise preset defaults; hints override after validation.
+	// otherwise preset defaults; hints override after validation. The Node
+	// scripts only describe Node.js presets: for Python/PHP they belong to a
+	// frontend asset build, not to the runtime command.
 	buildDet := Field[string]{}
 	if preset.BuildCommand != "" {
 		buildDet = Field[string]{Value: preset.BuildCommand, Provenance: ProvenanceDefault}
-		if f, ok := res.Get(evidence.KindBuildScript); ok && f.State == evidence.StateDetected {
+		if f, ok := res.Get(evidence.KindBuildScript); ok && f.State == evidence.StateDetected && (preset.Runtime == "node" || preset.Runtime == "static") {
 			buildDet.Provenance, buildDet.Confidence = ProvenanceDetected, f.Confidence
 		}
 	}
@@ -133,11 +143,17 @@ func Build(res evidence.Result, src Source, in Inputs) Profile {
 	startDet := Field[string]{}
 	if preset.StartCommand != "" {
 		startDet = Field[string]{Value: preset.StartCommand, Provenance: ProvenanceDefault}
-		if f, ok := res.Get(evidence.KindStartScript); ok && f.State == evidence.StateDetected {
+		if f, ok := res.Get(evidence.KindStartScript); ok && f.State == evidence.StateDetected && (preset.Runtime == "node" || preset.Runtime == "static") {
 			startDet.Provenance, startDet.Confidence = ProvenanceDetected, f.Confidence
 		}
 	}
 	p.StartCommand = b.layer("startCommand", startDet, "", func(h Hints) *string { return h.StartCommand }, presets.ValidateCommand)
+	// Static output is served by nginx: a start command cannot run. Refuse the
+	// override explicitly instead of silently generating a broken image.
+	if preset.Runtime == "static" && p.StartCommand.Set() {
+		b.issue(Issue{Field: "startCommand", Code: "invalid_override", Message: "static presets are served by nginx; a start command does not apply"})
+		p.StartCommand = Field[string]{}
+	}
 
 	// Port.
 	portDet := b.detected(evidence.KindPort)
@@ -204,7 +220,7 @@ func Build(res evidence.Result, src Source, in Inputs) Profile {
 	p.HealthCheck = health
 
 	// Language-level blocking facts.
-	if f, ok := res.Get(evidence.KindFramework); ok && f.State == evidence.StateAmbiguous && preset.Strategy == presets.StrategySource {
+	if f, ok := res.Get(evidence.KindFramework); ok && f.State == evidence.StateAmbiguous && preset.Strategy == presets.StrategySource && preset.Runtime != "php" {
 		b.issue(Issue{Field: "framework", Code: "ambiguous", Message: "Several frameworks were detected", Options: f.Candidates})
 	}
 
@@ -256,12 +272,33 @@ func (b *builder) facts() presets.Facts {
 	}
 	if b.hintString(func(h Hints) *string { return h.StartCommand }) != "" {
 		f.HasStartScript = true // an explicit start command makes generic Node deployable
+		f.StartCommandHint = true
 	}
 	if x, ok := b.res.Get(evidence.KindEntrypoint); ok && x.State == evidence.StateDetected {
 		if f.Language == "Python" {
 			f.PythonEntrypoints = x.Values
 		} else {
 			f.GoEntrypoints = x.Values
+		}
+	}
+	if x, ok := b.res.Get(evidence.KindAdapter); ok && x.State == evidence.StateDetected {
+		f.NodeAdapters = append([]string(nil), x.Values...)
+	}
+	if x, ok := b.res.Get(evidence.KindPHP); ok && x.State == evidence.StateDetected {
+		for _, v := range x.Values {
+			switch {
+			case v == "artisan":
+				f.PHPHasArtisan = true
+			case v == "document-root:public":
+				f.PHPDocumentRoot = true
+			case v == "assets:build":
+				f.PHPBuildAssets = true
+			}
+		}
+	}
+	if x, ok := b.res.Get(evidence.KindRuntimeVersion); ok && x.State == evidence.StateDetected {
+		if v, ok := strings.CutPrefix(x.Value, "php "); ok {
+			f.PHPVersion = v
 		}
 	}
 	if x, ok := b.res.Get(evidence.KindServices); ok && x.State == evidence.StateDetected {
@@ -384,6 +421,8 @@ func summary(p Profile, pr presets.Preset) string {
 		return fmt.Sprintf("Axiom will compile this Go application and run it as a container on port %d.", p.Port.Value)
 	case presets.Python:
 		return fmt.Sprintf("Axiom will install this %s app with pip and run it as a container on port %d.", stack, p.Port.Value)
+	case presets.PHP, presets.Laravel:
+		return fmt.Sprintf("Axiom will install this %s app with Composer and run PHP-FPM with Nginx in one container on port %d.", nonEmpty(p.Framework.Value, "PHP"), p.Port.Value)
 	default:
 		return fmt.Sprintf("Axiom will build this %s app with %s and run it as a container on port %d.", stack, p.PackageManager.Value, p.Port.Value)
 	}

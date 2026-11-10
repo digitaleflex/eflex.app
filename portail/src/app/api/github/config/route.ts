@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server'
-import { installationUrl } from '@/lib/github-app'
+import { getAppConfig, getOAuthConfig, installationUrl } from '@/lib/github-app'
 
 export const dynamic = 'force-dynamic'
 
 /** État de la GitHub App et URL d'installation pour l'interface. */
 export async function GET() {
+  const config = await getAppConfig()
   return NextResponse.json(
     {
-      configured: Boolean(process.env.GITHUB_APP_ID && process.env.GITHUB_APP_PRIVATE_KEY),
-      installationUrl: installationUrl(),
+      configured: Boolean(config),
+      oauthConfigured: Boolean(await getOAuthConfig()),
+      slug: config?.slug ?? null,
+      installationUrl: await installationUrl(),
     },
     { headers: { 'Cache-Control': 'no-store, max-age=0' } },
   )

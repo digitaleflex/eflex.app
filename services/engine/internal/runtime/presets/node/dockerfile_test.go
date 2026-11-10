@@ -74,7 +74,8 @@ func TestDockerfileConstructs(t *testing.T) {
 				if fw == presets.FrameworkVite {
 					assertContains(t, df, "FROM "+NginxAlpine)
 					assertContains(t, df, "COPY --from=build /app/dist /usr/share/nginx/html")
-					assertContains(t, df, "EXPOSE 80")
+					assertContains(t, df, "listen 8080;")
+					assertContains(t, df, "EXPOSE 8080")
 					assertContains(t, df, depsInstall(pm, true))
 					return
 				}
@@ -119,5 +120,45 @@ func assertContains(t *testing.T, df, want string) {
 	t.Helper()
 	if !strings.Contains(df, want) {
 		t.Fatalf("dockerfile must contain %q:\n%s", want, df)
+	}
+}
+
+// TestGoldenFrameworkDockerfiles pins one Dockerfile per framework added for
+// EFLEX parity (npm, with and without the framework's Node adapter).
+func TestGoldenFrameworkDockerfiles(t *testing.T) {
+	cases := map[string]Facts{
+		"nuxt":             factsFor(presets.PackageManagerNPM, presets.FrameworkNuxt, true),
+		"remix":            factsFor(presets.PackageManagerNPM, presets.FrameworkRemix, true),
+		"solidstart":       factsFor(presets.PackageManagerNPM, presets.FrameworkSolidStart, true),
+		"redwoodjs":        factsFor(presets.PackageManagerNPM, presets.FrameworkRedwoodJS, true),
+		"astro-static":     {PackageManager: presets.PackageManagerNPM, Framework: presets.FrameworkAstro, Adapter: presets.AdapterStatic, HasBuildScript: true, HasLockfile: true},
+		"astro-node":       {PackageManager: presets.PackageManagerNPM, Framework: presets.FrameworkAstro, Adapter: presets.AdapterNode, HasBuildScript: true, HasLockfile: true},
+		"sveltekit-static": {PackageManager: presets.PackageManagerNPM, Framework: presets.FrameworkSvelteKit, Adapter: presets.AdapterStatic, HasBuildScript: true, HasLockfile: true},
+		"sveltekit-node":   {PackageManager: presets.PackageManagerNPM, Framework: presets.FrameworkSvelteKit, Adapter: presets.AdapterNode, HasBuildScript: true, HasLockfile: true},
+	}
+	for name, f := range cases {
+		t.Run(name, func(t *testing.T) {
+			df, err := DockerfileForFacts(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join("testdata", "golden", name+".dockerfile")
+			if *update {
+				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte(df), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			want, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("missing golden file (run go test -update): %v", err)
+			}
+			if string(want) != df {
+				t.Fatalf("dockerfile changed for %s:\n%s", name, df)
+			}
+		})
 	}
 }

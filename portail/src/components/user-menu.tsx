@@ -3,9 +3,9 @@
 import Link from 'next/link'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Bell, LogOut, Monitor, Moon, Settings, Sun, Users } from 'lucide-react'
+import { Bell, LogOut, Settings, Users } from 'lucide-react'
 import { signOut } from '@/lib/auth-client'
-import { applyTheme, readTheme, type Theme } from '@/lib/theme'
+import { ThemeIcons } from '@/components/theme-switcher'
 import { useConnectionState } from '@/hooks/events-provider'
 import { cn } from '@/lib/utils'
 
@@ -14,13 +14,11 @@ const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2)
 export function UserMenu({ name, email }: { name: string; email: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [theme, setTheme] = useState<Theme>('system')
   const rootRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const panelId = useId()
   const connection = useConnectionState()
 
-  useEffect(() => setTheme(readTheme()), [])
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOpen(false); buttonRef.current?.focus() } }
@@ -30,8 +28,7 @@ export function UserMenu({ name, email }: { name: string; email: string }) {
     return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onClick) }
   }, [open])
 
-  const choose = (t: Theme) => { setTheme(t); applyTheme(t) }
-  const item = 'flex min-h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+  const item = 'flex min-h-11 w-full items-center gap-2.5 rounded-md px-2.5 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
   return (
     <div ref={rootRef} className="relative">
@@ -41,7 +38,7 @@ export function UserMenu({ name, email }: { name: string; email: string }) {
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((o) => !o)}
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-eflexroyalblue to-eflexsky text-xs font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11"
+        className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-eflexroyalblue to-eflexsky text-xs font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         <span aria-hidden="true">{initials(name)}</span>
         <span className="sr-only">Menu du compte de {name}</span>
@@ -63,23 +60,9 @@ export function UserMenu({ name, email }: { name: string; email: string }) {
           <Link href="/dashboard/organization" onClick={() => setOpen(false)} className={item}><Users className="h-4 w-4 text-muted-foreground" aria-hidden="true" />Équipe</Link>
           <Link href="/dashboard/settings" onClick={() => setOpen(false)} className={item}><Settings className="h-4 w-4 text-muted-foreground" aria-hidden="true" />Paramètres</Link>
           <div className="my-1 h-px bg-border" />
-          <div role="radiogroup" aria-label="Thème" className="flex items-center justify-between gap-2 px-2.5 py-1.5">
+          <div className="flex items-center justify-between gap-2 px-2.5 py-1.5">
             <span className="text-sm">Thème</span>
-            <span className="flex rounded-lg border border-border p-0.5">
-              {([['system', Monitor, 'Système'], ['light', Sun, 'Clair'], ['dark', Moon, 'Sombre']] as const).map(([t, Icon, label]) => (
-                <button
-                  key={t}
-                  type="button"
-                  role="radio"
-                  aria-checked={theme === t}
-                  onClick={() => choose(t)}
-                  className={cn('flex h-7 w-7 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:w-10', theme === t ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}
-                >
-                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span className="sr-only">{label}</span>
-                </button>
-              ))}
-            </span>
+            <ThemeIcons />
           </div>
           <div className="my-1 h-px bg-border" />
           <button type="button" className={item} onClick={async () => { await signOut(); router.push('/'); router.refresh() }}>

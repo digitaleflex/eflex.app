@@ -1,6 +1,7 @@
 import type { BuildPlan, Candidate, DetectionContext, ServiceSpec } from '../types.js';
 import { BASE_CONFIDENCE, scoreConfidence } from '../confidence.js';
 import { phpRuntime } from '../versions.js';
+import { installCommand, runScriptCommand } from './node.js';
 
 /** Laravel: laravel/framework in composer.json plus an artisan entrypoint. */
 export function detectLaravel(ctx: DetectionContext): Candidate | null {
@@ -42,7 +43,7 @@ export function detectLaravel(ctx: DetectionContext): Candidate | null {
     runtime: php.runtime,
     root: '',
     install: 'composer install --no-dev --optimize-autoloader',
-    ...(hasBuildScript ? { build: 'npm ci && npm run build' } : {}),
+    ...(hasBuildScript ? { build: `${installCommand(ctx)} && ${runScriptCommand(ctx, 'build')}` } : {}),
     port: 80,
     services,
     volumes: ['storage'],

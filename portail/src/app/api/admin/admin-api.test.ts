@@ -63,6 +63,9 @@ run('API d’administration', () => {
     const files = routeFiles(here)
     expect(files.length).toBeGreaterThan(0)
     for (const file of files) {
+      // Exception assumée : la fin d'usurpation doit rester accessible à la
+      // session usurpée (non-admin). Sans usurpation, elle répond 400.
+      if (file.endsWith('/impersonation/stop/route.ts')) continue
       const mod = (await import(/* @vite-ignore */ file)) as Record<string, unknown>
       const handlers = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].filter((m) => typeof mod[m] === 'function')
       expect(handlers.length, file).toBeGreaterThan(0)
@@ -120,5 +123,43 @@ run('API d’administration', () => {
   it('un utilisateur suspendu perd aussi l’accès administrateur', async () => {
     const { isAdmin } = await import('@/lib/admin')
     expect(isAdmin({ user: { role: 'admin', banned: true } } as never)).toBe(false)
+  })
+
+  it('terminal d’exploitation : 200 pour un administrateur, secrets masqués, 404 pour un utilisateur', async () => {
+    const { publish } = await import('@/lib/event-bus')
+    const { GET } = await import('@/app/api/admin/live/route')
+    const { GET: GET_AUDIT } = await import('@/app/api/admin/live/audit/route')
+
+    await publish({
+      type: 'deployment.status',
+      payload: { status: 'failed', name: 'Projet du test live', token: 'secret-live-test', nested: { password: 'hunter2' } },
+    })
+
+    as(admin)
+    const response = await GET(call('/api/admin/live?limit=20'))
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { events: Array<{ id: number; type: string; payload: Record<string, unknown> }>; cursors: { newest: number | null } }
+    expect(Array.isArray(body.events)).toBe(true)
+    expect(typeof body.cursors.newest).toBe('number')
+    const found = body.events.find((entry) => entry.type === 'deployment.status' && entry.payload.name === 'Projet du test live')
+    expect(found).toBeTruthy()
+    expect(found?.payload.token).toBe('[masqué]')
+    expect((found?.payload.nested as Record<string, unknown>).password).toBe('[masqué]')
+    expect(JSON.stringify(body)).not.toContain('secret-live-test')
+    expect(JSON.stringify(body)).not.toContain('hunter2')
+
+    // Curseur : rien de nouveau après le dernier identifiant.
+    const after = await GET(call(`/api/admin/live?after=${body.cursors.newest}`))
+    expect(after.status).toBe(200)
+    expect(((await after.json()) as { events: unknown[] }).events).toHaveLength(0)
+
+    // Le tail du journal d'audit répond aussi aux administrateurs.
+    expect((await GET_AUDIT(call('/api/admin/live/audit?limit=5'))).status).toBe(200)
+
+    as(regular)
+    expect((await GET(call('/api/admin/live'))).status).toBe(404)
+    expect((await GET_AUDIT(call('/api/admin/live/audit'))).status).toBe(404)
+    as(null)
+    expect((await GET(call('/api/admin/live'))).status).toBe(404)
   })
 })

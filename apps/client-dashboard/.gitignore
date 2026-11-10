@@ -1,7 +1,0 @@
-.next
-node_modules
-dist
-out
-*.env
-.env.local
-!important .env.production

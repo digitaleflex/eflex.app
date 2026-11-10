@@ -54,7 +54,7 @@ The generic Orchestrator (`services/orchestrator`) is superseded for deployments
 | `services/engine/internal/**` | Engine-private | not importable by other modules (`internal`) |
 | `services/agent/internal/**` | Agent-private | communicates with Engine only via protocol (#75) |
 | `services/orchestrator/internal/**` | framework-private | does not own deployment state |
-| `apps/cloud/**` | Console | talks only to Engine `/api/v1` |
+| `portail/**` | Console EFLEX | talks only to Engine `/api/v1` (the legacy `apps/cloud` console was removed, #16) |
 | user repository + `axiom.yaml` | project-specific | input only; never stored as platform code |
 
 Each Go module is independent (`go.mod` per service); cross-service sharing happens through contracts, not imports.

@@ -1,13 +1,14 @@
+import type { HTMLAttributes } from 'react'
 import { cn } from '@/lib/utils'
-import { HTMLAttributes } from 'react'
 
-type BadgeVariant = 'default' | 'success' | 'warning' | 'destructive' | 'outline'
+type BadgeVariant = 'default' | 'success' | 'warning' | 'destructive' | 'info' | 'outline'
 
 const badgeVariants: Record<BadgeVariant, string> = {
   default: 'bg-primary/10 text-primary border-primary/20',
   success: 'bg-success/10 text-success border-success/25',
   warning: 'bg-warning/10 text-warning border-warning/25',
   destructive: 'bg-destructive/10 text-destructive border-destructive/25',
+  info: 'bg-info/10 text-info border-info/25',
   outline: 'bg-transparent text-muted-foreground border-border',
 }
 
@@ -28,3 +29,5 @@ export function Badge({ className, variant = 'default', ...props }: BadgeProps) 
     />
   )
 }
+
+export type { BadgeVariant }

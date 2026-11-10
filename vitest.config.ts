@@ -3,7 +3,6 @@ import { defineConfig } from 'vitest/config';
 
 // La suite racine couvre les packages TypeScript du workspace pnpm et les modules
 // sans dépendance du portail (analyse d'URL, analyse de dépôt).
-// La console `apps/cloud` a sa propre configuration Vitest (npm, jsdom).
 export default defineConfig({
   resolve: {
     alias: {

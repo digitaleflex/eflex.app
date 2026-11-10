@@ -11,6 +11,8 @@ export type DashboardProject = {
   repoUrl: string
   branch: string
   domain: string | null
+  tlsValid: boolean | null
+  tlsExpiresAt: string | null
   updatedAt: string
   lastStatus: string | null
   lastCommit: string | null
@@ -41,6 +43,7 @@ export async function loadDashboard(organizationId: string, now = new Date()) {
       orderBy: { updatedAt: 'desc' },
       select: {
         id: true, name: true, framework: true, runtime: true, repoUrl: true, branch: true, domain: true, updatedAt: true,
+        tlsValid: true, tlsExpiresAt: true,
         deployments: { orderBy: { createdAt: 'desc' }, take: 8, select: { id: true, status: true, commitSha: true, createdAt: true } },
       },
     }),
@@ -62,6 +65,7 @@ export async function loadDashboard(organizationId: string, now = new Date()) {
     const last = p.deployments[0]
     return {
       id: p.id, name: p.name, framework: p.framework, runtime: p.runtime, repoUrl: p.repoUrl, branch: p.branch, domain: p.domain,
+      tlsValid: p.tlsValid, tlsExpiresAt: p.tlsExpiresAt?.toISOString() ?? null,
       updatedAt: p.updatedAt.toISOString(),
       lastStatus: last?.status ?? null,
       lastCommit: last && last.commitSha !== 'pending' ? last.commitSha.slice(0, 7) : null,

@@ -163,7 +163,7 @@ The Agent binary (`services/agent/cmd/agent/main.go`) builds its composition roo
 - The test records `https://e2e-test.local` as the application URL. No Traefik, DNS record or certificate is involved.
 - Its agent transport is in-process. The real handshake listener → protocol → HMAC verification → bridge, and the registration of a real agent, are not exercised end to end.
 - The source is a fixture. The GitHub connection (OAuth application, repository and archive download) has never been run end to end.
-- Supported stacks in V0.1: Node (Next.js, Vite, generic), Go, Python (FastAPI, Flask, Django with a `requirements.txt`, see below), Dockerfile and compose. Laravel (PHP), Rails and Spring Boot are detected but rejected (`internal/analyzer/evidence/decide.go`).
+- Supported stacks in V0.1: Node (Next.js, Nuxt, Remix, SolidStart, RedwoodJS, Astro, SvelteKit, Vite, generic), Go, Python (FastAPI, Flask, Django with a `requirements.txt`, see below), PHP and Laravel (Composer, see below), Dockerfile and compose. Rails (Ruby) and Spring Boot (Java) are detected but rejected (`internal/analyzer/evidence/decide.go`).
 - Docker-gated tests only run where `AXIOM_TEST_DOCKER` is set. The CI engine job sets it for `./internal/e2e/` and `./internal/build/` only; the agent job does not.
 
 A run of the Engine and a real Agent on a real server, with Traefik, a domain and a repository reached through GitHub, is the missing proof.
@@ -185,6 +185,59 @@ Limits — do not report these as supported:
 - A repository that ships its own Dockerfile keeps using it (Dockerfile precedence).
 
 Verified: unit tests, golden profiles and Dockerfiles, and `internal/e2e` `TestPythonToLive` — a minimal FastAPI, Flask and Django application each go through analysis, plan, a real `pip install` and image build, a real container and a real health probe to `LIVE` (the CI engine job runs it; it needs PyPI and Docker Hub). A static analysis of two real repositories: Microblog ships its own Dockerfile, which is used; Flasky is refused because its requirements use `-r` includes. Not done: building and running third-party repositories.
+
+### Node.js framework parity (V1)
+
+Added on 2026-11-10. The analyzer already detected Remix, Nuxt, Astro, SvelteKit, SolidStart and RedwoodJS, but `profile/presets` only resolved Next.js and Vite explicitly; the others fell back to the generic Node preset (or were rejected for a missing `start` script). They now have explicit presets, commands and runtime modes.
+
+| Framework | Runtime | Build (no script) | Start (no script) | Port |
+| --- | --- | --- | --- | --- |
+| Next.js | node | `next build` | `next start` | 3000 |
+| Nuxt | node | `nuxt build` | `node .output/server/index.mjs` | 3000 |
+| Remix | node | `remix build` | `remix-serve ./build/server/index.js` | 3000 |
+| SolidStart | node | `vinxi build` | package.json `start` (required) | 3000 |
+| RedwoodJS | node | package.json `build` (required) | package.json `start` (required) | 8910 |
+| Astro | static, or node with `@astrojs/node` | `astro build` | `node ./dist/server/entry.mjs` (node adapter) | 8080 static / 3000 node |
+| SvelteKit | static with `@sveltejs/adapter-static`, or node with `@sveltejs/adapter-node` | `vite build` | `node build/index.js` (node adapter) | 8080 static / 3000 node |
+| Vite | static | `vite build` | — | 8080 |
+| generic Node | node | package.json `build` when present | package.json `start` | 3000 |
+
+- A package.json `start` script always wins and the whole project (not only the build output) is kept in the runtime stage, because the script may read files outside it.
+- Without a `start` script the framework's canonical command is used; `HasBuildScript`/`HasStartScript` still come from `package.json`.
+- SolidStart and RedwoodJS require explicit `build` and `start` scripts: their CLI changed between majors (`vinxi`/`solid-start`, `rw serve` ports), so Axiom does not guess.
+- SvelteKit without `adapter-node`, `adapter-static` or a `start` script is refused (`SVELTEKIT_ADAPTER_MISSING`).
+- Static presets are served by nginx on port 8080. The generated nginx configuration and `EXPOSE` now use the plan port (previously the image exposed 80 while the plan said 8080).
+- Image safety is the #121 contract: pinned `node:20-alpine`/`nginx:1.27-alpine`, lockfile-aware installs, production-only `node_modules`, non-root `node` user, `PORT` exported, no `HEALTHCHECK` (Axiom probes externally). pnpm and yarn are enabled through Corepack and bun is installed with npm, because the pinned Node image only ships npm; `pnpm fetch` was replaced by `pnpm install --frozen-lockfile` so the deps stage really produces `node_modules`.
+
+Limits — do not report these as supported:
+
+- Monorepos are still refused at the root level (`AMBIGUOUS_APPLICATION_ROOT`); there is no workspace-aware build.
+- Nuxt is assumed to be SSR: `ssr: false` / `nuxt generate` static output is not detected. An explicit `start` script is honoured, otherwise the Nitro server entry is used.
+- Astro's mode is read from the `@astrojs/node` dependency only.
+- RedwoodJS is served from its `start` script and keeps the build-stage `node_modules` (its serve CLI is usually a devDependency), so its image is larger. Its default `rw serve` exposes an API port and a web port; that multi-port topology was not validated. Use a Dockerfile when both ports are needed.
+- No Docker end-to-end test was added for these frameworks: coverage is unit tests, profile goldens and Dockerfile goldens.
+- The plan carries resolved commands, not lockfile presence: generated Node images assume a lockfile (#121 limit). A repository without a lockfile or with a workspace layout should ship its own Dockerfile.
+
+### PHP / Laravel preset (V1)
+
+Added on 2026-11-10.
+
+- **Analysis.** `composer.json` now produces `language: PHP` and `package_manager: composer`; `require.php` gives the interpreter minor (a constraint other than 8.3 produces a warning, never a different image); `laravel/framework` produces `framework: Laravel`. `artisan`, `public/index.php`, `ext-*` requirements, Composer scripts and npm/Vite assets are recorded as tokens in the new multi-valued `php` finding (`analyzer/evidence/php.go`). A new `adapters` finding records `@sveltejs/adapter-node`/`adapter-static` and `@astrojs/node`. The analyzer version is now `evidence/1.1.0`.
+- **Contract impact (additive).** The profile `preset` enum (`schemas/artifact.schema.json`) and the `axiom.yaml` strategy/language/packageManager enums (`schemas/axiom.schema.json`, `internal/manifest`) gain the new values. `RepositoryAnalysis` gains two finding kinds (`adapters`, `php`). No existing value, field or state changed; consumers that ignore unknown presets/kinds keep working.
+- **Presets.** `php` requires a `composer.json` and either `public/index.php` or an explicit `start.command`; `laravel` is chosen when `laravel/framework` is detected. Both are source builds on port 8080 and use `StartCommand = sh /usr/local/bin/axiom-start`.
+- **Build command.** `composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts`. `--no-scripts` is mandatory: Composer scripts such as Laravel's `post-autoload-dump` call `artisan`, which is not copied yet at dependency-install time. Laravel rediscovers its packages at runtime (the `bootstrap/cache` directory is writable).
+- **Image.** One container: `php:8.3-fpm-bookworm` + nginx + Supervisor (`internal/runtime/presets/php`). Extensions `bcmath`, `pdo_mysql`, `pdo_pgsql`, `zip`, `opcache` are compiled in; nginx forwards `*.php` to `127.0.0.1:9000`; Supervisor runs `php-fpm -F` and `nginx -g 'daemon off;'`. The entrypoint runs `php artisan config:cache` then `php artisan migrate --force` for Laravel, and exits non-zero if either fails, so migrations can fail a deployment. `storage` and `bootstrap/cache` are owned by `www-data`. When a `public/index.php` document root and an npm build script exist, a `node:20-alpine` stage runs `npm ci`/`npm install` then `npm run build`, and the built `public/` directory is copied (Laravel's `public/build` included).
+- **Limits — do not report these as done:**
+  - **No `queue` or `scheduler` worker.** `php artisan queue:work` and `schedule:work` are not started: the planner has no multi-service model (`planner.Plan` has one runtime).
+  - **No persistent `storage` volume.** The planner has no volume model; `storage/` lives in the container and is lost on redeploy. There is no `VOLUME` instruction pretending otherwise.
+  - No nginx sidecar, no PHP-FPM pool tuning, no OPcache preload configuration.
+  - Frontend assets are built only with **npm**, and only when `public/index.php` exists. pnpm/yarn/bun lockfiles skip the asset stage instead of downloading a package manager inside the build.
+  - The extension set is fixed. A repository requiring another `ext-*` fails at `composer install` (loud failure), it is not silently ignored.
+  - The php-fpm and nginx masters run as root; FPM workers drop to `www-data`. The Composer binary stays in the image.
+  - No database provisioning: `DATABASE_URL`/`DB_*` must be configured; a Laravel app whose migrations fail at start does not reach LIVE.
+  - A `start.command` override replaces the generated entrypoint entirely: Laravel migrations and the nginx/php-fpm pair are then not started unless the override does it.
+  - No `TestLaravelToLive` e2e: building the image needs apt, Composer and Docker Hub, and was not added to the Docker-gated CI job. Coverage is analysis, profile goldens and Dockerfile goldens.
+  - A repository that ships its own Dockerfile still uses it (Dockerfile precedence).
 
 Two packages are delivered and tested but **not adopted by production code**:
 
@@ -401,7 +454,7 @@ GitHub → LIVE
 
 **Current phase:** the code path from a repository to a running container is wired and tested; what is missing is proof on a real server.
 
-**Current focus:** a real run (Engine + Agent + Traefik + a domain + a repository reached through GitHub), then the stacks that V0.1 rejects (PHP, Python). The Go suites are green; the Cloud Console tests were not re-verified.
+**Current focus:** a real run (Engine + Agent + Traefik + a domain + a repository reached through GitHub), then the remaining stacks that V0.1 rejects (Rails, Spring Boot) and the multi-service/volume model that would make Laravel queue/scheduler workers and a persistent `storage` volume possible. The Go suites are green; the Cloud Console tests were not re-verified.
 
 Axiom's first meaningful milestone is not a generic AI demonstration. It is a reliable deployment path:
 

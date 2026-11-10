@@ -27,7 +27,17 @@ export interface DeploymentArtifacts {
   buildPack: 'dockercompose' | 'dockerfile';
   postDeploy: string[];
   services: string[];
+  /** Volumes persistants à créer côté orchestrateur (nom + chemin conteneur). */
+  persistentVolumes: PersistentVolume[];
   warnings: string[];
+}
+
+/** Spécification d'un stockage persistant dérivée de `BuildPlan.volumes`. */
+export interface PersistentVolume {
+  /** Identifiant lisible transmis à Coolify (préfixé par l'UUID de l'application). */
+  name: string;
+  /** Chemin absolu monté dans le conteneur. */
+  mountPath: string;
 }
 
 const STATIC_FRAMEWORKS = new Set(['static', 'vite', 'svelte', 'astro']);
@@ -39,6 +49,45 @@ interface MutableService {
   restart?: string;
   depends_on?: string[];
   networks?: string[];
+}
+
+/** Nom de volume accepté par Coolify (`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`). */
+function volumeName(base: string, used: Map<string, number>): string {
+  const slug =
+    base
+      .replace(/^\//, '')
+      .replace(/[^a-zA-Z0-9._-]+/g, '-')
+      .replace(/^[-._]+|[-._]+$/g, '')
+      .toLowerCase() || 'data';
+  const prefix = `eflex-${slug}`.slice(0, 60).replace(/[-._]+$/g, '');
+  const count = (used.get(prefix) ?? 0) + 1;
+  used.set(prefix, count);
+  return count === 1 ? prefix : `${prefix}-${count}`;
+}
+
+/**
+ * Traduit `BuildPlan.volumes` en stockages persistants.
+ *
+ * - chemin absolu (`VOLUME /app/data`) : monté tel quel ;
+ * - chemin relatif (`storage`, `eflex.json`) : monté sous `/app`, le répertoire
+ *   de travail des images Nixpacks. Docker initialise un volume nommé avec le
+ *   contenu de l'image au premier montage : l'arborescence n'est pas masquée.
+ */
+export function persistentVolumesForPlan(plan: BuildPlan): PersistentVolume[] {
+  const used = new Map<string, number>();
+  const seen = new Set<string>();
+  const volumes: PersistentVolume[] = [];
+
+  for (const volume of plan.volumes ?? []) {
+    const trimmed = volume.trim();
+    if (trimmed === '') continue;
+    const mountPath = trimmed.startsWith('/') ? trimmed : `/app/${trimmed.replace(/^\/+/, '')}`;
+    if (seen.has(mountPath)) continue;
+    seen.add(mountPath);
+    volumes.push({ name: volumeName(trimmed, used), mountPath });
+  }
+
+  return volumes;
 }
 
 export function buildDeploymentArtifacts(
@@ -104,6 +153,7 @@ export function buildDeploymentArtifacts(
     buildPack,
     postDeploy: plan.postDeploy ?? [],
     services: rendered.metadata.services,
+    persistentVolumes: persistentVolumesForPlan(plan),
     warnings: rendered.metadata.warnings,
   };
 }

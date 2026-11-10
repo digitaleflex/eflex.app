@@ -30,7 +30,7 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Temps réel : toute création ou changement de statut recharge ces données côté serveur. */}
-      <LiveRefresh types={['project.created', 'project.updated', 'project.deleted', 'deployment.created', 'deployment.status']} />
+      <LiveRefresh types={['project.created', 'project.updated', 'project.deleted', 'project.transferred', 'deployment.created', 'deployment.status']} />
 
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-bold tracking-tight text-balance">

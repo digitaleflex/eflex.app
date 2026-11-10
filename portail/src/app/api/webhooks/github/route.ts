@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyGitHubWebhook } from '@/lib/github-app'
+import { getWebhookSecret, verifyGitHubWebhook } from '@/lib/github-app'
 import { prisma } from '@/lib/prisma'
-import { enqueueDeployment } from '@/lib/queue'
+import { enqueueProjectDeployment } from '@/lib/project-deployments'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -27,7 +27,7 @@ const SHA_RE = /^[0-9a-f]{40}$/
  */
 export async function POST(request: NextRequest) {
   const body = await request.text()
-  const secret = process.env.GITHUB_WEBHOOK_SECRET || ''
+  const secret = await getWebhookSecret()
   if (!verifyGitHubWebhook(body, request.headers.get('x-hub-signature-256'), secret)) {
     return NextResponse.json({ error: 'Signature invalide.' }, { status: 401 })
   }
@@ -75,24 +75,28 @@ export async function POST(request: NextRequest) {
           { repoUrl: { endsWith: `github.com/${fullName}` } },
         ],
       },
-      select: { id: true, branch: true, productionBranch: true, installationId: true },
+      select: { id: true, name: true, organizationId: true, branch: true, productionBranch: true, installationId: true },
     })
 
     const installationId = payload.installation?.id ? String(payload.installation.id) : null
     let queued = 0
+    let skipped = 0
     for (const project of projects) {
       if ((project.productionBranch ?? project.branch) !== branch) continue
-      const deployment = await prisma.deployment.create({
-        data: { projectId: project.id, commitSha: sha, status: 'queued' },
-      })
-      await enqueueDeployment(deployment.id)
+      // Même verrou que le redéploiement manuel : un push pendant un build ne
+      // crée pas un second déploiement concurrent.
+      const result = await enqueueProjectDeployment(project, { exclusive: true, commitSha: sha })
+      if ('error' in result) {
+        skipped += 1
+        continue
+      }
       if (installationId && !project.installationId) {
         await prisma.project.update({ where: { id: project.id }, data: { installationId } })
       }
       queued += 1
     }
-    console.info(`[eflex/webhook/github] push ${fullName}@${branch} -> ${queued} déploiement(s)`)
-    return NextResponse.json({ received: true, queued })
+    console.info(`[eflex/webhook/github] push ${fullName}@${branch} -> ${queued} déploiement(s), ${skipped} ignoré(s)`)
+    return NextResponse.json({ received: true, queued, skipped })
   }
 
   // pull_request / installation_repositories : enregistrés pour l'idempotence,

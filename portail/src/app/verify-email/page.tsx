@@ -3,6 +3,7 @@
 import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { ThemeToggle } from '@/components/theme-switcher'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -15,6 +16,7 @@ function VerifyEmailForm() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const errorId = 'verify-email-error'
 
   const handleResend = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,7 +38,7 @@ function VerifyEmailForm() {
   }
 
   return (
-    <main id="contenu" className="flex-1 flex items-center justify-center p-4">
+    <main id="contenu" tabIndex={-1} className="flex-1 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="space-y-2 text-center">
           <h1 className="text-display-sm font-bold">Vérifiez votre adresse e-mail</h1>
@@ -47,7 +49,7 @@ function VerifyEmailForm() {
 
         <Card className="p-6 space-y-5">
           {message && <p role="status" className="rounded-lg bg-success/10 border border-success/20 p-3 text-sm text-foreground">{message}</p>}
-          {error && <p role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">{error}</p>}
+          {error && <p id={errorId} role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">{error}</p>}
 
           <form onSubmit={handleResend} className="space-y-4">
             <Input
@@ -58,6 +60,8 @@ function VerifyEmailForm() {
               placeholder="vous@exemple.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? errorId : undefined}
               required
             />
             <Button type="submit" size="lg" className="w-full" loading={loading}>
@@ -79,10 +83,11 @@ export default function VerifyEmailPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="sticky top-0 z-50 glass">
-        <nav className="container flex h-16 items-center">
+        <nav className="container flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center">
             <Image src="/logo-horizontal.webp" alt="Eflex — accueil" width={1200} height={312} className="h-8 w-auto" priority />
           </Link>
+          <ThemeToggle />
         </nav>
       </header>
       <Suspense fallback={<div className="flex-1" />}>

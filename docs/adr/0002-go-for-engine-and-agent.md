@@ -16,7 +16,7 @@ Implement the Engine (`services/engine`) and Runtime Agent (`services/agent`) in
 
 - Single static binaries, simple distribution of the Agent.
 - First-class Docker ecosystem libraries available.
-- Frontend remains TypeScript (`apps/cloud`); contracts are language-neutral (JSON/YAML schemas).
+- Frontend remains TypeScript (`portail/`); contracts are language-neutral (JSON/YAML schemas).
 
 ## Alternatives considered
 

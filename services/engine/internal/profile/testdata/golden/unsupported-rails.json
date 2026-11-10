@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "version": 0,
-  "analyzerVersion": "evidence/1.0.0",
+  "analyzerVersion": "evidence/1.1.0",
   "source": {
     "repositoryId": "repo_1",
     "ref": "main",
@@ -17,7 +17,7 @@
     "alternatives": [
       "Add a Dockerfile to the repository to deploy any stack as a container",
       "Add an axiom.yaml manifest with explicit build and start commands",
-      "Supported in V0.1: Next.js, Vite, Node.js, Go, Python (FastAPI, Flask, Django with a requirements.txt), Dockerfile, Docker Compose"
+      "Supported in V0.1: Next.js, Nuxt, Remix, SolidStart, RedwoodJS, Astro, SvelteKit, Vite, Node.js, Go, Python (FastAPI, Flask, Django with a requirements.txt), PHP and Laravel (Composer), Dockerfile, Docker Compose"
     ]
   },
   "blocking": [],

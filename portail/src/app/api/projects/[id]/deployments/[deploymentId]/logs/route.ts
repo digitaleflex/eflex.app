@@ -26,6 +26,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const userId = session.user.id
 
   const org = await resolveOrganization(session)
+  // Le rôle facturation ne doit jamais accéder aux journaux de build (#27).
+  if (org?.role === 'billing') {
+    return NextResponse.json({ error: 'Le rôle facturation n’a pas accès aux journaux.' }, { status: 403 })
+  }
   const { id, deploymentId } = await params
   // Projet et déploiement doivent appartenir à l'organisation de l'utilisateur : sinon 404.
   const deployment = org
@@ -65,7 +69,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     async (send, signal) => {
       try {
         if (!configured && buildId) {
-          send('warn', { message: "Les journaux en direct sont indisponibles : Coolify n'est pas configuré sur cette plateforme." })
+          send('warn', { message: "Les journaux en direct sont indisponibles : le service de déploiement n'est pas configuré sur cette plateforme." })
         }
         await streamDeploymentLogs({
           client: {

@@ -11,12 +11,28 @@ export interface ServiceSpec {
   port?: number;
 }
 
+/** Informations minimales d'une application appartenant à un workspace JavaScript. */
+export interface WorkspaceContext {
+  manager: PackageManager;
+  /** `package.json#name` du paquet applicatif, quand il est déclaré. */
+  name?: string;
+  /** Script de build exécutable via le filtre du gestionnaire (généralement `build`). */
+  buildScript?: string;
+}
+
 export interface BuildPlan {
   version: 1;
   framework: Framework;
   runtime: string; // "node@22" | "php@8.3" | "python@3.12" | "static@1" | "docker@1"
   root: string; // "" for repo root, else "apps/web"
   repoRoot?: string; // set when root !== ""
+  /**
+   * Contexte de workspace JavaScript, présent seulement quand `root` est une
+   * application d'un monorepo (marqueurs de workspace à la racine du dépôt).
+   * Le déploiement construit alors depuis la racine du dépôt pour que les
+   * dépendances internes soient visibles.
+   */
+  workspace?: WorkspaceContext;
   install?: string;
   build?: string;
   start?: string;
@@ -84,6 +100,7 @@ export interface PackageJson {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   engines?: { node?: string };
+  packageManager?: string;
   workspaces?: unknown;
   [key: string]: unknown;
 }

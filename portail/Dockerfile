@@ -3,8 +3,12 @@
 #   docker build -f portail/Dockerfile .
 # (docker-compose.prod.yml et docker-compose.portail.yml le font déjà.)
 ARG DATABASE_URL=postgresql://eflex:eflexpass@localhost:5432/eflex
+# Clé publique du captcha Turnstile (facultative). Inlinée par Next au build.
+ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=
 
 FROM node:24-alpine AS builder
+ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
 # Même disposition que dans le dépôt : portail/ et packages/ côte à côte,
 # car le code importe « ../packages/detector » (alias @eflex/detector).
 WORKDIR /repo/portail

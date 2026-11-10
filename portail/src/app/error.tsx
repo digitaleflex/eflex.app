@@ -15,7 +15,7 @@ export default function ErrorPage({
   }, [error])
 
   return (
-    <main id="contenu" className="min-h-screen flex flex-col items-center justify-center gap-7 bg-background px-4 text-center">
+    <main id="contenu" tabIndex={-1} className="min-h-screen flex flex-col items-center justify-center gap-7 bg-background px-4 text-center">
       <div className="space-y-3">
         <h1 className="text-display-sm font-bold">Une erreur est survenue</h1>
         <p className="max-w-md text-muted-foreground">

@@ -1,0 +1,260 @@
+// Package php renders the safe production Dockerfile for the PHP preset
+// (generic PHP and Laravel), as one single container: PHP-FPM, Nginx and
+// Supervisor.
+//
+// Why one container: the planner has no multi-service or volume model yet, so
+// Axiom cannot attach an nginx sidecar, a queue worker or a persistent storage
+// volume to a deployment. Nginx and PHP-FPM therefore share the image (a
+// Supervisor process runs both), Laravel migrations run at container start,
+// and the queue/scheduler workers are not started. The limits are documented
+// in docs/axiom-engine.md and must not be reported as supported.
+//
+// Safety properties, mirrored from the Python preset:
+//   - The base image is a pinned constant (php:<minor>-fpm-bookworm) and
+//     Composer comes from the pinned composer:2 image.
+//   - The generated file depends only on Detect facts plus the resolved
+//     commands/port: identical facts always produce an identical Dockerfile.
+//   - Commands are refused when they could escape their Dockerfile
+//     instruction (line breaks, trailing backslash).
+package php
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/digitaleflex/axiom/services/engine/internal/runtime/presets"
+)
+
+// BaseImage is the pinned PHP-FPM image.
+const BaseImage = "php:" + presets.PHPVersion + "-fpm-bookworm"
+
+// ComposerImage provides the Composer binary without installing PHP again.
+const ComposerImage = "composer:2"
+
+// NodeImage builds the frontend assets of a Laravel application.
+const NodeImage = "node:20-alpine"
+
+// Facts are the repository facts the build stage reads from the extracted
+// source (not from the plan): they decide which optional stages are emitted.
+type Facts struct {
+	ComposerLock bool
+	Laravel      bool
+	PublicIndex  bool
+	// AssetInstallCommand is "npm ci"/"npm install" when package.json has a
+	// build script, npm is the package manager and a public/ document root
+	// exists; "" disables the asset stage.
+	AssetInstallCommand string
+	AssetBuildCommand   string
+	NpmLock             bool
+}
+
+// ErrInvalid is returned when the facts cannot produce a safe Dockerfile.
+var ErrInvalid = errors.New("php preset: invalid input")
+
+// Detect reads the repository files that decide the optional Dockerfile
+// stages. It never executes repository code.
+func Detect(dir string) Facts {
+	f := Facts{}
+	f.ComposerLock = isFile(filepath.Join(dir, "composer.lock"))
+	f.Laravel = isFile(filepath.Join(dir, "artisan"))
+	f.PublicIndex = isFile(filepath.Join(dir, "public", "index.php"))
+
+	pkgPath := filepath.Join(dir, "package.json")
+	raw, err := os.ReadFile(pkgPath)
+	if err != nil {
+		return f
+	}
+	var pkg struct {
+		PackageManager string            `json:"packageManager"`
+		Scripts        map[string]string `json:"scripts"`
+	}
+	if err := json.Unmarshal(raw, &pkg); err != nil {
+		return f
+	}
+	if strings.TrimSpace(pkg.Scripts["build"]) == "" {
+		return f
+	}
+	// Only npm is supported in the asset stage: pnpm/yarn/bun would need
+	// Corepack and a network download inside the build.
+	if name, _, _ := strings.Cut(pkg.PackageManager, "@"); name != "" && name != "npm" {
+		return f
+	}
+	if isFile(filepath.Join(dir, "pnpm-lock.yaml")) || isFile(filepath.Join(dir, "yarn.lock")) || isFile(filepath.Join(dir, "bun.lockb")) || isFile(filepath.Join(dir, "bun.lock")) {
+		return f
+	}
+	if f.PublicIndex {
+		f.NpmLock = isFile(filepath.Join(dir, "package-lock.json"))
+		if f.NpmLock {
+			f.AssetInstallCommand = "npm ci"
+		} else {
+			f.AssetInstallCommand = "npm install"
+		}
+		f.AssetBuildCommand = "npm run build"
+	}
+	return f
+}
+
+func isFile(path string) bool {
+	st, err := os.Stat(path)
+	return err == nil && !st.IsDir()
+}
+
+func checkCommand(name, cmd string) error {
+	if strings.TrimSpace(cmd) == "" {
+		return fmt.Errorf("%w: %s is required", ErrInvalid, name)
+	}
+	if strings.ContainsAny(cmd, "\n\r\x00") || strings.HasSuffix(strings.TrimRight(cmd, " \t"), `\`) {
+		return fmt.Errorf("%w: %s must be a single line that does not end with a backslash", ErrInvalid, name)
+	}
+	return nil
+}
+
+// Dockerfile renders the single-container Dockerfile for the facts and the
+// resolved build/start commands.
+func Dockerfile(f Facts, buildCommand, startCommand string, port int) (string, error) {
+	if err := checkCommand("build command", buildCommand); err != nil {
+		return "", err
+	}
+	if err := checkCommand("start command", startCommand); err != nil {
+		return "", err
+	}
+	if port < 1 || port > 65535 {
+		return "", fmt.Errorf("%w: port %d is out of range", ErrInvalid, port)
+	}
+
+	var cmd bytes.Buffer
+	enc := json.NewEncoder(&cmd)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode([]string{"sh", "-c", startCommand}); err != nil {
+		return "", err
+	}
+
+	docRoot := "/var/www/html"
+	if f.PublicIndex {
+		docRoot = "/var/www/html/public"
+	}
+	assets := f.AssetInstallCommand != "" && f.AssetBuildCommand != ""
+
+	var b strings.Builder
+	b.WriteString("# Generated by Axiom — PHP preset (php-fpm + nginx + supervisor). Do not edit.\n")
+
+	if assets {
+		fmt.Fprintf(&b, "FROM %s AS assets\n", NodeImage)
+		b.WriteString("WORKDIR /app\n")
+		b.WriteString("COPY package.json ./\n")
+		if f.NpmLock {
+			b.WriteString("COPY package-lock.json ./\n")
+		}
+		fmt.Fprintf(&b, "RUN %s\n", f.AssetInstallCommand)
+		b.WriteString("COPY . .\n")
+		fmt.Fprintf(&b, "RUN %s\n", f.AssetBuildCommand)
+		b.WriteString("\n")
+	}
+
+	fmt.Fprintf(&b, "FROM %s\n", BaseImage)
+	b.WriteString("ENV COMPOSER_ALLOW_SUPERUSER=1 \\\n")
+	b.WriteString("    COMPOSER_NO_INTERACTION=1\n")
+	b.WriteString("RUN apt-get update \\\n")
+	b.WriteString(" && apt-get install -y --no-install-recommends nginx supervisor libpq-dev libzip-dev \\\n")
+	b.WriteString(" && docker-php-ext-install -j\"$(nproc)\" bcmath pdo_mysql pdo_pgsql zip opcache \\\n")
+	b.WriteString(" && rm -rf /var/lib/apt/lists/*\n")
+	fmt.Fprintf(&b, "COPY --from=%s /usr/bin/composer /usr/bin/composer\n", ComposerImage)
+	b.WriteString("WORKDIR /var/www/html\n")
+	b.WriteString("COPY composer.json ./\n")
+	if f.ComposerLock {
+		b.WriteString("COPY composer.lock ./\n")
+	}
+	fmt.Fprintf(&b, "RUN %s\n", buildCommand)
+	b.WriteString("COPY . .\n")
+	if assets {
+		b.WriteString("COPY --from=assets /app/public ./public\n")
+	}
+	if f.Laravel {
+		b.WriteString("RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \\\n")
+		b.WriteString(" && chown -R www-data:www-data storage bootstrap/cache\n")
+	}
+
+	// Nginx forwards PHP requests to the php-fpm process of the same container
+	// (the official image listens on 127.0.0.1:9000).
+	b.WriteString("RUN ")
+	b.WriteString(printfLine("/etc/nginx/conf.d/default.conf", []string{
+		"server {",
+		fmt.Sprintf("    listen %d;", port),
+		"    server_name _;",
+		"    root " + docRoot + ";",
+		"    index index.php index.html;",
+		"    location / {",
+		"        try_files $uri $uri/ /index.php?$query_string;",
+		"    }",
+		"    location ~ \\.php$ {",
+		"        include fastcgi_params;",
+		"        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;",
+		"        fastcgi_pass 127.0.0.1:9000;",
+		"    }",
+		"    location ~ /\\. {",
+		"        deny all;",
+		"    }",
+		"}",
+	}))
+	b.WriteString("\n")
+	b.WriteString("RUN ")
+	b.WriteString(printfLine("/etc/supervisor/conf.d/axiom.conf", supervisorConfig()))
+	b.WriteString("\n")
+	entry := []string{
+		"#!/bin/sh",
+		"set -eu",
+		"if [ -f /var/www/html/artisan ]; then",
+		"  php artisan config:cache",
+		"  php artisan migrate --force",
+		"fi",
+		"exec /usr/bin/supervisord -c /etc/supervisor/conf.d/axiom.conf",
+	}
+	b.WriteString("RUN ")
+	b.WriteString(printfLine("/usr/local/bin/axiom-start", entry))
+	b.WriteString(" && chmod +x /usr/local/bin/axiom-start\n")
+	fmt.Fprintf(&b, "EXPOSE %d\n", port)
+	fmt.Fprintf(&b, "CMD %s", cmd.String())
+	return b.String(), nil
+}
+
+func supervisorConfig() []string {
+	program := func(name, command string) []string {
+		return []string{
+			"[program:" + name + "]",
+			"command=" + command,
+			"autorestart=true",
+			"stdout_logfile=/dev/stdout",
+			"stdout_logfile_maxbytes=0",
+			"stderr_logfile=/dev/stderr",
+			"stderr_logfile_maxbytes=0",
+		}
+	}
+	lines := []string{
+		"[supervisord]",
+		"nodaemon=true",
+		"user=root",
+		"pidfile=/tmp/supervisord.pid",
+		"logfile=/dev/null",
+		"logfile_maxbytes=0",
+		"",
+	}
+	lines = append(lines, program("php-fpm", "/usr/local/sbin/php-fpm -F")...)
+	lines = append(lines, "")
+	lines = append(lines, program("nginx", "/usr/sbin/nginx -g 'daemon off;'")...)
+	return lines
+}
+
+// printfLine renders a portable `printf '%s\n' ... > <path>` command (dash
+// compatible, no heredoc, no shell interpolation of the content).
+func printfLine(path string, lines []string) string {
+	quoted := make([]string, len(lines))
+	for i, line := range lines {
+		quoted[i] = "'" + strings.ReplaceAll(line, "'", `'\''`) + "'"
+	}
+	return fmt.Sprintf("printf '%%s\\n' %s > %s", strings.Join(quoted, " "), path)
+}

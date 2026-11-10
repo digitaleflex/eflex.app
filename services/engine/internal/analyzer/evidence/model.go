@@ -6,7 +6,8 @@
 package evidence
 
 // Version identifies the analyzer rules; it changes when results may change.
-const Version = "evidence/1.0.0"
+// 1.1.0: Node adapters (Astro/SvelteKit rendering mode) and PHP facts.
+const Version = "evidence/1.1.0"
 
 // Finding states (schemas/artifact.schema.json RepositoryAnalysis).
 const (
@@ -34,6 +35,8 @@ const (
 	KindLanguage       = "language"
 	KindRuntimeVersion = "runtime_version"
 	KindFramework      = "framework"
+	KindAdapter        = "adapters"
+	KindPHP            = "php"
 	KindPackageManager = "package_manager"
 	KindContainer      = "container_strategy"
 	KindBuildScript    = "build_script"
@@ -48,7 +51,7 @@ const (
 )
 
 // KindOrder is the canonical, deterministic finding order.
-var KindOrder = []string{KindLanguage, KindRuntimeVersion, KindFramework, KindPackageManager, KindContainer,
+var KindOrder = []string{KindLanguage, KindRuntimeVersion, KindFramework, KindAdapter, KindPHP, KindPackageManager, KindContainer,
 	KindBuildScript, KindStartScript, KindEntrypoint, KindPort, KindServices, KindPublicService, KindConfiguration, KindWorkspace, KindManifest}
 
 // Evidence explains why a fact is believed.

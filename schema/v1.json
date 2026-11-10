@@ -48,6 +48,37 @@
       "type": "string",
       "pattern": "^(|\\.\\.(/\\.\\.)*)$"
     },
+    "workspace": {
+      "description": "Contexte de workspace JavaScript, présent uniquement quand `root` est une application d'un monorepo (marqueurs de workspace à la racine). Permet de construire depuis la racine du dépôt et de démarrer l'application depuis son dossier.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manager"
+      ],
+      "properties": {
+        "manager": {
+          "description": "Gestionnaire de paquets du workspace.",
+          "enum": [
+            "pnpm",
+            "yarn",
+            "npm",
+            "bun"
+          ]
+        },
+        "name": {
+          "description": "Nom du paquet applicatif (`package.json#name`) quand il est déclaré.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 214
+        },
+        "buildScript": {
+          "description": "Script de build du paquet, exécutable via le filtre du gestionnaire (généralement `build`).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      }
+    },
     "install": {
       "description": "Commande d'installation des dépendances.",
       "type": "string",

@@ -17,20 +17,36 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
   // Un simple membre peut consulter le projet, pas le reconfigurer.
   if (!canManageProjects(org.role)) redirect(`/dashboard/projects/${id}`)
 
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: {
-      id: true,
-      name: true,
-      branch: true,
-      slug: true,
-      domain: true,
-      coolifyAppId: true,
-      // Les valeurs ne quittent jamais le serveur : on n'envoie que les noms.
-      envVars: { select: { key: true, updatedAt: true }, orderBy: { key: 'asc' } },
-    },
-  })
+  const [project, transferMemberships] = await Promise.all([
+    prisma.project.findFirst({
+      where: { id, organizationId: org.organizationId },
+      select: {
+        id: true,
+        name: true,
+        branch: true,
+        slug: true,
+        domain: true,
+        coolifyAppId: true,
+        // Les valeurs ne quittent jamais le serveur : on n'envoie que les noms.
+        envVars: { select: { key: true, updatedAt: true }, orderBy: { key: 'asc' } },
+      },
+    }),
+    // Organisations de destination possibles : rôles autorisés uniquement, jamais les
+    // organisations où l'utilisateur n'est qu'un simple membre.
+    prisma.member.findMany({
+      where: {
+        userId: session.user.id,
+        role: { in: ['owner', 'admin'] },
+        organizationId: { not: org.organizationId },
+      },
+      select: { organization: { select: { id: true, name: true } } },
+    }),
+  ])
   if (!project) notFound()
+
+  const transferTargets = transferMemberships
+    .map((membership) => membership.organization)
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
 
   return (
     <div className="animate-fade-in">
@@ -43,6 +59,7 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
           domain: project.domain,
           coolifyAppId: project.coolifyAppId,
         }}
+        transferTargets={transferTargets}
         envVars={project.envVars.map((item) => ({
           key: item.key,
           updatedAt: item.updatedAt.toISOString(),

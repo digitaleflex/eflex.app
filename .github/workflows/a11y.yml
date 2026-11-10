@@ -1,0 +1,104 @@
+name: Accessibilité (axe + Playwright)
+
+# Issue #32 : zéro violation axe « serious » ou « critical » sur les pages publiques
+# et les parcours authentifiés, à 360 / 768 / 1280 px, en clair et en sombre.
+on:
+  pull_request:
+    paths:
+      - "portail/**"
+      - "packages/detector/**"
+      - ".github/workflows/a11y.yml"
+  push:
+    branches: [main]
+    paths:
+      - "portail/**"
+      - "packages/detector/**"
+      - ".github/workflows/a11y.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: a11y-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  a11y:
+    name: axe + Playwright (WCAG 2.1 AA)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql://eflex:eflex@localhost:5432/eflex?schema=public
+      BETTER_AUTH_SECRET: ci-a11y-secret-ci-a11y-secret-ci-a11y-0123
+      BETTER_AUTH_URL: http://localhost:3000
+      ENV_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      # Compte de test (voir portail/e2e/seed-auth.mjs) : il est administrateur pour
+      # couvrir aussi les pages /admin, et ses e-mails sortants sont désactivés
+      # (RESEND_API_KEY absent).
+      ADMIN_EMAILS: a11y-e2e@example.test
+      E2E_ADMIN: "1"
+      E2E_EMAIL: a11y-e2e@example.test
+      E2E_PASSWORD: E2e-Password-123!
+      PLAYWRIGHT_AUTH: "1"
+      PLAYWRIGHT_ADMIN: "1"
+      PLAYWRIGHT_BASE_URL: http://localhost:3000
+      PLAYWRIGHT_WEB_SERVER: npm run start -- --port 3000
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: eflex
+          POSTGRES_PASSWORD: eflex
+          POSTGRES_DB: eflex
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U eflex"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.0.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install (workspace pnpm)
+        run: pnpm install --frozen-lockfile
+      - name: Install (portail, npm)
+        working-directory: portail
+        run: npm ci
+      - name: Prisma — generate
+        working-directory: portail
+        run: npx prisma generate
+      - name: Prisma — migrate (base de test)
+        working-directory: portail
+        run: npx prisma migrate deploy
+      - name: Playwright — Chromium + dépendances système
+        working-directory: portail
+        run: npx playwright install --with-deps chromium
+      - name: Build (portail)
+        working-directory: portail
+        run: npm run build
+        env:
+          REDIS_URL: redis://localhost:6379
+      - name: Initialiser le compte et le projet de test
+        working-directory: portail
+        run: node e2e/seed-auth.mjs
+      - name: Tests d'accessibilité
+        working-directory: portail
+        run: npm run test:a11y
+
+      - name: Rapports (échec uniquement)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-a11y
+          path: |
+            portail/playwright-report
+            portail/test-results
+          retention-days: 7

@@ -3,6 +3,10 @@
 > **Référence rapide** : tous les outils modernes, validés, battle-tested, pour éviter de réinventer la roue.
 > 
 > **Date** : 2026-10-10 · **Version** : 1.0
+>
+> **Document historique.** La proposition de tableau de bord Axiom ci-dessous n'a jamais été
+> industrialisée : l'ébauche correspondante a été retirée du dépôt (#16). La console actuelle
+> est `portail/` (Next.js 15, App Router).
 
 ---
 
@@ -112,11 +116,11 @@ require (
 | **Package Manager** | **pnpm 9** | Fast, disk-efficient, strict |
 | **State (Server)** | **Server Actions** (React 19) | Zéro API route boilerplate |
 
-### 📦 **package.json Client Dashboard**
+### 📦 **package.json — proposition historique (non implémentée)**
 
 ```json
 {
-  "name": "@axiom/client-dashboard",
+  "name": "@eflex/portail",
   "version": "0.1.0",
   "private": true,
   "scripts": {

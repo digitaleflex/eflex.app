@@ -31,3 +31,11 @@ export async function resolveOrganization(session: SessionLike): Promise<{ organ
 
 /** Les rôles autorisés à créer, redéployer ou supprimer des projets. */
 export const canManageProjects = (role: string) => role === 'owner' || role === 'admin'
+
+/**
+ * Accès à la facturation : propriétaire, administrateur et rôle dédié
+ * `billing`. Un simple membre n'a jamais accès aux plans, factures, paiements,
+ * variables d'environnement ni journaux.
+ */
+export const canManageBilling = (role: string) =>
+  role === 'owner' || role === 'admin' || role === 'billing'

@@ -5,6 +5,21 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { FrameworkIcon } from '@/components/framework-icon'
 import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 
+const PACKAGE_MANAGER_LABELS: Record<string, string> = {
+  npm: 'npm',
+  pnpm: 'pnpm',
+  yarn: 'Yarn',
+  bun: 'Bun',
+}
+
+/** Déduit le gestionnaire de paquets de la commande d'installation, sans exposer Corepack. */
+function packageManagerLabel(install: string | undefined): string | null {
+  if (!install) return null
+  const command = install.replace(/^corepack enable && /, '')
+  const name = command.split(/\s+/)[0]
+  return name ? PACKAGE_MANAGER_LABELS[name] ?? null : null
+}
+
 function Command({ label, value, fallback }: { label: string; value?: string; fallback?: string }) {
   return (
     <div className="grid gap-1 sm:grid-cols-[8rem_1fr] sm:gap-4">
@@ -34,6 +49,7 @@ export function DetectionCard({
   const isPrimary = plan.framework === detection.plan?.framework
   const services = Object.entries(plan.services ?? {})
   const questions = detection.questions.filter((q) => q.id !== 'app')
+  const packageManager = packageManagerLabel(plan.install)
 
   return (
     <Card>
@@ -64,15 +80,28 @@ export function DetectionCard({
       </CardHeader>
 
       <CardContent className="space-y-6">
-        <dl className="space-y-3">
-          <Command label="Installation" value={plan.install} />
-          <Command label="Build" value={plan.build} />
-          <Command label="Démarrage" value={plan.start} fallback={services.length > 0 ? 'Assuré par les services ci-dessous' : undefined} />
-          <div className="grid gap-1 sm:grid-cols-[8rem_1fr] sm:gap-4">
-            <dt className="text-sm text-muted-foreground">Port</dt>
-            <dd className="text-sm font-mono">{plan.port}</dd>
-          </div>
-        </dl>
+        <p className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span>
+            Installation, build et démarrage sont configurés automatiquement
+            {packageManager ? ` avec ${packageManager}` : ''}. Aucun choix technique n’est nécessaire.
+          </span>
+        </p>
+
+        <details className="group rounded-lg border border-border px-3 py-2">
+          <summary className="cursor-pointer text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
+            Voir les commandes techniques
+          </summary>
+          <dl className="mt-3 space-y-3">
+            <Command label="Installation" value={plan.install} />
+            <Command label="Build" value={plan.build} />
+            <Command label="Démarrage" value={plan.start} fallback={services.length > 0 ? 'Assuré par les services ci-dessous' : undefined} />
+            <div className="grid gap-1 sm:grid-cols-[8rem_1fr] sm:gap-4">
+              <dt className="text-sm text-muted-foreground">Port</dt>
+              <dd className="text-sm font-mono">{plan.port}</dd>
+            </div>
+          </dl>
+        </details>
 
         {services.length > 0 && (
           <div className="space-y-2">

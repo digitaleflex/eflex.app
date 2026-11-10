@@ -78,7 +78,7 @@ export function CommandPalette() {
       <button
         type="button"
         onClick={show}
-        className="flex h-9 items-center gap-2 rounded-lg border border-input bg-background px-3 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-56 [@media(pointer:coarse)]:h-11"
+        className="flex h-11 items-center gap-2 rounded-lg border border-input bg-background px-3 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-56"
       >
         <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span className="hidden sm:inline">Rechercher…</span>
@@ -110,7 +110,7 @@ export function CommandPalette() {
               if (e.key === 'Enter') { e.preventDefault(); go(results[active]) }
             }}
             placeholder="Rechercher un projet ou une action…"
-            className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           />
         </div>
         <ul id={listId} role="listbox" aria-label="Résultats" className="max-h-80 overflow-auto p-2">

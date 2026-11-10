@@ -2,15 +2,20 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Activity, ArrowLeft, LayoutDashboard, ScrollText, Users } from 'lucide-react'
+import { ArrowLeft, Building2, CreditCard, FolderGit2, LayoutDashboard, Radio, Rocket, ScrollText, Server, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ConnectionBadge } from '@/components/connection-badge'
 
 const NAV = [
   { label: "Vue d'ensemble", href: '/admin', icon: LayoutDashboard, exact: true },
+  { label: 'Activité en direct', href: '/admin/live', icon: Radio },
+  { label: 'Projets', href: '/admin/projects', icon: FolderGit2 },
+  { label: 'Déploiements', href: '/admin/deployments', icon: Rocket },
   { label: 'Utilisateurs', href: '/admin/users', icon: Users },
+  { label: 'Organisations', href: '/admin/organizations', icon: Building2 },
+  { label: 'Paiements', href: '/admin/payments', icon: CreditCard },
+  { label: 'Infrastructure', href: '/admin/infrastructure', icon: Server },
   { label: 'Journal d’audit', href: '/admin/audit', icon: ScrollText },
-  { label: 'Infrastructure', href: '/admin/infra', icon: Activity, soon: true },
 ] as const
 
 export function AdminShell({ children, email }: { children: React.ReactNode; email: string }) {

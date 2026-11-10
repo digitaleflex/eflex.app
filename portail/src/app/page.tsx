@@ -55,7 +55,7 @@ const steps = [
 const faqs = [
   {
     q: 'Quelles technologies sont prises en charge ?',
-    a: 'Next.js, Nuxt, Astro, Vite, SvelteKit, Remix, SolidStart, RedwoodJS, Node.js (Express, Fastify, NestJS…), Laravel, PHP, Python (Django, FastAPI, Flask) et les sites HTML statiques. Pour tout le reste, un Dockerfile suffit.',
+    a: "Next.js, Nuxt, Astro, Vite, SvelteKit, Remix, SolidStart, RedwoodJS, Node.js (Express, Fastify, NestJS…), PHP, Python (Django, FastAPI, Flask) et les sites HTML statiques. Laravel est détecté, mais son plan multi-services (PHP-FPM + Nginx, files d'attente, planificateur) n'est pas encore déployé. Pour tout le reste, un Dockerfile suffit.",
   },
   {
     q: 'Dois-je écrire un Dockerfile ?',
@@ -63,19 +63,23 @@ const faqs = [
   },
   {
     q: "Que se passe-t-il si Eflex se trompe de stack ?",
-    a: "Vous pouvez forcer le framework à la création du projet, ou ajouter un fichier eflex.json à la racine du dépôt. Ce fichier a toujours priorité sur la détection automatique.",
+    a: "Vous pouvez choisir une autre stack parmi celles qu'Eflex a détectées à la création du projet, ou ajouter un fichier eflex.json à la racine du dépôt. Ce fichier a toujours priorité sur la détection automatique.",
   },
   {
     q: "Où sont stockées mes variables d'environnement ?",
-    a: "Dans Eflex, jamais dans votre dépôt. Elles sont transmises à l'application au moment du déploiement et ne s'affichent plus une fois enregistrées.",
+    a: "Dans Eflex, jamais dans votre dépôt. Elles sont chiffrées en base (AES-256-GCM), transmises à l'application au démarrage et ne s'affichent plus une fois enregistrées.",
   },
   {
     q: 'Mes dépôts privés sont-ils compatibles ?',
-    a: 'Pas encore. Pour le moment, Eflex déploie les dépôts GitHub publics. La connexion à votre compte GitHub pour les dépôts privés est en préparation.',
+    a: "Oui. Connectez la GitHub App (recommandée) ou ajoutez un jeton personnel dans Paramètres → Connexion GitHub. Eflex lit le dépôt avec un accès à durée limitée et crée une deploy key en lecture seule pour le déploiement.",
   },
   {
     q: 'Mon dépôt contient plusieurs applications. Ça marche ?',
-    a: "Oui. Eflex reconnaît les monorepos (pnpm, Turborepo, Nx, Lerna…). S'il trouve plusieurs applications, il vous demande laquelle publier.",
+    a: "Oui, pour en publier une. Eflex reconnaît les monorepos (pnpm, Turborepo, Nx, Lerna…) et vous demande laquelle déployer. Aujourd'hui, un seul service est publié par projet : les dépendances de workspace partagées et les applications annexes ne sont pas déployées automatiquement.",
+  },
+  {
+    q: "Qu'est-ce qui n'est pas encore pris en charge ?",
+    a: "Le déploiement multi-services (files d'attente et planificateur Laravel, plusieurs applications d'un même monorepo déployées ensemble) et les métriques CPU/RAM. Un projet ne publie qu'un service : les plans qui en nécessitent plusieurs sont refusés avec un message explicite.",
   },
 ]
 
@@ -93,7 +97,7 @@ export default function HomePage() {
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
 
-      <main id="contenu" className="flex-1">
+      <main id="contenu" tabIndex={-1} className="flex-1">
         {/* ─── Hero ─── */}
         <section className="relative overflow-hidden">
           <div
@@ -130,7 +134,7 @@ export default function HomePage() {
               </div>
 
               <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-                {['HTTPS automatique', 'Dockerfile facultatif', 'Secrets hors de votre dépôt'].map((item) => (
+                {['HTTPS automatique', 'Dockerfile facultatif', 'Dépôts privés pris en charge', 'Secrets chiffrés hors de votre dépôt'].map((item) => (
                   <li key={item} className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" aria-hidden="true" />
                     {item}
@@ -165,6 +169,10 @@ export default function HomePage() {
                 </li>
               ))}
             </ul>
+            <p className="mx-auto mt-6 max-w-2xl text-center text-xs text-muted-foreground text-pretty">
+              Laravel est reconnu, mais son plan multi-services (PHP-FPM + Nginx, files d&apos;attente, planificateur)
+              n&apos;est pas encore déployé. Aujourd&apos;hui, chaque projet publie un seul service.
+            </p>
           </div>
         </section>
 
@@ -198,7 +206,7 @@ export default function HomePage() {
           <div className="container py-20 md:py-28 space-y-12">
             <SectionHeading
               title="Pensé pour les vrais projets, pas seulement pour les démos"
-              lead="Files d'attente, tâches planifiées, migrations, monorepos : Eflex gère ce que les autres plateformes vous laissent configurer."
+              lead="Détection expliquée, dépôts privés, HTTPS automatique, variables chiffrées : Eflex s'occupe de la mise en ligne pendant que vous gardez la main sur le code."
             />
 
             <div className="grid gap-6 lg:grid-cols-3">
@@ -244,9 +252,11 @@ export default function HomePage() {
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Layers className="h-5 w-5" aria-hidden="true" />
                 </span>
-                <h3 className="mt-5 text-lg font-semibold">Laravel, au complet</h3>
+                <h3 className="mt-5 text-lg font-semibold">Laravel détecté, PHP déployé</h3>
                 <p className="mt-2 text-muted-foreground">
-                  PHP-FPM et Nginx, files d&apos;attente, planificateur, migrations et mise en cache à chaque déploiement.
+                  Laravel est reconnu (PHP-FPM, Nginx, files d&apos;attente, planificateur), mais le portail ne publie
+                  encore qu&apos;un service par projet. Les applications PHP sans Laravel passent en ligne dès
+                  aujourd&apos;hui ; le déploiement Laravel complet arrive bientôt.
                 </p>
               </article>
 
@@ -256,7 +266,8 @@ export default function HomePage() {
                 </span>
                 <h3 className="mt-5 text-lg font-semibold">HTTPS sans y penser</h3>
                 <p className="mt-2 text-muted-foreground">
-                  Certificats Let&apos;s Encrypt émis et renouvelés automatiquement, sur votre domaine.
+                  Certificats Let&apos;s Encrypt émis automatiquement et vérifiés après chaque déploiement, sur
+                  l&apos;adresse fournie par Eflex comme sur votre domaine après vérification DNS.
                 </p>
               </article>
 
@@ -266,7 +277,8 @@ export default function HomePage() {
                 </span>
                 <h3 className="mt-5 text-lg font-semibold">Vos secrets restent hors de Git</h3>
                 <p className="mt-2 text-muted-foreground">
-                  Déclarez vos variables d&apos;environnement dans Eflex : elles sont injectées au démarrage, jamais écrites dans le dépôt.
+                  Déclarez vos variables d&apos;environnement dans Eflex : elles sont chiffrées (AES-256-GCM) et injectées
+                  au démarrage, jamais écrites dans le dépôt.
                 </p>
               </article>
 
@@ -274,9 +286,11 @@ export default function HomePage() {
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Boxes className="h-5 w-5" aria-hidden="true" />
                 </span>
-                <h3 className="mt-5 text-lg font-semibold">Monorepos compris</h3>
+                <h3 className="mt-5 text-lg font-semibold">Monorepos : une application à la fois</h3>
                 <p className="mt-2 text-muted-foreground">
-                  pnpm, Turborepo, Nx, Lerna : Eflex repère vos applications et vous demande laquelle publier.
+                  pnpm, Turborepo, Nx, Lerna : Eflex repère vos applications et vous demande laquelle publier. Seule
+                  celle-ci est déployée : les dépendances de workspace partagées et les services annexes ne sont pas
+                  encore publiés.
                 </p>
               </article>
 
@@ -331,7 +345,8 @@ export default function HomePage() {
                 Votre prochain projet mérite mieux qu&apos;un serveur à configurer.
               </h2>
               <p className="text-lg text-white/75">
-                Créez un compte, collez l&apos;URL de votre dépôt : Eflex s&apos;occupe du reste.
+                Créez un compte, collez l&apos;URL de votre dépôt : Eflex analyse la stack et vous montre le plan avant
+                de publier.
               </p>
               <Link
                 href="/register"

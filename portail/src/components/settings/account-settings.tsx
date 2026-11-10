@@ -3,10 +3,11 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { KeyRound, Mail, ShieldCheck, TriangleAlert, User } from 'lucide-react'
+import { KeyRound, Mail, Palette, ShieldCheck, TriangleAlert, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { ThemeSwitcher } from '@/components/theme-switcher'
 import { authClient, authErrorMessage } from '@/lib/auth-client'
 
 const NETWORK_ERROR = 'Impossible de contacter le serveur. Vérifiez votre connexion et réessayez.'
@@ -23,17 +24,17 @@ interface AccountSettingsProps {
 
 type Feedback = { tone: 'success' | 'error'; message: string } | null
 
-function FeedbackMessage({ feedback }: { feedback: Feedback }) {
+function FeedbackMessage({ feedback, id }: { feedback: Feedback; id: string }) {
   if (!feedback) return null
   if (feedback.tone === 'success') {
     return (
-      <p role="status" className="rounded-lg bg-success/10 border border-success/20 p-3 text-sm text-foreground">
+      <p id={id} role="status" className="rounded-lg bg-success/10 border border-success/20 p-3 text-sm text-foreground">
         {feedback.message}
       </p>
     )
   }
   return (
-    <p role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+    <p id={id} role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
       {feedback.message}
     </p>
   )
@@ -205,7 +206,7 @@ export function AccountSettings({
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <FeedbackMessage feedback={nameFeedback} />
+          <FeedbackMessage feedback={nameFeedback} id="account-name-feedback" />
           <form onSubmit={saveName} className="space-y-4">
             <Input
               id="account-name"
@@ -214,6 +215,8 @@ export function AccountSettings({
               onChange={(e) => setName(e.target.value)}
               maxLength={80}
               autoComplete="name"
+              aria-invalid={nameFeedback?.tone === 'error' ? true : undefined}
+              aria-describedby={nameFeedback?.tone === 'error' ? 'account-name-feedback' : undefined}
               required
             />
             <div className="flex justify-end">
@@ -222,6 +225,21 @@ export function AccountSettings({
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <h2 className="font-semibold flex items-center gap-2">
+            <Palette className="w-4 h-4" aria-hidden="true" />
+            Apparence
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Choisissez le thème de l’interface. « Système » suit le réglage de votre appareil.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ThemeSwitcher />
         </CardContent>
       </Card>
 
@@ -240,7 +258,7 @@ export function AccountSettings({
         <CardContent>
           {hasPassword ? (
             <form onSubmit={savePassword} className="space-y-4">
-              <FeedbackMessage feedback={passwordFeedback} />
+              <FeedbackMessage feedback={passwordFeedback} id="account-password-feedback" />
               <Input
                 id="current-password"
                 label="Mot de passe actuel"
@@ -248,6 +266,8 @@ export function AccountSettings({
                 autoComplete="current-password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
+                aria-invalid={passwordFeedback?.tone === 'error' ? true : undefined}
+                aria-describedby={passwordFeedback?.tone === 'error' ? 'account-password-feedback' : undefined}
                 required
               />
               <div className="grid gap-4 sm:grid-cols-2">
@@ -259,6 +279,8 @@ export function AccountSettings({
                   hint="8 caractères minimum."
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
+                  aria-invalid={passwordFeedback?.tone === 'error' ? true : undefined}
+                  aria-describedby={passwordFeedback?.tone === 'error' ? 'account-password-feedback' : undefined}
                   required
                 />
                 <Input
@@ -268,6 +290,8 @@ export function AccountSettings({
                   autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
+                  aria-invalid={passwordFeedback?.tone === 'error' ? true : undefined}
+                  aria-describedby={passwordFeedback?.tone === 'error' ? 'account-password-feedback' : undefined}
                   required
                 />
               </div>
@@ -298,7 +322,7 @@ export function AccountSettings({
         <CardContent className="space-y-4">
           {emailEnabled ? (
             <>
-              <FeedbackMessage feedback={emailFeedback} />
+              <FeedbackMessage feedback={emailFeedback} id="account-email-feedback" />
               <form onSubmit={saveEmail} className="space-y-4">
                 <Input
                   id="new-email"
@@ -308,6 +332,8 @@ export function AccountSettings({
                   placeholder="vous@exemple.com"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
+                  aria-invalid={emailFeedback?.tone === 'error' ? true : undefined}
+                  aria-describedby={emailFeedback?.tone === 'error' ? 'account-email-feedback' : undefined}
                   required
                 />
                 <div className="flex justify-end">
@@ -338,7 +364,7 @@ export function AccountSettings({
         </CardHeader>
         <CardContent className="space-y-4">
           {deleteBlocked ? (
-            <div className="rounded-lg bg-amber-500/10 border border-amber-500/25 p-3 text-sm text-foreground space-y-2">
+            <div className="rounded-lg bg-warning/10 border border-warning/25 p-3 text-sm text-foreground space-y-2">
               <p className="flex items-center gap-2 font-medium">
                 <ShieldCheck className="w-4 h-4" aria-hidden="true" />
                 Suppression impossible pour le moment
@@ -355,7 +381,7 @@ export function AccountSettings({
           ) : (
             <form onSubmit={deleteAccount} className="space-y-4">
               {deleteError && (
-                <p role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+                <p id="account-delete-feedback" role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
                   {deleteError}
                 </p>
               )}
@@ -365,6 +391,8 @@ export function AccountSettings({
                 value={confirmText}
                 onChange={(e) => setConfirmText(e.target.value)}
                 autoComplete="off"
+                aria-invalid={deleteError ? true : undefined}
+                aria-describedby={deleteError ? 'account-delete-feedback' : undefined}
                 required
               />
               {hasPassword && (
@@ -375,6 +403,8 @@ export function AccountSettings({
                   autoComplete="current-password"
                   value={deletePassword}
                   onChange={(e) => setDeletePassword(e.target.value)}
+                  aria-invalid={deleteError ? true : undefined}
+                  aria-describedby={deleteError ? 'account-delete-feedback' : undefined}
                   required
                 />
               )}

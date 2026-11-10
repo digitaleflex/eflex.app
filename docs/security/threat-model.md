@@ -428,9 +428,9 @@ policy exists.
 
 **Controls.** None. The CI (`.github/workflows/go.yml:33-49`) runs `gofmt`,
 `go vet`, `go test -race` and an end-to-end job; there is no `govulncheck`, no
-`npm audit`, no OSV or Trivy step, and no image scan. `apps/cloud` has a
-lockfile (`apps/cloud/package-lock.json`) but no audit gate, and the
-`@axiom/cloud` build is not part of any workflow.
+`npm audit`, no OSV or Trivy step, and no image scan. The portal has a
+lockfile (`portail/package-lock.json`) and is built by `ts.yml`, but there is
+no dependency audit gate.
 
 **State: ABSENT.**
 

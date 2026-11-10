@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "version": 0,
+  "analyzerVersion": "evidence/1.1.0",
+  "source": {
+    "repositoryId": "repo_1",
+    "ref": "main",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "root": ""
+  },
+  "status": "ready",
+  "preset": "redwoodjs",
+  "summary": "Axiom will build this RedwoodJS app with npm and run it as a container on port 8910.",
+  "blocking": [],
+  "language": {
+    "value": "JavaScript",
+    "provenance": "detected",
+    "confidence": 0.8
+  },
+  "runtimeVersion": {
+    "value": ""
+  },
+  "framework": {
+    "value": "RedwoodJS",
+    "provenance": "detected",
+    "confidence": 0.98
+  },
+  "packageManager": {
+    "value": "npm",
+    "provenance": "detected",
+    "confidence": 0.9
+  },
+  "buildCommand": {
+    "value": "npm run build",
+    "provenance": "detected",
+    "confidence": 0.95
+  },
+  "startCommand": {
+    "value": "npm start",
+    "provenance": "detected",
+    "confidence": 0.95
+  },
+  "port": {
+    "value": 8910,
+    "provenance": "default"
+  },
+  "containerStrategy": {
+    "value": "source",
+    "provenance": "default"
+  },
+  "healthCheck": {
+    "value": {
+      "type": "http",
+      "path": "/"
+    },
+    "provenance": "default"
+  },
+  "services": [],
+  "configuration": [],
+  "confidence": 0.8
+}

@@ -234,7 +234,7 @@ func (e *Engine) resolveDockerfile(dir string, plan planner.Plan) (string, bool,
 		}
 		return "", false, &Error{Code: CodeNoDockerfile, Message: "strategy is dockerfile but no Dockerfile was found in the repository"}
 	}
-	content, err := dockerfileForPreset(plan.Strategy, plan.Build.Command, plan.Runtime.StartCommand, plan.Runtime.Port, plan.Build.OutputDir)
+	content, err := dockerfileForPreset(plan.Strategy, plan.Build.Command, plan.Runtime.StartCommand, plan.Runtime.Port, plan.Build.OutputDir, dir)
 	if err != nil {
 		return "", false, &Error{Code: CodeInvalidInput, Message: err.Error()}
 	}

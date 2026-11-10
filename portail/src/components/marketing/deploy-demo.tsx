@@ -1,20 +1,20 @@
 import { Check } from 'lucide-react'
 
 // Démonstration statique d'un déploiement. Les messages de détection reprennent
-// ceux que produit réellement le détecteur Eflex (packages/detector).
+// ceux que produit réellement le détecteur Eflex (packages/detector) ; l'exemple
+// reste volontairement mono-service, seule configuration que le portail déploie.
 const steps = [
   { label: 'Dépôt récupéré', detail: 'github.com/agence/mon-app · main' },
-  { label: 'Stack Laravel identifiée.', detail: 'PHP 8.3 · Composer · npm' },
-  { label: 'Planificateur Laravel détecté.', detail: 'service scheduler ajouté' },
-  { label: 'Script `build` présent : les assets front sont compilés.', detail: 'npm ci && npm run build' },
-  { label: 'Image construite', detail: 'php-fpm + nginx' },
-  { label: 'Certificat HTTPS émis', detail: "Let's Encrypt" },
+  { label: 'Stack Next.js identifiée.', detail: 'node@22 · pnpm' },
+  { label: 'Script `build` trouvé : l\'application est compilée.', detail: 'pnpm install && pnpm run build' },
+  { label: 'Image construite', detail: 'next start · port 3000' },
+  { label: 'Certificat HTTPS vérifié', detail: "Let's Encrypt" },
 ]
 
 export function DeployDemo() {
   return (
     <figure
-      aria-label="Exemple de déploiement d'une application Laravel avec Eflex"
+      aria-label="Exemple de déploiement d'une application Next.js avec Eflex"
       className="relative rounded-2xl bg-eflexnavy text-white shadow-2xl shadow-eflexnavy/30 ring-1 ring-white/10 overflow-hidden"
     >
       <div className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-3">
@@ -23,7 +23,7 @@ export function DeployDemo() {
           <span className="h-3 w-3 rounded-full bg-white/20" />
           <span className="h-3 w-3 rounded-full bg-white/20" />
         </div>
-        <span className="font-mono text-xs text-white/60 truncate">mon-app · déploiement</span>
+        <span className="font-mono text-xs text-white/75 truncate">mon-app · déploiement</span>
         <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/70">Exemple</span>
       </div>
 
@@ -35,7 +35,7 @@ export function DeployDemo() {
             </span>
             <span className="min-w-0">
               <span className="block text-white/90">{step.label}</span>
-              <span className="block text-white/50">{step.detail}</span>
+              <span className="block text-white/70">{step.detail}</span>
             </span>
           </li>
         ))}
@@ -52,7 +52,7 @@ export function DeployDemo() {
           </span>
           En ligne
         </span>
-        <span className="font-mono text-sm text-eflexsky truncate">https://mon-app.fr</span>
+        <span className="font-mono text-sm text-eflexsky truncate">https://mon-app.eflex.app</span>
       </div>
     </figure>
   )

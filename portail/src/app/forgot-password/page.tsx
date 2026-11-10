@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { ThemeToggle } from '@/components/theme-switcher'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { CAPTCHA_ENABLED, Turnstile, captchaHeaders } from '@/components/auth/turnstile'
 import { authClient, authErrorMessage } from '@/lib/auth-client'
 
 export default function ForgotPasswordPage() {
@@ -14,6 +16,8 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
   const [emailEnabled, setEmailEnabled] = useState(true)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const errorId = 'forgot-password-error'
 
   useEffect(() => {
     fetch('/api/auth/config', { cache: 'no-store' })
@@ -27,10 +31,17 @@ export default function ForgotPasswordPage() {
     setLoading(true)
     setError('')
     try {
-      const { error: authError } = await authClient.requestPasswordReset({
-        email: email.trim(),
-        redirectTo: '/reset-password',
-      })
+      if (CAPTCHA_ENABLED && !captchaToken) {
+        setError('Complétez la vérification anti-robot avant de continuer.')
+        return
+      }
+      const { error: authError } = await authClient.requestPasswordReset(
+        {
+          email: email.trim(),
+          redirectTo: '/reset-password',
+        },
+        captchaHeaders(captchaToken),
+      )
       if (authError) {
         setError(authErrorMessage(authError, "Impossible d'envoyer le lien. Réessayez dans un instant."))
       } else {
@@ -47,14 +58,15 @@ export default function ForgotPasswordPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="sticky top-0 z-50 glass">
-        <nav className="container flex h-16 items-center">
+        <nav className="container flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center">
             <Image src="/logo-horizontal.webp" alt="Eflex — accueil" width={1200} height={312} className="h-8 w-auto" priority />
           </Link>
+          <ThemeToggle />
         </nav>
       </header>
 
-      <main id="contenu" className="flex-1 flex items-center justify-center p-4">
+      <main id="contenu" tabIndex={-1} className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-6">
           <div className="space-y-2 text-center">
             <h1 className="text-display-sm font-bold">Mot de passe oublié</h1>
@@ -76,7 +88,7 @@ export default function ForgotPasswordPage() {
               </div>
             ) : (
               <>
-                {error && <p role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">{error}</p>}
+                {error && <p id={errorId} role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">{error}</p>}
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <Input
                     id="forgot-email"
@@ -86,8 +98,11 @@ export default function ForgotPasswordPage() {
                     placeholder="vous@exemple.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={error ? errorId : undefined}
                     required
                   />
+                  {CAPTCHA_ENABLED && <Turnstile onToken={setCaptchaToken} />}
                   <Button type="submit" size="lg" className="w-full" loading={loading}>
                     Envoyer le lien
                   </Button>

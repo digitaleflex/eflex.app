@@ -21,6 +21,9 @@ model User {
   banned                  Boolean                  @default(false)
   banReason               String?
   banExpires              DateTime?
+  twoFactorEnabled        Boolean                  @default(false)
+  twoFactor               TwoFactor[]
+  passkeys                Passkey[]
   sessions                Session[]
   accounts                Account[]
   projects                Project[]
@@ -28,8 +31,9 @@ model User {
   invitations             Invitation[]             @relation("InvitationInviter")
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
-  subscription            Subscription?
   gitInstallations        GitInstallation[]
+  gitPat                  GitPat?
+  payments                Payment[]
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
 }
@@ -81,37 +85,135 @@ model Verification {
   @@index([identifier])
 }
 
+/**
+ * Secrets TOTP et codes de secours (plugin Better Auth two-factor).
+ */
+model TwoFactor {
+  id                      String    @id @default(cuid())
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secret                  String
+  backupCodes             String
+  verified                Boolean   @default(true)
+  failedVerificationCount Int       @default(0)
+  lockedUntil             DateTime?
+
+  @@index([userId])
+}
+
+/**
+ * Clés WebAuthn (plugin Better Auth passkey).
+ */
+model Passkey {
+  id           String   @id @default(cuid())
+  name         String?
+  publicKey    String
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialID String
+  counter      Int
+  deviceType   String
+  backedUp     Boolean
+  transports   String?
+  createdAt    DateTime @default(now())
+  aaguid       String?
+
+  @@index([userId])
+  @@index([credentialID])
+}
+
+/**
+ * Compteurs du limiteur Better Auth en base (partagés entre instances).
+ */
+model RateLimit {
+  id          String @id
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+}
+
 model Project {
-  id               String       @id @default(cuid())
-  organizationId   String
-  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  userId           String // créateur du projet
-  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name             String
-  slug             String       @unique // ex: "mon-projet-42"
-  repoUrl          String
-  branch           String       @default("main")
+  id                    String            @id @default(cuid())
+  organizationId        String
+  organization          Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId                String // créateur du projet
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                  String
+  slug                  String            @unique // ex: "mon-projet-42"
+  repoUrl               String
+  branch                String            @default("main")
   /**
    * Dépôt au format « proprietaire/nom » et installation GitHub App liée (issue 07).
    */
-  repoFullName     String?
-  installationId   String?
-  productionBranch String?
-  framework        String // laravel, nextjs, node, python, static
-  runtime          String? // node@22, php@8.3, etc.
-  domain           String? // domaine client, sans protocole
-  coolifyAppId     String? // ID côté Coolify (null jusqu'au premier déploiement)
-  plan             Json? // BuildPlan retenu à la création (voir packages/detector)
-  detection        Json? // résultat de l'analyse : confiance, raisons, avertissements, commit
-  port             Int          @default(80)
-  envVars          EnvVar[]
-  deployments      Deployment[]
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  repoFullName          String?
+  installationId        String?
+  productionBranch      String?
+  repoPrivate           Boolean           @default(false)
+  // Dépôt privé : deploy key créée dans le dépôt GitHub et clé privée correspondante dans Coolify.
+  githubDeployKeyId     Int?
+  coolifyPrivateKeyUuid String?
+  // Dernier contrôle TLS effectué après un déploiement (lib/tls.ts).
+  tlsValid              Boolean?
+  tlsExpiresAt          DateTime?
+  tlsCheckedAt          DateTime?
+  framework             String // laravel, nextjs, node, python, static
+  runtime               String? // node@22, php@8.3, etc.
+  domain                String? // domaine client, sans protocole
+  coolifyAppId          String? // ID côté Coolify (null jusqu'au premier déploiement)
+  plan                  Json? // BuildPlan retenu à la création (voir packages/detector)
+  detection             Json? // résultat de l'analyse : confiance, raisons, avertissements, commit
+  port                  Int               @default(80)
+  envVars               EnvVar[]
+  deployments           Deployment[]
+  domains               ProjectDomain[]
+  databases             ProjectDatabase[]
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
 
   @@index([userId])
   @@index([organizationId])
   @@index([slug])
+}
+
+/**
+ * Domaine personnalisé rattaché à un projet. Le domaine auto-généré reste
+ * `Project.domain` ; ces entrées sont des alias (client, www…).
+ */
+model ProjectDomain {
+  id           String    @id @default(cuid())
+  projectId    String
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  hostname     String    @unique
+  verifiedAt   DateTime?
+  tlsValid     Boolean?
+  tlsExpiresAt DateTime?
+  tlsCheckedAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([projectId])
+}
+
+/**
+ * Base de données managée par Eflex (PostgreSQL ou Redis), hébergée par
+ * l'infrastructure et accessible uniquement depuis le réseau Docker.
+ * L'URL interne contient le mot de passe : elle est chiffrée au repos et
+ * n'est jamais renvoyée à l'interface.
+ */
+model ProjectDatabase {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind        String // postgresql | redis
+  coolifyId   String   @unique
+  name        String
+  status      String?
+  internalUrl String   @db.Text // AES-256-GCM, AAD project-db:<projectId>:<kind>
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([projectId, kind])
+  @@index([projectId])
 }
 
 model EnvVar {
@@ -141,18 +243,87 @@ model Deployment {
 }
 
 model Subscription {
-  id               String   @id @default(cuid())
-  userId           String   @unique
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status           String // active, cancelled, past_due, trialing
-  plan             String // starter, pro, agency
-  priceCents       Int      @default(0)
-  providerRef      String?
-  currentPeriodEnd DateTime
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                   String       @id @default(cuid())
+  organizationId       String       @unique
+  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  status               String       @default("active") // active, trialing, pending, past_due, cancelled
+  plan                 String       @default("free")
+  /**
+   * Plan demandé, conservé jusqu'à l'activation par un administrateur.
+   */
+  pendingPlan          String?
+  priceFcfa            Int          @default(0)
+  providerRef          String? // identifiant Stripe/Paddle/facture externe
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean      @default(false)
+  /**
+   * Fin de la période de grâce après un impayé (`past_due`). Pendant la grâce,
+   * les limites du plan payant restent actives ; après, les nouveaux
+   * déploiements sont bloqués mais les applications en ligne restent intactes.
+   */
+  graceUntil           DateTime?
+  /**
+   * Changement manuel effectué par un administrateur (geste commercial).
+   * Un webhook de paiement ne doit jamais l'écraser silencieusement : il
+   * enregistre alors le plan demandé dans `pendingPlan`.
+   */
+  manualOverride       Boolean      @default(false)
+  manualOverrideAt     DateTime?
+  manualOverrideBy     String?
+  manualOverrideReason String?
+  /**
+   * Crédit interne (prorata) en FCFA, déduit du prochain paiement.
+   */
+  creditFcfa           Int          @default(0)
+  /**
+   * Dérive temporaire des quotas accordée par un administrateur.
+   */
+  projectLimitOverride Int?
+  memberLimitOverride  Int?
+  quotaOverrideUntil   DateTime?
+  /**
+   * Note interne visible des administrateurs (motif du dernier geste).
+   */
+  note                 String?      @db.Text
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
 
-  @@index([userId])
+  @@index([organizationId])
+  @@index([graceUntil])
+}
+
+/**
+ * Paiement en ligne (Kkiapay ou FedaPay). `reference` est notre identifiant
+ * interne, transmis au prestataire pour corréler le webhook sans faire
+ * confiance aux données du client.
+ */
+model Payment {
+  id             String       @id @default(cuid())
+  reference      String       @unique
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan           String
+  provider       String // kkiapay | fedapay
+  providerRef    String? // identifiant de transaction chez le prestataire
+  amountFcfa     Int
+  /**
+   * Part du prix couverte par un crédit interne (prorata) au moment du paiement.
+   */
+  creditFcfa     Int          @default(0)
+  status         String       @default("pending") // pending, approved, declined, canceled, expired
+  invoiceNumber  String?      @unique
+  invoicedAt     DateTime?
+  refundedAt     DateTime?
+  refundRef      String?
+  refundStatus   String? // requested, refunded, failed
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([provider, providerRef])
+  @@index([organizationId])
+  @@index([status])
 }
 
 // ─── GitHub App (issue 07) ──────────────────────────────────────────────────
@@ -166,6 +337,32 @@ model GitInstallation {
   updatedAt      DateTime @updatedAt
 
   @@index([userId])
+}
+
+/**
+ * Jeton personnel GitHub (PAT) : solution de repli quand la GitHub App n'est pas
+ * installée sur le compte ou l'organisation du dépôt. Le jeton est chiffré au repos
+ * (AAD `github-pat:<userId>`) et n'est jamais renvoyé au client.
+ */
+model GitPat {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  login     String
+  token     String   @db.Text
+  scopes    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/**
+ * Configuration de la plateforme modifiable depuis l'admin (GitHub App créée via
+ * le flux manifest). Les valeurs sensibles sont chiffrées avec `lib/crypto.ts`.
+ */
+model PlatformSetting {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
 }
 
 /**
@@ -207,15 +404,25 @@ model StatusIncident {
 // Tout projet appartient à une organisation. Chaque utilisateur a une organisation
 // personnelle créée à l'inscription. Rôles : owner, admin, member.
 model Organization {
-  id          String       @id @default(cuid())
-  name        String
-  slug        String       @unique
-  logo        String?
-  metadata    String?      @db.Text
-  createdAt   DateTime     @default(now())
-  members     Member[]
-  invitations Invitation[]
-  projects    Project[]
+  id               String        @id @default(cuid())
+  name             String
+  slug             String        @unique
+  logo             String?
+  metadata         String?       @db.Text
+  /**
+   * Suspension administrative : gèle la création de projets et les nouveaux
+   * déploiements. Aucune donnée ni application en ligne n'est supprimée.
+   */
+  suspendedAt      DateTime?
+  suspensionReason String?       @db.Text
+  createdAt        DateTime      @default(now())
+  members          Member[]
+  invitations      Invitation[]
+  projects         Project[]
+  subscription     Subscription?
+  payments         Payment[]
+
+  @@index([suspendedAt])
 }
 
 model Member {

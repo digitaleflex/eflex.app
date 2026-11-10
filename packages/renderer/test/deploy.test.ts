@@ -4,6 +4,7 @@ import { detect } from '@eflex/detector';
 import {
   allFixtures,
   dockerfile,
+  dockerfileVolume,
   fastapi,
   laravelFull,
   nextjsWithPnpm,
@@ -55,7 +56,7 @@ describe('generateDockerfile — toutes les fixtures', () => {
   it('génère un build multi-étapes pour un site statique avec build', () => {
     const out = generateDockerfile(planOf(vite)!)!;
     expect(out).toContain('FROM node:22-alpine AS assets');
-    expect(out).toContain('RUN npm ci');
+    expect(out).toContain('RUN npm install');
     expect(out).toContain('RUN npm run build');
     expect(out).toContain('FROM nginx:1.27-alpine');
     expect(out).toContain('COPY --from=assets /app/dist /usr/share/nginx/html');
@@ -118,6 +119,39 @@ describe('buildDeploymentArtifacts', () => {
     expect(artifacts.dockerfile).toBeNull();
     expect(artifacts.compose).toBe('');
     expect(artifacts.portsExposes).toBe(3000);
+  });
+
+  it('propage un VOLUME du Dockerfile vers les stockages persistants', () => {
+    const artifacts = buildDeploymentArtifacts(planOf(dockerfileVolume)!, {
+      projectId: 'dock-proj',
+    });
+    expect(artifacts.persistentVolumes).toEqual([
+      { name: 'eflex-app-data', mountPath: '/app/data' },
+    ]);
+  });
+
+  it('monte les volumes relatifs sous /app et déduplique les chemins', () => {
+    const plan: BuildPlan = {
+      version: 1,
+      framework: 'node',
+      runtime: 'node@22',
+      root: '',
+      port: 3000,
+      volumes: ['storage', '/app/storage', '/app/data'],
+    };
+    const artifacts = buildDeploymentArtifacts(plan, { projectId: 'vol-proj' });
+    expect(artifacts.persistentVolumes).toEqual([
+      { name: 'eflex-storage', mountPath: '/app/storage' },
+      { name: 'eflex-app-data', mountPath: '/app/data' },
+    ]);
+  });
+
+  it('Laravel déclare le stockage `storage` comme volume persistant', () => {
+    const artifacts = buildDeploymentArtifacts(planOf(laravelFull)!, { projectId: 'test-proj' });
+    expect(artifacts.persistentVolumes).toContainEqual({
+      name: 'eflex-storage',
+      mountPath: '/app/storage',
+    });
   });
 
   it('aucun artefact ne contient nixpacks', () => {
