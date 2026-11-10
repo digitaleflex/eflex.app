@@ -13,5 +13,7 @@ export default defineConfig({
   },
   test: {
     include: ['packages/**/test/**/*.test.ts', 'portail/src/**/*.test.ts'],
+    // Refuse une base de production quand EFLEX_TEST_DB=1 (voir le module).
+    setupFiles: ['portail/src/lib/test-support/require-test-db.ts'],
   },
 });

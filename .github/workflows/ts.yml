@@ -37,7 +37,7 @@ jobs:
     name: Tests, schémas et typecheck
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: postgresql://eflex:eflex@localhost:5432/eflex?schema=public
+      DATABASE_URL: postgresql://eflex:eflex@localhost:5432/eflex_test?schema=public
     # PostgreSQL pour les tests d'intégration du portail (organisations, temps réel, notifications,
     # administration, journaux). Sans EFLEX_TEST_DB=1 ces tests sont ignorés.
     services:
@@ -46,7 +46,7 @@ jobs:
         env:
           POSTGRES_USER: eflex
           POSTGRES_PASSWORD: eflex
-          POSTGRES_DB: eflex
+          POSTGRES_DB: eflex_test
         ports:
           - 5432:5432
         options: >-
