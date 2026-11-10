@@ -64,6 +64,7 @@ describe('description en français', () => {
 
   it('traduit les actions d’audit et les inscriptions', () => {
     expect(auditActionLabel('user.ban')).toBe('Compte suspendu')
+    expect(auditActionLabel('deployment.rollback')).toBe('Retour à une version précédente')
     expect(auditActionLabel('une.action.inconnue')).toBe('Action d’administration (une.action.inconnue)')
     expect(describeEvent(event({ type: 'audit.entry', payload: { action: 'payment.refund', targetType: 'payment' } }))).toEqual({
       title: 'Paiement remboursé',

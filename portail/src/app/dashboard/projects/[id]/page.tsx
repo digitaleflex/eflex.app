@@ -13,7 +13,9 @@ import { StatusPill } from '@/components/dashboard/status-pill'
 import { GithubMark } from '@/components/icons/github-mark'
 import { RedeployButton } from '@/components/redeploy-button'
 import { CancelDeploymentButton } from '@/components/cancel-deployment-button'
+import { RollbackDeploymentButton } from '@/components/rollback-deployment-button'
 import { canManageProjects } from '@/lib/organizations'
+import { isCommitSha } from '@/lib/deployment-rollback'
 import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 import { statusInfo } from '@/lib/project-status'
 import { applicationHealth, tlsHealth } from '@/lib/project-health'
@@ -362,29 +364,45 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           {deployments.length === 0 ? (
             <p className="px-5 py-10 text-center text-sm text-muted-foreground">Aucun déploiement pour ce projet.</p>
           ) : (
-            <ul className="divide-y divide-border">
-              {deployments.map((d, i) => (
-                <li key={d.id} className="px-5 py-4">
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <StatusPill status={d.status} />
-                    <div className="min-w-0 flex-1">
-                      <p className="flex flex-wrap items-center gap-x-2 text-sm font-medium">
-                        <span className="font-mono">{d.commitSha === 'pending' ? 'commit en attente' : d.commitSha.slice(0, 7)}</span>
-                        <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground"><GitBranch className="h-3.5 w-3.5" aria-hidden="true" />{project.branch}</span>
-                        {i === 0 && <span className="rounded-full border border-border px-1.5 text-[11px] font-medium text-muted-foreground">Dernier</span>}
-                        {production?.id === d.id && <span className="rounded-full bg-primary/10 px-1.5 text-[11px] font-semibold text-primary">Production</span>}
-                      </p>
-                      {d.status === 'failed' && d.logsSummary && <p className="mt-1 line-clamp-2 break-words text-xs text-destructive">{d.logsSummary}</p>}
+            <>
+              {canManageProjects(org.role) && (
+                <p className="border-b border-border px-5 py-3 text-xs text-muted-foreground">
+                  « Redéployer cette version » reconstruit un déploiement réussi avec les variables
+                  d’environnement actuelles. Les migrations de base de données ne sont pas annulées.
+                </p>
+              )}
+              <ul className="divide-y divide-border">
+                {deployments.map((d, i) => (
+                  <li key={d.id} className="px-5 py-4">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                      <StatusPill status={d.status} />
+                      <div className="min-w-0 flex-1">
+                        <p className="flex flex-wrap items-center gap-x-2 text-sm font-medium">
+                          <span className="font-mono">{d.commitSha === 'pending' ? 'commit en attente' : d.commitSha.slice(0, 7)}</span>
+                          <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground"><GitBranch className="h-3.5 w-3.5" aria-hidden="true" />{project.branch}</span>
+                          {i === 0 && <span className="rounded-full border border-border px-1.5 text-[11px] font-medium text-muted-foreground">Dernier</span>}
+                          {production?.id === d.id && <span className="rounded-full bg-primary/10 px-1.5 text-[11px] font-semibold text-primary">Production</span>}
+                        </p>
+                        {d.status === 'failed' && d.logsSummary && <p className="mt-1 line-clamp-2 break-words text-xs text-destructive">{d.logsSummary}</p>}
+                      </div>
+                      <time dateTime={d.createdAt.toISOString()} className="text-xs text-muted-foreground">{dateFormat.format(d.createdAt)}</time>
+                      {canManageProjects(org.role) && !inProgress && d.status === 'live' && isCommitSha(d.commitSha) && (
+                        <RollbackDeploymentButton
+                          projectId={project.id}
+                          deploymentId={d.id}
+                          commitSha={d.commitSha}
+                          createdAtLabel={dateFormat.format(d.createdAt)}
+                        />
+                      )}
+                      {canManageProjects(org.role) && statusInfo(d.status).inProgress && (
+                        <CancelDeploymentButton projectId={project.id} deploymentId={d.id} />
+                      )}
                     </div>
-                    <time dateTime={d.createdAt.toISOString()} className="text-xs text-muted-foreground">{dateFormat.format(d.createdAt)}</time>
-                    {canManageProjects(org.role) && statusInfo(d.status).inProgress && (
-                      <CancelDeploymentButton projectId={project.id} deploymentId={d.id} />
-                    )}
-                  </div>
-                  <DeploymentLogs projectId={project.id} deploymentId={d.id} defaultOpen={d.id === last?.id && inProgress} />
-                </li>
-              ))}
-            </ul>
+                    <DeploymentLogs projectId={project.id} deploymentId={d.id} defaultOpen={d.id === last?.id && inProgress} />
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </section>
       )}

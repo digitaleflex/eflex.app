@@ -253,6 +253,67 @@ describe('deployApplication', () => {
   })
 })
 
+describe('deployApplicationCommit', () => {
+  const sha = 'b'.repeat(40)
+
+  it('poste le commit sur /applications/{uuid}/rollback et lit deployment_uuid', async () => {
+    const calls = mockFetch((url) => {
+      if (url.endsWith('/applications/app/rollback')) {
+        return json({ message: 'Rollback deployment queued.', deployment_uuid: 'dep-rb' })
+      }
+      throw new Error(url)
+    })
+    const { deployApplicationCommit } = await loadModule()
+
+    await expect(deployApplicationCommit('app', sha)).resolves.toEqual({ deploymentId: 'dep-rb' })
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.url).toBe('https://coolify.test/api/v1/applications/app/rollback')
+    expect(calls[0]?.init?.method).toBe('POST')
+    // Seul `commit` est accepté : aucun changement de branche n'est envoyé.
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({ commit: sha })
+  })
+
+  it('refuse un identifiant incomplet sans appeler l’API', async () => {
+    const calls = mockFetch(() => json({}))
+    const { deployApplicationCommit } = await loadModule()
+
+    await expect(deployApplicationCommit('app', 'pending')).resolves.toEqual({
+      error:
+        'Commit de retour invalide : un identifiant complet de 40 caractères hexadécimaux est requis.',
+    })
+    expect(calls).toHaveLength(0)
+  })
+
+  it('traduit un refus 422 en message explicite (commit jamais livré)', async () => {
+    mockFetch(() =>
+      json(
+        {
+          message: 'Validation failed.',
+          errors: {
+            commit: ['The commit is not a rollback image or a successful deployment of this application.'],
+          },
+        },
+        422,
+      ),
+    )
+    const { deployApplicationCommit } = await loadModule()
+
+    await expect(deployApplicationCommit('app', sha)).resolves.toEqual({
+      error:
+        'L’hébergement refuse ce retour arrière : ce commit n’a pas été déployé avec succès pour cette application, ou son image n’est plus disponible.',
+    })
+  })
+
+  it('remonte le message quand aucun déploiement n’est renvoyé', async () => {
+    mockFetch(() => json({ message: 'Deployment queue full.' }))
+    const { deployApplicationCommit } = await loadModule()
+
+    await expect(deployApplicationCommit('app', sha)).resolves.toEqual({
+      error: 'Deployment queue full.',
+    })
+  })
+})
+
 describe('getDeploymentStatus / getDeploymentLogs', () => {
   it('lit le statut et décode les logs JSON de Coolify', async () => {
     mockFetch((url) => {

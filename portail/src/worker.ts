@@ -29,11 +29,13 @@ import { createDeployKey, deleteDeployKey } from '@/lib/github-app'
 import { parseGitHubUrl } from '@/lib/github-url'
 import { generateDeployKeyPair } from '@/lib/ssh-key'
 import { waitForTls } from '@/lib/tls'
+import { isCommitSha } from '@/lib/deployment-rollback'
 import {
   cancelDeployment as cancelCoolifyDeployment,
   createApplication,
   createPrivateKey,
   deployApplication,
+  deployApplicationCommit,
   ensureApplicationStorages,
   getDeploymentLogs,
   getDeploymentStatus,
@@ -144,7 +146,10 @@ function isBuildPlan(value: unknown): value is BuildPlan {
   return typeof value === 'object' && value !== null && 'framework' in value && 'port' in value
 }
 
-export async function processDeployment(deploymentId: string): Promise<void> {
+export async function processDeployment(
+  deploymentId: string,
+  options: { rollback?: boolean } = {},
+): Promise<void> {
   const deployment = await prisma.deployment.findUnique({
     where: { id: deploymentId },
     include: { project: { include: { domains: true } } },
@@ -153,6 +158,19 @@ export async function processDeployment(deploymentId: string): Promise<void> {
   if (isTerminal(deployment.status)) return // idempotence
 
   const project = deployment.project
+
+  // Retour arrière : la cible est le commit enregistré sur le déploiement. On
+  // valide avant toute transition pour ne pas laisser un déploiement bloqué en
+  // « analyse » si le SHA est inexploitable.
+  const rollbackCommit = options.rollback ? deployment.commitSha : null
+  if (options.rollback && !isCommitSha(rollbackCommit)) {
+    await fail(
+      deploymentId,
+      'Retour arrière impossible : le commit cible est invalide (identifiant de 40 caractères hexadécimaux attendu).',
+    )
+    return
+  }
+
   // Annulé avant même le démarrage (job encore en file) : rien à faire.
   if (!(await setStatus(deploymentId, 'analyzing'))) return
 
@@ -356,9 +374,20 @@ export async function processDeployment(deploymentId: string): Promise<void> {
   }
 
   if (!(await setStatus(deploymentId, 'building'))) return
-  const started = await deployApplication(appId)
+  // Retour arrière : Coolify reconstruit exactement le commit cible via
+  // `POST /applications/{uuid}/rollback` (endpoint non destructif : la branche
+  // suivie n'est pas modifiée). Les déploiements normaux (webhook,
+  // redéploiement) gardent `POST /deploy`, c'est-à-dire la tête de branche.
+  const started = rollbackCommit
+    ? await deployApplicationCommit(appId, rollbackCommit)
+    : await deployApplication(appId)
   if ('error' in started) {
-    await fail(deploymentId, `Déclenchement du déploiement impossible : ${started.error}`)
+    await fail(
+      deploymentId,
+      rollbackCommit
+        ? `Retour arrière impossible : ${started.error}`
+        : `Déclenchement du déploiement impossible : ${started.error}`,
+    )
     return
   }
   await prisma.deployment.update({
@@ -503,7 +532,9 @@ export function startDeploymentWorker(): Worker {
       // Un redémarrage peut avoir laissé des déploiements bloqués : on les
       // expire avant de traiter le job courant.
       await runDeploymentWatchdog()
-      await processDeployment(String(job.data.deploymentId))
+      await processDeployment(String(job.data.deploymentId), {
+        rollback: job.data.rollback === true,
+      })
     },
     { connection: redisConnection(), concurrency: 2 },
   )

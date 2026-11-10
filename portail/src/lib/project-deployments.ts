@@ -35,10 +35,14 @@ export function activeDeploymentMessage(status: string): string {
  * critère « impossible de lancer un second déploiement tant qu'un est en
  * cours »). La vérification est refaite après création pour couvrir une course
  * entre deux requêtes : le perdant est annulé et son job retiré.
+ *
+ * `rollback` marque un retour arrière : la cible est `commitSha` (obligatoire)
+ * et le worker déploiera exactement ce commit au lieu du dernier commit de la
+ * branche. Voir `lib/deployment-rollback.ts` et `deployApplicationCommit`.
  */
 export async function enqueueProjectDeployment(
   project: { id: string; name: string; organizationId: string },
-  options: { exclusive?: boolean; commitSha?: string } = {},
+  options: { exclusive?: boolean; commitSha?: string; rollback?: boolean } = {},
 ): Promise<
   | { deploymentId: string }
   | {
@@ -48,6 +52,10 @@ export async function enqueueProjectDeployment(
       activeDeploymentId?: string
     }
 > {
+  if (options.rollback && !options.commitSha) {
+    return { error: 'Retour arrière impossible : aucun commit cible n’a été fourni.' }
+  }
+
   // Mode maintenance (issue 31) : aucun nouveau déploiement, message explicite.
   if (await isMaintenanceActive()) {
     return { error: MAINTENANCE_DEPLOYMENT_MESSAGE, code: MAINTENANCE_DEPLOYMENT_CODE }
@@ -115,7 +123,7 @@ export async function enqueueProjectDeployment(
   }
 
   try {
-    await enqueueDeployment(deployment.id)
+    await enqueueDeployment(deployment.id, { rollback: options.rollback })
   } catch {
     await prisma.deployment.update({
       where: { id: deployment.id },

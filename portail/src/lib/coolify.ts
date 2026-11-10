@@ -13,6 +13,7 @@
  * « production »), `COOLIFY_PROJECT_UUID` et `COOLIFY_SERVER_UUID` permettent
  * de forcer la cible sans découverte.
  */
+import { isCommitSha } from '@/lib/deployment-rollback'
 
 const COOLIFY_URL = process.env.COOLIFY_API_URL || ''
 const COOLIFY_TOKEN = process.env.COOLIFY_API_TOKEN || ''
@@ -344,6 +345,58 @@ export async function updateApplication(
     }
   }
   return { deploymentId: deployment.deployment_uuid }
+}
+
+/**
+ * Déploie un commit précis : retour arrière vers une version déjà livrée.
+ *
+ * Endpoint retenu (Coolify 4.7.3, `routes/api.php`) :
+ *   `POST /applications/{uuid}/rollback` avec `{ commit: "<sha40>" }`
+ * → `{ deployment_uuid }`. Coolify refuse (422) un commit qui n'est ni une
+ * image de retour de l'application ni le commit d'un déploiement **réussi**
+ * de cette application (`GetRollbackImages::allows`). C'est la garantie qu'on
+ * ne « déploie » pas un commit jamais construit.
+ *
+ * Cet appel ne touche ni `git_branch` ni `git_commit_sha` de l'application :
+ * l'épinglage ne dure que le temps du déploiement. L'alternative — PATCH de
+ * `git_commit_sha` puis `/deploy` puis restauration — laisserait l'application
+ * épinglée sur l'ancien commit entre les deux appels (et si le processus meurt,
+ * définitivement). C'est pour cela qu'elle n'est pas utilisée.
+ */
+export async function deployApplicationCommit(
+  appId: string,
+  commitSha: string,
+): Promise<{ deploymentId: string } | { error: string }> {
+  if (!isCommitSha(commitSha)) {
+    return {
+      error:
+        'Commit de retour invalide : un identifiant complet de 40 caractères hexadécimaux est requis.',
+    }
+  }
+
+  const res = await coolifyFetch<{ deployment_uuid?: string; message?: string }>(
+    `/applications/${encodeURIComponent(appId)}/rollback`,
+    { method: 'POST', body: JSON.stringify({ commit: commitSha }) },
+  )
+  if (res.error) {
+    if (res.error.includes('Hébergement API 422')) {
+      return {
+        error:
+          'L’hébergement refuse ce retour arrière : ce commit n’a pas été déployé avec succès pour cette application, ou son image n’est plus disponible.',
+      }
+    }
+    return { error: res.error }
+  }
+
+  const deploymentId = res.data?.deployment_uuid
+  if (!deploymentId) {
+    return {
+      error:
+        res.data?.message ||
+        'L’hébergement n’a pas renvoyé d’identifiant de déploiement pour ce retour arrière.',
+    }
+  }
+  return { deploymentId }
 }
 
 /** Statut d'un déploiement (`queued`, `in_progress`, `finished`, `failed`…). */
