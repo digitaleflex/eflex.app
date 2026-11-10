@@ -25,6 +25,9 @@ export default function LoginPage() {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [passkeyLoading, setPasskeyLoading] = useState(false)
   const [passkeySupported, setPasskeySupported] = useState(false)
+  // Masqué par défaut : le bouton Google n'apparaît que si l'instance a des
+  // identifiants OAuth, sinon Better Auth renvoie PROVIDER_NOT_FOUND.
+  const [googleEnabled, setGoogleEnabled] = useState(false)
   const errorId = 'login-error'
 
   useEffect(() => {
@@ -32,6 +35,21 @@ export default function LoginPage() {
       setTwoFactor(true)
     }
     setPasskeySupported(typeof window !== 'undefined' && 'PublicKeyCredential' in window)
+
+    let active = true
+    fetch('/api/auth/config', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((config: { googleEnabled?: boolean }) => {
+        if (active) setGoogleEnabled(config.googleEnabled === true)
+      })
+      .catch(() => {
+        // Endpoint indisponible : on garde le bouton plutôt que de retirer
+        // silencieusement une méthode de connexion qui pourrait fonctionner.
+        if (active) setGoogleEnabled(true)
+      })
+    return () => {
+      active = false
+    }
   }, [])
 
   const finish = () => {
@@ -180,6 +198,8 @@ export default function LoginPage() {
               </form>
             ) : (
               <>
+            {googleEnabled && (
+              <>
             <Button
               variant="outline"
               size="lg"
@@ -202,6 +222,8 @@ export default function LoginPage() {
                 <span className="bg-card px-2 text-muted-foreground">ou</span>
               </div>
             </div>
+              </>
+            )}
 
             {error && (
               <div id={errorId} role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">

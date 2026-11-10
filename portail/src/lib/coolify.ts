@@ -282,7 +282,10 @@ export async function createApplication(
       // Coolify ne doit ni régénérer les labels Traefik (il ne connaît pas nos
       // entrypoints `websecure` / résolveur `letsencrypt`) ni déclencher de
       // déploiement concurrent : c'est le webhook Eflex qui décide.
-      is_container_label_readonly_enabled: false,
+      // Coolify 4.7.3 plante (`Undefined variable $labels`) quand ce drapeau
+      // vaut `false` sans `custom_labels`. On ne le désactive donc que si des
+      // labels sont réellement fournis (domaines) ; sinon Coolify garde la main.
+      is_container_label_readonly_enabled: (params.customLabels?.length ?? 0) === 0,
       is_auto_deploy_enabled: false,
     }
 
@@ -581,8 +584,14 @@ export async function setApplicationLabels(
  */
 export async function deleteApplication(
   appId: string,
+  options: { deleteVolumes?: boolean } = {},
 ): Promise<{ ok: true } | { error: string }> {
-  const res = await coolifyFetch(`/applications/${encodeURIComponent(appId)}`, {
+  // Coolify supprime les volumes par défaut (`delete_volumes=true`). On les
+  // conserve sauf demande explicite : une suppression de projet ne doit pas
+  // effacer silencieusement des données persistantes.
+  const deleteVolumes = options.deleteVolumes === true
+  const query = deleteVolumes ? '?delete_volumes=true' : '?delete_volumes=false'
+  const res = await coolifyFetch(`/applications/${encodeURIComponent(appId)}${query}`, {
     method: 'DELETE',
   })
   if (res.error) {

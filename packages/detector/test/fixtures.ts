@@ -428,6 +428,89 @@ export const monorepoWorkspace = makeSnapshot({
   'packages/ui/src/index.ts': 'export const Button = (): string => "ok";\n',
 });
 
+/** Monorepo Nx : trois applications réellement déployables (Next.js, Express, Vite). */
+export const monorepoNx = makeSnapshot({
+  'nx.json': json({ affected: { defaultBase: 'main' } }),
+  'package.json': json({ name: 'acme-nx', private: true }),
+  'apps/web/package.json': json({
+    name: '@acme/web',
+    scripts: { build: 'next build', start: 'next start' },
+    dependencies: { next: '14.2.0' },
+  }),
+  'apps/web/next.config.js': 'module.exports = {};\n',
+  'apps/api/package.json': json({
+    name: '@acme/api',
+    scripts: { start: 'node server.js' },
+    dependencies: { express: '^4.19.0' },
+  }),
+  'apps/api/server.js': 'console.log("api");\n',
+  'apps/admin/package.json': json({
+    name: '@acme/admin',
+    scripts: { build: 'vite build' },
+    devDependencies: { vite: '^5.0.0' },
+  }),
+  'apps/admin/index.html': '<div id="root"></div>\n',
+  'apps/admin/vite.config.ts': 'export default {};\n',
+});
+
+/** Deux paquets imbriqués à profondeur 4 : hors de la limite par défaut (3). */
+export const monorepoDeepApp = makeSnapshot({
+  'pnpm-workspace.yaml': 'packages:\n  - "apps/**"\n',
+  'apps/ok/package.json': json({
+    name: 'ok',
+    scripts: { build: 'next build', start: 'next start' },
+    dependencies: { next: '14.2.0' },
+  }),
+  'apps/ok/next.config.js': 'module.exports = {};\n',
+  'apps/one/two/three/package.json': json({
+    name: 'trop-profond',
+    scripts: { build: 'next build', start: 'next start' },
+    dependencies: { next: '14.2.0' },
+  }),
+  'apps/one/two/three/next.config.js': 'module.exports = {};\n',
+});
+
+/** Noms dupliqués et nom npm avec scope : web, web-2, web-admin. */
+export const monorepoDuplicateNames = makeSnapshot({
+  'pnpm-workspace.yaml': 'packages:\n  - "apps/*"\n',
+  'apps/alpha/package.json': json({
+    name: '@acme/web',
+    scripts: { build: 'next build', start: 'next start' },
+    dependencies: { next: '14.2.0' },
+  }),
+  'apps/alpha/next.config.js': 'module.exports = {};\n',
+  'apps/beta/package.json': json({
+    name: 'web',
+    scripts: { build: 'next build', start: 'next start' },
+    dependencies: { next: '14.2.0' },
+  }),
+  'apps/beta/next.config.js': 'module.exports = {};\n',
+  'apps/gamma/package.json': json({
+    name: 'Web Admin',
+    scripts: { build: 'vite build' },
+    devDependencies: { vite: '^5.0.0' },
+  }),
+  'apps/gamma/index.html': '<div id="root"></div>\n',
+  'apps/gamma/vite.config.ts': 'export default {};\n',
+});
+
+/** Bruit de dépendances installées : jamais une application. */
+export const monorepoNodeModulesNoise = makeSnapshot({
+  'pnpm-workspace.yaml': 'packages:\n  - "apps/*"\n',
+  'node_modules/left-pad/package.json': json({
+    name: 'left-pad',
+    scripts: { start: 'node index.js' },
+  }),
+  '.next/server/package.json': json({ name: 'compiled', scripts: { start: 'node index.js' } }),
+  'dist/legacy/package.json': json({ name: 'legacy', scripts: { start: 'node index.js' } }),
+  'apps/real/package.json': json({
+    name: 'real',
+    scripts: { build: 'next build', start: 'next start' },
+    dependencies: { next: '14.2.0' },
+  }),
+  'apps/real/next.config.js': 'module.exports = {};\n',
+});
+
 export const dockerfileArgRequired = makeSnapshot({
   'Dockerfile': 'FROM node:22-alpine\nWORKDIR /app\nARG NEXT_PUBLIC_URL\nEXPOSE 3000\nCOPY . .\n',
 });
@@ -506,6 +589,10 @@ export function allFixtures(): Fixture[] {
     { name: 'monorepo-multiple', snapshot: monorepoMultiple },
     { name: 'monorepo-single', snapshot: monorepoSingle },
     { name: 'monorepo-workspace', snapshot: monorepoWorkspace },
+    { name: 'monorepo-nx', snapshot: monorepoNx },
+    { name: 'monorepo-deep-app', snapshot: monorepoDeepApp },
+    { name: 'monorepo-duplicate-names', snapshot: monorepoDuplicateNames },
+    { name: 'monorepo-node-modules-noise', snapshot: monorepoNodeModulesNoise },
     { name: 'unknown', snapshot: unknownRepo },
   ];
 }

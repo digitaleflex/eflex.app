@@ -1,7 +1,7 @@
 'use client'
 
 import { nextFromLocation, withNext } from '@/lib/safe-next'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ThemeToggle } from '@/components/theme-switcher'
@@ -20,7 +20,27 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  // Masqué par défaut : le bouton Google n'apparaît que si l'instance a des
+  // identifiants OAuth, sinon Better Auth renvoie PROVIDER_NOT_FOUND.
+  const [googleEnabled, setGoogleEnabled] = useState(false)
   const errorId = 'register-error'
+
+  useEffect(() => {
+    let active = true
+    fetch('/api/auth/config', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((config: { googleEnabled?: boolean }) => {
+        if (active) setGoogleEnabled(config.googleEnabled === true)
+      })
+      .catch(() => {
+        // Endpoint indisponible : on garde le bouton plutôt que de retirer
+        // silencieusement une méthode de connexion qui pourrait fonctionner.
+        if (active) setGoogleEnabled(true)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -80,6 +100,8 @@ export default function RegisterPage() {
           </div>
 
           <Card className="p-6 space-y-6">
+            {googleEnabled && (
+              <>
             <Button
               variant="outline"
               size="lg"
@@ -106,6 +128,8 @@ export default function RegisterPage() {
                 <span className="bg-card px-2 text-muted-foreground">ou</span>
               </div>
             </div>
+              </>
+            )}
 
             {error && (
               <div id={errorId} role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
