@@ -91,7 +91,7 @@ export default async function StatusPage() {
     <div className="min-h-screen flex flex-col">
       <SiteHeader />
 
-      <main id="contenu" className="container flex-1 py-10 sm:py-14 space-y-10">
+      <main id="contenu" tabIndex={-1} className="container flex-1 py-10 sm:py-14 space-y-10">
         <header className="space-y-3">
           <h1 className="text-display-sm font-bold">Statut des services</h1>
           <p className="text-muted-foreground">

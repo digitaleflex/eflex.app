@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  darkMode: 'media',
+  darkMode: 'class',
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -53,6 +53,14 @@ module.exports = {
           DEFAULT: 'hsl(var(--success))',
           foreground: 'hsl(var(--success-foreground))',
         },
+        info: {
+          DEFAULT: 'hsl(var(--info))',
+          foreground: 'hsl(var(--info-foreground))',
+        },
+        'surface-raised': {
+          DEFAULT: 'hsl(var(--surface-raised))',
+          foreground: 'hsl(var(--surface-raised-foreground))',
+        },
         eflexnavy: 'hsl(var(--eflex-navy))',
         eflexroyalblue: 'hsl(var(--eflex-royalblue))',
         eflexblue: 'hsl(var(--eflex-blue))',
@@ -62,6 +70,13 @@ module.exports = {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        control: 'var(--radius-control)',
+        pill: 'var(--radius-pill)',
+      },
+      spacing: {
+        gutter: 'var(--space-gutter)',
+        stack: 'var(--space-stack)',
+        section: 'var(--space-section)',
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],

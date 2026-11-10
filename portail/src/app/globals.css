@@ -18,7 +18,7 @@
     --foreground: 215 45% 11%;
     --card: 0 0% 100%;
     --card-foreground: 215 45% 11%;
-    --primary: 221 83% 53%;
+    --primary: 221 83% 51%;
     --primary-foreground: 0 0% 100%;
     --secondary: 220 16% 95%;
     --secondary-foreground: 215 40% 16%;
@@ -32,11 +32,24 @@
     --success-foreground: 0 0% 100%;
     --warning: 32 95% 30%;
     --warning-foreground: 0 0% 100%;
-    --border: 220 14% 89%;
-    --input: 220 14% 86%;
-    --ring: 221 83% 53%;
+    /* Information : bleu-cyan distinct du bleu royal d'action. */
+    --info: 199 89% 32%;
+    --info-foreground: 0 0% 100%;
+    --border: 220 14% 89%; /* séparateurs décoratifs (pas un contour de contrôle) */
+    --input: 220 14% 55%; /* contour de champ ≥ 3:1 sur --card et --background */
+    --ring: 221 83% 51%;
+    /* Surface surélevée (dialogue, panneau, infobulle) au-dessus de --card. */
+    --surface-raised: 0 0% 100%;
+    --surface-raised-foreground: 215 45% 11%;
 
     --radius: 0.875rem; /* 14px — cartes 12–16px */
+    --radius-control: 0.625rem; /* 10px — boutons, champs, onglets */
+    --radius-pill: 999px;
+
+    /* Échelle d'espacement documentée (Tailwind : gap-gutter, p-stack…). */
+    --space-gutter: 1rem;
+    --space-stack: 1.5rem;
+    --space-section: 2rem;
 
     /* Élévation : décalage + flou doux, jamais de halo à décalage nul. */
     --shadow-color: 215 45% 18%;
@@ -49,10 +62,10 @@
     scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
   }
 
-  /* Thème sombre automatique : aucun JS, donc aucun conflit avec l'hydratation React. */
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --background: 215 40% 7%;
+  /* Thème sombre piloté par la classe `dark` posée sur <html> (cookie ou système).
+     Le thème clair reste donc toujours accessible, quel que soit le réglage de l'OS. */
+  :root.dark {
+    --background: 215 40% 7%;
     --foreground: 210 20% 96%;
     --card: 215 35% 10%;
     --card-foreground: 210 20% 96%;
@@ -71,26 +84,29 @@
     --success-foreground: 215 69% 12%;
     --warning: 38 92% 58%;
     --warning-foreground: 215 69% 12%;
+    --info: 199 89% 66%;
+    --info-foreground: 215 69% 12%;
     --border: 215 22% 20%;
-    --input: 215 22% 26%;
+    --input: 215 22% 45%; /* contour de champ ≥ 3:1 sur --card et --background */
     --ring: 217 91% 65%;
+    --surface-raised: 215 32% 13%;
+    --surface-raised-foreground: 210 20% 96%;
 
     --shadow-color: 0 0% 0%;
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.25);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 10px 24px -6px rgb(0 0 0 / 0.45);
     --shadow-lg: 0 12px 24px -8px rgb(0 0 0 / 0.55), 0 24px 48px -12px rgb(0 0 0 / 0.5);
 
-      color-scheme: dark;
-      scrollbar-color: hsl(var(--muted-foreground) / 0.45) transparent;
-    }
+    color-scheme: dark;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.45) transparent;
+  }
 
-    /* L'asset original (marine + dégradé bleu) reste INTACT : on lui offre
-       simplement une plaque claire au lieu de le rendre monochrome. */
-    img[alt^='Eflex'] {
-      background-color: #ffffff;
-      border-radius: 0.5rem;
-      padding: 0.3rem 0.45rem;
-    }
+  /* L'asset original (marine + dégradé bleu) reste INTACT : on lui offre
+     simplement une plaque claire au lieu de le rendre monochrome. */
+  :root.dark img[alt^='Eflex'] {
+    background-color: #ffffff;
+    border-radius: 0.5rem;
+    padding: 0.3rem 0.45rem;
   }
 }
 
@@ -195,11 +211,9 @@
     border-radius: 0.5rem;
   }
 
-  @media (prefers-color-scheme: dark) {
-    .framework-icon {
-      background-color: rgb(255 255 255 / 0.92);
-      background-color: color-mix(in srgb, rgb(var(--brand-rgb, 100 116 139)) 16%, white);
-    }
+  :root.dark .framework-icon {
+    background-color: rgb(255 255 255 / 0.92);
+    background-color: color-mix(in srgb, rgb(var(--brand-rgb, 100 116 139)) 16%, white);
   }
 
   .framework-icon {

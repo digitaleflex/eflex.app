@@ -126,7 +126,7 @@ export function ProjectsExplorer({ projects }: { projects: DashboardProject[] })
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-card px-6 py-14 text-center">
           <p className="font-display text-lg font-semibold">Mettez votre premier projet en ligne</p>
           <p className="max-w-md text-sm text-muted-foreground">Indiquez un dépôt GitHub : Eflex reconnaît la stack, construit l&apos;application et la publie avec son adresse.</p>
-          <Link href="/dashboard/new" className="mt-2 inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+          <Link href="/dashboard/new" className="mt-2 inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
             <Plus className="h-4 w-4" aria-hidden="true" />
             Importer un dépôt
           </Link>

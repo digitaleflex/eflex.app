@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { OrgSwitcher } from '@/components/org-switcher'
 import { NotificationBell } from '@/components/notification-bell'
 import { CommandPalette } from '@/components/command-palette'
+import { ThemeToggle } from '@/components/theme-switcher'
 import { UserMenu } from '@/components/user-menu'
 import { cn } from '@/lib/utils'
 
@@ -28,12 +29,13 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b border-border bg-card/85 backdrop-blur supports-[backdrop-filter]:bg-card/70">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4 sm:gap-3 sm:px-6">
-          <Link href="/dashboard" className="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Link href="/dashboard" className="flex min-h-11 shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <Image src="/logo-mark.png" alt="Eflex — accueil de la console" width={28} height={28} className="h-7 w-7" priority />
           </Link>
           <span aria-hidden="true" className="select-none text-xl font-light text-border">/</span>
           <OrgSwitcher className="min-w-0 max-w-[45vw] sm:max-w-xs" />
           <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
             <CommandPalette />
             <NotificationBell />
             <UserMenu name={user.name || 'Mon compte'} email={user.email ?? ''} />

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowUpRight, GitBranch, GitCommitHorizontal } from 'lucide-react'
+import { ArrowUpRight, GitBranch, GitCommitHorizontal, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { GithubMark as Github } from '@/components/icons/github-mark'
 import { FrameworkIcon } from '@/components/framework-icon'
 import { StatusPill } from '@/components/dashboard/status-pill'
@@ -8,6 +8,7 @@ import { relativeTime } from '@/lib/relative-time'
 import { repoLabel } from '@/lib/repo'
 import type { DashboardProject } from '@/lib/dashboard-data'
 import { statusInfo } from '@/lib/project-status'
+import { tlsHealth } from '@/lib/project-health'
 import { cn } from '@/lib/utils'
 
 /** Vignette de framework : toujours le même carré bordé, centré, quelle que soit l'icône. */
@@ -46,6 +47,12 @@ export function DeployHistory({ history, className }: { history: string[]; class
  * reste un lien distinct, au-dessus de la zone cliquable, pour ne pas imbriquer deux liens.
  */
 export function ProjectCard({ project }: { project: DashboardProject }) {
+  const certificate = tlsHealth(
+    project.tlsValid,
+    project.tlsExpiresAt ? new Date(project.tlsExpiresAt) : null,
+    null,
+  )
+
   return (
     <article className="group relative flex flex-col gap-4 rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/25 focus-within:border-foreground/25">
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
@@ -57,16 +64,31 @@ export function ProjectCard({ project }: { project: DashboardProject }) {
             </Link>
           </h3>
           {project.domain ? (
-            <a
-              href={`https://${project.domain}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="relative z-10 inline-flex max-w-full items-center gap-0.5 text-[13px] leading-5 text-muted-foreground hover:text-foreground hover:underline"
-            >
-              <span className="truncate">{project.domain}</span>
-              <ArrowUpRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              <span className="sr-only">(ouvre le site dans un nouvel onglet)</span>
-            </a>
+            <div className="flex items-center gap-1.5">
+              <a
+                href={`https://${project.domain}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="relative z-10 inline-flex max-w-full items-center gap-0.5 text-[13px] leading-5 text-muted-foreground hover:text-foreground hover:underline"
+              >
+                <span className="truncate">{project.domain}</span>
+                <ArrowUpRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="sr-only">(ouvre le site dans un nouvel onglet)</span>
+              </a>
+              {project.tlsValid !== null && (
+                <span
+                  title={certificate.detail ?? certificate.label}
+                  className="relative z-10 inline-flex shrink-0 items-center"
+                >
+                  {certificate.tone === 'success' ? (
+                    <ShieldCheck className="h-3.5 w-3.5 text-success" aria-hidden="true" />
+                  ) : (
+                    <ShieldAlert className="h-3.5 w-3.5 text-warning" aria-hidden="true" />
+                  )}
+                  <span className="sr-only">Certificat HTTPS : {certificate.label}</span>
+                </span>
+              )}
+            </div>
           ) : (
             <p className="text-[13px] leading-5 text-muted-foreground">Pas encore de domaine</p>
           )}
