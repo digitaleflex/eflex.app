@@ -1,10 +1,18 @@
 'use client'
 
 import { createAuthClient } from 'better-auth/react'
-import { adminClient, organizationClient } from 'better-auth/client/plugins'
+import { adminClient, organizationClient, twoFactorClient } from 'better-auth/client/plugins'
+import { passkeyClient } from '@better-auth/passkey/client'
 
 // Sans baseURL, le client appelle /api/auth sur l'origine courante.
-export const authClient = createAuthClient({ plugins: [organizationClient(), adminClient()] })
+export const authClient = createAuthClient({
+  plugins: [
+    organizationClient(),
+    adminClient(),
+    twoFactorClient({ twoFactorPage: '/login?two-factor=1' }),
+    passkeyClient(),
+  ],
+})
 
 // `authClient` reste exporté pour les méthodes de vérification et de reset.
 export const { signIn, signUp, signOut, useSession } = authClient
@@ -41,6 +49,28 @@ const MESSAGES: Record<string, string> = {
   INVITATION_NOT_FOUND: 'Cette invitation est introuvable, expirée ou déjà utilisée.',
   YOU_ARE_NOT_THE_RECIPIENT_OF_THE_INVITATION: "Cette invitation a été envoyée à une autre adresse e-mail. Connectez-vous avec l'adresse invitée.",
   SOCIAL_ACCOUNT_ALREADY_LINKED: 'Ce compte Google est déjà associé à un autre compte Eflex.',
+  LINKING_NOT_ALLOWED: 'La liaison avec Google a été refusée. Réessayez depuis vos paramètres.',
+  LINKING_DIFFERENT_EMAILS_NOT_ALLOWED: "L'adresse du compte Google doit être identique à celle de votre compte Eflex.",
+  LINKING_FAILED: 'La liaison avec Google a échoué. Réessayez dans un instant.',
+  // Passkeys (WebAuthn)
+  AUTH_CANCELLED: 'Connexion par passkey annulée.',
+  REGISTRATION_CANCELLED: "Création de la passkey annulée.",
+  PASSKEY_NOT_FOUND: 'Cette passkey est introuvable. Elle a peut-être déjà été supprimée.',
+  CHALLENGE_NOT_FOUND: 'La vérification a expiré. Réessayez.',
+  FAILED_TO_VERIFY_REGISTRATION: "La passkey n'a pas pu être vérifiée. Réessayez avec un autre appareil.",
+  AUTHENTICATION_FAILED: 'La passkey ne correspond pas à ce compte.',
+  UNABLE_TO_CREATE_SESSION: 'Impossible d’ouvrir une session. Réessayez.',
+  PREVIOUSLY_REGISTERED: 'Cet appareil possède déjà une passkey pour votre compte.',
+  ORIGIN_NOT_CONFIGURED: 'La connexion par passkey n’est pas configurée sur ce domaine.',
+  // Captcha
+  VERIFICATION_FAILED: 'La vérification anti-robot a échoué. Réessayez.',
+  MISSING_RESPONSE: 'La vérification anti-robot est requise. Rechargez la page et réessayez.',
+  // Comptes liés
+  PASSWORD_ALREADY_SET: 'Un mot de passe est déjà défini pour ce compte.',
+  SIGNUPS_DISABLED: 'Les inscriptions sont temporairement fermées. Réessayez plus tard.',
+  FAILED_TO_UNLINK_LAST_ACCOUNT: 'Ajoutez un autre moyen de connexion avant de retirer celui-ci.',
+  YOU_CANNOT_UNLINK_LAST_ACCOUNT: 'Ajoutez un autre moyen de connexion avant de retirer celui-ci.',
+  ACCOUNT_NOT_FOUND: 'Compte introuvable.',
 }
 
 /** Traduit une erreur Better Auth en message français affichable. */

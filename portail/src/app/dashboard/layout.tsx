@@ -1,6 +1,4 @@
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
-import { THEME_ROOT_ID, themeBootScript } from '@/lib/theme'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { resolveOrganization } from '@/lib/organizations'
@@ -8,6 +6,7 @@ import { EventsProvider } from '@/hooks/events-provider'
 import { ToastProvider } from '@/components/ui/toast'
 import { NotificationToaster } from '@/components/notification-toaster'
 import { MembershipWatcher } from '@/components/membership-watcher'
+import { ImpersonationBanner } from '@/components/impersonation-banner'
 import { DashboardShell } from '@/components/dashboard-shell'
 
 // Protection côté serveur : aucune page du tableau de bord n'est rendue sans session.
@@ -22,16 +21,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
     await prisma.session.update({ where: { id: session.session.id }, data: { activeOrganizationId: org.organizationId } })
   }
 
-  const theme = (await cookies()).get('eflex-theme')?.value
   return (
-    // Thème propre à la console : `dark` posé côté serveur si choisi, sinon par le script (mode système).
-    <div id={THEME_ROOT_ID} className={`${theme === 'dark' ? 'dark ' : ''}min-h-screen bg-background text-foreground`} suppressHydrationWarning>
-      <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+    // Le thème est porté par <html> (cookie ou système), commun à tout le site.
+    <div className="min-h-screen bg-background text-foreground">
     <EventsProvider>
       <ToastProvider>
         <MembershipWatcher />
         <NotificationToaster />
         <DashboardShell user={{ name: session.user.name, email: session.user.email }}>
+          {session.session.impersonatedBy && <ImpersonationBanner userName={session.user.name} />}
           {children}
         </DashboardShell>
       </ToastProvider>

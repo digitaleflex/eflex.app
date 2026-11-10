@@ -4,10 +4,12 @@ import { nextFromLocation, withNext } from '@/lib/safe-next'
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { ThemeToggle } from '@/components/theme-switcher'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
+import { CAPTCHA_ENABLED, Turnstile, captchaHeaders } from '@/components/auth/turnstile'
 import { authErrorMessage, signIn, signUp } from '@/lib/auth-client'
 
 export default function RegisterPage() {
@@ -17,14 +19,23 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const errorId = 'register-error'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
     try {
+      if (CAPTCHA_ENABLED && !captchaToken) {
+        setError('Complétez la vérification anti-robot avant de continuer.')
+        return
+      }
       // Le compte est créé puis la session ouverte dans la foulée.
-      const { error: authError } = await signUp.email({ name: name.trim(), email: email.trim(), password })
+      const { error: authError } = await signUp.email(
+        { name: name.trim(), email: email.trim(), password },
+        captchaHeaders(captchaToken),
+      )
       if (authError) {
         setError(authErrorMessage(authError, 'Impossible de créer le compte. Réessayez dans un instant.'))
         return
@@ -53,14 +64,15 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="sticky top-0 z-50 glass">
-        <nav className="container flex h-16 items-center">
+        <nav className="container flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center">
             <Image src="/logo-horizontal.webp" alt="Eflex — accueil" width={1200} height={312} className="h-8 w-auto" priority />
           </Link>
+          <ThemeToggle />
         </nav>
       </header>
 
-      <main id="contenu" className="flex-1 flex items-center justify-center p-4">
+      <main id="contenu" tabIndex={-1} className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-8 animate-fade-in">
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">Créer un compte</h1>
@@ -96,14 +108,14 @@ export default function RegisterPage() {
             </div>
 
             {error && (
-              <div role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+              <div id={errorId} role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
                 {error}
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <Input id="name" label="Nom" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required />
-              <Input id="email" label="Adresse e-mail" type="email" placeholder="vous@exemple.com" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Input id="name" label="Nom" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} required />
+              <Input id="email" label="Adresse e-mail" type="email" placeholder="vous@exemple.com" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} required />
               <Input
                 id="password"
                 label="Mot de passe"
@@ -116,6 +128,7 @@ export default function RegisterPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              {CAPTCHA_ENABLED && <Turnstile onToken={setCaptchaToken} />}
               <Button type="submit" size="lg" className="w-full" loading={loading}>
                 Créer mon compte
               </Button>

@@ -1,6 +1,8 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { securityHeadersConfig } from './src/lib/security-headers.mjs'
+
 const here = path.dirname(fileURLToPath(import.meta.url))
 
 /** @type {import('next').NextConfig} */
@@ -11,9 +13,19 @@ const nextConfig = {
   // la route directement au lieu de répondre par une redirection 308 qu'un
   // webhook POST ne suivrait pas forcément.
   skipTrailingSlashRedirect: true,
+  // Avatars des comptes GitHub affichés dans la connexion et le sélecteur de dépôts.
+  images: {
+    remotePatterns: [{ protocol: 'https', hostname: 'github.com', pathname: '/**' }],
+  },
   // BullMQ / ioredis sont des modules Node natifs : on les laisse externes au
   // bundle serveur (sinon webpack tente de résoudre leurs requires dynamiques).
   serverExternalPackages: ['bullmq', 'ioredis'],
+  // En-têtes de sécurité globaux (HSTS en production, nosniff, COOP, CSP en
+  // Report-Only). Détail et procédure de passage en enforce :
+  // `src/lib/security-headers.mjs`.
+  async headers() {
+    return securityHeadersConfig()
+  },
   // Le build « standalone » reste à la racine de portail/ même quand le dépôt parent
   // contient un autre lockfile (sans cela, Next remonte au dossier du monorepo).
   outputFileTracingRoot: here,
