@@ -5,17 +5,24 @@ import { useRouter } from 'next/navigation'
 import { Copy, LogOut, Trash2, UserPlus } from 'lucide-react'
 import { authClient, authErrorMessage } from '@/lib/auth-client'
 import { slugify } from '@/lib/slug'
+import { canManageBilling } from '@/lib/organizations'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useEvents } from '@/hooks/events-provider'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { BillingCard } from '@/components/organization/billing-card'
 
-const ROLE_LABEL: Record<string, string> = { owner: 'Propriétaire', admin: 'Administrateur', member: 'Membre' }
+const ROLE_LABEL: Record<string, string> = {
+  owner: 'Propriétaire',
+  admin: 'Administrateur',
+  billing: 'Facturation',
+  member: 'Membre',
+}
 const roleLabel = (role: string) => ROLE_LABEL[role] ?? role
 
-type InviteRole = 'admin' | 'member'
+type InviteRole = 'admin' | 'billing' | 'member'
 
 export function OrganizationPanel({ currentUserId }: { currentUserId: string }) {
   const router = useRouter()
@@ -46,7 +53,7 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
       </div>
 
       {message && (
-        <p role={message.kind === 'error' ? 'alert' : 'status'} className={message.kind === 'error' ? 'rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive' : 'rounded-lg border border-border bg-muted/50 p-3 text-sm'}>
+        <p id="organization-feedback" role={message.kind === 'error' ? 'alert' : 'status'} className={message.kind === 'error' ? 'rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive' : 'rounded-lg border border-border bg-muted/50 p-3 text-sm'}>
           {message.text}
         </p>
       )}
@@ -62,12 +69,26 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
             </CardHeader>
             <CardContent>
               {canInvite ? (
-                <RenameForm key={org.id} orgId={org.id} name={org.name} onDone={() => { ok('Organisation mise à jour.'); void refetch() }} onError={fail} />
+                <RenameForm key={org.id} orgId={org.id} name={org.name} hasError={message?.kind === 'error'} onDone={() => { ok('Organisation mise à jour.'); void refetch() }} onError={fail} />
               ) : (
                 <p className="text-sm text-muted-foreground">Seuls les propriétaires et administrateurs peuvent modifier l&apos;organisation.</p>
               )}
             </CardContent>
           </Card>
+
+          {canManageBilling(myRole) ? (
+            <BillingCard />
+          ) : (
+            <Card>
+              <CardHeader><h2 className="font-semibold">Facturation</h2></CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  La facturation est réservée au propriétaire, aux administrateurs et au rôle facturation. Un
+                  propriétaire peut vous y donner accès sans vous confier la gestion des projets.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader><h2 className="font-semibold">Membres ({org.members.length})</h2></CardHeader>
@@ -90,14 +111,15 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
                               id={`role-${member.id}`}
                               value={member.role}
                               onChange={async (e) => {
-                                const { error } = await authClient.organization.updateMemberRole({ memberId: member.id, role: e.target.value as 'owner' | 'admin' | 'member', organizationId: org.id })
+                                const { error } = await authClient.organization.updateMemberRole({ memberId: member.id, role: e.target.value as 'owner' | 'admin' | 'billing' | 'member', organizationId: org.id })
                                 if (error) fail(error)
                                 else { ok('Rôle mis à jour.'); void refetch() }
                               }}
-                              className="h-9 rounded-lg border border-input bg-background px-2 text-sm"
+                              className="h-11 rounded-lg border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
                               {isOwner && <option value="owner">Propriétaire</option>}
                               <option value="admin">Administrateur</option>
+                              {isOwner && <option value="billing">Facturation</option>}
                               <option value="member">Membre</option>
                             </select>
                             <Button
@@ -124,7 +146,7 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
             <Card>
               <CardHeader><h2 className="font-semibold">Inviter</h2></CardHeader>
               <CardContent className="space-y-4">
-                <InviteForm key={org.id} orgId={org.id} canGiveAdmin={isOwner} onDone={() => void refetch()} onError={fail} />
+                <InviteForm key={org.id} orgId={org.id} canGiveAdmin={isOwner} hasError={message?.kind === 'error'} onDone={() => void refetch()} onError={fail} />
                 {org.invitations.filter((i) => i.status === 'pending').length > 0 && (
                   <ul className="divide-y divide-border">
                     {org.invitations.filter((i) => i.status === 'pending').map((invitation) => (
@@ -230,7 +252,7 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
 
 type OnError = (error: Parameters<typeof authErrorMessage>[0]) => void
 
-function RenameForm({ orgId, name, onDone, onError }: { orgId: string; name: string; onDone: () => void; onError: OnError }) {
+function RenameForm({ orgId, name, hasError, onDone, onError }: { orgId: string; name: string; hasError: boolean; onDone: () => void; onError: OnError }) {
   const [value, setValue] = useState(name)
   const [loading, setLoading] = useState(false)
   return (
@@ -246,14 +268,23 @@ function RenameForm({ orgId, name, onDone, onError }: { orgId: string; name: str
       }}
     >
       <div className="flex-1">
-        <Input id="org-name" label="Nom de l'organisation" value={value} onChange={(e) => setValue(e.target.value)} maxLength={60} required />
+        <Input
+          id="org-name"
+          label="Nom de l'organisation"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          maxLength={60}
+          aria-invalid={hasError ? true : undefined}
+          aria-describedby={hasError ? 'organization-feedback' : undefined}
+          required
+        />
       </div>
       <Button type="submit" loading={loading} disabled={!value.trim() || value.trim() === name}>Enregistrer</Button>
     </form>
   )
 }
 
-function InviteForm({ orgId, canGiveAdmin, onDone, onError }: { orgId: string; canGiveAdmin: boolean; onDone: () => void; onError: OnError }) {
+function InviteForm({ orgId, canGiveAdmin, hasError, onDone, onError }: { orgId: string; canGiveAdmin: boolean; hasError: boolean; onDone: () => void; onError: OnError }) {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<InviteRole>('member')
   const [loading, setLoading] = useState(false)
@@ -263,7 +294,13 @@ function InviteForm({ orgId, canGiveAdmin, onDone, onError }: { orgId: string; c
       onSubmit={async (e) => {
         e.preventDefault()
         setLoading(true)
-        const { error } = await authClient.organization.inviteMember({ email: email.trim(), role, organizationId: orgId })
+        const { error } = await authClient.organization.inviteMember({
+          email: email.trim(),
+          // Le serveur accepte aussi le rôle personnalisé `billing` ; les types
+          // générés du client ne connaissent que les rôles Better Auth.
+          role: role as 'admin' | 'member',
+          organizationId: orgId,
+        })
         setLoading(false)
         if (error) return onError(error)
         setEmail('')
@@ -271,13 +308,29 @@ function InviteForm({ orgId, canGiveAdmin, onDone, onError }: { orgId: string; c
       }}
     >
       <div className="flex-1">
-        <Input id="invite-email" type="email" label="Adresse e-mail" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <Input
+          id="invite-email"
+          type="email"
+          label="Adresse e-mail"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          aria-invalid={hasError ? true : undefined}
+          aria-describedby={hasError ? 'organization-feedback' : undefined}
+          required
+        />
       </div>
       <div className="space-y-1.5">
         <label htmlFor="invite-role" className="text-sm font-medium">Rôle</label>
-        <select id="invite-role" value={role} onChange={(e) => setRole(e.target.value as InviteRole)} className="flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
+        <select
+          id="invite-role"
+          value={role}
+          onChange={(e) => setRole(e.target.value as InviteRole)}
+          aria-describedby={hasError ? 'organization-feedback' : undefined}
+          className="flex h-11 w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
           <option value="member">Membre</option>
           {canGiveAdmin && <option value="admin">Administrateur</option>}
+          {canGiveAdmin && <option value="billing">Facturation</option>}
         </select>
       </div>
       <Button type="submit" loading={loading}><UserPlus className="h-4 w-4" aria-hidden="true" />Inviter</Button>

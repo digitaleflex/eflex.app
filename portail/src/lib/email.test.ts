@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { emailFrom, isEmailConfigured, sendEmail } from './email'
-import { resetPasswordEmail, verificationEmail } from './email-templates'
+import { appUrl, emailFrom, isEmailConfigured, sendEmail } from './email'
+import {
+  notificationEmail,
+  notificationEmailSubject,
+  resetPasswordEmail,
+  verificationEmail,
+} from './email-templates'
 
 const KEY = 're_test_key_123'
 const INPUT = { to: 'client@exemple.fr', subject: 'Sujet', html: '<p>Bonjour</p>', text: 'Bonjour' }
@@ -40,6 +45,19 @@ describe('configuration', () => {
     expect(emailFrom()).toBe('Eflex <noreply@eflex.app>')
     process.env.EMAIL_FROM = 'Eflex <contact@eflex.app>'
     expect(emailFrom()).toBe('Eflex <contact@eflex.app>')
+  })
+
+  it('construit une URL absolue depuis BETTER_AUTH_URL, avec eflex.app par défaut', () => {
+    const saved = process.env.BETTER_AUTH_URL
+    try {
+      delete process.env.BETTER_AUTH_URL
+      expect(appUrl('/dashboard/settings')).toBe('https://eflex.app/dashboard/settings')
+      process.env.BETTER_AUTH_URL = 'https://console.exemple.fr/'
+      expect(appUrl('/dashboard/settings')).toBe('https://console.exemple.fr/dashboard/settings')
+    } finally {
+      if (saved === undefined) delete process.env.BETTER_AUTH_URL
+      else process.env.BETTER_AUTH_URL = saved
+    }
   })
 })
 
@@ -102,5 +120,37 @@ describe('gabarits', () => {
     expect(tpl.html).toContain('https://eflex.app/reset-password?token=xyz')
     expect(tpl.html).toContain('1 heure')
     expect(tpl.text).toContain('Choisir un nouveau mot de passe')
+  })
+
+  it('le mail de notification reprend le titre, le corps, le lien direct et les préférences', () => {
+    const tpl = notificationEmail({
+      title: 'Démo est en ligne',
+      body: 'Le déploiement s’est terminé avec succès.',
+      url: 'https://eflex.app/dashboard/projects/p1',
+      preferencesUrl: 'https://eflex.app/dashboard/settings',
+    })
+    expect(tpl.html).toContain('Démo est en ligne')
+    expect(tpl.html).toContain('Le déploiement s’est terminé avec succès.')
+    expect(tpl.html).toContain('https://eflex.app/dashboard/projects/p1')
+    expect(tpl.html).toContain('https://eflex.app/dashboard/settings')
+    expect(tpl.text).toContain('Vous recevez cet e-mail selon vos préférences')
+  })
+
+  it('le mail de notification échappe le HTML dynamique', () => {
+    const tpl = notificationEmail({
+      title: '<img src=x onerror=alert(1)>',
+      body: 'Nom <b>du projet</b>',
+      url: 'https://eflex.app/dashboard/projects/p1',
+      preferencesUrl: 'https://eflex.app/dashboard/settings',
+    })
+    expect(tpl.html).not.toContain('<img src=x')
+    expect(tpl.html).toContain('&lt;img src=x')
+    expect(tpl.html).not.toContain('<b>du projet</b>')
+  })
+
+  it('borne l’objet du mail à une seule ligne', () => {
+    expect(notificationEmailSubject('  Déploiement\néchoué  ')).toBe('Déploiement échoué')
+    expect(notificationEmailSubject('')).toBe('Nouvelle notification Eflex')
+    expect(notificationEmailSubject('a'.repeat(200))).toHaveLength(118)
   })
 })

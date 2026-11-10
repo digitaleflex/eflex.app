@@ -6,18 +6,34 @@ import { NOTIFICATION_TYPES, isNotificationType } from '@/lib/notifications'
 
 export const dynamic = 'force-dynamic'
 
-/** Préférences par type : tout est activé tant que l'utilisateur n'a rien désactivé. */
+const CHANNELS = ['app', 'email'] as const
+
+/** Préférences par type et canal : tout est activé tant que l'utilisateur n'a rien désactivé. */
 export async function GET() {
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-  const stored = await prisma.notificationPreference.findMany({ where: { userId: session.user.id, channel: 'app' } })
-  const byType = new Map(stored.map((p) => [p.type, p.enabled]))
+  const stored = await prisma.notificationPreference.findMany({
+    where: { userId: session.user.id, channel: { in: [...CHANNELS] } },
+    select: { type: true, channel: true, enabled: true },
+  })
+  const byTypeAndChannel = new Map(stored.map((p) => [`${p.channel}:${p.type}`, p.enabled]))
   return NextResponse.json({
-    preferences: Object.entries(NOTIFICATION_TYPES).map(([type, meta]) => ({ type, ...meta, enabled: byType.get(type) ?? true })),
+    preferences: Object.entries(NOTIFICATION_TYPES).map(([type, meta]) => ({
+      type,
+      ...meta,
+      enabled: byTypeAndChannel.get(`app:${type}`) ?? true,
+      emailEnabled: byTypeAndChannel.get(`email:${type}`) ?? true,
+    })),
   })
 }
 
-const schema = z.object({ type: z.string(), enabled: z.boolean() })
+const schema = z.object({
+  type: z.string(),
+  // `channel` est optionnel pour rester compatible avec les clients qui ne gèrent que
+  // l'application : sans canal explicite, la préférence concerne l'application.
+  channel: z.enum(CHANNELS).default('app'),
+  enabled: z.boolean(),
+})
 
 export async function PUT(request: Request) {
   const session = await getSession()
@@ -28,11 +44,11 @@ export async function PUT(request: Request) {
   if (!parsed.success || !isNotificationType(parsed.data.type)) {
     return NextResponse.json({ error: 'Type de notification inconnu.' }, { status: 400 })
   }
-  const { type, enabled } = parsed.data
+  const { type, channel, enabled } = parsed.data
   await prisma.notificationPreference.upsert({
-    where: { userId_type_channel: { userId, type, channel: 'app' } },
-    create: { userId, type, channel: 'app', enabled },
+    where: { userId_type_channel: { userId, type, channel } },
+    create: { userId, type, channel, enabled },
     update: { enabled },
   })
-  return NextResponse.json({ type, enabled })
+  return NextResponse.json({ type, channel, enabled })
 }

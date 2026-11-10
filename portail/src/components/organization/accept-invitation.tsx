@@ -35,7 +35,7 @@ export function AcceptInvitation({ invitationId }: { invitationId: string }) {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4">
+    <main id="contenu" tabIndex={-1} className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader><h1 className="text-xl font-semibold">Invitation à rejoindre une organisation</h1></CardHeader>
         <CardContent className="space-y-4">
