@@ -56,7 +56,7 @@ function shell(command: string | undefined, keyword: 'RUN' | 'CMD'): string | nu
 }
 
 export function generateDockerfile(plan: BuildPlan): string | null {
-  if (plan.framework === 'docker') return null;
+  if (plan.framework === 'docker' || plan.framework === 'compose') return null;
 
   const lines: string[] = [
     '# Généré par @eflex/renderer à partir du BuildPlan — ne pas modifier.',

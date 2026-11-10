@@ -2,17 +2,22 @@
  * Pont entre le BuildPlan stocké en base et les artefacts envoyés à Coolify.
  * Le plan (et lui seul) décide du port, des services et des commandes.
  *
- * Note : Coolify 4.6 ne sait pas combiner un Dockerfile/compose généré avec le
- * source d'un dépôt (le champ `dockerfile` ne clone pas le dépôt, et le compose
- * brut relit le fichier du dépôt). Le portail déploie donc :
+ * Note : Coolify 4.7.3 ne sait pas combiner un Dockerfile/compose généré avec
+ * le source d'un dépôt (le champ `dockerfile` ne clone pas le dépôt, et le
+ * compose brut relit le fichier du dépôt à chaque déploiement). Le portail
+ * déploie donc :
+ *   - les dépôts qui fournissent leur propre compose (`framework: compose`,
+ *     `build_pack=dockercompose`) : le fichier fait foi, rien n'est généré ;
  *   - les dépôts qui ont leur propre Dockerfile (`build_pack=dockerfile`) ;
  *   - les frameworks sans Dockerfile via Nixpacks, avec les commandes du plan.
  */
 import type { BuildPlan } from '@eflex/detector'
 import {
   buildDeploymentArtifacts,
+  repositoryComposeForPlan,
   traefikLabels,
   type DeploymentArtifacts,
+  type RepositoryCompose,
 } from '@eflex/renderer'
 
 const STATIC_FRAMEWORKS = new Set(['static', 'vite', 'svelte', 'astro'])
@@ -54,13 +59,20 @@ export interface CoolifyApplicationSettings {
   publishDirectory?: string
   /** Chemin du Dockerfile relatif à `baseDirectory` (framework `docker`). */
   dockerfileLocation?: string
+  /**
+   * Chemin du compose relatif à `baseDirectory` (framework `compose`), avec un
+   * `/` initial. Coolify cherche `base_directory + docker_compose_location`.
+   */
+  dockerComposeLocation?: string
 }
 
 export function coolifyApplicationSettings(plan: BuildPlan): CoolifyApplicationSettings {
   const root = appRoot(plan)
-  // Le contexte Docker fait exception : le Dockerfile et son contexte de build
-  // sont pensés par l'auteur du dépôt relativement au dossier de l'application.
-  const workspace = plan.framework === 'docker' ? undefined : plan.workspace
+  // Le contexte Docker et le compose font exception : le Dockerfile, le contexte
+  // de build et le compose sont pensés par l'auteur du dépôt relativement au
+  // dossier de l'application. Un workspace JS ne s'applique pas ici.
+  const workspace =
+    plan.framework === 'docker' || plan.framework === 'compose' ? undefined : plan.workspace
   const baseDirectory = workspace || root === '' ? '/' : `/${root}`
 
   const installCommand = plan.install
@@ -94,7 +106,54 @@ export function coolifyApplicationSettings(plan: BuildPlan): CoolifyApplicationS
     startCommand,
     publishDirectory: publishDirectoryForPlan(plan),
     dockerfileLocation,
+    dockerComposeLocation:
+      plan.framework === 'compose' && plan.compose ? normalizeComposeLocation(plan.compose.location) : undefined,
   }
+}
+
+/** Chemin compose normalisé (`/` initial, pas de `..`, pas de dossier vide). */
+export function normalizeComposeLocation(location: string): string {
+  const parts = location
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter((part) => part !== '' && part !== '.')
+  if (parts.some((part) => part === '..')) return '/docker-compose.yaml'
+  if (parts.length === 0) return '/docker-compose.yaml'
+  return `/${parts.join('/')}`
+}
+
+/** Compose fourni par le dépôt, ou `null` pour un plan sans compose. */
+export function repositoryCompose(plan: BuildPlan): RepositoryCompose | null {
+  return repositoryComposeForPlan(plan)
+}
+
+/** Entrée `docker_compose_domains` de Coolify 4.7.3. */
+export interface DockerComposeDomain {
+  name: string
+  /** Un ou plusieurs domaines séparés par une virgule (Coolify les éclate). */
+  domain: string
+  redirect?: 'www' | 'non-www' | 'both'
+}
+
+/**
+ * Domaines attachés au service compose qui porte le trafic public.
+ *
+ * Coolify refuse `domains` pour une application `dockercompose` : le routage
+ * passe uniquement par `docker_compose_domains`. Sans service identifié, on
+ * n'attache rien plutôt que de router le domaine vers une base de données.
+ */
+export function composeDomains(
+  hosts: readonly string[],
+  service: string | undefined,
+): DockerComposeDomain[] {
+  const normalized = hosts.map(normalizeHost).filter(Boolean)
+  if (!service || normalized.length === 0) return []
+  return [
+    {
+      name: service,
+      domain: normalized.map((host) => `https://${host}`).join(','),
+    },
+  ]
 }
 
 /**
@@ -119,6 +178,26 @@ export function buildProjectArtifacts(
     domain,
     image: `eflex/${projectId}:latest`,
   })
+}
+
+/**
+ * Aiguillage du worker, testable sans Coolify ni base :
+ * - `compose` : le dépôt fournit son compose, l'Application Coolify le lit ;
+ * - `single` : chemin mono-service historique (Nixpacks/Dockerfile) ;
+ * - `multiple-without-compose` : plan généré multi-services → refus explicite ;
+ * - `invalid-compose` : framework compose sans fichier décrit.
+ */
+export type DeploymentKind =
+  | 'compose'
+  | 'single'
+  | 'multiple-without-compose'
+  | 'invalid-compose'
+
+export function deploymentKind(plan: BuildPlan, artifacts: DeploymentArtifacts): DeploymentKind {
+  if (plan.framework === 'compose') {
+    return artifacts.repositoryCompose ? 'compose' : 'invalid-compose'
+  }
+  return artifacts.services.length > 1 ? 'multiple-without-compose' : 'single'
 }
 
 /** Normalise un domaine en nom d'hôte (sans schéma ni chemin). */

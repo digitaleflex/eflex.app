@@ -3,6 +3,9 @@ import { detect, detectApplication, scoreConfidence } from '../src/index.js';
 import {
   allFixtures,
   astro,
+  composeMonorepoApp,
+  composeRoot,
+  composeYaml,
   django,
   dockerfile,
   dockerfileArgBeforeFrom,
@@ -13,6 +16,7 @@ import {
   dockerfilePhpFpm,
   dockerfileVolume,
   eflexConfig,
+  eflexConfigCompose,
   eflexConfigInvalid,
   eflexConfigStatic,
   eflexConfigUnsafePaths,
@@ -65,12 +69,63 @@ describe('detect', () => {
     expect(detect(dockerfile).plan?.dockerfile).toBeUndefined();
   });
 
+  it('détecte un compose fourni par le dépôt avant le Dockerfile', () => {
+    const result = detect(composeRoot);
+
+    expect(result.framework).toBe('compose');
+    expect(result.plan?.framework).toBe('compose');
+    expect(result.plan?.runtime).toBe('docker@1');
+    expect(result.plan?.compose).toEqual({
+      location: '/docker-compose.yml',
+      services: ['app', 'web', 'queue'],
+      service: 'web',
+    });
+    expect(result.reasons.join(' ')).toContain('3 service(s)');
+    expect(result.warnings.join(' ')).toContain('fait foi');
+    // Le manifeste Next.js reste visible comme alternative, sans gagner.
+    expect(result.alternatives.some((plan) => plan.framework === 'nextjs')).toBe(true);
+  });
+
+  it('reconnaît compose.yaml et choisit le service au port HTTP', () => {
+    const result = detect(composeYaml);
+
+    expect(result.plan?.compose?.location).toBe('/compose.yaml');
+    expect(result.plan?.compose?.services).toEqual(['api', 'db']);
+    expect(result.plan?.compose?.service).toBe('api');
+  });
+
+  it('résout un compose placé dans l’application d’un monorepo', () => {
+    const result = detect(composeMonorepoApp);
+
+    expect(result.framework).toBe('compose');
+    expect(result.plan?.root).toBe('apps/api');
+    expect(result.plan?.repoRoot).toBe('../..');
+    expect(result.plan?.compose?.location).toBe('/compose.yml');
+    expect(result.plan?.compose?.service).toBe('app');
+  });
+
+  it('avertit quand le compose ne déclare pas de labels websecure', () => {
+    const result = detect(composeYaml);
+    expect(result.warnings.join(' ')).toContain('websecure');
+  });
+
   it('lit publish depuis eflex.json et écarte les chemins qui sortent du dépôt', () => {
     expect(detect(eflexConfigStatic).plan?.publish).toBe('out/site');
 
     const unsafe = detect(eflexConfigUnsafePaths).plan;
     expect(unsafe?.publish).toBeUndefined();
     expect(unsafe?.dockerfile).toBeUndefined();
+  });
+
+  it('accepte un compose explicite dans eflex.json', () => {
+    const plan = detect(eflexConfigCompose).plan;
+
+    expect(plan?.framework).toBe('compose');
+    expect(plan?.compose).toEqual({
+      location: '/docker/compose.yaml',
+      services: ['app', 'worker'],
+      service: 'app',
+    });
   });
 
   it('detects Vite as a static runtime on port 80', () => {

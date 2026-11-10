@@ -16,6 +16,7 @@ const FRAMEWORK_LABELS: Record<string, string> = {
   python: 'Python',
   static: 'Site statique',
   docker: 'Dockerfile',
+  compose: 'Docker Compose',
   'eflex-config': 'eflex.json',
 }
 

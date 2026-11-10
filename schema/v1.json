@@ -17,6 +17,7 @@
       "description": "Framework détecté ou déclaré.",
       "enum": [
         "docker",
+        "compose",
         "eflex-config",
         "nextjs",
         "nuxt",
@@ -118,6 +119,37 @@
       "type": "string",
       "pattern": "^[^/]+(/[^/]+)*$"
     },
+    "compose": {
+      "description": "Fichier Docker Compose fourni par le dépôt (framework `compose` uniquement). Le plan le décrit sans le réécrire : Coolify lit ce fichier dans le dépôt à chaque déploiement.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "location"
+      ],
+      "properties": {
+        "location": {
+          "description": "Chemin du fichier compose, relatif à la racine de l'application (`root`), avec un `/` initial. Exemple : `/docker-compose.yaml`.",
+          "type": "string",
+          "pattern": "^/[^/]+(/[^/]+)*$",
+          "maxLength": 300
+        },
+        "services": {
+          "description": "Services déclarés par le compose, dans l'ordre du fichier. Purement descriptif : aucun service n'est ajouté par la plateforme.",
+          "type": "array",
+          "maxItems": 50,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$"
+          }
+        },
+        "service": {
+          "description": "Service qui porte le domaine public quand un port HTTP a été identifié. Absent : aucun domaine n'est attaché automatiquement.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$"
+        }
+      }
+    },
     "buildEnv": {
       "description": "Variables d'environnement de BUILD, PUBLIQUES. Elles sont intégrées au bundle client : n'y mettez JAMAIS de secrets, de clés d'API ni de mots de passe. Les secrets sont fournis à la plateforme, pas au dépôt.",
       "type": "object",
@@ -183,6 +215,25 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "framework": {
+            "const": "compose"
+          }
+        },
+        "required": [
+          "framework"
+        ]
+      },
+      "then": {
+        "required": [
+          "compose"
+        ]
+      }
+    }
+  ],
   "$defs": {
     "service": {
       "type": "object",

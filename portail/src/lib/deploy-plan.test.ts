@@ -3,11 +3,14 @@ import type { BuildPlan } from '@eflex/detector'
 import {
   buildApplicationLabels,
   buildProjectArtifacts,
+  composeDomains,
   coolifyApplicationSettings,
+  deploymentKind,
   nixpacksRuntimeVariable,
   normalizeHost,
   persistentVolumesEnabled,
   publishDirectoryForPlan,
+  repositoryCompose,
 } from './deploy-plan'
 
 const pythonPlan: BuildPlan = {
@@ -52,6 +55,33 @@ const monorepoStaticPlan: BuildPlan = {
   build: 'pnpm run build',
   publish: 'dist',
   port: 80,
+}
+
+const composePlan: BuildPlan = {
+  version: 1,
+  framework: 'compose',
+  runtime: 'docker@1',
+  root: 'apps/api',
+  repoRoot: '..',
+  port: 80,
+  compose: {
+    location: '/docker-compose.yml',
+    services: ['app', 'web', 'queue'],
+    service: 'web',
+  },
+  volumes: ['storage'],
+}
+
+const laravelMultiPlan: BuildPlan = {
+  version: 1,
+  framework: 'laravel',
+  runtime: 'php@8.3',
+  root: '',
+  port: 80,
+  services: {
+    app: { command: 'php-fpm', port: 9000 },
+    web: { command: "nginx -g 'daemon off;'", port: 80 },
+  },
 }
 
 describe('buildProjectArtifacts', () => {
@@ -197,5 +227,75 @@ describe('buildApplicationLabels', () => {
   it('normalise le domaine', () => {
     expect(normalizeHost('https://demo.example.com/path')).toBe('demo.example.com')
     expect(normalizeHost(' demo.example.com ')).toBe('demo.example.com')
+  })
+})
+
+describe('compose fourni par le dépôt', () => {
+  it('expose le chemin compose et ne génère aucun Dockerfile ni volume Coolify', () => {
+    const artifacts = buildProjectArtifacts(composePlan, 'api-proj')
+
+    expect(artifacts.buildPack).toBe('dockercompose')
+    expect(artifacts.compose).toBe('')
+    expect(artifacts.dockerfile).toBeNull()
+    expect(artifacts.services).toEqual(['app', 'web', 'queue'])
+    expect(artifacts.repositoryCompose).toEqual({
+      location: '/docker-compose.yml',
+      repoPath: 'apps/api/docker-compose.yml',
+      services: ['app', 'web', 'queue'],
+      service: 'web',
+    })
+    expect(artifacts.persistentVolumes).toEqual([])
+  })
+
+  it('utilise le dossier de l’application pour base_directory', () => {
+    const settings = coolifyApplicationSettings(composePlan)
+
+    expect(settings.baseDirectory).toBe('/apps/api')
+    expect(settings.dockerComposeLocation).toBe('/docker-compose.yml')
+    expect(settings.dockerfileLocation).toBeUndefined()
+    expect(settings.installCommand).toBeUndefined()
+    expect(settings.buildCommand).toBeUndefined()
+    expect(settings.startCommand).toBeUndefined()
+  })
+
+  it('normalise le chemin compose et refuse de sortir du dépôt', () => {
+    expect(repositoryCompose({ ...composePlan, compose: { ...composePlan.compose!, location: '../../etc/passwd' } })).toBeNull()
+    expect(
+      repositoryCompose({
+        ...composePlan,
+        root: '',
+        compose: { location: 'docker/compose.yaml', services: ['app'] },
+      }),
+    ).toEqual({
+      location: '/docker/compose.yaml',
+      repoPath: 'docker/compose.yaml',
+      services: ['app'],
+    })
+  })
+
+  it('attache les domaines au service public, jamais à un service absent', () => {
+    expect(composeDomains(['demo.example.com', 'https://custom.example.com/'], 'web')).toEqual([
+      {
+        name: 'web',
+        domain: 'https://demo.example.com,https://custom.example.com',
+      },
+    ])
+    expect(composeDomains(['demo.example.com'], undefined)).toEqual([])
+  })
+
+  it('aiguille compose, mono-service et refus multi-services', () => {
+    const composeArtifacts = buildProjectArtifacts(composePlan, 'api-proj')
+    expect(deploymentKind(composePlan, composeArtifacts)).toBe('compose')
+
+    const pythonArtifacts = buildProjectArtifacts(pythonPlan, 'py-proj')
+    expect(deploymentKind(pythonPlan, pythonArtifacts)).toBe('single')
+
+    const laravelArtifacts = buildProjectArtifacts(laravelMultiPlan, 'laravel-proj')
+    expect(laravelArtifacts.services.length).toBeGreaterThan(1)
+    expect(deploymentKind(laravelMultiPlan, laravelArtifacts)).toBe('multiple-without-compose')
+
+    const invalidCompose: BuildPlan = { ...composePlan, compose: undefined }
+    const invalidArtifacts = buildProjectArtifacts(invalidCompose, 'api-proj')
+    expect(deploymentKind(invalidCompose, invalidArtifacts)).toBe('invalid-compose')
   })
 })

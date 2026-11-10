@@ -72,6 +72,137 @@ Pour le framework `docker`, `base_directory` reste le dossier de l'application
 Dockerfile de monorepo qui attend la racine du dépôt doit donc être placé à la
 racine (cas `root === ""`), ou être adapté par l'auteur du dépôt.
 
+## Compose fourni par le dépôt (D1)
+
+Un dépôt qui contient `docker-compose.yml`, `docker-compose.yaml`, `compose.yml`
+ou `compose.yaml` à la racine de l'application est déployé comme **Application
+Coolify `docker_compose`** (`build_pack=dockercompose`). C'est la seule voie
+Coolify pour un vrai multi-services avec statut, logs par service, annulation et
+retour arrière.
+
+### Précédence de détection
+
+```text
+eflex.json > compose > Dockerfile > monorepo > candidats de framework
+```
+
+- `eflex.json` reste prioritaire : c'est l'échappatoire explicite pour un
+  compose réservé au développement local (base de données seule) ou pour fixer
+  un autre framework.
+- Le compose passe avant un `Dockerfile` présent au même endroit : il décrit
+  l'application **et** ses voisins, et il référence souvent ce Dockerfile
+  (`build: .`). Choisir le Dockerfile seul perdrait les workers et les sidecars.
+- Un compose à la racine du dépôt passe avant la découverte de monorepo : il
+  décrit la stack complète. Un compose dans un sous-dossier reste détecté
+  lorsque ce dossier est choisi comme application (`discoverApps` reconnaît
+  désormais un dossier qui ne contient qu'un compose).
+
+### Contrat du plan
+
+```json
+{
+  "framework": "compose",
+  "runtime": "docker@1",
+  "root": "apps/api",
+  "port": 80,
+  "compose": {
+    "location": "/compose.yml",
+    "services": ["app", "web", "queue"],
+    "service": "web"
+  }
+}
+```
+
+Le plan est **descriptif** : aucun service n'est inventé, aucun fichier n'est
+généré. Le détecteur ne lit que les noms de services et les ports conteneur
+(`ports:`), sans dépendance YAML, pour choisir le service public probable.
+
+### Réglages Coolify 4.7.3
+
+| Élément | Valeur |
+| --- | --- |
+| `build_pack` | `dockercompose` |
+| `docker_compose_location` | `plan.compose.location` (`/compose.yml`), relatif à `base_directory` |
+| `base_directory` | `/<root>` (ou `/` à la racine) |
+| `docker_compose_domains` | `[{ name: "<service>", domain: "https://<hôte>[,https://…]" }]` |
+| `domains` | **jamais envoyé** (422 pour un compose) |
+| `ports_exposes` | **jamais envoyé** (Coolify force 80) |
+| commandes install/build/start | **jamais envoyées** : le compose les porte |
+| `custom_labels` | **jamais envoyés** : Coolify les ignore pour un compose |
+| `docker_compose_raw` | **jamais envoyé** : Coolify relit le fichier du dépôt |
+
+Le worker relit le fichier à chaque déploiement (`fetchRepositoryFile`, API
+Contents pour un dépôt privé, `raw.githubusercontent.com` pour un public) puis
+applique `inspectCompose` **avant** tout appel Coolify.
+
+### Sécurité
+
+Le compose est refusé, avec un message explicite, s'il contient :
+
+- `privileged: true` ;
+- `network_mode: host` ;
+- un montage de `/var/run/docker.sock` ;
+- un montage de l'hôte en chemin absolu (`/etc`, `/home`, `~…`) ou par
+  remontée `..`, en syntaxe courte ou longue.
+
+Un bind relatif au dépôt (`./storage:/app/storage`) et les volumes nommés
+restent autorisés. Coolify valide de son côté l'injection shell
+(`validateDockerComposeForInjection`). Les secrets ne doivent **jamais** figurer
+dans le compose : ils passent par les variables Coolify (`.env` commun à tous
+les services).
+
+### Domaines, TLS et labels
+
+Coolify refuse `domains` pour une application compose : le domaine est attaché
+au service public via `docker_compose_domains`. Le service est choisi par port
+HTTP reconnu (80, 8080, 8000, 3000…), puis par nom (`web`, `nginx`, `app`…).
+Sans service identifié, aucun domaine n'est attaché : le déploiement reste
+possible, mais l'application n'est pas routée.
+
+**Limite importante** : Coolify génère ses labels avec l'entrypoint `https`,
+alors que le Traefik de l'hôte utilise `websecure`. Comme les `custom_labels`
+ne s'appliquent pas à une application compose, le fichier du dépôt doit
+déclarer lui-même les labels du routeur sur le service public, et le réseau
+`proxy` externe :
+
+```yaml
+services:
+  web:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.demo.rule=Host(`demo.eflex.app`)"
+      - "traefik.http.routers.demo.entrypoints=websecure"
+      - "traefik.http.routers.demo.tls.certresolver=letsencrypt"
+      - "traefik.http.services.demo.loadbalancer.server.port=80"
+    networks:
+      - proxy
+networks:
+  proxy:
+    external: true
+```
+
+Le worker journalise un avertissement quand `websecure` est absent. La
+vérification TLS après déploiement (`waitForTls`) reste inchangée.
+
+### Volumes, migrations et rollback
+
+- **Volumes** : ceux du compose, jamais ceux du plan. Le worker ne crée aucun
+  stockage Coolify pour un compose (`ensureApplicationStorages` est sauté) et
+  ne supprime jamais un volume à la suppression de l'application.
+- **Migrations** : `postDeploy` n'est pas exécuté automatiquement (le
+  `post_deployment_command` d'un compose n'échoue pas le déploiement). Utilisez
+  un service one-shot (`restart: "no"`, `depends_on` avec
+  `condition: service_healthy`). Le worker journalise qu'il ignore les
+  commandes.
+- **Migrations de base** : aucune migration n'est jouée par la plateforme.
+- **Rollback** : `POST /applications/{uuid}/rollback` fonctionne pour une
+  Application compose ; Coolify relit toutefois le compose de la branche suivie.
+  Un retour arrière ne restaure ni les volumes ni les variables d'alors.
+- **Annulation / logs** : mêmes endpoints que le chemin mono-service
+  (`POST /deployments/{uuid}/cancel`, logs de build) ; les logs d'exécution
+  acceptent `service_name=<service>`.
+
 ## Volumes persistants
 
 Les volumes du plan sont traduits en stockages persistants dans les artefacts
@@ -113,20 +244,27 @@ Pour activer :
 
 ## Limites connues
 
-- **Laravel multi-services reste refusé.** Un plan Laravel déclare `app`, `web`,
-  `queue` et `scheduler` ; le worker refuse tout plan de plus d'un service. Le
-  volume `storage` est donc correctement décrit dans les artefacts, mais aucun
-  déploiement Laravel complet n'est encore possible. La persistance réelle
-  (fichier conservé après redéploiement) n'a pas été validée sur un Coolify de
-  production.
-- Le volume Laravel est monté sur `/app/storage` (Nixpacks). Un montage plus
-  fin (`storage/app` seul) sera à décider lors de l'implémentation du
-  multi-services.
+- **Multi-services généré refusé.** Un plan Laravel (`app`, `web`, `queue`,
+  `scheduler`) ou tout autre plan de plus d'un service est refusé tant que le
+  dépôt ne fournit pas son propre compose. Ce n'est plus une impasse : ajoutez
+  un `docker-compose.yml` à la racine de l'application, l'Application Coolify
+  `dockercompose` prend le relais (voir « Compose fourni par le dépôt »). Le
+  volume `storage` du plan reste descriptif et n'est pas monté par la
+  plateforme dans ce cas.
+- Le volume Laravel est monté sur `/app/storage` (Nixpacks) pour le chemin
+  mono-service. Un montage plus fin (`storage/app` seul) sera à décider lors de
+  l'implémentation du multi-services.
 - Les volumes ne sont jamais supprimés automatiquement : la suppression d'une
   application laisse ses volumes côté Coolify (choix conservateur).
 - Le renderer généré (`pnpm render`) reste destiné au compose/Dockerfile ; le
-  déploiement Coolify utilise Nixpacks pour les frameworks non-Docker. Les
-  commandes préfixées `cd` du plan ne modifient donc pas le compose.
+  déploiement Coolify utilise Nixpacks pour les frameworks non-Docker, et le
+  fichier du dépôt pour `compose`. Les commandes préfixées `cd` du plan ne
+  modifient donc pas le compose.
+- **Compose** : pas de génération automatique, pas de fusion d'un
+  `docker-compose.override.yml` (Coolify ne lit qu'un fichier), pas de
+  migrations jouées, et les labels `websecure` doivent être dans le fichier.
+  Un compose avec `privileged`, `network_mode: host` ou un montage de l'hôte
+  est refusé avant tout appel Coolify.
 - L'API de stockage peut varier selon les versions de Coolify. La version
   minimale vérifiée est **4.7.3** ; en cas d'erreur, le drapeau
   `EFLEX_PERSISTENT_VOLUMES` doit être retiré avant de relancer.

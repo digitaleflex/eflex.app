@@ -14,10 +14,14 @@ import { decrypt } from '@/lib/crypto'
 import {
   buildProjectArtifacts,
   buildApplicationLabels,
+  composeDomains,
   coolifyApplicationSettings,
+  deploymentKind,
   nixpacksRuntimeVariable,
   persistentVolumesEnabled,
 } from '@/lib/deploy-plan'
+import { inspectCompose, type ComposeInspection } from '@/lib/compose-safety'
+import { fetchRepositoryFile } from '@/lib/repo-file'
 import { assertTransition, isTerminal, TERMINAL_STATUSES, type DeploymentStatus } from '@/lib/deployment-state'
 import { expireStaleDeployments, WATCHDOG_INTERVAL_MS } from '@/lib/deployment-watchdog'
 import { startBillingMaintenance } from '@/lib/billing-renewal'
@@ -180,7 +184,6 @@ export async function processDeployment(
     return
   }
 
-  if (!(await setStatus(deploymentId, 'provisioning'))) return
   const customHosts = project.domains
     .filter((item) => item.verifiedAt !== null)
     .map((item) => item.hostname)
@@ -188,25 +191,76 @@ export async function processDeployment(
   const domain = project.domain ?? hosts[0]
   const artifacts = buildProjectArtifacts(plan, project.slug, domain)
   const settings = coolifyApplicationSettings(plan)
+  const composeSource = artifacts.repositoryCompose
+  const kind = deploymentKind(plan, artifacts)
 
-  // Les plans multi-services nécessitent un fichier compose dans le dépôt.
-  // On s'arrête ici avec un message explicite plutôt que de laisser le
-  // constructeur échouer sans contexte.
-  if (artifacts.services.length > 1) {
+  // Aiguillage avant tout appel Coolify :
+  //   - compose fourni par le dépôt → Application `dockercompose` ;
+  //   - plan généré mono-service → chemin historique ;
+  //   - plan généré multi-services → refus explicite, aucun faux espoir.
+  if (kind === 'invalid-compose') {
     await fail(
       deploymentId,
-      `Ce plan nécessite plusieurs services (${artifacts.services.join(', ')}). ` +
-        'La plateforme ne déploie pas encore un compose multi-services sans docker-compose.yaml dans le dépôt. ' +
-        'Ajoutez le compose au dépôt ou choisissez un plan mono-service.',
+      'Ce plan déclare un compose mais aucun fichier compose exploitable. ' +
+        'Ajoutez `docker-compose.yml` (ou `compose.yaml`) à la racine du dépôt, puis relancez le déploiement.',
     )
     return
   }
+  if (kind === 'multiple-without-compose') {
+    await fail(
+      deploymentId,
+      `Ce plan nécessite plusieurs services (${artifacts.services.join(', ')}). ` +
+        'La plateforme ne génère pas de compose multi-services : ajoutez un fichier `docker-compose.yml` (ou `compose.yaml`) au dépôt, puis relancez. ' +
+        'Les services décrits par le plan restent disponibles comme référence, mais aucun compose n’est écrit dans le dépôt.',
+    )
+    return
+  }
+
+  // Compose : on relit le fichier que Coolify va déployer et on refuse les
+  // clauses qui donneraient accès à l'hôte. Cette validation est refaite à
+  // chaque déploiement (le dépôt peut avoir changé depuis l'analyse).
+  let composeInspection: ComposeInspection | null = null
+  let composeService: string | undefined
+  if (composeSource) {
+    const fetched = await fetchRepositoryFile({
+      repoUrl: project.repoUrl,
+      branch: project.branch,
+      repoPrivate: project.repoPrivate,
+      userId: project.userId,
+      installationId: project.installationId,
+      path: composeSource.repoPath,
+    })
+    if ('error' in fetched) {
+      await fail(deploymentId, `Compose non vérifié : ${fetched.error}`)
+      return
+    }
+    const inspection = inspectCompose(fetched.content)
+    if (!inspection.ok) {
+      await fail(deploymentId, `Déploiement refusé : ${inspection.error}`)
+      return
+    }
+    composeInspection = inspection
+    composeService = inspection.primaryService ?? composeSource.service
+    for (const warning of inspection.warnings) {
+      await appendLogs(deploymentId, `[compose] ${warning}`)
+    }
+    if (!composeService) {
+      await appendLogs(
+        deploymentId,
+        '[compose] Aucun service public identifié : le domaine du projet ne sera pas attaché. Déclarez `ports` ou les labels Traefik websecure dans le compose.',
+      )
+    }
+  }
+
+  if (!(await setStatus(deploymentId, 'provisioning'))) return
 
   // Dépôt avec son propre Dockerfile (framework `docker`) : Coolify clone le
   // dépôt et utilise ce Dockerfile. Sinon, Nixpacks construit l'image avec les
   // commandes du BuildPlan (le champ `dockerfile` de l'API ne clone pas le
   // dépôt, il ne peut donc pas transporter notre Dockerfile généré).
-  const repoHasDockerfile = artifacts.buildPack === 'dockerfile' && artifacts.dockerfile === null
+  const repoHasDockerfile =
+    !composeSource && artifacts.buildPack === 'dockerfile' && artifacts.dockerfile === null
+  const attachedDomains = composeDomains(hosts, composeService)
 
   let appId = project.coolifyAppId
   let privateKeyUuid = project.coolifyPrivateKeyUuid ?? undefined
@@ -256,24 +310,31 @@ export async function processDeployment(
           : project.repoUrl,
       gitBranch: project.branch,
       privateKeyUuid,
-      buildPack: repoHasDockerfile ? 'dockerfile' : 'nixpacks',
-      portsExposes: String(artifacts.portsExposes),
-      // Monorepo : la racine du dépôt est le dossier de travail (les commandes
-      // rejoignent elles-mêmes le dossier de l'application). `root` vide reste
-      // inchangé : Coolify garde sa valeur par défaut `/`.
+      buildPack: composeSource ? 'dockercompose' : repoHasDockerfile ? 'dockerfile' : 'nixpacks',
+      // Monorepo/compose : `base_directory` est le dossier de l'application.
+      // `root` vide reste inchangé : Coolify garde sa valeur par défaut `/`.
       baseDirectory: plan.root !== '' ? settings.baseDirectory : undefined,
-      dockerfileLocation: repoHasDockerfile ? settings.dockerfileLocation : undefined,
-      installCommand: repoHasDockerfile ? undefined : settings.installCommand,
-      buildCommand: repoHasDockerfile ? undefined : settings.buildCommand,
-      startCommand: repoHasDockerfile ? undefined : settings.startCommand,
-      publishDirectory: repoHasDockerfile ? undefined : settings.publishDirectory,
-      fqdn: domain,
-      domains: hosts,
-      customLabels: hosts.length > 0
-        ? buildApplicationLabels(project.slug, hosts, artifacts.portsExposes)
-        : undefined,
-      postDeploymentCommand:
-        artifacts.postDeploy.length > 0 ? artifacts.postDeploy.join(' && ') : undefined,
+      ...(composeSource
+        ? {
+            dockerComposeLocation: settings.dockerComposeLocation,
+            dockerComposeDomains: attachedDomains,
+          }
+        : {
+            portsExposes: String(artifacts.portsExposes),
+            dockerfileLocation: repoHasDockerfile ? settings.dockerfileLocation : undefined,
+            installCommand: repoHasDockerfile ? undefined : settings.installCommand,
+            buildCommand: repoHasDockerfile ? undefined : settings.buildCommand,
+            startCommand: repoHasDockerfile ? undefined : settings.startCommand,
+            publishDirectory: repoHasDockerfile ? undefined : settings.publishDirectory,
+            fqdn: domain,
+            domains: hosts,
+            customLabels:
+              hosts.length > 0
+                ? buildApplicationLabels(project.slug, hosts, artifacts.portsExposes)
+                : undefined,
+            postDeploymentCommand:
+              artifacts.postDeploy.length > 0 ? artifacts.postDeploy.join(' && ') : undefined,
+          }),
     })
     if ('error' in created) {
       await fail(deploymentId, `Préparation de l'hébergement impossible : ${created.error}`)
@@ -287,17 +348,25 @@ export async function processDeployment(
   // l'application Coolify existe déjà : on réapplique les réglages à chaque
   // déploiement, sinon Coolify garde les anciens. Le dossier de travail est
   // toujours renvoyé : un plan revenu à la racine réinitialise `/`.
-  const updated = await updateApplication(appId, {
-    baseDirectory: plan.root !== '' ? settings.baseDirectory : '/',
-    dockerfileLocation: repoHasDockerfile
-      ? (settings.dockerfileLocation ?? '/Dockerfile')
-      : undefined,
-    installCommand: repoHasDockerfile ? undefined : (settings.installCommand ?? null),
-    buildCommand: repoHasDockerfile ? undefined : (settings.buildCommand ?? null),
-    startCommand: repoHasDockerfile ? undefined : (settings.startCommand ?? null),
-    publishDirectory: repoHasDockerfile ? undefined : (settings.publishDirectory ?? null),
-    portsExposes: String(artifacts.portsExposes),
-  })
+  const updated = composeSource
+    ? await updateApplication(appId, {
+        buildPack: 'dockercompose',
+        baseDirectory: plan.root !== '' ? settings.baseDirectory : '/',
+        dockerComposeLocation: settings.dockerComposeLocation,
+        dockerComposeDomains: attachedDomains.length > 0 ? attachedDomains : undefined,
+      })
+    : await updateApplication(appId, {
+        buildPack: repoHasDockerfile ? 'dockerfile' : 'nixpacks',
+        baseDirectory: plan.root !== '' ? settings.baseDirectory : '/',
+        dockerfileLocation: repoHasDockerfile
+          ? (settings.dockerfileLocation ?? '/Dockerfile')
+          : undefined,
+        installCommand: repoHasDockerfile ? undefined : (settings.installCommand ?? null),
+        buildCommand: repoHasDockerfile ? undefined : (settings.buildCommand ?? null),
+        startCommand: repoHasDockerfile ? undefined : (settings.startCommand ?? null),
+        publishDirectory: repoHasDockerfile ? undefined : (settings.publishDirectory ?? null),
+        portsExposes: String(artifacts.portsExposes),
+      })
   if ('error' in updated) {
     await fail(deploymentId, `Commandes de déploiement non appliquées : ${updated.error}`)
     return
@@ -306,7 +375,18 @@ export async function processDeployment(
   // Volumes persistants : désactivés par défaut, car tous les jetons Coolify ne
   // disposent pas des droits de stockage. Activés, un échec est explicite et
   // bloque le déploiement plutôt que de laisser croire à une persistance.
-  if (artifacts.persistentVolumes.length > 0) {
+  if (composeSource) {
+    await appendLogs(
+      deploymentId,
+      '[volumes] les volumes sont déclarés dans le compose du dépôt : aucun stockage Coolify n’est créé.',
+    )
+    if (artifacts.postDeploy.length > 0) {
+      await appendLogs(
+        deploymentId,
+        '[post-deploy] commandes non exécutées automatiquement pour un compose : utilisez un service one-shot (`restart: no`) dans le fichier.',
+      )
+    }
+  } else if (artifacts.persistentVolumes.length > 0) {
     if (!persistentVolumesEnabled()) {
       await appendLogs(
         deploymentId,
@@ -328,7 +408,7 @@ export async function processDeployment(
   }
 
   // Nixpacks : force la version du runtime connue du plan (variable de build).
-  if (!repoHasDockerfile) {
+  if (!repoHasDockerfile && !composeSource) {
     const runtimeVariable = nixpacksRuntimeVariable(plan.runtime)
     if (runtimeVariable) {
       const result = await setEnvironmentVariable(
@@ -346,7 +426,23 @@ export async function processDeployment(
 
   // Les labels sont réappliqués à chaque déploiement, y compris pour une
   // application existante : ils contiennent tous les domaines vérifiés.
-  if (hosts.length > 0) {
+  // Pour un compose, ils appartiennent au fichier du dépôt : envoyer `domains`
+  // ou `custom_labels` serait refusé (422) ou ignoré par Coolify.
+  if (composeSource) {
+    if (attachedDomains.length > 0) {
+      await appendLogs(
+        deploymentId,
+        `[réseau] domaines ${hosts.join(', ')} attachés au service compose « ${composeService} ».`,
+      )
+    }
+    if (composeInspection?.warnings.some((warning) => warning.includes('websecure'))) {
+      // Déjà journalisé avant `provisioning`; on garde une trace au build.
+      await appendLogs(
+        deploymentId,
+        '[compose] les labels Traefik du domaine doivent être déclarés dans le fichier compose (entrypoint `websecure`).',
+      )
+    }
+  } else if (hosts.length > 0) {
     const labels = buildApplicationLabels(project.slug, hosts, artifacts.portsExposes)
     const labeled = await setApplicationLabels(appId, labels, hosts)
     if ('error' in labeled) {
@@ -371,6 +467,12 @@ export async function processDeployment(
       await fail(deploymentId, `Variable « ${variable.key} » non transmise : ${result.error}`)
       return
     }
+  }
+  if (composeSource && envVars.length > 0) {
+    await appendLogs(
+      deploymentId,
+      `[env] ${envVars.length} variable(s) injectée(s) via le fichier .env commun : tous les services du compose les voient.`,
+    )
   }
 
   if (!(await setStatus(deploymentId, 'building'))) return

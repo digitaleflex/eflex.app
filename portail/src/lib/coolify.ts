@@ -1,5 +1,5 @@
 /**
- * Client API Coolify v4.6 — https://coolify.io/docs/api-reference
+ * Client API Coolify v4.7.3 — https://coolify.io/docs/api-reference
  *
  * Le cycle d'un déploiement Eflex :
  *   ensureTarget (serveur + projet + environnement)
@@ -195,17 +195,28 @@ async function resolveTarget(): Promise<Target> {
   return targetPromise
 }
 
+export interface ComposeDomain {
+  /** Nom du service dans le fichier compose. */
+  name: string
+  /** Domaine(s) séparés par une virgule, avec schéma (`https://…`). */
+  domain: string
+  redirect?: 'www' | 'non-www' | 'both'
+}
+
 export interface CreateApplicationParams {
   name: string
   gitRepository: string
   gitBranch?: string
   /**
-   * `dockerfile` : le dépôt contient son Dockerfile (Coolify clone et l'utilise).
-   * `nixpacks`   : Coolify construit l'image avec Nixpacks, en utilisant les
-   *                commandes du BuildPlan (install/build/start).
+   * `dockercompose` : le dépôt fournit son compose (lu dans le dépôt à chaque
+   *                     déploiement, jamais envoyé par le portail) ;
+   * `dockerfile`    : le dépôt contient son Dockerfile (Coolify clone et l'utilise) ;
+   * `nixpacks`      : Coolify construit l'image avec Nixpacks, en utilisant les
+   *                   commandes du BuildPlan (install/build/start).
    */
-  buildPack: 'dockerfile' | 'nixpacks'
-  portsExposes: string
+  buildPack: 'dockercompose' | 'dockerfile' | 'nixpacks'
+  /** Omis pour `dockercompose` : Coolify force déjà le port sur 80. */
+  portsExposes?: string
   /**
    * Répertoire de travail Coolify (chemin absolu dans le clone). Omis quand il
    * vaut la valeur par défaut `/`.
@@ -217,7 +228,11 @@ export interface CreateApplicationParams {
   publishDirectory?: string
   /** Dockerfile relatif à `baseDirectory` (framework `docker`). */
   dockerfileLocation?: string
-  /** Domaine public principal. */
+  /** Compose relatif à `baseDirectory` (framework `compose`). */
+  dockerComposeLocation?: string
+  /** Domaines par service compose ; interdit `domains` pour `dockercompose`. */
+  dockerComposeDomains?: readonly ComposeDomain[]
+  /** Domaine public principal (ignoré pour `dockercompose`). */
   fqdn?: string
   /** Tous les domaines publics (principal + personnalisés). Prioritaire sur `fqdn`. */
   domains?: readonly string[]
@@ -225,6 +240,8 @@ export interface CreateApplicationParams {
   customLabels?: string[]
   /** Commande exécutée après le déploiement (migrations, etc.). */
   postDeploymentCommand?: string
+  /** Service compose ciblé par `postDeploymentCommand`. */
+  postDeploymentCommandContainer?: string
   /** Clé privée Coolify à utiliser pour cloner un dépôt privé (deploy key). */
   privateKeyUuid?: string
 }
@@ -243,6 +260,7 @@ export async function createApplication(
       .map(normalizeHost)
       .filter((host) => host.length > 0)
 
+    const isCompose = params.buildPack === 'dockercompose'
     const payload: Record<string, unknown> = {
       name: params.name,
       project_uuid: target.projectUuid,
@@ -251,7 +269,6 @@ export async function createApplication(
       git_repository: params.gitRepository,
       git_branch: params.gitBranch || 'main',
       build_pack: params.buildPack,
-      ports_exposes: params.portsExposes,
       connect_to_docker_network: true,
       // Eflex gère les domaines : pas de domaine sslip.io généré par Coolify.
       autogenerate_domain: false,
@@ -266,19 +283,41 @@ export async function createApplication(
     if (params.baseDirectory) payload.base_directory = params.baseDirectory
     if (params.dockerfileLocation) payload.dockerfile_location = params.dockerfileLocation
 
-    if (params.installCommand) payload.install_command = params.installCommand
-    if (params.buildCommand) payload.build_command = params.buildCommand
-    if (params.startCommand) payload.start_command = params.startCommand
-    if (params.publishDirectory) payload.publish_directory = params.publishDirectory
-    if (params.postDeploymentCommand) {
-      payload.post_deployment_command = params.postDeploymentCommand
-    }
+    if (isCompose) {
+      // Champs réels de Coolify 4.7.3 pour une Application `dockercompose` :
+      // `domains` est refusé (422) et `ports_exposes` est forcé à 80 côté
+      // serveur. Le compose est lu dans le dépôt, jamais transmis ici.
+      payload.docker_compose_location = params.dockerComposeLocation || '/docker-compose.yaml'
+      const composeDomains = (params.dockerComposeDomains ?? []).filter(
+        (entry) => entry.name.length > 0 && entry.domain.length > 0,
+      )
+      if (composeDomains.length > 0) {
+        payload.docker_compose_domains = composeDomains.map((entry) => ({
+          name: entry.name,
+          domain: entry.domain,
+          ...(entry.redirect ? { redirect: entry.redirect } : {}),
+        }))
+      }
+    } else {
+      payload.ports_exposes = params.portsExposes ?? '80'
 
-    if (hosts.length > 0) {
-      payload.domains = hosts.map((host) => `https://${host}`).join(',')
-      const labels = params.customLabels ?? []
-      if (labels.length > 0) {
-        payload.custom_labels = Buffer.from(labels.join('\n'), 'utf8').toString('base64')
+      if (params.installCommand) payload.install_command = params.installCommand
+      if (params.buildCommand) payload.build_command = params.buildCommand
+      if (params.startCommand) payload.start_command = params.startCommand
+      if (params.publishDirectory) payload.publish_directory = params.publishDirectory
+      if (params.postDeploymentCommand) {
+        payload.post_deployment_command = params.postDeploymentCommand
+        if (params.postDeploymentCommandContainer) {
+          payload.post_deployment_command_container = params.postDeploymentCommandContainer
+        }
+      }
+
+      if (hosts.length > 0) {
+        payload.domains = hosts.map((host) => `https://${host}`).join(',')
+        const labels = params.customLabels ?? []
+        if (labels.length > 0) {
+          payload.custom_labels = Buffer.from(labels.join('\n'), 'utf8').toString('base64')
+        }
       }
     }
 
@@ -301,8 +340,11 @@ export async function createApplication(
 export async function updateApplication(
   appId: string,
   params: {
+    buildPack?: 'dockercompose' | 'dockerfile' | 'nixpacks'
     baseDirectory?: string | null
     dockerfileLocation?: string | null
+    dockerComposeLocation?: string | null
+    dockerComposeDomains?: readonly ComposeDomain[]
     installCommand?: string | null
     buildCommand?: string | null
     startCommand?: string | null
@@ -311,8 +353,19 @@ export async function updateApplication(
   },
 ): Promise<{ ok: true } | { error: string }> {
   const payload: Record<string, unknown> = {}
+  if (params.buildPack !== undefined) payload.build_pack = params.buildPack
   if (params.baseDirectory !== undefined) payload.base_directory = params.baseDirectory
   if (params.dockerfileLocation !== undefined) payload.dockerfile_location = params.dockerfileLocation
+  if (params.dockerComposeLocation !== undefined) {
+    payload.docker_compose_location = params.dockerComposeLocation
+  }
+  if (params.dockerComposeDomains !== undefined) {
+    payload.docker_compose_domains = params.dockerComposeDomains.map((entry) => ({
+      name: entry.name,
+      domain: entry.domain,
+      ...(entry.redirect ? { redirect: entry.redirect } : {}),
+    }))
+  }
   if (params.installCommand !== undefined) payload.install_command = params.installCommand
   if (params.buildCommand !== undefined) payload.build_command = params.buildCommand
   if (params.startCommand !== undefined) payload.start_command = params.startCommand
@@ -783,13 +836,44 @@ export async function getApplicationRuntime(
   }
 }
 
+/**
+ * Attache les domaines d'une application compose, sans jamais envoyer
+ * `domains` (refusé en 422 par Coolify pour `build_pack=dockercompose`).
+ */
+export async function setComposeApplicationDomains(
+  appId: string,
+  domains: readonly ComposeDomain[],
+): Promise<{ ok: true } | { error: string }> {
+  if (domains.length === 0) return { ok: true }
+  const res = await coolifyFetch(`/applications/${encodeURIComponent(appId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      docker_compose_domains: domains.map((entry) => ({
+        name: entry.name,
+        domain: entry.domain,
+        ...(entry.redirect ? { redirect: entry.redirect } : {}),
+      })),
+    }),
+  })
+  if (res.error) return { error: res.error }
+  return { ok: true }
+}
+
 /** Journaux d'exécution du conteneur (les secrets sont masqués par l'appelant). */
 export async function getApplicationLogs(
   appId: string,
   lines = 200,
+  serviceName?: string,
 ): Promise<{ logs: string } | { error: string }> {
+  const params = new URLSearchParams({
+    lines: String(lines),
+    show_timestamps: 'true',
+  })
+  // Coolify 4.7.3 expose `GET /applications/{uuid}/logs?service_name=web` :
+  // les logs du service compose demandé, pas seulement du premier conteneur.
+  if (serviceName) params.set('service_name', serviceName)
   const res = await coolifyFetch<{ logs?: unknown }>(
-    `/applications/${encodeURIComponent(appId)}/logs?lines=${encodeURIComponent(String(lines))}&show_timestamps=true`,
+    `/applications/${encodeURIComponent(appId)}/logs?${params.toString()}`,
   )
   if (res.error) return { error: res.error }
   return { logs: typeof res.data?.logs === 'string' ? res.data.logs : '' }

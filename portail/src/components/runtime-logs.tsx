@@ -7,20 +7,34 @@ import { cn } from '@/lib/utils'
 
 /**
  * Journaux d'exécution du conteneur (Coolify), rafraîchis automatiquement.
- * Les valeurs des variables d'environnement connues sont masquées côté serveur.
+ * Pour un compose, un sélecteur permet de lire les logs d'un service précis
+ * (`service_name` dans l'API Coolify). Les valeurs des variables
+ * d'environnement connues sont masquées côté serveur.
  */
-export function RuntimeLogs({ projectId }: { projectId: string }) {
+export function RuntimeLogs({
+  projectId,
+  services = [],
+}: {
+  projectId: string
+  /** Services compose ; vide pour une application mono-service. */
+  services?: readonly string[]
+}) {
   const [logs, setLogs] = useState('')
   const [updatedAt, setUpdatedAt] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [service, setService] = useState('')
   const timer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/logs?lines=200`, { cache: 'no-store' })
+      const query = new URLSearchParams({ lines: '200' })
+      if (service !== '') query.set('service', service)
+      const response = await fetch(`/api/projects/${projectId}/logs?${query.toString()}`, {
+        cache: 'no-store',
+      })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
         setError(data.error ?? 'Journaux indisponibles.')
@@ -34,7 +48,7 @@ export function RuntimeLogs({ projectId }: { projectId: string }) {
     } finally {
       setLoading(false)
     }
-  }, [projectId])
+  }, [projectId, service])
 
   useEffect(() => {
     void load()
@@ -79,6 +93,23 @@ export function RuntimeLogs({ projectId }: { projectId: string }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {services.length > 0 && (
+            <label className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm [@media(pointer:coarse)]:min-h-11">
+              <span className="text-muted-foreground">Service</span>
+              <select
+                value={service}
+                onChange={(e) => setService(e.target.value)}
+                className="min-h-7 bg-transparent font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="">tous</option>
+                {services.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm [@media(pointer:coarse)]:min-h-11">
             <input
               type="checkbox"

@@ -3,6 +3,7 @@ import type { Framework } from './types.js';
 /** Base confidence per framework, before any adjustment. */
 export const BASE_CONFIDENCE: Record<Framework, number> = {
   docker: 0.99,
+  compose: 0.95,
   'eflex-config': 1,
   nextjs: 0.92,
   nuxt: 0.9,

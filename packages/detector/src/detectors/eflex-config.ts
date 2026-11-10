@@ -1,6 +1,7 @@
 import type {
   BuildPlan,
   Candidate,
+  ComposeContext,
   DetectionContext,
   Framework,
   ServiceSpec,
@@ -14,6 +15,7 @@ export interface EflexConfigOutcome {
 
 const FRAMEWORKS: readonly Framework[] = [
   'docker',
+  'compose',
   'eflex-config',
   'nextjs',
   'nuxt',
@@ -61,6 +63,39 @@ function sanitizeRoot(value: unknown): string {
   const parts = normalized.split('/').filter((part) => part !== '' && part !== '.');
   if (parts.some((part) => part === '..')) return '';
   return parts.join('/');
+}
+
+function sanitizeCompose(value: unknown): ComposeContext | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+
+  // Même règle que `root` : pas de `..`, chemin relatif à l'application.
+  const rawLocation = typeof raw.location === 'string' ? raw.location.trim() : '';
+  if (
+    rawLocation !== '' &&
+    (rawLocation.split(/[\\/]+/).includes('..') || rawLocation.startsWith('~'))
+  ) {
+    return null;
+  }
+  const location = sanitizeRoot(rawLocation);
+  const services = Array.isArray(raw.services)
+    ? raw.services
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter((item) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$/.test(item))
+        .slice(0, 50)
+    : [];
+  const uniqueServices = [...new Set(services)];
+  const service =
+    typeof raw.service === 'string' && uniqueServices.includes(raw.service)
+      ? raw.service
+      : undefined;
+
+  return {
+    location: location === '' ? '/docker-compose.yaml' : `/${location}`,
+    services: uniqueServices,
+    ...(service ? { service } : {}),
+  };
 }
 
 function sanitizeServices(value: unknown): Record<string, ServiceSpec> | null {
@@ -140,6 +175,7 @@ function inferRuntime(
     case 'python':
       return 'python@3.12';
     case 'docker':
+    case 'compose':
       return 'docker@1';
     case 'eflex-config':
     default: {
@@ -201,6 +237,28 @@ export function detectEflexConfig(ctx: DetectionContext): EflexConfigOutcome | n
 
   if (root !== '') plan.repoRoot = repoRootFromApp(root);
 
+  const warnings: string[] = [];
+  if (framework === 'compose') {
+    const configuredCompose =
+      config.compose === undefined ? null : sanitizeCompose(config.compose);
+    if (config.compose !== undefined && configuredCompose === null) {
+      return {
+        candidate: null,
+        error:
+          '`eflex.json` est invalide : `compose` doit être un objet avec un `location` sûr (sans `..`).',
+      };
+    }
+    plan.compose = configuredCompose ?? {
+      location: '/docker-compose.yaml',
+      services: [],
+    };
+    if (plan.compose.services.length === 0) {
+      warnings.push(
+        '`eflex.json` déclare `framework: compose` : vérifiez que le fichier compose existe et liste bien ses services.',
+      );
+    }
+  }
+
   const install = stringField(config.install);
   if (install) plan.install = install;
 
@@ -241,7 +299,7 @@ export function detectEflexConfig(ctx: DetectionContext): EflexConfigOutcome | n
       reasons: [
         'Configuration explicite `eflex.json` (version 1) détectée : elle remplace la détection automatique.',
       ],
-      warnings: [],
+      warnings,
       questions: [],
     },
     error: null,

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { BuildPlan } from '@eflex/detector'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { resolveOrganization } from '@/lib/organizations'
@@ -31,6 +32,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     select: {
       id: true,
       coolifyAppId: true,
+      plan: true,
       envVars: { select: { key: true, value: true } },
     },
   })
@@ -39,10 +41,25 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Ce projet n'a pas encore été déployé." }, { status: 409 })
   }
 
-  const linesParam = Number.parseInt(new URL(request.url).searchParams.get('lines') ?? '', 10)
+  const search = new URL(request.url).searchParams
+  const linesParam = Number.parseInt(search.get('lines') ?? '', 10)
   const lines = Number.isFinite(linesParam) ? Math.min(500, Math.max(50, linesParam)) : 200
 
-  const result = await getApplicationLogs(project.coolifyAppId, lines)
+  // Logs par service : uniquement pour un compose fourni par le dépôt, et
+  // uniquement un service réellement déclaré (jamais un nom arbitraire).
+  const plan = project.plan as unknown as BuildPlan | null
+  const composeServices =
+    plan && plan.framework === 'compose' ? (plan.compose?.services ?? []) : []
+  const requestedService = search.get('service')?.trim() ?? ''
+  if (requestedService !== '' && !composeServices.includes(requestedService)) {
+    return NextResponse.json({ error: 'Service inconnu pour ce projet.' }, { status: 400 })
+  }
+
+  const result = await getApplicationLogs(
+    project.coolifyAppId,
+    lines,
+    requestedService === '' ? undefined : requestedService,
+  )
   if ('error' in result) {
     return NextResponse.json({ error: result.error }, { status: 502 })
   }
