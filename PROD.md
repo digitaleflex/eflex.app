@@ -144,6 +144,29 @@ Le worker exécute un watchdog au démarrage, à chaque job et toutes les minute
 
 Pour allonger le délai (builds très lourds), définir `DEPLOYMENT_TIMEOUT_MINUTES` dans `.env.prod` puis redémarrer le portail. La valeur par défaut est **30**.
 
+## Sauvegardes, test de restauration et surveillance
+
+Les scripts sont dans `scripts/` et la procédure complète (RPO/RTO, rétention,
+restauration manuelle, incident) dans `docs/operations/backups.md`.
+
+```bash
+bash scripts/backup-db.sh       # dump quotidien + vérifications + rétention
+bash scripts/restore-test.sh    # restaure dans eflex_restore_test puis supprime
+bash scripts/healthcheck.sh     # HTTP, TLS, Docker, PostgreSQL, Redis
+```
+
+- Sauvegardes dans `/home/fantome/backups/eflex` (700, fichiers 600) :
+  7 quotidiennes + 4 hebdomadaires ; seuls les préfixes `eflex-db-daily-` et
+  `eflex-db-weekly-` sont purgés.
+- `restore-test.sh` refuse toute base cible sans « test » dans son nom et ne
+  touche jamais `eflex` (lectures de comptage uniquement).
+- `healthcheck.sh` sort en code 1 à la moindre anomalie (TLS < 21 jours inclus)
+  et peut alerter par webhook (`ALERT_WEBHOOK_URL`) ou e-mail Resend
+  (`RESEND_API_KEY` + `ALERT_EMAIL`).
+- Unités systemd prêtes à installer : `docs/operations/systemd/`
+  (sauvegarde quotidienne 03:30, test de restauration dimanche 05:15,
+  healthcheck toutes les 15 min).
+
 ## Sécurité
 
 - Ne commitez **jamais** `.env.prod` (déjà couvert par `.env.*` dans `.gitignore`).

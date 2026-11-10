@@ -1,0 +1,22 @@
+[Unit]
+Description=Eflex — healthcheck HTTP, TLS, Docker, PostgreSQL, Redis
+Documentation=file:///home/fantome/eflex/docs/operations/backups.md
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=fantome
+Group=fantome
+WorkingDirectory=/home/fantome/eflex
+Environment=EFLEX_ENV_FILE=/home/fantome/eflex/.env.prod
+ExecStart=/bin/bash /home/fantome/eflex/scripts/healthcheck.sh
+SyslogIdentifier=eflex-healthcheck
+UMask=0077
+Nice=5
+TimeoutStartSec=5min
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=no

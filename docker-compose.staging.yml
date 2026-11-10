@@ -1,0 +1,216 @@
+# ---------------------------------------------------------------------------
+# Environnement de STAGING isolé — ne touche JAMAIS à la production
+# ---------------------------------------------------------------------------
+# Isolation volontaire par rapport à docker-compose.prod.yml :
+#   * projet Compose distinct          : `eflex-staging`
+#   * conteneurs distincts             : `eflex-staging-*`
+#   * volumes distincts                : `eflex-staging-*` (jamais `eflex_postgres_data`)
+#   * réseau interne distinct          : `eflex-staging-internal`
+#   * base PostgreSQL distincte        : `eflex_staging`
+#   * Redis distinct, protégé par mot de passe
+#   * projet Coolify distinct          : `Eflex Staging` (les applications de
+#     production ne sont donc jamais pilotées depuis le staging)
+#   * routeur Traefik distinct         : `eflex-staging` (pas de collision avec
+#     le routeur `portail` de la production)
+# ---------------------------------------------------------------------------
+# Le portail est accessible de deux façons :
+#   1. via Traefik sur https://staging.eflex.app (labels ci-dessous) ;
+#   2. en local sur http://127.0.0.1:3001 (bind loopback uniquement) tant que
+#      le DNS / certificat n'est pas prêt.
+# Le port loopback ne sert QUE de secours de diagnostic : il n'écoute pas sur
+# l'interface publique.
+# ---------------------------------------------------------------------------
+# Usage :
+#   cp .env.staging.example .env.staging   # puis renseigner les secrets
+#   bash deploy-staging.sh                 # build + migrations + up -d + health
+# ou, sans script :
+#   docker compose -p eflex-staging -f docker-compose.staging.yml \
+#     --env-file .env.staging up -d --build
+# ---------------------------------------------------------------------------
+# Traefik n'est pas géré ici : on se rattache au Traefik déjà présent sur le
+# réseau Docker externe `proxy` (certresolver `letsencrypt`, HTTP-01).
+# Prérequis DNS : voir docs/operations/staging.md.
+# ---------------------------------------------------------------------------
+
+name: eflex-staging
+
+services:
+  ###########################################################################
+  # PORTAIL — Next.js (API + interface client)
+  ###########################################################################
+  portail:
+    build:
+      context: .
+      dockerfile: portail/Dockerfile
+      args:
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
+    image: eflex-staging-portail:local
+    container_name: eflex-staging-portail
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      # Next standalone écoute sur l'IP du conteneur : 0.0.0.0 est nécessaire
+      # pour le healthcheck local et pour Traefik.
+      - HOSTNAME=0.0.0.0
+      # Base et cache dédiés au staging (jamais les URLs de production).
+      - DATABASE_URL=${DATABASE_URL:?definir DATABASE_URL dans .env.staging}
+      - REDIS_URL=${REDIS_URL:?definir REDIS_URL dans .env.staging}
+      - DEPLOYMENT_TIMEOUT_MINUTES=${DEPLOYMENT_TIMEOUT_MINUTES:-30}
+      # L'authentification du staging est autonome : secret dédié, URL dédiée.
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?definir BETTER_AUTH_SECRET dans .env.staging}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-https://staging.eflex.app}
+      # Domaine racine des applications déployées depuis le staging :
+      # `<slug>.staging.eflex.app`. Ne pas mettre `eflex.app` ici.
+      - PORTAL_DOMAIN=${PORTAL_DOMAIN:-staging.eflex.app}
+      - PORTAL_URL=${PORTAL_URL:-https://staging.eflex.app}
+      - ADMIN_EMAILS=${ADMIN_EMAILS:-}
+      - MAINTENANCE_MODE=${MAINTENANCE_MODE:-false}
+      - MAINTENANCE_MESSAGE=${MAINTENANCE_MESSAGE:-}
+      - STATUS_ENGINE_URL=${STATUS_ENGINE_URL:-}
+      # Clé de chiffrement DÉDIÉE au staging. Ne jamais réutiliser celle de la
+      # production : les données chiffrées des deux environnements ne doivent
+      # pas être interchangeables.
+      - ENV_ENCRYPTION_KEY=${ENV_ENCRYPTION_KEY:?definir ENV_ENCRYPTION_KEY dans .env.staging}
+      - ENV_ENCRYPTION_KEY_PREVIOUS=${ENV_ENCRYPTION_KEY_PREVIOUS:-}
+      # E-mails : laisser vide ou utiliser une clé Resend de test (sandbox).
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - EMAIL_FROM=${EMAIL_FROM:-Eflex Staging <no-reply@staging.eflex.app>}
+      - RESEND_WEBHOOK_SECRET=${RESEND_WEBHOOK_SECRET:-}
+      # GitHub : facultatif, un jeton de lecture suffit pour l'analyse publique.
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITHUB_APP_ID=${GITHUB_APP_ID:-}
+      - GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY:-}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-}
+      - GITHUB_APP_SLUG=${GITHUB_APP_SLUG:-}
+      - GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID:-}
+      - GITHUB_APP_CLIENT_SECRET=${GITHUB_APP_CLIENT_SECRET:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY:-}
+      # ─── Coolify : cible VOLONTAIREMENT séparée ───────────────────────────
+      # Sans `COOLIFY_API_URL`/`COOLIFY_API_TOKEN`, les créations de projet
+      # restent en base et échouent proprement : aucun effet de bord distant.
+      # Si le staging pilote Coolify, garder `Eflex Staging` et l'environnement
+      # `staging` : les applications de production (`Eflex`/`production`) ne
+      # sont jamais touchées.
+      - COOLIFY_API_URL=${COOLIFY_API_URL:-}
+      - COOLIFY_API_TOKEN=${COOLIFY_API_TOKEN:-}
+      - COOLIFY_PROJECT_NAME=${COOLIFY_PROJECT_NAME:-Eflex Staging}
+      - COOLIFY_ENVIRONMENT=${COOLIFY_ENVIRONMENT:-staging}
+      - COOLIFY_PROJECT_UUID=${COOLIFY_PROJECT_UUID:-}
+      - COOLIFY_SERVER_UUID=${COOLIFY_SERVER_UUID:-}
+      # Paiements : sandbox uniquement côté staging.
+      - KKIAPAY_PUBLIC_KEY=${KKIAPAY_PUBLIC_KEY:-}
+      - KKIAPAY_PRIVATE_KEY=${KKIAPAY_PRIVATE_KEY:-}
+      - KKIAPAY_SECRET_KEY=${KKIAPAY_SECRET_KEY:-}
+      - KKIAPAY_SANDBOX=${KKIAPAY_SANDBOX:-true}
+      - KKIAPAY_WEBHOOK_SECRET=${KKIAPAY_WEBHOOK_SECRET:-}
+      - FEDAPAY_SECRET_KEY=${FEDAPAY_SECRET_KEY:-}
+      - FEDAPAY_SANDBOX=${FEDAPAY_SANDBOX:-true}
+      - FEDAPAY_WEBHOOK_SECRET=${FEDAPAY_WEBHOOK_SECRET:-}
+      - INVOICE_COMPANY_NAME=${INVOICE_COMPANY_NAME:-Eflex Staging}
+      - INVOICE_COMPANY_ADDRESS=${INVOICE_COMPANY_ADDRESS:-}
+      - INVOICE_COMPANY_EMAIL=${INVOICE_COMPANY_EMAIL:-facturation@staging.eflex.app}
+      - INVOICE_TAX_ID=${INVOICE_TAX_ID:-}
+    # Secours de diagnostic local : bind loopback SEULEMENT, jamais 0.0.0.0.
+    ports:
+      - "127.0.0.1:${STAGING_PORTAL_PORT:-3001}:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      # Noms de routeur/service préfixés : aucun conflit avec la prod.
+      - "traefik.http.routers.eflex-staging.rule=Host(`${STAGING_DOMAIN:-staging.eflex.app}`)"
+      - "traefik.http.routers.eflex-staging.entrypoints=websecure"
+      - "traefik.http.routers.eflex-staging.tls=true"
+      - "traefik.http.routers.eflex-staging.tls.certresolver=letsencrypt"
+      - "traefik.http.services.eflex-staging.loadbalancer.server.port=3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - proxy
+      - eflex-staging-internal
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ###########################################################################
+  # MIGRATE — `prisma migrate deploy` (one-off, profil "tools")
+  ###########################################################################
+  migrate:
+    build:
+      context: .
+      dockerfile: portail/Dockerfile
+      target: migrator
+    image: eflex-staging-migrator:local
+    profiles: ["tools"]
+    environment:
+      - DATABASE_URL=${DATABASE_URL:?definir DATABASE_URL dans .env.staging}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - eflex-staging-internal
+
+  ###########################################################################
+  # POSTGRESQL — base `eflex_staging`, volume dédié
+  ###########################################################################
+  postgres:
+    image: postgres:16-alpine
+    container_name: eflex-staging-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-eflex}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?definir POSTGRES_PASSWORD dans .env.staging}
+      - POSTGRES_DB=${POSTGRES_DB:-eflex_staging}
+    volumes:
+      - eflex-staging-postgres-data:/var/lib/postgresql/data
+    networks:
+      - eflex-staging-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eflex} -d ${POSTGRES_DB:-eflex_staging}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ###########################################################################
+  # REDIS — instance dédiée, protégée par mot de passe
+  ###########################################################################
+  redis:
+    image: redis:7-alpine
+    container_name: eflex-staging-redis
+    restart: unless-stopped
+    # Le mot de passe est lu depuis l'environnement du conteneur (jamais dans
+    # la ligne de commande, donc pas dans `docker inspect` du process).
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?definir REDIS_PASSWORD dans .env.staging}
+      # redis-cli lit REDISCLI_AUTH : pas de `-a` en ligne de commande.
+      - REDISCLI_AUTH=${REDIS_PASSWORD:?definir REDIS_PASSWORD dans .env.staging}
+    command: ["sh", "-c", "exec redis-server --save '' --appendonly no --requirepass \"$$REDIS_PASSWORD\""]
+    networks:
+      - eflex-staging-internal
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  # Nom explicite : jamais partagé avec `eflex_postgres_data` (production).
+  eflex-staging-postgres-data:
+    name: eflex-staging-postgres-data
+
+networks:
+  # Réseau du Traefik existant (partagé, mais rien de sensible n'y transite
+  # autrement que le portail sur 3000).
+  proxy:
+    external: true
+  # Réseau applicatif du staging : PostgreSQL et Redis n'y sont visibles que
+  # par les conteneurs eflex-staging-*.
+  eflex-staging-internal:
+    name: eflex-staging-internal
+    driver: bridge

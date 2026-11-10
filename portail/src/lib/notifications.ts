@@ -10,6 +10,8 @@ export const NOTIFICATION_TYPES = {
   'invitation.received': { label: 'Invitation reçue', description: "Quand quelqu'un vous invite à rejoindre une organisation." },
   'member.joined': { label: 'Nouveau membre', description: 'Quand une personne rejoint une de vos organisations (propriétaires et administrateurs).' },
   'membership.removed': { label: 'Retrait d’une organisation', description: 'Quand vous êtes retiré d’une organisation.' },
+  'billing.grace_started': { label: 'Abonnement en retard', description: 'Quand le paiement d’un abonnement est en retard et qu’une période de grâce démarre.' },
+  'billing.grace_ended': { label: 'Fin de période de grâce', description: 'Quand la période de grâce d’un abonnement impayé se termine ; les applications restent en ligne, les nouveaux déploiements sont bloqués.' },
 } as const
 
 export type NotificationType = keyof typeof NOTIFICATION_TYPES
