@@ -19,6 +19,15 @@ migration lancée, aucune application créée ou déployée, aucun secret reprod
 > l'application. **Aucune écriture en base, aucun changement de schéma Prisma** :
 > la création reste mono-application dans ce lot.
 
+> **Statut au 10 novembre 2026 — lot B livré (expand + backfill).**
+> Migration `20261110170000_project_apps` (nouvelle table `ProjectApp`,
+> `Deployment.appId|groupId`, `EnvVar.appId`, `ProjectDomain.appId`, index
+> partiel des variables) et script idempotent
+> `portail/scripts/backfill-project-apps.ts`. **Le comportement d'exécution est
+> inchangé** : le worker, les routes, l'UI et `coolify.ts` ne lisent encore ni
+> `ProjectApp` ni `Deployment.appId`, et le drapeau `EFLEX_MULTI_APP` **n'est pas
+> branché**. Voir § 8.
+
 
 > ⚠️ `worker.ts`, `coolify.ts` et l'interface de déploiement viennent d'être
 > réécrits par les lots D1 (#6, compose fourni par le dépôt) et retour arrière
@@ -297,11 +306,11 @@ model ProjectApp {
   framework     String
   runtime       String?
   port          Int          @default(80)
-  plan          Json?
-  detection     Json?
+  /** Plan v1 de l'application (obligatoire : sans plan, elle n'est pas déployable). */
+  plan          Json
   /** Domaine public de l'application. null = application non exposée. */
   domain        String?      @unique
-  coolifyAppId  String?      @unique
+  coolifyAppId  String?
   tlsValid      Boolean?
   tlsExpiresAt  DateTime?
   tlsCheckedAt  DateTime?
@@ -315,6 +324,7 @@ model ProjectApp {
   @@unique([projectId, name])
   @@unique([projectId, root])
   @@index([projectId])
+  @@index([coolifyAppId])
 }
 
 model Deployment {
@@ -333,7 +343,9 @@ model EnvVar {
   appId String?
   app   ProjectApp? @relation(fields: [appId], references: [id], onDelete: Cascade)
 
-  @@unique([projectId, appId, key])
+  // Conservé au lot B (les routes utilisent `projectId_key`) ; deviendra
+  // `@@unique([projectId, appId, key])` au lot C/D.
+  @@unique([projectId, key])
   @@index([appId])
 }
 
@@ -362,6 +374,15 @@ Points de vigilance **à ne pas rater** :
    ici : `hostname` reste unique global). `prisma migrate dev` signale l'index
    brut comme dérive possible : relire `prisma migrate diff` avant de committer,
    et ne jamais laisser `migrate dev` le supprimer.
+
+   **État livré au lot B.** La contrainte Prisma `@@unique([projectId, key])`
+   est **conservée** : les routes `env-vars` et `lib/project-databases.ts`
+   utilisent le sélecteur `projectId_key`, et le lot B ne touche à aucune route.
+   L'index partiel `EnvVar_project_scope_key` est néanmoins créé dès maintenant :
+   il est redondant aujourd'hui avec la contrainte large, mais il garantira la
+   portée projet au lot C/D, quand `@@unique([projectId, appId, key])` remplacera
+   `@@unique([projectId, key])`. Aucune fenêtre où deux variables projet
+   pourraient partager une clé n'est ainsi ouverte.
 2. **AAD des secrets inchangée.** `EnvVar.value` est chiffré avec l'AAD
    `projectId:key` (`lib/crypto.ts`). On **ne change pas** l'AAD : cela
    éviterait de rechiffrer des milliers de lignes et garderait la propriété qui
@@ -385,6 +406,12 @@ Points de vigilance **à ne pas rater** :
 6. **Suppression en cascade.** Supprimer un projet supprime ses apps, variables,
    domaines et déploiements. La suppression des **applications Coolify** reste
    explicite dans la route (jamais en cascade silencieuse).
+   Exception assumée : `Deployment.appId` est en `onDelete: SetNull` — retirer
+   une application ne doit pas effacer l'historique de ses déploiements. La
+   suppression du **projet** continue de supprimer ses déploiements via
+   `projectId` (Cascade). `EnvVar.appId` et `ProjectDomain.appId` sont en
+   `Cascade` : une variable ou un alias rattaché à une application disparaît
+   avec elle.
 
 ## 6. Contrat API
 
@@ -513,43 +540,92 @@ Objectif : **aucun changement visible** pour un projet mono-application.
 
 ## 8. Migration Prisma (expand / contract)
 
-Aucune migration n'est jouée dans le cadre de cette étude. Ordre prévu :
+Ordre prévu. **Les phases E et B sont livrées** (lot B, 10 novembre 2026) ; les
+phases D et C restent à faire.
 
-### Phase E — expand (lot B)
+### Phase E — expand (lot B) — **livrée**
+
+Migration : `portail/prisma/migrations/20261110170000_project_apps/migration.sql`,
+écrite à la main (pas de `migrate dev`, qui exigerait une base). Elle est
+purement additive :
 
 ```bash
 cd portail
-npx prisma migrate dev --name project_app
+npx prisma migrate deploy     # applique l'expand, aucune donnée touchée
 npx prisma validate && npx prisma generate
 ```
 
-- création de `ProjectApp`, des colonnes `Deployment.appId|groupId`,
-  `EnvVar.appId`, `ProjectDomain.appId` (toutes **nullables**) ;
-- index partiel `EnvVar_project_scope_key` ajouté par SQL brut dans le même
-  fichier de migration ;
+- création de `ProjectApp` (vide), `plan` **obligatoire** (le worker refuse déjà
+  un projet sans plan valide ; une app sans plan ne serait pas déployable) ;
+- colonnes `Deployment.appId|groupId`, `EnvVar.appId`, `ProjectDomain.appId`,
+  toutes **nullables** ; index `appId`, `groupId`, `coolifyAppId` ;
+- clés étrangères : `Deployment.appId → SetNull` (historique conservé),
+  `EnvVar.appId` / `ProjectDomain.appId → Cascade` (configuration de l'app),
+  `ProjectApp.projectId → Cascade` ;
+- index unique partiel `EnvVar_project_scope_key` ajouté par SQL brut ;
+- la contrainte `@@unique([projectId, key])` existante est **conservée** (voir
+  § 5, point 1) : aucune route ne change, aucun sélecteur Prisma ne casse ;
 - le code continue de lire `Project.*` : **aucun changement de comportement**.
 
-### Phase B — backfill (lot B, après la migration)
+Vérifications faites sur une base PostgreSQL 16 jetable (`eflex_d2_test`,
+jamais `eflex`) : `prisma migrate deploy` du schéma complet, puis
+`prisma migrate diff --from-url … --to-schema-datamodel …` (seule dérive
+préexistante : `Project_repoFullName_idx` et deux `updatedAt` sans défaut,
+antérieurs à ce lot). `prisma migrate deploy` est la commande d'application ;
+ne pas utiliser `migrate dev` en production.
 
-`portail/scripts/backfill-project-apps.ts` (nouveau, idempotent, journalisé) :
+### Phase B — backfill (lot B) — **livrée**
 
-- pour chaque `Project` sans `ProjectApp` : crée une app `name = 'app'`
-  (ou dernier segment de `plan.root`), `position = 0`, en recopiant `plan`,
-  `framework`, `runtime`, `port`, `domain`, `coolifyAppId`, `tls*` ;
-- **ne touche pas** aux `Deployment` existants (`appId = null` = app
-  principale à la lecture) ;
-- `--dry-run` par défaut, `--batch=200`, compteur `created/skipped` ;
-- testé avec `EFLEX_TEST_DB=1` (crée un projet, exécute le script, vérifie les
-  champs recopiés, puis le relance et vérifie l'idempotence).
+`portail/scripts/backfill-project-apps.ts` (nouveau, idempotent, journalisé),
+s'appuyant sur les règles pures de `portail/src/lib/project-app-backfill.ts` :
 
-Commande d'exploitation (à ajouter au runbook `docs/operations/deployments.md`) :
+- pour chaque `Project` **sans** `ProjectApp` : crée une app `position = 0` en
+  recopiant `plan`, `framework`, `runtime`, `port`, `domain`, `coolifyAppId`,
+  `tls*` ;
+- `name` stable et déterministe : dernier segment de `plan.root` normalisé
+  (`apps/web` → `web`), `app` pour la racine ; le nom ne dépend ni du nom du
+  projet ni de l'ordre d'exécution ;
+- `root` = `plan.root` normalisé (sans `/` initial ou final) ;
+- un projet **sans plan v1 exploitable** (plan absent, non-objet, sans
+  `framework`/`port`) est **ignoré** et compté `skippedNoPlan` : le worker le
+  refuse déjà, et `ProjectApp.plan` est obligatoire ;
+- un `domain` déjà pris par une autre `ProjectApp` est laissé `null` avec un
+  avertissement (l'unicité `ProjectApp.domain` n'est jamais violée, l'app
+  existante garde son routage) ;
+- les `Deployment` du projet sont rattachés à l'app créée (`appId`), avec
+  `groupId = null` : la machine à états, les logs et l'historique sont inchangés ;
+  aucune autre colonne de `Deployment` n'est modifiée ;
+- `EnvVar.appId` et `ProjectDomain.appId` restent **`null`** : portée projet.
+  Le worker actuel (`findMany({ where: { projectId } })`) diffuse toutes les
+  variables à l'unique application, et les alias du projet s'appliquent à cette
+  application. Les rattacher à l'app principale changerait la sémantique
+  (« variable de l'app » au lieu de « diffusée à toutes les apps ») sans aucun
+  besoin du lot B ; le lot C/D décidera app par app ;
+- **aucune écriture** sur un projet qui possède déjà une `ProjectApp`
+  (idempotence : une seconde exécution crée 0 ligne) ;
+- une erreur sur un projet est comptée et n'interrompt pas le lot.
 
 ```bash
-cd portail
-npx prisma migrate deploy
-pnpm exec tsx scripts/backfill-project-apps.ts --dry-run
-pnpm exec tsx scripts/backfill-project-apps.ts
+# depuis la racine du dépôt
+pnpm exec tsx portail/scripts/backfill-project-apps.ts                 # simulation (défaut)
+pnpm exec tsx portail/scripts/backfill-project-apps.ts --dry-run        # identique
+pnpm exec tsx portail/scripts/backfill-project-apps.ts --apply          # écrit
+pnpm exec tsx portail/scripts/backfill-project-apps.ts --batch=500      # pagination
 ```
+
+Le script n'affiche que des slugs, des noms d'application, le nom de la base et
+des compteurs — jamais de secret. Codes de sortie : `1` si au moins une erreur,
+`2` pour une option invalide.
+
+Tests :
+
+- unitaires (`pnpm test`) : nom stable, lecture de `plan.root`, décision
+  création/ignoré, collision de domaine, absence de plan, déterminisme,
+  arguments CLI ;
+- intégration (`EFLEX_TEST_DB=1 DATABASE_URL=…/eflex_test pnpm test`) :
+  simulation sans écriture, création + recopie des champs, rattachement des
+  déploiements, portée projet des variables/domaines, double exécution = 0
+  doublon, vérifiée sur PostgreSQL 16 jetable.
 
 ### Phase D — dual (lots C, D, E)
 
@@ -559,6 +635,10 @@ pnpm exec tsx scripts/backfill-project-apps.ts
   `apps.length === 0` ;
 - `EFLEX_MULTI_APP=1` active la création multi-apps ; à `0`, la création
   n'accepte qu'une app et le comportement est celui d'aujourd'hui.
+
+> **Drapeau non branché au lot B.** Aucun code ne lit `EFLEX_MULTI_APP` : le
+> schéma et le backfill sont prêts, mais la création, le worker, l'enfilement,
+> les routes et l'UI restent strictement mono-application.
 
 ### Phase C — contract (lot G, après un cycle de release)
 
@@ -599,6 +679,10 @@ Unitaires (sans infrastructure, `pnpm test`) :
   inchangées ;
 - **domaines** : `appDomain('shop','web') === 'shop-web.<root>'`, troncature à
   63 caractères, collision avec un slug existant, app sans domaine ;
+- **backfill (lot B)** : nom stable (`apps/web` → `web`, racine → `app`),
+  lecture/normalisation de `plan.root`, décision création/ignoré (app existante,
+  plan absent), collision de domaine, déterminisme, arguments CLI (`--apply`,
+  `--batch`) ;
 - **agrégation** : `aggregateGroupStatus([...])` → `in_progress`, `live`,
   `failed`, `cancelled`, `partial` ; lot vide refusé ;
 - **quotas** : `assertAppQuota` avec 0/4/5 apps sur le plan gratuit, dérive
@@ -616,7 +700,8 @@ Unitaires (sans infrastructure, `pnpm test`) :
 
 Intégration (`EFLEX_TEST_DB=1 DATABASE_URL=… pnpm test`, CI PostgreSQL) :
 
-- backfill idempotent, `Deployment.appId` restant `null` sur l'historique ;
+- backfill idempotent, `Deployment.appId` rattaché à l'app créée, double
+  exécution sans doublon, variables et alias laissés de portée projet ;
 - lecture d'un projet non backfillé (repli app implicite) ;
 - création multi-apps transactionnelle (rollback complet si une app échoue).
 
@@ -641,7 +726,7 @@ Matrice staging (projet jetable, **jamais** sur `eflex.app`) :
 | Lot | Contenu | Durée | Livrable vérifiable |
 | --- | --- | --- | --- |
 | **A** | `detectApplications`, noms stables, profondeur 3, `apps` dans `analyze`, tests détecteur — **livré le 10/11/2026** | 1,5 j | l'analyse liste **toutes** les apps (aucune écriture en base) ; aucune régression des fixtures |
-| **B** | `ProjectApp` + `Deployment.appId/groupId` + `EnvVar.appId` + `ProjectDomain.appId`, index partiel, script de backfill, dual-write miroir | 2 j | migration + backfill idempotents ; comportement inchangé, drapeau à 0 |
+| **B** | `ProjectApp` + `Deployment.appId/groupId` + `EnvVar.appId` + `ProjectDomain.appId`, index partiel, script de backfill — **livré le 10/11/2026** (sans dual-write ni drapeau : lot C) | 2 j | migration + backfill idempotents ; comportement inchangé |
 | **C** | Création multi-apps (`POST` avec `apps[]`), fan-out à l'enfilement, domaines par app, worker par app, logs/runtime `?appId=`, suppression en boucle | 2 j | un monorepo de 2 apps se déploie en un clic (staging #1, #3, #4) |
 | **D** | UI projet (tableau des apps, sélecteur de logs, redéployer tout/une app), écran de création multi-sélection, paramètres | 2 j | parcours complet utilisable, mono-app inchangé |
 | **E** | Webhook fan-out, rollback par app, statut agrégé, notifications par lot, admin + réconciliation | 1,5 j | staging #6, #7, #8 ; admin cohérent |
@@ -674,6 +759,27 @@ Prisma étant ascendantes, la phase E n'est pas annulée en base : on redéploie
 version précédente du portail avec le drapeau à 0. Un script de nettoyage
 (`scripts/prune-project-apps.ts`, `--dry-run`) permettra de supprimer les
 `ProjectApp` créées pendant un pilote, après décision explicite.
+
+**Rollback du lot B précisément.** Aucune migration inverse n'est nécessaire et
+aucune n'est fournie : la table `ProjectApp` et les colonnes `appId`/`groupId`
+peuvent rester en place indéfiniment sans effet, puisque rien ne les lit. Pour
+revenir à l'état d'avant le backfill :
+
+1. redéployer la version précédente du portail (le code ne connaît pas ces
+   colonnes) ;
+2. les `ProjectApp` créées peuvent être laissées telles quelles (inertes) ;
+3. si l'on veut vraiment les retirer, supprimer d'abord les lignes `ProjectApp`
+   (`Deployment.appId` repasse à `NULL` par `SetNull`, l'historique est
+   conservé), puis la table ; les colonnes `Deployment.appId|groupId`,
+   `EnvVar.appId` et `ProjectDomain.appId` peuvent rester — les supprimer est
+   inutile et risqué en production ;
+4. ne **jamais** supprimer `EnvVar_project_scope_key` tant que la contrainte
+   large `(projectId, key)` est en place : l'index est le futur garde-fou de la
+   portée projet.
+
+Le backfill est rejouable après un rollback partiel : un projet dont
+l'application a été supprimée sera repris, un projet qui en a déjà une sera
+ignoré.
 
 ## 13. Critères de sortie
 

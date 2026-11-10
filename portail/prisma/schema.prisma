@@ -167,6 +167,14 @@ model Project {
   deployments           Deployment[]
   domains               ProjectDomain[]
   databases             ProjectDatabase[]
+  /**
+   * Applications déployables du projet (D2, lot B). Un projet sans ligne
+   * `ProjectApp` (données antérieures au backfill) reste traité comme une
+   * application implicite décrite par les colonnes `plan`/`framework`/`port`/
+   * `domain`/`coolifyAppId` ci-dessus, qui servent de miroir de l'application
+   * principale pendant la transition.
+   */
+  apps                  ProjectApp[]
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 
@@ -176,22 +184,78 @@ model Project {
 }
 
 /**
+ * Application déployable d'un projet (D2, lot B) : un dossier du dépôt, un
+ * build Coolify, un port, éventuellement un domaine public. Le `BuildPlan`
+ * (contrat `schema/v1.json`) est celui de l'application, pas du dépôt.
+ * `plan` est obligatoire : le worker refuse déjà un projet dépourvu de plan
+ * valide, donc une application sans plan ne serait pas déployable.
+ * `domain` n'est unique que lorsqu'il est renseigné (PostgreSQL ignore les
+ * NULL) : une application interne non exposée n'a pas de domaine.
+ */
+model ProjectApp {
+  id           String          @id @default(cuid())
+  projectId    String
+  project      Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /**
+   * Nom court stable et unique dans le projet : "web", "api", "admin".
+   */
+  name         String
+  /**
+   * Dossier de l'application dans le dépôt ("" = racine).
+   */
+  root         String          @default("")
+  /**
+   * Ordre d'affichage déterministe (application principale = 0).
+   */
+  position     Int             @default(0)
+  plan         Json
+  framework    String
+  runtime      String?
+  port         Int             @default(80)
+  /**
+   * Domaine public de l'application. null = application non exposée.
+   */
+  domain       String?         @unique
+  coolifyAppId String?
+  tlsValid     Boolean?
+  tlsExpiresAt DateTime?
+  tlsCheckedAt DateTime?
+  envVars      EnvVar[]
+  deployments  Deployment[]
+  domains      ProjectDomain[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@unique([projectId, name])
+  @@unique([projectId, root])
+  @@index([projectId])
+  @@index([coolifyAppId])
+}
+
+/**
  * Domaine personnalisé rattaché à un projet. Le domaine auto-généré reste
  * `Project.domain` ; ces entrées sont des alias (client, www…).
  */
 model ProjectDomain {
-  id           String    @id @default(cuid())
+  id           String      @id @default(cuid())
   projectId    String
-  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  hostname     String    @unique
+  project      Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /**
+   * Application ciblée (D2). null = alias de portée projet : il reste appliqué
+   * à l'application principale pendant la transition (comportement actuel).
+   */
+  appId        String?
+  app          ProjectApp? @relation(fields: [appId], references: [id], onDelete: Cascade)
+  hostname     String      @unique
   verifiedAt   DateTime?
   tlsValid     Boolean?
   tlsExpiresAt DateTime?
   tlsCheckedAt DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   @@index([projectId])
+  @@index([appId])
 }
 
 /**
@@ -217,29 +281,54 @@ model ProjectDatabase {
 }
 
 model EnvVar {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   projectId String
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /**
+   * Application ciblée (D2). null = variable de portée projet, diffusée à
+   * toutes les applications. L'unicité `(projectId, key)` ci-dessous ne couvre
+   * aujourd'hui que ce cas ; un index unique partiel SQL
+   * (`EnvVar_project_scope_key`, WHERE "appId" IS NULL) garantit la même
+   * propriété quand la portée par application arrivera (lot C/D).
+   */
+  appId     String?
+  app       ProjectApp? @relation(fields: [appId], references: [id], onDelete: Cascade)
   key       String // ex: DATABASE_URL, NEXT_PUBLIC_URL
   value     String // AES-256-GCM : v1:<nonce base64>:<ciphertext+tag base64> (voir lib/crypto.ts)
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime    @updatedAt
 
   @@unique([projectId, key])
   @@index([projectId])
+  @@index([appId])
 }
 
 model Deployment {
-  id             String   @id @default(cuid())
+  id             String      @id @default(cuid())
   projectId      String
-  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project        Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /**
+   * Application déployée (D2). null = déploiement antérieur à D2 (ou app
+   * supprimée) : les lectures le rattachent à l'application principale.
+   * `SetNull` conserve l'historique de déploiement quand une application est
+   * retirée du projet ; la suppression du projet supprime bien les lignes via
+   * `projectId` (Cascade).
+   */
+  appId          String?
+  app            ProjectApp? @relation(fields: [appId], references: [id], onDelete: SetNull)
+  /**
+   * Lot commun aux N déploiements créés par un même événement (push, redéploiement global).
+   */
+  groupId        String?
   commitSha      String
-  status         String   @default("pending") // pending, building, deploying, live, failed, rollbacked
+  status         String      @default("pending") // pending, building, deploying, live, failed, rollbacked
   coolifyBuildId String?
-  logsSummary    String?  @db.Text
-  createdAt      DateTime @default(now())
+  logsSummary    String?     @db.Text
+  createdAt      DateTime    @default(now())
 
   @@index([projectId])
   @@index([status])
+  @@index([appId])
+  @@index([groupId])
 }
 
 model Subscription {
