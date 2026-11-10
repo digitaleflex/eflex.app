@@ -173,6 +173,7 @@ describe('createApplication', () => {
           domain: 'https://demo.example.com,https://custom.example.com',
         },
       ],
+      dockerComposeRaw: 'services:\n  web:\n    image: nginx:alpine\n',
       // Ces valeurs ne doivent jamais être envoyées pour un compose.
       portsExposes: '3000',
       fqdn: 'demo.example.com',
@@ -208,7 +209,7 @@ describe('createApplication', () => {
     expect(body.build_command).toBeUndefined()
     expect(body.start_command).toBeUndefined()
     expect(body.post_deployment_command).toBeUndefined()
-    expect(body.docker_compose_raw).toBeUndefined()
+    expect(body.docker_compose_raw).toBe('services:\n  web:\n    image: nginx:alpine\n')
   })
 
   it('n’envoie pas de dossier de travail pour un dépôt déployé à la racine', async () => {

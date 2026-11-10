@@ -221,6 +221,7 @@ export async function processDeployment(
   // chaque déploiement (le dépôt peut avoir changé depuis l'analyse).
   let composeInspection: ComposeInspection | null = null
   let composeService: string | undefined
+  let composeContent: string | null = null
   if (composeSource) {
     const fetched = await fetchRepositoryFile({
       repoUrl: project.repoUrl,
@@ -240,6 +241,7 @@ export async function processDeployment(
       return
     }
     composeInspection = inspection
+    composeContent = fetched.content
     composeService = inspection.primaryService ?? composeSource.service
     for (const warning of inspection.warnings) {
       await appendLogs(deploymentId, `[compose] ${warning}`)
@@ -318,6 +320,9 @@ export async function processDeployment(
         ? {
             dockerComposeLocation: settings.dockerComposeLocation,
             dockerComposeDomains: attachedDomains,
+            // Contenu initial : Coolify exige que le compose soit connu pour
+            // accepter `docker_compose_domains`. Il relira le dépôt ensuite.
+            dockerComposeRaw: composeContent ?? undefined,
           }
         : {
             portsExposes: String(artifacts.portsExposes),
@@ -348,7 +353,7 @@ export async function processDeployment(
   // l'application Coolify existe déjà : on réapplique les réglages à chaque
   // déploiement, sinon Coolify garde les anciens. Le dossier de travail est
   // toujours renvoyé : un plan revenu à la racine réinitialise `/`.
-  const updated = composeSource
+  let updated = composeSource
     ? await updateApplication(appId, {
         buildPack: 'dockercompose',
         baseDirectory: plan.root !== '' ? settings.baseDirectory : '/',
@@ -367,6 +372,25 @@ export async function processDeployment(
         publishDirectory: repoHasDockerfile ? undefined : (settings.publishDirectory ?? null),
         portsExposes: String(artifacts.portsExposes),
       })
+  // Application compose créée avant ce correctif (sans `docker_compose_raw`) :
+  // Coolify refuse encore le mapping de domaines. On réapplique le reste et on
+  // s'appuie sur les labels Traefik du compose, plutôt que de bloquer le client.
+  if (
+    'error' in updated &&
+    composeSource &&
+    /docker_compose_(domains|raw)/i.test(updated.error)
+  ) {
+    await appendLogs(
+      deploymentId,
+      '[compose] mapping de domaine Coolify indisponible pour cette application existante ; ' +
+        'le routage repose sur les labels Traefik déclarés dans le compose.',
+    )
+    updated = await updateApplication(appId, {
+      buildPack: 'dockercompose',
+      baseDirectory: plan.root !== '' ? settings.baseDirectory : '/',
+      dockerComposeLocation: settings.dockerComposeLocation,
+    })
+  }
   if ('error' in updated) {
     await fail(deploymentId, `Commandes de déploiement non appliquées : ${updated.error}`)
     return
