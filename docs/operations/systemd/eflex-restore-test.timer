@@ -1,0 +1,13 @@
+[Unit]
+Description=Eflex — test de restauration hebdomadaire (dimanche 05:15)
+Documentation=file:///home/fantome/eflex/docs/operations/backups.md
+
+[Timer]
+OnCalendar=Sun *-*-* 05:15:00
+RandomizedDelaySec=10min
+AccuracySec=1min
+Persistent=true
+Unit=eflex-restore-test.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=Eflex — healthcheck toutes les 15 minutes
+Documentation=file:///home/fantome/eflex/docs/operations/backups.md
+
+[Timer]
+OnBootSec=3min
+OnCalendar=*:0/15
+AccuracySec=1min
+Persistent=false
+Unit=eflex-healthcheck.service
+
+[Install]
+WantedBy=timers.target
