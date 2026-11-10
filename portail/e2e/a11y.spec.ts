@@ -125,7 +125,10 @@ async function assertKeyboardFocus(page: Page, stops: number) {
       `arrêt ${checked} (${focused.tag} « ${focused.label} ») : aucun indicateur de focus visible`,
     ).toBe(true)
   }
-  expect(checked, 'Aucun élément focusable trouvé').toBeGreaterThanOrEqual(5)
+  // Certaines pages publiques remplacent le formulaire par un message quand
+  // l'envoi d'e-mails n'est pas configuré (CI sans RESEND_API_KEY). On vérifie
+  // donc un minimum bas, tout en contrôlant que chaque arrêt a un focus visible.
+  expect(checked, 'Trop peu d’éléments focusables pour vérifier le focus').toBeGreaterThanOrEqual(3)
 }
 
 test.describe('clavier', () => {

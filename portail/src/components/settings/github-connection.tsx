@@ -41,7 +41,9 @@ function Steps({ steps }: { steps: GuideStep[] }) {
             className={cn(
               'flex gap-3 rounded-xl border p-3 transition-[border-color,background-color] duration-200 ease-out-expo',
               state === 'current' ? 'border-primary/40 bg-primary/5' : 'border-border',
-              state === 'todo' && 'opacity-70',
+              // Pas d'opacité sur le texte : `text-muted-foreground` + opacité
+              // passait sous 4,5:1. L'état « à venir » est porté par la bordure.
+              state === 'todo' && 'border-dashed',
             )}
           >
             <span
