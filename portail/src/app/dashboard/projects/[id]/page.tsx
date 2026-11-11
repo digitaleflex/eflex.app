@@ -1,24 +1,45 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowUpRight, ExternalLink, GitBranch, GitCommitHorizontal, Globe, KeyRound, Layers, Lock, Settings, ShieldAlert, ShieldCheck, Sparkles, Activity } from 'lucide-react'
+import {
+  Activity,
+  ArrowUpRight,
+  CircleAlert,
+  ExternalLink,
+  GitBranch,
+  GitCommitHorizontal,
+  Globe,
+  KeyRound,
+  Layers,
+  Loader2,
+  Lock,
+  Rocket,
+  Settings,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+  TerminalSquare,
+} from 'lucide-react'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { resolveOrganization } from '@/lib/organizations'
+import { resolveOrganization, canManageProjects } from '@/lib/organizations'
 import { AutoRefresh } from '@/components/auto-refresh'
 import { DeploymentLogs } from '@/components/deployment-logs'
 import { RuntimeLogs } from '@/components/runtime-logs'
 import { LiveRefresh } from '@/components/live-refresh'
 import { FrameworkTile, DeployHistory } from '@/components/dashboard/project-card'
 import { StatusPill } from '@/components/dashboard/status-pill'
+import { SectionCard } from '@/components/dashboard/section'
+import { Notice } from '@/components/dashboard/notice'
 import { GithubMark } from '@/components/icons/github-mark'
 import { RedeployButton } from '@/components/redeploy-button'
 import { CancelDeploymentButton } from '@/components/cancel-deployment-button'
 import { RollbackDeploymentButton } from '@/components/rollback-deployment-button'
-import { canManageProjects } from '@/lib/organizations'
+import { EmptyState } from '@/components/ui/empty-state'
 import { isCommitSha } from '@/lib/deployment-rollback'
 import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 import { statusInfo } from '@/lib/project-status'
 import { applicationHealth, tlsHealth } from '@/lib/project-health'
+import { nextProjectAction, projectSituation, type NextProjectAction } from '@/lib/project-actions'
 import { getApplicationRuntime } from '@/lib/coolify'
 import { relativeTime } from '@/lib/relative-time'
 import { repoLabel } from '@/lib/repo'
@@ -41,13 +62,47 @@ function readAnalysis(value: unknown): StoredAnalysis | null {
 }
 
 const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
+
 const TABS = [
-  { id: 'overview', label: "Vue d'ensemble" },
-  { id: 'deployments', label: 'Déploiements' },
-  { id: 'variables', label: 'Variables' },
-  { id: 'logs', label: 'Logs' },
+  { id: 'overview', label: "Vue d'ensemble", short: 'Aperçu' },
+  { id: 'deployments', label: 'Déploiements', short: 'Déploiements' },
+  { id: 'variables', label: 'Variables', short: 'Variables' },
+  { id: 'logs', label: 'Logs', short: 'Logs' },
 ] as const
 type Tab = (typeof TABS)[number]['id']
+
+const primaryLinkClass =
+  'inline-flex h-9 items-center gap-1.5 rounded-lg bg-foreground px-3 text-sm font-semibold text-background hover:bg-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [@media(pointer:coarse)]:h-11'
+const secondaryLinkClass =
+  'inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11'
+const smallLinkClass =
+  'inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9'
+
+/** Action prioritaire du projet : même emplacement et même style quel que soit l'état. */
+function PrimaryAction({ action, projectId }: { action: NextProjectAction; projectId: string }) {
+  if (action.kind === 'deploy' || action.kind === 'redeploy') {
+    return <RedeployButton projectId={projectId} variant="primary" label={action.label} />
+  }
+  if (action.kind === 'visit') {
+    return (
+      <a href={action.href} target="_blank" rel="noopener noreferrer" className={primaryLinkClass}>
+        {action.label}
+        <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+        <span className="sr-only"> (nouvel onglet)</span>
+      </a>
+    )
+  }
+  return (
+    <Link href={action.href!} className={primaryLinkClass}>
+      {action.kind === 'settings' ? (
+        <Settings className="h-4 w-4" aria-hidden="true" />
+      ) : (
+        <TerminalSquare className="h-4 w-4" aria-hidden="true" />
+      )}
+      {action.label}
+    </Link>
+  )
+}
 
 export default async function ProjectPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const session = await getSession()
@@ -58,25 +113,44 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const tab: Tab = TABS.some((t) => t.id === tabParam) ? (tabParam as Tab) : 'overview'
   const org = await resolveOrganization(session)
   if (!org) notFound()
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    include: {
-      envVars: { select: { key: true, updatedAt: true }, orderBy: { key: 'asc' } },
-      deployments: { orderBy: { createdAt: 'desc' }, take: 20 },
-      domains: { orderBy: { createdAt: 'asc' } },
-      // Applications du projet (lot C de D2) : liste minimale avec leur statut.
-      apps: {
-        orderBy: [{ position: 'asc' }, { name: 'asc' }],
-        include: {
-          deployments: {
-            take: 1,
-            orderBy: { createdAt: 'desc' },
-            select: { status: true, commitSha: true, createdAt: true },
+  const [project, latestLiveDeployment] = await Promise.all([
+    prisma.project.findFirst({
+      where: { id, organizationId: org.organizationId },
+      include: {
+        envVars: { select: { key: true, updatedAt: true, appId: true }, orderBy: { key: 'asc' } },
+        deployments: {
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            status: true,
+            commitSha: true,
+            createdAt: true,
+            app: { select: { id: true, name: true } },
+          },
+        },
+        domains: { orderBy: { createdAt: 'asc' } },
+        // Applications du projet (lot C de D2) : liste minimale avec leur statut.
+        apps: {
+          orderBy: [{ position: 'asc' }, { name: 'asc' }],
+          include: {
+            deployments: {
+              take: 1,
+              orderBy: { createdAt: 'desc' },
+              select: { status: true, commitSha: true, createdAt: true },
+            },
           },
         },
       },
-    },
-  })
+    }),
+    // La dernière version en ligne peut être plus ancienne que l'historique récent :
+    // on la lit séparément pour ne jamais afficher « aucun déploiement réussi » à tort.
+    prisma.deployment.findFirst({
+      where: { projectId: id, status: 'live', project: { organizationId: org.organizationId } },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, commitSha: true, createdAt: true, app: { select: { name: true } } },
+    }),
+  ])
   if (!project) notFound()
 
   // Statut runtime Coolify (lecture courte : une page ne doit jamais attendre l'API).
@@ -100,61 +174,84 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       ? storedPlan.compose.services.filter((name): name is string => typeof name === 'string')
       : []
   const last = deployments[0]
-  const production = deployments.find((d) => d.status === 'live')
+  const production = latestLiveDeployment ?? deployments.find((deployment) => deployment.status === 'live')
   const inProgress = last !== undefined && statusInfo(last.status).inProgress
-  const tabHref = (t: Tab) => `/dashboard/projects/${project.id}${t === 'overview' ? '' : `?tab=${t}`}`
+  const canManage = canManageProjects(org.role)
+  const multiApp = project.apps.length > 1
+  const primaryApp = project.apps.find((app) => app.position === 0) ?? project.apps[0]
+  const appNameById = new Map(project.apps.map((app) => [app.id, app.name]))
+  const situation = projectSituation(last?.status, deployments.length > 0)
+  const primaryAction = nextProjectAction({
+    projectId: project.id,
+    situation,
+    domain: project.domain,
+    canManage,
+  })
+  const principalDomains = project.domains.filter(
+    (domain) => domain.verifiedAt && (domain.appId === null || domain.appId === primaryApp?.id),
+  )
+  const pendingDomains = project.domains.filter(
+    (domain) => !domain.verifiedAt && (domain.appId === null || domain.appId === primaryApp?.id),
+  )
+  const tabHref = (value: Tab) => `/dashboard/projects/${project.id}${value === 'overview' ? '' : `?tab=${value}`}`
 
   return (
     <div className="space-y-6">
       <AutoRefresh active={inProgress} />
       <LiveRefresh types={['deployment.created', 'deployment.status']} projectId={project.id} />
 
-      {/* En-tête : identité du projet et actions principales */}
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-4">
+      {/* En-tête : statut, domaine, puis action prioritaire selon l'état réel. */}
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 items-start gap-4">
           <FrameworkTile framework={project.framework} name={project.name} size="lg" />
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="truncate font-display text-2xl font-bold tracking-tight">{project.name}</h1>
               <StatusPill status={last?.status} />
+              {multiApp && (
+                <span className="rounded-full border border-border px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+                  {project.apps.length} applications
+                </span>
+              )}
             </div>
-            <p className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
-              <GithubMark className="h-3.5 w-3.5" />
+            {project.domain ? (
+              <a
+                href={`https://${project.domain}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex max-w-full items-center gap-1 text-sm font-medium text-foreground hover:underline"
+              >
+                <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="truncate">{project.domain}</span>
+                <ArrowUpRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="sr-only"> (nouvel onglet)</span>
+              </a>
+            ) : (
+              <p className="text-sm text-muted-foreground">Pas encore de domaine public</p>
+            )}
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <GithubMark className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{repoLabel(project.repoUrl)}</span>
+              <span aria-hidden="true">·</span>
+              <GitBranch className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span className="truncate font-mono">{project.branch}</span>
             </p>
           </div>
         </div>
+
         <div className="flex shrink-0 flex-wrap gap-2">
-          {canManageProjects(org.role) && last && statusInfo(last.status).inProgress && (
+          {primaryAction && <PrimaryAction action={primaryAction} projectId={project.id} />}
+          {canManage && situation === 'failed' && <RedeployButton projectId={project.id} />}
+          {canManage && situation === 'live' && primaryAction?.kind === 'visit' && <RedeployButton projectId={project.id} />}
+          {canManage && last && statusInfo(last.status).inProgress && (
             <CancelDeploymentButton projectId={project.id} deploymentId={last.id} />
           )}
-          {canManageProjects(org.role) && <RedeployButton projectId={project.id} />}
-          <a
-            href={project.repoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11"
-          >
+          <a href={project.repoUrl} target="_blank" rel="noopener noreferrer" className={secondaryLinkClass}>
             <GithubMark className="h-4 w-4" />
             Dépôt<span className="sr-only"> (nouvel onglet)</span>
           </a>
-          {project.domain && (
-            <a
-              href={`https://${project.domain}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-foreground px-3 text-sm font-semibold text-background hover:bg-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [@media(pointer:coarse)]:h-11"
-            >
-              Visiter
-              <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-              <span className="sr-only">{project.domain} (nouvel onglet)</span>
-            </a>
-          )}
-          {canManageProjects(org.role) && (
-            <Link
-              href={`/dashboard/projects/${project.id}/settings`}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11"
-            >
+          {canManage && (
+            <Link href={`/dashboard/projects/${project.id}/settings`} className={secondaryLinkClass}>
               <Settings className="h-4 w-4" aria-hidden="true" />
               Paramètres
             </Link>
@@ -162,22 +259,35 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         </div>
       </header>
 
-      <nav aria-label="Sections du projet" className="flex gap-1 overflow-x-auto border-b border-border">
-        {TABS.map((t) => (
-          <Link
-            key={t.id}
-            href={tabHref(t.id)}
-            aria-current={tab === t.id ? 'page' : undefined}
-            className={cn(
-              '-mb-px inline-flex min-h-11 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-sm font-medium',
-              tab === t.id ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {t.label}
-            {t.id === 'deployments' && <span className="rounded-full bg-muted px-1.5 text-xs tabular-nums text-muted-foreground">{deployments.length}</span>}
-            {t.id === 'variables' && <span className="rounded-full bg-muted px-1.5 text-xs tabular-nums text-muted-foreground">{project.envVars.length}</span>}
-          </Link>
-        ))}
+      <nav
+        aria-label="Sections du projet"
+        className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-card p-1 sm:flex sm:gap-0 sm:rounded-none sm:border-0 sm:border-b sm:bg-transparent sm:p-0"
+      >
+        {TABS.map((item) => {
+          const active = tab === item.id
+          return (
+            <Link
+              key={item.id}
+              href={tabHref(item.id)}
+              aria-current={active ? 'page' : undefined}
+              className={cn(
+                'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:-mb-px sm:justify-start sm:rounded-none sm:border-b-2',
+                active
+                  ? 'bg-muted text-foreground sm:bg-transparent sm:border-foreground'
+                  : 'text-muted-foreground hover:text-foreground sm:border-transparent',
+              )}
+            >
+              <span className="sm:hidden">{item.short}</span>
+              <span className="hidden sm:inline">{item.label}</span>
+              {item.id === 'deployments' && (
+                <span className="rounded-full bg-muted px-1.5 text-xs font-normal tabular-nums text-muted-foreground">{deployments.length}</span>
+              )}
+              {item.id === 'variables' && (
+                <span className="rounded-full bg-muted px-1.5 text-xs font-normal tabular-nums text-muted-foreground">{project.envVars.length}</span>
+              )}
+            </Link>
+          )
+        })}
       </nav>
 
       {/* Statut du dernier déploiement : annoncé après chaque mise à jour temps réel. */}
@@ -185,85 +295,161 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         {last ? `Dernier déploiement : ${statusInfo(last.status).label}.` : 'Aucun déploiement pour ce projet.'}
       </p>
 
+      {/* La situation qui demande une décision, avec la sortie la plus directe. */}
+      {situation === 'failed' && (
+        <Notice
+          tone="danger"
+          icon={CircleAlert}
+          title="Le dernier déploiement a échoué"
+          actions={
+            <>
+              <Link href={tabHref('deployments')} className={primaryLinkClass}>
+                <TerminalSquare className="h-4 w-4" aria-hidden="true" />
+                Voir les journaux
+              </Link>
+              {canManage && <RedeployButton projectId={project.id} />}
+            </>
+          }
+        >
+          {production
+            ? `La version du ${dateFormat.format(production.createdAt)} reste en ligne. Consultez le journal du dernier déploiement pour identifier la cause, puis relancez.`
+            : 'Aucune version n’est en ligne pour l’instant. Consultez le journal du dernier déploiement, corrigez le dépôt, puis relancez.'}
+        </Notice>
+      )}
+
+      {situation === 'in-progress' && last && (
+        <Notice
+          tone="warning"
+          icon={Loader2}
+          title="Déploiement en cours"
+          actions={
+            <Link href={tabHref('deployments')} className={primaryLinkClass}>
+              <TerminalSquare className="h-4 w-4" aria-hidden="true" />
+              Suivre les journaux
+            </Link>
+          }
+        >
+          {statusInfo(last.status).label}. La page se met à jour automatiquement ; le journal est
+          disponible sans attendre la fin.
+        </Notice>
+      )}
+
+      {situation === 'never' && (
+        <Notice tone="info" icon={Rocket} title="Ce projet n’a pas encore été déployé">
+          Le premier déploiement crée l’application, attribue un domaine et prépare le certificat HTTPS.
+          {canManage
+            ? ' Lancez-le depuis l’action principale en haut de page.'
+            : ' Un propriétaire ou un administrateur peut lancer ce premier déploiement.'}
+        </Notice>
+      )}
+
+      {situation === 'idle' && (
+        <Notice tone="info" icon={Rocket} title="Dernier déploiement annulé">
+          {production
+            ? `La version du ${dateFormat.format(production.createdAt)} reste en ligne. Vous pouvez relancer un déploiement quand vous le souhaitez.`
+            : 'Le dernier déploiement a été annulé. Vous pouvez le relancer quand vous le souhaitez.'}
+        </Notice>
+      )}
+
       {/* Applications du projet (lot C de D2) : visible seulement en multi-app. */}
-      {project.apps.length > 1 && (
-        <section aria-labelledby="apps-title" className="overflow-hidden rounded-xl border border-border bg-card">
-          <div className="border-b border-border px-5 py-3">
-            <h2 id="apps-title" className="flex items-center gap-2 text-sm font-semibold">
-              <Layers className="h-4 w-4 text-primary" aria-hidden="true" />
+      {multiApp && (
+        <SectionCard
+          id="apps"
+          title={
+            <>
               Applications
               <span className="rounded-full bg-muted px-1.5 text-xs font-normal tabular-nums text-muted-foreground">
                 {project.apps.length}
               </span>
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Chaque application a son propre build, son dossier et son domaine. Le redéploiement
-              global les relance ensemble.
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[36rem] text-left text-sm">
-              <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th scope="col" className="px-5 py-2 font-medium">Application</th>
-                  <th scope="col" className="px-3 py-2 font-medium">Dossier</th>
-                  <th scope="col" className="px-3 py-2 font-medium">Domaine</th>
-                  <th scope="col" className="px-5 py-2 font-medium">Dernier déploiement</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {project.apps.map((app) => {
-                  const appLast = app.deployments[0]
-                  return (
-                    <tr key={app.id}>
-                      <th scope="row" className="px-5 py-3 font-medium">
-                        <span className="flex items-center gap-2">
-                          {app.name}
-                          {app.position === 0 && (
-                            <span className="rounded-full border border-border px-1.5 text-[11px] font-normal text-muted-foreground">
-                              Principale
-                            </span>
-                          )}
+            </>
+          }
+          icon={Layers}
+          description="Chaque application a son propre build, son dossier et son domaine. Elle peut être relancée séparément."
+        >
+          <ul className="divide-y divide-border">
+            {project.apps.map((app) => {
+              const appLast = app.deployments[0]
+              const appDomains = project.domains.filter(
+                (domain) => domain.verifiedAt && domain.appId === app.id,
+              )
+              const appPendingDomains = project.domains.filter(
+                (domain) => !domain.verifiedAt && domain.appId === app.id,
+              )
+              return (
+                <li key={app.id} className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center sm:px-5">
+                  <div className="min-w-0">
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                      {app.name}
+                      {app.position === 0 && (
+                        <span className="rounded-full border border-border px-1.5 text-[11px] font-normal text-muted-foreground">
+                          Principale
                         </span>
-                      </th>
-                      <td className="px-3 py-3">
-                        <code className="font-mono text-xs text-muted-foreground">
-                          {app.root === '' ? 'Racine du dépôt' : app.root}
-                        </code>
-                      </td>
-                      <td className="px-3 py-3">
-                        {app.domain ? (
+                      )}
+                      <span className="text-xs font-normal text-muted-foreground">{frameworkLabel(app.framework)}</span>
+                    </p>
+                    <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                      {app.root === '' ? 'Racine du dépôt' : app.root}
+                    </p>
+                  </div>
+
+                  <div className="min-w-0 space-y-1">
+                    {app.domain ? (
+                      <a
+                        href={`https://${app.domain}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex max-w-full items-center gap-1 break-all text-sm text-primary hover:underline"
+                      >
+                        {app.domain}
+                        <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        <span className="sr-only"> (nouvel onglet)</span>
+                      </a>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Non exposée</p>
+                    )}
+                    {appDomains.length > 0 && (
+                      <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                        <span>Aussi :</span>
+                        {appDomains.map((domain) => (
                           <a
-                            href={`https://${app.domain}`}
+                            key={domain.id}
+                            href={`https://${domain.hostname}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 break-all text-primary hover:underline"
+                            className="font-mono text-primary hover:underline"
                           >
-                            {app.domain}
-                            <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
-                            <span className="sr-only">(nouvel onglet)</span>
+                            {domain.hostname}
                           </a>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Non exposée</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3">
-                        <span className="flex flex-wrap items-center gap-2">
-                          <StatusPill status={appLast?.status} />
-                          {appLast && (
-                            <time dateTime={appLast.createdAt.toISOString()} className="text-xs text-muted-foreground">
-                              {dateFormat.format(appLast.createdAt)}
-                            </time>
-                          )}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                        ))}
+                      </p>
+                    )}
+                    {appPendingDomains.length > 0 && (
+                      <p className="text-xs text-warning">
+                        {appPendingDomains.length} domaine{appPendingDomains.length > 1 ? 's' : ''} en attente de vérification
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                    <StatusPill status={appLast?.status} />
+                    {appLast && (
+                      <time dateTime={appLast.createdAt.toISOString()} className="text-xs text-muted-foreground" suppressHydrationWarning>
+                        {relativeTime(appLast.createdAt)}
+                      </time>
+                    )}
+                    {canManage && (
+                      <RedeployButton
+                        projectId={project.id}
+                        appId={app.id}
+                        srLabel={`l’application ${app.name}`}
+                      />
+                    )}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </SectionCard>
       )}
 
       {tab === 'overview' && (
@@ -274,7 +460,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
               <div className="relative flex min-h-48 flex-col justify-between gap-6 overflow-hidden bg-eflexnavy p-6 text-white">
                 <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-eflexroyalblue/40 blur-3xl" />
                 <div aria-hidden="true" className="pointer-events-none absolute -bottom-20 left-10 h-48 w-48 rounded-full bg-eflexsky/25 blur-3xl" />
-                <p id="prod-title" className="relative text-xs font-semibold uppercase tracking-wider text-white/70">Production</p>
+                <h2 id="prod-title" className="relative text-xs font-semibold uppercase tracking-wider text-white/70">Production</h2>
                 <div className="relative min-w-0">
                   {project.domain ? (
                     <a href={`https://${project.domain}`} target="_blank" rel="noopener noreferrer" className="group inline-flex max-w-full items-center gap-2 font-display text-xl font-bold hover:underline sm:text-2xl">
@@ -289,27 +475,40 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                     {production && last && last.id !== production.id && last.status === 'failed'
                       ? <>Le dernier déploiement a échoué. La version du <time dateTime={production.createdAt.toISOString()}>{dateFormat.format(production.createdAt)}</time> reste celle en ligne.</>
                       : production
-                        ? <>Version en ligne : déploiement du <time dateTime={production.createdAt.toISOString()}>{dateFormat.format(production.createdAt)}</time>.</>
+                        ? <>Version en ligne : déploiement du <time dateTime={production.createdAt.toISOString()}>{dateFormat.format(production.createdAt)}</time>{production.app ? ` (${production.app.name})` : ''}.</>
                         : last
                           ? 'Aucun déploiement réussi pour l’instant.'
                           : 'Ce projet n’a pas encore été déployé.'}
                   </p>
-                  {project.domains.filter((item) => item.verifiedAt).length > 0 && (
+                  {principalDomains.length > 0 && (
                     <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Domaines personnalisés">
-                      {project.domains.filter((item) => item.verifiedAt).map((item) => (
-                        <li key={item.id}>
+                      {principalDomains.map((domain) => (
+                        <li key={domain.id}>
                           <a
-                            href={`https://${item.hostname}`}
+                            href={`https://${domain.hostname}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 font-mono text-xs text-white/85 hover:bg-white/20"
                           >
-                            {item.hostname}
+                            {domain.hostname}
                             <ExternalLink className="h-3 w-3" aria-hidden="true" />
                           </a>
                         </li>
                       ))}
                     </ul>
+                  )}
+                  {pendingDomains.length > 0 && (
+                    <p className="mt-3 text-xs text-white/70">
+                      {pendingDomains.length} domaine{pendingDomains.length > 1 ? 's' : ''} en attente de vérification DNS.
+                      {canManage && (
+                        <>
+                          {' '}
+                          <Link href={`/dashboard/projects/${project.id}/settings#domaines`} className="font-medium text-white underline underline-offset-2">
+                            Configurer
+                          </Link>
+                        </>
+                      )}
+                    </p>
                   )}
                 </div>
               </div>
@@ -324,6 +523,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                       <span className="text-sm">
                         <time dateTime={last.createdAt.toISOString()} suppressHydrationWarning>{relativeTime(last.createdAt)}</time>
                         {last.commitSha !== 'pending' && <span className="font-mono text-muted-foreground"> · {last.commitSha.slice(0, 7)}</span>}
+                        {last.app && multiApp && <span className="text-muted-foreground"> · {last.app.name}</span>}
                       </span>
                     ) : <span className="text-sm text-muted-foreground">—</span>,
                   },
@@ -347,13 +547,12 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             </div>
           </section>
 
-          <section aria-labelledby="health-title" className="rounded-xl border border-border bg-card">
-            <div className="border-b border-border px-5 py-3">
-              <h2 id="health-title" className="flex items-center gap-2 text-sm font-semibold">
-                <Activity className="h-4 w-4 text-primary" aria-hidden="true" />
-                Santé & sécurité
-              </h2>
-            </div>
+          <SectionCard
+            id="health"
+            title="Santé & sécurité"
+            icon={Activity}
+            description="Dernier statut connu de l’hébergement et du certificat, sans garantie de disponibilité en temps réel."
+          >
             <dl className="grid divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
               <div className="p-4">
                 <dt className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -392,25 +591,40 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 </dd>
               </div>
             </dl>
-          </section>
+          </SectionCard>
 
           <div className={cn('grid gap-6', analysis && 'lg:grid-cols-2')}>
-            <section aria-labelledby="recent-title" className="rounded-xl border border-border bg-card">
-              <div className="flex items-center justify-between border-b border-border px-5 py-3">
-                <h2 id="recent-title" className="text-sm font-semibold">Derniers déploiements</h2>
-                <DeployHistory history={[...deployments].slice(0, 12).reverse().map((d) => d.status)} />
-              </div>
+            <SectionCard
+              id="recent"
+              title="Derniers déploiements"
+              actions={<DeployHistory history={[...deployments].slice(0, 12).reverse().map((deployment) => deployment.status)} />}
+            >
               {deployments.length === 0 ? (
-                <p className="px-5 py-8 text-center text-sm text-muted-foreground">Aucun déploiement pour ce projet.</p>
+                <EmptyState
+                  title="Aucun déploiement pour ce projet"
+                  description="Le premier déploiement apparaîtra ici avec son statut et ses journaux."
+                  className="py-8"
+                />
               ) : (
                 <ul className="divide-y divide-border">
-                  {deployments.slice(0, 4).map((d) => (
-                    <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                  {deployments.slice(0, 4).map((deployment) => (
+                    <li key={deployment.id} className="flex items-start justify-between gap-3 px-4 py-3 sm:px-5">
                       <div className="min-w-0">
-                        <p className="text-sm font-medium"><time dateTime={d.createdAt.toISOString()}>{dateFormat.format(d.createdAt)}</time></p>
-                        <p className="font-mono text-xs text-muted-foreground">{d.commitSha === 'pending' ? 'commit en attente' : d.commitSha.slice(0, 7)}</p>
+                        <p className="flex flex-wrap items-center gap-x-2 text-sm font-medium">
+                          <time dateTime={deployment.createdAt.toISOString()} suppressHydrationWarning>
+                            {relativeTime(deployment.createdAt)}
+                          </time>
+                          {deployment.app && multiApp && (
+                            <span className="rounded-full border border-border px-1.5 text-[11px] font-normal text-muted-foreground">
+                              {deployment.app.name}
+                            </span>
+                          )}
+                        </p>
+                        <p className="font-mono text-xs text-muted-foreground">
+                          {deployment.commitSha === 'pending' ? 'commit en attente' : deployment.commitSha.slice(0, 7)}
+                        </p>
                       </div>
-                      <StatusPill status={d.status} />
+                      <StatusPill status={deployment.status} />
                     </li>
                   ))}
                 </ul>
@@ -418,141 +632,232 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
               <Link href={tabHref('deployments')} className="flex min-h-11 items-center justify-center border-t border-border text-sm font-medium text-primary hover:bg-muted">
                 Tous les déploiements et leurs journaux
               </Link>
-            </section>
+            </SectionCard>
 
             {analysis && (
-              <section aria-labelledby="analysis-title" className="rounded-xl border border-border bg-card">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
-                  <h2 id="analysis-title" className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />Comment Eflex a compris ce dépôt</h2>
-                  {typeof analysis.confidence === 'number' && (
-                    <span className="text-xs text-muted-foreground">
-                      Confiance {confidenceLevel(analysis.confidence).label.toLowerCase()} · {Math.round(analysis.confidence * 100)} %
+              <SectionCard
+                id="analysis"
+                title="Détection du dépôt"
+                icon={Sparkles}
+                description="Eflex déduit la stack des fichiers du dépôt. Le niveau de confiance est une estimation, pas une garantie : les points signalés expliquent les échecs possibles."
+                actions={
+                  typeof analysis.confidence === 'number' ? (
+                    <span className="text-xs text-muted-foreground" title="Estimation calculée à partir des fichiers reconnus">
+                      Estimation : {confidenceLevel(analysis.confidence).label.toLowerCase()} ·{' '}
+                      <span className="tabular-nums">{Math.round(analysis.confidence * 100)} %</span>
                     </span>
-                  )}
-                </div>
-                <div className="space-y-4 px-5 py-4">
+                  ) : undefined
+                }
+              >
+                <div className="space-y-4 px-4 py-4 sm:px-5">
                   {analysis.reasons.length > 0 && (
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      {analysis.reasons.map((reason) => (
-                        <li key={reason} className="flex gap-2">
-                          <span aria-hidden="true" className="mt-2 h-1 w-1 shrink-0 rounded-full bg-primary" />
-                          <span>{reason}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {analysis.warnings.length > 0 && (
-                    <div role="note" className="rounded-lg border border-warning/30 bg-warning/10 p-3">
-                      <p className="text-sm font-medium text-warning">À savoir</p>
-                      <ul className="mt-1.5 space-y-1 text-sm text-warning">
-                        {analysis.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">Ce qu’Eflex a reconnu</p>
+                      <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
+                        {analysis.reasons.map((reason, index) => (
+                          <li key={`${index}-${reason}`} className="flex gap-2">
+                            <span aria-hidden="true" className="mt-2 h-1 w-1 shrink-0 rounded-full bg-primary" />
+                            <span>{reason}</span>
+                          </li>
+                        ))}
                       </ul>
                     </div>
                   )}
+                  {analysis.warnings.length > 0 && (
+                    <Notice tone="warning" title="Points à vérifier">
+                      <p className="mb-1.5 text-xs text-foreground/70">
+                        Ces remarques ne bloquent pas le déploiement, mais peuvent expliquer un build en échec.
+                      </p>
+                      <ul className="space-y-1">
+                        {analysis.warnings.map((warning, index) => <li key={`${index}-${warning}`}>{warning}</li>)}
+                      </ul>
+                    </Notice>
+                  )}
                   {analysis.commitSha && (
-                    <p className="text-xs text-muted-foreground">Analysé sur le commit <code className="font-mono">{analysis.commitSha.slice(0, 7)}</code></p>
+                    <p className="text-xs text-muted-foreground">
+                      Analysé sur le commit <code className="font-mono">{analysis.commitSha.slice(0, 7)}</code>
+                    </p>
                   )}
                 </div>
-              </section>
+              </SectionCard>
             )}
           </div>
         </div>
       )}
 
       {tab === 'deployments' && (
-        <section aria-label="Déploiements" className="overflow-hidden rounded-xl border border-border bg-card">
+        <SectionCard
+          id="deployments"
+          title="Historique des déploiements"
+          description={`${deployments.length} déploiement${deployments.length > 1 ? 's' : ''}, du plus récent au plus ancien. Les journaux sont en lecture seule et les secrets connus y sont masqués.`}
+        >
           {deployments.length === 0 ? (
-            <p className="px-5 py-10 text-center text-sm text-muted-foreground">Aucun déploiement pour ce projet.</p>
+            <EmptyState
+              title="Aucun déploiement pour ce projet"
+              description="Lancez un premier déploiement : son statut et ses journaux s’afficheront ici."
+              action={canManage ? <RedeployButton projectId={project.id} variant="primary" label="Lancer le déploiement" /> : undefined}
+              className="py-10"
+            />
           ) : (
             <>
-              {canManageProjects(org.role) && (
-                <p className="border-b border-border px-5 py-3 text-xs text-muted-foreground">
+              {multiApp && (
+                <p className="border-b border-border px-4 py-3 text-xs text-muted-foreground sm:px-5">
+                  Un déploiement par application : le nom de l’application est indiqué à côté du commit.
+                </p>
+              )}
+              {canManage && (
+                <p className="border-b border-border px-4 py-3 text-xs text-muted-foreground sm:px-5">
                   « Redéployer cette version » reconstruit un déploiement réussi avec les variables
                   d’environnement actuelles. Les migrations de base de données ne sont pas annulées.
                 </p>
               )}
               <ul className="divide-y divide-border">
-                {deployments.map((d, i) => (
-                  <li key={d.id} className="px-5 py-4">
+                {deployments.map((deployment, index) => (
+                  <li key={deployment.id} className="px-4 py-4 sm:px-5">
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                      <StatusPill status={d.status} />
+                      <StatusPill status={deployment.status} />
                       <div className="min-w-0 flex-1">
-                        <p className="flex flex-wrap items-center gap-x-2 text-sm font-medium">
-                          <span className="font-mono">{d.commitSha === 'pending' ? 'commit en attente' : d.commitSha.slice(0, 7)}</span>
-                          <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground"><GitBranch className="h-3.5 w-3.5" aria-hidden="true" />{project.branch}</span>
-                          {i === 0 && <span className="rounded-full border border-border px-1.5 text-[11px] font-medium text-muted-foreground">Dernier</span>}
-                          {production?.id === d.id && <span className="rounded-full bg-primary/10 px-1.5 text-[11px] font-semibold text-primary">Production</span>}
+                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium">
+                          <span className="font-mono">
+                            {deployment.commitSha === 'pending' ? 'commit en attente' : deployment.commitSha.slice(0, 7)}
+                          </span>
+                          {deployment.app && (
+                            <span className="rounded-full border border-border px-1.5 text-[11px] font-normal text-muted-foreground">
+                              {deployment.app.name}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                            <GitBranch className="h-3.5 w-3.5" aria-hidden="true" />
+                            {project.branch}
+                          </span>
+                          {index === 0 && <span className="rounded-full border border-border px-1.5 text-[11px] font-medium text-muted-foreground">Dernier</span>}
+                          {production?.id === deployment.id && <span className="rounded-full bg-primary/10 px-1.5 text-[11px] font-semibold text-primary">Production</span>}
                         </p>
-                        {d.status === 'failed' && d.logsSummary && <p className="mt-1 line-clamp-2 break-words text-xs text-destructive">{d.logsSummary}</p>}
+                        {deployment.status === 'failed' && (
+                          <p className="mt-1 text-xs text-destructive">
+                            Le déploiement a échoué. Ouvrez le journal pour identifier la cause ; les
+                            valeurs connues des variables y sont masquées.
+                          </p>
+                        )}
                       </div>
-                      <time dateTime={d.createdAt.toISOString()} className="text-xs text-muted-foreground">{dateFormat.format(d.createdAt)}</time>
-                      {canManageProjects(org.role) && !inProgress && d.status === 'live' && isCommitSha(d.commitSha) && (
-                        <RollbackDeploymentButton
-                          projectId={project.id}
-                          deploymentId={d.id}
-                          commitSha={d.commitSha}
-                          createdAtLabel={dateFormat.format(d.createdAt)}
-                        />
-                      )}
-                      {canManageProjects(org.role) && statusInfo(d.status).inProgress && (
-                        <CancelDeploymentButton projectId={project.id} deploymentId={d.id} />
-                      )}
+                      <time dateTime={deployment.createdAt.toISOString()} className="text-xs text-muted-foreground">
+                        {dateFormat.format(deployment.createdAt)}
+                      </time>
                     </div>
-                    <DeploymentLogs projectId={project.id} deploymentId={d.id} defaultOpen={d.id === last?.id && inProgress} />
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                      <DeploymentLogs
+                        projectId={project.id}
+                        deploymentId={deployment.id}
+                        status={deployment.status}
+                        defaultOpen={deployment.id === last?.id && inProgress}
+                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        {canManage && !inProgress && deployment.status === 'live' && isCommitSha(deployment.commitSha) && (
+                          <RollbackDeploymentButton
+                            projectId={project.id}
+                            deploymentId={deployment.id}
+                            commitSha={deployment.commitSha}
+                            createdAtLabel={dateFormat.format(deployment.createdAt)}
+                          />
+                        )}
+                        {canManage && statusInfo(deployment.status).inProgress && (
+                          <CancelDeploymentButton projectId={project.id} deploymentId={deployment.id} />
+                        )}
+                      </div>
+                    </div>
                   </li>
                 ))}
               </ul>
             </>
           )}
-        </section>
+        </SectionCard>
       )}
 
       {tab === 'variables' && (
-        <section aria-labelledby="vars-title" className="rounded-xl border border-border bg-card">
-          <div className="border-b border-border px-5 py-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 id="vars-title" className="flex items-center gap-2 text-sm font-semibold"><KeyRound className="h-4 w-4" aria-hidden="true" />Variables d&apos;environnement</h2>
-              {canManageProjects(org.role) && (
-                <Link
-                  href={`/dashboard/projects/${project.id}/settings`}
-                  className="text-sm font-medium text-primary hover:underline"
-                >
-                  Modifier
-                </Link>
-              )}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Les valeurs ne quittent jamais le serveur et sont masquées dans les journaux. Une modification s’applique au prochain déploiement.
-            </p>
-          </div>
+        <SectionCard
+          id="variables"
+          title="Variables d’environnement"
+          icon={KeyRound}
+          description="Les valeurs sont chiffrées au repos et ne sont jamais renvoyées par le serveur. Une modification s’applique au prochain déploiement."
+          actions={
+            canManage ? (
+              <Link href={`/dashboard/projects/${project.id}/settings#variables`} className={smallLinkClass}>
+                Modifier
+              </Link>
+            ) : undefined
+          }
+        >
           {project.envVars.length === 0 ? (
-            <p className="px-5 py-8 text-center text-sm text-muted-foreground">Aucune variable définie pour ce projet.</p>
+            <EmptyState
+              title="Aucune variable définie"
+              description={
+                canManage
+                  ? 'Ajoutez une variable (par exemple une clé d’API) : sa valeur restera masquée et chiffrée.'
+                  : 'Un propriétaire ou un administrateur peut ajouter des variables au projet.'
+              }
+              action={
+                canManage ? (
+                  <Link href={`/dashboard/projects/${project.id}/settings#variables`} className={smallLinkClass}>
+                    Ajouter une variable
+                  </Link>
+                ) : undefined
+              }
+              className="py-8"
+            />
           ) : (
             <ul className="divide-y divide-border">
-              {project.envVars.map((v) => (
-                <li key={v.key} className="flex items-center justify-between gap-3 px-5 py-3">
-                  <code className="truncate font-mono text-sm">{v.key}</code>
+              {project.envVars.map((envVar) => (
+                <li key={envVar.key} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                  <div className="min-w-0">
+                    <code className="break-all font-mono text-sm">{envVar.key}</code>
+                    <p className="text-xs text-muted-foreground">
+                      {envVar.appId
+                        ? `Application : ${appNameById.get(envVar.appId) ?? 'inconnue'}`
+                        : 'Toutes les applications'}{' '}
+                      · Mise à jour le {dateFormat.format(envVar.updatedAt)}
+                    </p>
+                  </div>
                   <span className="flex shrink-0 items-center gap-1.5 font-mono text-sm tracking-widest text-muted-foreground">
-                    <Lock className="h-3.5 w-3.5" aria-hidden="true" />••••••••
-                    <span className="sr-only">valeur masquée</span>
+                    <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span aria-hidden="true">••••••••</span>
+                    <span className="sr-only">Valeur masquée</span>
                   </span>
                 </li>
               ))}
             </ul>
           )}
-        </section>
+          <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground sm:px-5">
+            Une valeur ne peut pas être relue depuis l’interface : pour la remplacer, saisissez-la à
+            nouveau dans les paramètres. Les journaux masquent les valeurs connues.
+          </p>
+        </SectionCard>
       )}
 
       {tab === 'logs' &&
         (project.coolifyAppId ? (
-          <RuntimeLogs projectId={project.id} services={composeServices} />
+          <div className="space-y-3">
+            {multiApp && (
+              <Notice tone="info" title="Journaux de l’application principale">
+                En mode multi-applications, cet écran suit les journaux d’exécution de l’application
+                principale. Chaque application conserve ses propres journaux de déploiement dans
+                l’onglet Déploiements.
+              </Notice>
+            )}
+            <RuntimeLogs projectId={project.id} services={composeServices} />
+          </div>
         ) : (
-          <section aria-labelledby="logs-title" className="rounded-xl border border-border bg-card p-6">
-            <h2 id="logs-title" className="font-semibold">Journaux d’exécution</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Les journaux seront disponibles après le premier déploiement du projet.
-            </p>
-          </section>
+          <SectionCard
+            id="logs"
+            title="Journaux d’exécution"
+            icon={TerminalSquare}
+            description="Les journaux seront disponibles après le premier déploiement du projet."
+          >
+            <EmptyState
+              title="Rien à afficher pour l’instant"
+              description="Après le premier déploiement, les dernières lignes du conteneur apparaîtront ici, avec les secrets connus masqués."
+              className="py-8"
+            />
+          </SectionCard>
         ))}
     </div>
   )

@@ -228,6 +228,7 @@ export function ProjectDomains({ projectId }: { projectId: string }) {
                           size="sm"
                           loading={working === domain.id}
                           onClick={() => void verify(domain)}
+                          aria-label={`${verified ? 'Revérifier' : 'Vérifier'} le domaine ${domain.hostname}`}
                         >
                           <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
                           {verified ? 'Revérifier' : 'Vérifier'}
@@ -238,6 +239,7 @@ export function ProjectDomains({ projectId }: { projectId: string }) {
                           size="sm"
                           loading={working === domain.id}
                           onClick={() => void remove(domain)}
+                          aria-label={`Retirer le domaine ${domain.hostname}`}
                         >
                           <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                           Retirer
