@@ -1,7 +1,7 @@
 # ADR-0011 — Coolify reste le moteur de déploiement, derrière une abstraction avant Axiom
 
-- **Status:** Proposed
-- **Date:** 2026-11-10
+- **Status:** Accepted
+- **Date:** 2026-11-11
 - **Issue:** #14
 - **Supersedes:** —
 

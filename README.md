@@ -71,10 +71,14 @@ Points clés :
 
 ## Feuille de route de l'unification
 
-1. **Un seul moteur** : porter les règles du détecteur Eflex (Laravel, PHP, Python, Svelte, Remix, SolidStart, RedwoodJS, monorepos) dans l'analyseur Go (`services/engine/internal/analyzer`), puis ajouter les presets d'exécution correspondants (Laravel : php-fpm + nginx + queue + scheduler). **Python (FastAPI, Flask, Django avec `requirements.txt`) est fait et testé de bout en bout** ; restent Laravel/PHP et le reste de la liste (voir `docs/axiom-engine.md`, « Python preset »).
-2. **Un seul manifeste** : converger `eflex.json` et `axiom.yaml`.
-3. **Une seule console** : la console client EFLEX (`portail/`, charte EFLEX, en français) construite sur l'API du moteur ; retrait de Coolify. Les anciennes consoles Axiom (`apps/cloud`, `apps/client-dashboard`) ont été supprimées (#16).
-4. Ensuite seulement, retrait de `packages/detector`, `packages/renderer` et `schema/`.
+Décision de moteur de déploiement : **[ADR-0011](docs/adr/0011-coolify-then-axiom.md)** (acceptée). **Coolify reste le backend de production du portail** (3–6 mois) ; le portail ne doit plus en dépendre directement à terme via une abstraction progressive `DeployBackend` (`CoolifyBackend`, puis `AxiomBackend` quand les critères de sortie sont prouvés). **Axiom** reste la cible stratégique du moteur.
+
+1. **Abstraction backend (portail)** : introduire `DeployBackend` (provision, deploy, status, logs, cancel, delete, runtimeAction, etc.) et migrer progressivement les appels de `portail/src/lib/coolify.ts` derrière `CoolifyBackend`, sans « big bang » (tests existants comme filet).
+2. **Capacités portail sur Coolify (court terme)** : continuer à livrer les besoins utilisateurs (volumes/monorepos #6, logs/métriques runtime #35, etc.) sur le backend actuel.
+3. **Moteur Axiom — critères de sortie avant bascule** : parité frameworks avec détecteur/renderer, plans multi-services et volumes persistants, Traefik/DNS/certificats prouvés sur VPS réel (#12), agent distant réel (#13), preset Laravel/PHP (#11), rollback/dépôts privés et parité fonctionnelle vérifiée via `DeployBackend`.
+4. **Convergence long terme** : porter les règles du détecteur Eflex dans l'analyseur Go (`services/engine/internal/analyzer`), converger `eflex.json`/`axiom.yaml`, faire consommer l’API du moteur par la console EFLEX (`portail/`) via `DeployBackend`, puis retirer `packages/detector`, `packages/renderer` et `schema/` — **après** validation des critères Axiom.
+
+État vérifié du moteur Axiom (tests exécutés, ce qui est prouvé et ce qui ne l'est pas encore) : [`docs/roadmap/parallel-plan.md`](./docs/roadmap/parallel-plan.md), section « Verified status ».
 
 État vérifié du moteur Axiom (tests exécutés, ce qui est prouvé et ce qui ne l'est pas encore) : [`docs/roadmap/parallel-plan.md`](./docs/roadmap/parallel-plan.md), section « Verified status ».
 
