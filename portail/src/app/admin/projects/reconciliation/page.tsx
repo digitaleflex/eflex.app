@@ -49,14 +49,14 @@ export default async function AdminReconciliationPage() {
     const appRefs =
       project.apps.length > 0
         ? project.apps.map((app) => ({ label: app.name, coolifyAppId: app.coolifyAppId }))
-        : [{ label: 'Application principale', coolifyAppId: project.coolifyAppId }]
+        : undefined
     return {
       id: project.id,
       name: project.name,
       slug: project.slug,
       coolifyAppId: project.coolifyAppId,
       organizationName: project.organization.name,
-      appRefs,
+      ...(appRefs ? { appRefs } : {}),
     }
   })
 

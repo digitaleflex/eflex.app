@@ -50,8 +50,10 @@ interface ProjectSettingsProps {
     name: string
     branch: string
     slug: string
+    /** Domaine de l’application principale. */
     domain: string | null
-    coolifyAppId: string | null
+    /** Au moins une application est provisionnée sur l’hébergement. */
+    hasHostedApp: boolean
   }
   apps?: SettingsApp[]
   envVars: EnvVarKey[]
@@ -783,8 +785,8 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
         description={
           <>
             Le projet, ses variables et son historique de déploiements sont supprimés.
-            {project.coolifyAppId
-              ? ' L’application et ses conteneurs sont arrêtés au passage.'
+            {project.hasHostedApp
+              ? ' L’application hébergée et ses conteneurs sont arrêtés au passage.'
               : ' Aucune application n’a encore été déployée.'}
           </>
         }

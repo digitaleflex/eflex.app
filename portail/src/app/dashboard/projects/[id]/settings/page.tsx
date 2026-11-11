@@ -26,13 +26,19 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
         name: true,
         branch: true,
         slug: true,
-        domain: true,
-        coolifyAppId: true,
         // Les valeurs ne quittent jamais le serveur : on n'envoie que les noms.
         envVars: { select: { key: true, updatedAt: true, appId: true }, orderBy: { key: 'asc' } },
         apps: {
           orderBy: [{ position: 'asc' }, { name: 'asc' }],
-          select: { id: true, name: true, root: true, domain: true, framework: true },
+          select: {
+            id: true,
+            name: true,
+            root: true,
+            domain: true,
+            framework: true,
+            coolifyAppId: true,
+            position: true,
+          },
         },
       },
     }),
@@ -49,6 +55,10 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
   ])
   if (!project) notFound()
 
+  const primaryApp = project.apps.find((app) => app.position === 0) ?? project.apps[0] ?? null
+  const primaryDomain = primaryApp?.domain ?? null
+  const hasHostedApp = project.apps.some((app) => Boolean(app.coolifyAppId))
+
   const transferTargets = transferMemberships
     .map((membership) => membership.organization)
     .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
@@ -61,8 +71,8 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
           name: project.name,
           branch: project.branch,
           slug: project.slug,
-          domain: project.domain,
-          coolifyAppId: project.coolifyAppId,
+          domain: primaryDomain,
+          hasHostedApp,
         }}
         apps={project.apps.map((app) => ({
           id: app.id,

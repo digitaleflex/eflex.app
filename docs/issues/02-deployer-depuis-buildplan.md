@@ -1,55 +1,41 @@
 # [P0] Déployer à partir du BuildPlan (renderer) au lieu de Nixpacks par défaut
 
-> **Mise à jour :** réalisé sur `feat/02-buildplan-deploy`. `packages/renderer/src/dockerfile.ts` génère le Dockerfile depuis le plan, `deploy.ts` assemble les artefacts (compose, nginx, `.env`, port réel, `build_pack`, `postDeploy` en service one-shot `migrate`). Le portail (`lib/deploy-plan.ts` → `POST /api/projects`) transmet tout à Coolify, qui n'utilise plus jamais `nixpacks` par défaut. Vérifié par 10 + 4 tests unitaires sur les fixtures ; **le déploiement réel reste à valider contre un Coolify distant** (volontairement non configuré dans cette infra).
+> **État (mis à jour, #6 lot G)** : le principe est réalisé. Le `BuildPlan` est la source de vérité transmise à Coolify (`build_pack`, port réel, commandes, dossier de travail). `packages/renderer` génère Dockerfile/artefacts quand nécessaire, mais le portail ne s'appuie pas sur un compose généré envoyé à Coolify.
 >
-> **Reste à faire (issues GitHub) :** volumes persistants et monorepos avec dépendances de workspace (#6), redéploiement et annulation (#4), statut en arrière-plan (#5), plans multi-services (le worker refuse aujourd'hui plus d'un service : Coolify 4.6 ne déploie pas un compose brut).
+> - **Compose fourni par le dépôt (D1)** : livré. Un `docker-compose.yml`/`compose.yaml` détecté est déployé comme application Coolify `dockercompose` (le fichier du dépôt fait foi).
+> - **Build pack effectif** : `dockerfile` si le dépôt fournit son Dockerfile, `dockercompose` si le dépôt fournit un compose, sinon `nixpacks` avec les commandes et le port issus du plan (valeur explicite, jamais implicite).
+> - **Plans multi-services générés sans compose fourni** : refusés avec un message explicite qui oriente vers l’ajout d’un `docker-compose.yml`/`compose.yaml` (voie D1). La plateforme ne génère pas de compose multi-services.
+> - **Monorepo / multi-app (D2)** : A–F livrés (`EFLEX_MULTI_APP` prod 0, staging 1), lot G en cours.
+> - **Volumes** : traduits du plan/artefacts, mais création des stockages Coolify conditionnée à `EFLEX_PERSISTENT_VOLUMES` (désactivé par défaut) ; pas de suppression automatique, sauvegardes/quotas non implémentés.
+> - **Reste (#6)** : activation/validation réelle des volumes derrière drapeau, fin du lot G, sauvegardes/quotas.
 
-## Contexte
+## Contexte (historique)
 
-Aujourd'hui, `createApplication()` dans `portail/src/lib/coolify.ts` envoie le dépôt à Coolify avec :
-
-```ts
-build_pack: params.buildPack || 'nixpacks',
-ports_exposes: params.portsExposes || '3000',
-```
-
-et `portail/src/app/api/projects/route.ts` ne passe aucun de ces deux paramètres. Conséquences :
-- c'est **Nixpacks** qui détecte et construit, pas Eflex ;
-- tout ce que produisent le détecteur et le renderer est ignoré : services Laravel (`php-fpm` + `nginx` + `queue` + `scheduler`), volumes, `postDeploy` (migrations, caches), healthchecks, port réel ;
-- une application Laravel, Python (port 8000) ou statique (port 80) est exposée sur le mauvais port.
-
-La question stratégique derrière : **si Coolify fait la détection et le build, qu'est-ce qui est propre à Eflex ?** Le `BuildPlan` doit devenir la source de vérité du déploiement.
+Au départ, `createApplication()` envoyait le dépôt à Coolify sans `build_pack`/`ports_exposes` explicites issus du plan : Coolify détectait et construisait via Nixpacks, ignorant le plan (services Laravel, volumes, `postDeploy`, port réel).
 
 ## Objectif
 
-Le déploiement d'un projet utilise le `BuildPlan` enregistré (voir #01) et la sortie de `renderStack()` (`packages/renderer`).
+Le déploiement d'un projet utilise le `BuildPlan` enregistré et les artefacts dérivés.
 
-## Proposition technique
+## État technique actuel
 
-Deux approches, qui peuvent coexister :
+- `portail/src/lib/deploy-plan.ts` : traduction plan → réglages Coolify (port, commandes, `base_directory`, `publish_directory`, compose fourni, volumes persistants traduits) et aiguillage `deploymentKind` (`compose` / `single` / `multiple-without-compose` / `invalid-compose`).
+- `portail/src/worker.ts` : file BullMQ, machine à états, déploiement idempotent, refus explicite des plans multi-services générés sans compose avec guidage D1, création de stockages Coolify uniquement si `EFLEX_PERSISTENT_VOLUMES` est actif.
+- `portail/src/lib/coolify.ts` : API Coolify 4.7.x (applications `dockerfile`/`nixpacks`/`dockercompose`, domaines, variables, storages, annulation, logs).
+- `packages/renderer` : Dockerfile et artefacts déterministes depuis le plan (tests sur fixtures) ; le compose généré n'est pas poussé brut à Coolify.
 
-### Option A — Coolify en mode `dockercompose` (recommandée pour aller vite)
-1. Générer pour le projet : un `Dockerfile` par runtime (node / php / python / static) à partir du plan, **plus** le `docker-compose.yml` de `renderStack()`, `nginx/default.conf` et le modèle `.env`.
-2. Créer l'application Coolify avec `build_pack: 'dockercompose'` et le contenu du compose (endpoint à confirmer selon la version de l'API Coolify).
-3. Exécuter les `postDeploy` après la mise en ligne (commande Coolify « execute command » ou service one-shot dans le compose).
+## Critères d'acceptation (reformulés selon la réalité)
 
-### Option B — Build par Eflex, Coolify uniquement comme runtime
-1. Construire l'image côté Eflex (BuildKit/buildx) à partir des Dockerfiles générés depuis le plan, puis la pousser dans un registre.
-2. Déployer le compose de `renderStack()` avec `ctx.image` pointant sur cette image.
-
-### Dans tous les cas
-- Nouveau module `packages/builder` (ou `renderer/src/dockerfile.ts`) : `BuildPlan → Dockerfile`, déterministe et testé sur les fixtures de `test/fixtures.ts`.
-- `createApplication()` reçoit le plan et transmet le **vrai** port (`plan.port`) et le bon build pack.
-- `framework === 'docker'` : garder le build pack `dockerfile` de Coolify (c'est le dépôt qui contrôle le build).
-- Les secrets ne passent **jamais** par le plan ni par le compose généré : uniquement par les variables d'environnement Coolify.
-
-## Critères d'acceptation
-- [x] Un projet Laravel déployé lance bien `app`, `web`, `queue` et `scheduler`, et exécute `php artisan migrate --force` (vérifié sur le compose généré ; service one-shot `migrate`).
-- [x] Un projet Python est exposé sur le port 8000, un site statique sur le port 80.
-- [x] Plus aucun appel à Coolify avec `nixpacks` par défaut (`buildPack` et `portsExposes` obligatoires).
-- [x] Tests unitaires `BuildPlan → Dockerfile` pour chaque framework des fixtures (10 tests renderer + 4 tests portail).
-- [x] `README.md` et `PROD.md` décrivent le pipeline : détection → plan → rendu → déploiement.
+- [x] Le port réel du plan est transmis (Python 8000, statique 80, Node 3000, etc.).
+- [x] `build_pack` et `ports_exposes` sont explicitement dérivés du plan/contexte (pas de valeur implicite laissée à Coolify).
+- [x] Dépôts avec Dockerfile : `dockerfile`. Dépôts avec compose fourni : `dockercompose`. Sinon : `nixpacks` avec commandes du plan.
+- [x] Les plans multi-services générés sans compose fourni sont refusés avec un message actionnable (ajout d’un `docker-compose.yml`/`compose.yaml`).
+- [x] Compose fourni (D1) déployé tel quel ; domaines et labels gérés selon les contraintes Coolify/Traefik documentées.
+- [x] Volumes traduits ; création Coolify derrière `EFLEX_PERSISTENT_VOLUMES` (désactivé par défaut), idempotente, sans suppression automatique.
+- [x] Tests unitaires `BuildPlan → Dockerfile`/artefacts sur les fixtures ; tests portail sur la traduction plan → déploiement.
+- [ ] Validation réelle « Laravel complet multi-services » en production sans compose fourni : **non applicable** tant que les plans générés multi-services sont refusés. La voie supportée est un compose fourni (D1) dans le dépôt.
 
 ## Dépendances
 - Dépend de : #01 « Intégrer le détecteur dans le flux Nouveau projet ».
 - Dépend de : #03 « Renderer : couvrir tous les frameworks détectés ».
+- Suite : #6 (volumes, monorepos/multi-app, compose fourni D1).

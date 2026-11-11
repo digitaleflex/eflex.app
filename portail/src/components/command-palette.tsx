@@ -51,8 +51,14 @@ export function CommandPalette() {
       inputRef.current?.focus()
       fetch('/api/projects')
         .then((r) => (r.ok ? r.json() : { projects: [] }))
-        .then((data: { projects?: { id: string; name: string; domain: string | null }[] }) =>
-          setProjects((data.projects ?? []).map((p) => ({ id: p.id, label: p.name, hint: p.domain ?? undefined, href: `/dashboard/projects/${p.id}`, group: 'Projets' }))),
+        .then((data: { projects?: { id: string; name: string; domain: string | null; apps?: { id: string; name?: string; position: number; domain?: string | null }[] }[] }) =>
+          setProjects(
+            (data.projects ?? []).map((p) => {
+              const primary = p.apps?.slice().sort((a, b) => a.position - b.position || (a.name ?? '').localeCompare(b.name ?? '') || a.id.localeCompare(b.id))[0]
+              const domain = primary?.domain ?? p.domain ?? null
+              return { id: p.id, label: p.name, hint: domain ?? undefined, href: `/dashboard/projects/${p.id}`, group: 'Projets' }
+            }),
+          ),
         )
         .catch(() => undefined)
     }

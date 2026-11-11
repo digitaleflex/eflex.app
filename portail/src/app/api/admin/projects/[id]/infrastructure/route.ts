@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { deleteApplication } from '@/lib/coolify'
 import { ACTIVE_DEPLOYMENT_STATUSES } from '@/lib/deployment-state'
 import { REASON_MAX, REASON_MIN } from '@/lib/admin-projects'
+import { collectCoolifyAppIds } from '@/lib/project-primary'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -21,9 +22,9 @@ const schema = z.object({
 })
 
 /**
- * Supprime l'application **côté infrastructure** (Coolify) sans supprimer le
- * projet ni son historique. La référence locale est remise à zéro après succès :
- * un échec local est signalé et reste détectable par la réconciliation.
+ * Supprime les applications **côté infrastructure** (Coolify) sans supprimer le
+ * projet ni son historique. Les références locales sont remises à zéro après
+ * succès : un échec local est signalé et reste détectable par la réconciliation.
  */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireAdminApi()
@@ -38,10 +39,18 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   const project = await prisma.project.findUnique({
     where: { id },
-    select: { id: true, name: true, organizationId: true, coolifyAppId: true },
+    select: {
+      id: true,
+      name: true,
+      organizationId: true,
+      coolifyAppId: true,
+      apps: { select: { id: true, coolifyAppId: true } },
+    },
   })
   if (!project) return NextResponse.json({ error: 'Projet introuvable.' }, { status: 404 })
-  if (!project.coolifyAppId) {
+
+  const appIds = project.apps.length > 0 ? collectCoolifyAppIds({ apps: project.apps }) : project.coolifyAppId ? [project.coolifyAppId] : []
+  if (appIds.length === 0) {
     return NextResponse.json(
       { error: 'Ce projet n’a pas d’application sur l’infrastructure : rien à supprimer.' },
       { status: 409 },
@@ -61,27 +70,34 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (active) {
     return NextResponse.json(
       {
-        error: 'Un déploiement est en cours pour ce projet : annulez-le ou débloquez-le avant de supprimer l’application.',
+        error: 'Un déploiement est en cours pour ce projet : annulez-le ou débloquez-le avant de supprimer les applications.',
         deploymentId: active.id,
       },
       { status: 409 },
     )
   }
 
-  const removed = await deleteApplication(project.coolifyAppId)
-  if ('error' in removed) {
+  const results = await Promise.all(appIds.map((appId: string) => deleteApplication(appId)))
+  const failure = results.find((result: { error?: string } | unknown): result is { error: string } => Boolean(result && typeof result === 'object' && 'error' in (result as Record<string, unknown>)))
+  if (failure) {
     return NextResponse.json(
-      { error: `L’infrastructure n’a pas confirmé la suppression : ${removed.error}` },
+      { error: `L’infrastructure n’a pas confirmé la suppression : ${failure.error}` },
       { status: 502 },
     )
   }
 
   let localCleared = true
   try {
-    await prisma.project.update({
-      where: { id: project.id },
-      data: { coolifyAppId: null, tlsValid: null, tlsExpiresAt: null, tlsCheckedAt: null },
-    })
+    await prisma.$transaction([
+      prisma.project.update({
+        where: { id: project.id },
+        data: { coolifyAppId: null, tlsValid: null, tlsExpiresAt: null, tlsCheckedAt: null },
+      }),
+      prisma.projectApp.updateMany({
+        where: { projectId: project.id },
+        data: { coolifyAppId: null, tlsValid: null, tlsExpiresAt: null, tlsCheckedAt: null },
+      }),
+    ])
   } catch {
     localCleared = false
   }
@@ -91,7 +107,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     action: 'project.infrastructure.delete',
     target: { type: 'project', id: project.id },
     organizationId: project.organizationId,
-    details: { coolifyAppId: project.coolifyAppId, reason: parsed.data.reason, localCleared },
+    details: { coolifyAppIds: appIds, reason: parsed.data.reason, localCleared },
     request,
   })
 
@@ -99,7 +115,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     return NextResponse.json(
       {
         error:
-          'L’application a été supprimée, mais la référence locale n’a pas pu être effacée. La réconciliation la signalera : effacez-la manuellement si nécessaire.',
+          'Les applications ont été supprimées, mais les références locales n’ont pas pu être effacées. La réconciliation les signalera : effacez-les manuellement si nécessaire.',
       },
       { status: 500 },
     )

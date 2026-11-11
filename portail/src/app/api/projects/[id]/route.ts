@@ -4,10 +4,12 @@ import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { publish } from '@/lib/event-bus'
+import { audit } from '@/lib/audit'
 import { deleteApplication, deletePrivateKey, deleteManagedDatabase } from '@/lib/coolify'
 import { resolveProjectToken } from '@/lib/git-credentials'
 import { deleteDeployKey } from '@/lib/github-app'
 import { parseGitHubUrl } from '@/lib/github-url'
+import { getPrimaryApp } from '@/lib/project-apps'
 import { firstIssue, projectUpdateSchema } from '@/lib/project-settings'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -30,12 +32,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       slug: true,
       repoUrl: true,
       branch: true,
-      framework: true,
-      runtime: true,
-      domain: true,
-      port: true,
       createdAt: true,
       updatedAt: true,
+      // Repli de transition (Lot G) : inclus sans être exposé directement.
+      coolifyAppId: true,
       // Seulement les noms des variables : les valeurs ne quittent jamais le serveur.
       envVars: { select: { key: true, updatedAt: true }, orderBy: { key: 'asc' } },
       // Applications du projet (D2) : nom, dossier, domaine, TLS et dernier déploiement.
@@ -46,6 +46,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           name: true,
           root: true,
           position: true,
+          plan: true,
           framework: true,
           runtime: true,
           port: true,
@@ -81,15 +82,24 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
   }
 
-  const { apps, ...rest } = project
+  const { apps, coolifyAppId: legacyCoolifyAppId, ...rest } = project
+  const primary = getPrimaryApp(apps)
   return NextResponse.json({
     project: {
       ...rest,
+      framework: primary?.framework ?? null,
+      runtime: primary?.runtime ?? null,
+      domain: primary?.domain ?? null,
+      port: primary?.port ?? 80,
+      coolifyAppId: primary?.coolifyAppId ?? legacyCoolifyAppId ?? null,
+      tlsValid: primary?.tlsValid ?? null,
+      tlsExpiresAt: primary?.tlsExpiresAt ?? null,
+      tlsCheckedAt: primary?.tlsCheckedAt ?? null,
       apps: apps.map(({ deployments, ...app }) => ({
         ...app,
         lastDeployment: deployments[0] ?? null,
       })),
-      primaryAppId: apps.find((app) => app.position === 0)?.id ?? apps[0]?.id ?? null,
+      primaryAppId: primary?.id ?? null,
     },
   })
 }
@@ -168,7 +178,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
  * échec côté Coolify annule la suppression locale (meilleur message qu'un
  * projet fantôme).
  */
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
@@ -205,12 +215,12 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
   }
 
-  // Applications Coolify du projet (D2) : une par `ProjectApp`, plus le miroir
-  // `Project.coolifyAppId` de l'application principale. Un échec annule la
+  // Applications Coolify du projet (D2) : une par `ProjectApp`, avec repli sur
+  // le miroir `Project.coolifyAppId` pendant la transition. Un échec annule la
   // suppression locale, jamais de conteneur orphelin silencieux.
   const coolifyAppIds = [
     ...new Set(
-      [project.coolifyAppId, ...project.apps.map((app) => app.coolifyAppId)].filter(
+      [...project.apps.map((app) => app.coolifyAppId), project.coolifyAppId].filter(
         (appId): appId is string => Boolean(appId),
       ),
     ),
@@ -255,6 +265,15 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
 
   await prisma.project.delete({ where: { id: project.id } })
+
+  await audit({
+    actor: { id: session.user.id, email: session.user.email },
+    action: 'project.delete',
+    target: { type: 'project', id: project.id },
+    organizationId: org.organizationId,
+    details: { projectName: project.name },
+    request,
+  })
 
   await publish({
     type: 'project.deleted',

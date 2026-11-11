@@ -25,6 +25,7 @@ import { resolveOrganization, canManageProjects } from '@/lib/organizations'
 import { AutoRefresh } from '@/components/auto-refresh'
 import { DeploymentLogs } from '@/components/deployment-logs'
 import { RuntimeLogs } from '@/components/runtime-logs'
+import { ProjectMetrics } from '@/components/project-metrics'
 import { LiveRefresh } from '@/components/live-refresh'
 import { FrameworkTile, DeployHistory } from '@/components/dashboard/project-card'
 import { StatusPill } from '@/components/dashboard/status-pill'
@@ -42,6 +43,7 @@ import { statusInfo } from '@/lib/project-status'
 import { applicationHealth, tlsHealth } from '@/lib/project-health'
 import { nextProjectAction, projectSituation, type NextProjectAction } from '@/lib/project-actions'
 import { getApplicationRuntime } from '@/lib/coolify'
+import { getPrimaryApp } from '@/lib/project-apps'
 import { relativeTime } from '@/lib/relative-time'
 import { repoLabel } from '@/lib/repo'
 import { cn } from '@/lib/utils'
@@ -132,10 +134,23 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           },
         },
         domains: { orderBy: { createdAt: 'asc' } },
-        // Applications du projet (lot C de D2) : liste minimale avec leur statut.
+        // Applications du projet : source principale (domaine, stack, runtime, TLS, hébergement).
         apps: {
           orderBy: [{ position: 'asc' }, { name: 'asc' }],
-          include: {
+          select: {
+            id: true,
+            name: true,
+            root: true,
+            position: true,
+            framework: true,
+            runtime: true,
+            port: true,
+            domain: true,
+            coolifyAppId: true,
+            plan: true,
+            tlsValid: true,
+            tlsExpiresAt: true,
+            tlsCheckedAt: true,
             deployments: {
               take: 1,
               orderBy: { createdAt: 'desc' },
@@ -155,26 +170,38 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   ])
   if (!project) notFound()
 
-  // Statut runtime Coolify (lecture courte : une page ne doit jamais attendre l'API).
-  const runtime = project.coolifyAppId ? await getApplicationRuntime(project.coolifyAppId, 3_000) : null
-  const runtimeStatus = project.coolifyAppId ? (runtime && !('error' in runtime) ? runtime.status : null) : null
+  const primaryApp = getPrimaryApp(project.apps)
+  const primaryDomain = primaryApp?.domain ?? null
+  const primaryFramework = primaryApp?.framework ?? null
+  const primaryRuntime = primaryApp?.runtime ?? null
+  const primaryCoolifyAppId = primaryApp?.coolifyAppId ?? null
+  const primaryTlsValid = primaryApp?.tlsValid ?? null
+  const primaryTlsExpiresAt = primaryApp?.tlsExpiresAt ?? null
+  const primaryTlsCheckedAt = primaryApp?.tlsCheckedAt ?? null
+  const deployed = project.apps.some((app) => Boolean(app.coolifyAppId))
+
+  // Statut runtime Coolify de l'application principale (lecture courte : une page ne doit jamais attendre l'API).
+  const runtime = primaryCoolifyAppId ? await getApplicationRuntime(primaryCoolifyAppId, 3_000) : null
+  const runtimeStatus = primaryCoolifyAppId ? (runtime && !('error' in runtime) ? runtime.status : null) : null
   const runtimeError = runtime && 'error' in runtime ? runtime.error : null
-  const appHealth = project.coolifyAppId
+  const appHealth = primaryCoolifyAppId
     ? applicationHealth(runtimeStatus)
     : { label: 'Pas encore déployé', detail: 'Le statut sera disponible après le premier déploiement.', tone: 'muted' as const }
-  const certificateHealth = tlsHealth(project.tlsValid, project.tlsExpiresAt, project.tlsCheckedAt)
+  const certificateHealth = tlsHealth(primaryTlsValid, primaryTlsExpiresAt, primaryTlsCheckedAt)
 
   // L'état des déploiements est écrit par le worker (file Redis) ; la page se met à jour par événements.
   const deployments = project.deployments
   const analysis = readAnalysis(project.detection)
-  const storedPlan = project.plan as unknown as {
+  const primaryPlan = primaryApp?.plan as unknown as {
     framework?: string
     compose?: { services?: unknown }
   } | null
   const composeServices =
-    storedPlan?.framework === 'compose' && Array.isArray(storedPlan.compose?.services)
-      ? storedPlan.compose.services.filter((name): name is string => typeof name === 'string')
+    primaryPlan?.framework === 'compose' && Array.isArray(primaryPlan.compose?.services)
+      ? primaryPlan.compose.services.filter((name): name is string => typeof name === 'string')
       : []
+  const metricsApps = project.apps.map((app) => ({ id: app.id, name: app.name }))
+
   const runtimeLogApps = project.apps.map((app) => {
     const appPlan = app.plan as unknown as { framework?: string; compose?: { services?: unknown } } | null
     const appServices =
@@ -188,13 +215,12 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const inProgress = last !== undefined && statusInfo(last.status).inProgress
   const canManage = canManageProjects(org.role)
   const multiApp = project.apps.length > 1
-  const primaryApp = project.apps.find((app) => app.position === 0) ?? project.apps[0]
   const appNameById = new Map(project.apps.map((app) => [app.id, app.name]))
   const situation = projectSituation(last?.status, deployments.length > 0)
   const primaryAction = nextProjectAction({
     projectId: project.id,
     situation,
-    domain: project.domain,
+    domain: primaryDomain,
     canManage,
   })
   const principalDomains = project.domains.filter(
@@ -213,7 +239,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       {/* En-tête : statut, domaine, puis action prioritaire selon l'état réel. */}
       <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 items-start gap-4">
-          <FrameworkTile framework={project.framework} name={project.name} size="lg" />
+          <FrameworkTile framework={primaryFramework} name={project.name} size="lg" />
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="truncate font-display text-2xl font-bold tracking-tight">{project.name}</h1>
@@ -224,15 +250,15 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 </span>
               )}
             </div>
-            {project.domain ? (
+            {primaryDomain ? (
               <a
-                href={`https://${project.domain}`}
+                href={`https://${primaryDomain}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex max-w-full items-center gap-1 text-sm font-medium text-foreground hover:underline"
               >
                 <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <span className="truncate">{project.domain}</span>
+                <span className="truncate">{primaryDomain}</span>
                 <ArrowUpRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span className="sr-only"> (nouvel onglet)</span>
               </a>
@@ -398,9 +424,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 <div aria-hidden="true" className="pointer-events-none absolute -bottom-20 left-10 h-48 w-48 rounded-full bg-eflexsky/25 blur-3xl" />
                 <h2 id="prod-title" className="relative text-xs font-semibold uppercase tracking-wider text-white/70">Production</h2>
                 <div className="relative min-w-0">
-                  {project.domain ? (
-                    <a href={`https://${project.domain}`} target="_blank" rel="noopener noreferrer" className="group inline-flex max-w-full items-center gap-2 font-display text-xl font-bold hover:underline sm:text-2xl">
-                      <span className="truncate">{project.domain}</span>
+                  {primaryDomain ? (
+                    <a href={`https://${primaryDomain}`} target="_blank" rel="noopener noreferrer" className="group inline-flex max-w-full items-center gap-2 font-display text-xl font-bold hover:underline sm:text-2xl">
+                      <span className="truncate">{primaryDomain}</span>
                       <ExternalLink className="h-5 w-5 shrink-0 opacity-70" aria-hidden="true" />
                       <span className="sr-only">(nouvel onglet)</span>
                     </a>
@@ -468,8 +494,8 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                     label: 'Stack',
                     value: (
                       <span className="text-sm">
-                        {project.framework ? frameworkLabel(project.framework) : 'Détection automatique'}
-                        {project.runtime && <span className="text-muted-foreground"> · {runtimeLabel(project.runtime)}</span>}
+                        {primaryFramework ? frameworkLabel(primaryFramework) : 'Détection automatique'}
+                        {primaryRuntime && <span className="text-muted-foreground"> · {runtimeLabel(primaryRuntime)}</span>}
                       </span>
                     ),
                   },
@@ -528,6 +554,30 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
               </div>
             </dl>
           </SectionCard>
+
+          {deployed ? (
+            <ProjectMetrics projectId={project.id} apps={multiApp ? metricsApps : []} />
+          ) : (
+            <section
+              aria-labelledby="project-metrics-title"
+              className="overflow-hidden rounded-xl border border-border bg-card"
+            >
+              <div className="border-b border-border px-4 py-4 sm:px-5">
+                <h2 id="project-metrics-title" className="flex items-center gap-2 text-base font-semibold">
+                  <Activity className="h-4 w-4 text-primary" aria-hidden="true" />
+                  Ressources
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Les métriques CPU et mémoire seront disponibles après le premier déploiement.
+                </p>
+              </div>
+              <div className="p-4 sm:p-5">
+                <p className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+                  Métriques indisponibles : cette application n’a pas encore été déployée.
+                </p>
+              </div>
+            </section>
+          )}
 
           <div className={cn('grid gap-6', analysis && 'lg:grid-cols-2')}>
             <SectionCard
@@ -779,7 +829,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       )}
 
       {tab === 'logs' &&
-        (project.coolifyAppId || project.apps.some((app) => app.coolifyAppId) ? (
+        (deployed ? (
           <div className="space-y-3">
             <RuntimeLogs
               projectId={project.id}

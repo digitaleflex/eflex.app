@@ -1,12 +1,16 @@
 import { attentionRank, statusInfo } from '@/lib/project-status'
 
 export type DeploymentLite = { id: string; status: string; createdAt: Date; commitSha?: string }
+export type ProjectLiteApp = { framework?: string | null; domain?: string | null; position?: number; name?: string | null }
 export type ProjectLite = {
   id: string
   name: string
+  /** Miroirs projet (compatibilité) ; l'app principale prévaut quand `apps` est fourni. */
   framework: string | null
   domain: string | null
   deployments: DeploymentLite[] // du plus récent au plus ancien
+  /** Applications du projet : source de vérité pour domaine/framework. */
+  apps?: readonly ProjectLiteApp[]
 }
 
 export type DayBucket = { day: string; live: number; failed: number; other: number }

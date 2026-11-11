@@ -12,6 +12,7 @@ import { maskProjectLogs } from '@/lib/admin-deployment-logs'
 import { frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 import { STATUS_LABELS, isDeploymentStatus } from '@/lib/deployment-state'
 import { relativeTime } from '@/lib/relative-time'
+import { getPrimaryApp } from '@/lib/project-apps'
 import {
   deploymentDuration,
   isActiveDeploymentStatus,
@@ -39,23 +40,29 @@ export default async function AdminDeploymentPage({ params }: { params: Promise<
       coolifyBuildId: true,
       logsSummary: true,
       createdAt: true,
+      app: {
+        select: { id: true, name: true, framework: true, runtime: true, domain: true, plan: true },
+      },
       project: {
         select: {
           id: true,
           name: true,
           slug: true,
-          framework: true,
-          runtime: true,
-          plan: true,
           organization: { select: { id: true, name: true } },
           envVars: { select: { key: true, value: true } },
+          apps: {
+            orderBy: { position: 'asc' },
+            select: { id: true, name: true, position: true, framework: true, runtime: true, domain: true, plan: true },
+          },
         },
       },
     },
   })
   if (!deployment) notFound()
 
-  const plan = summarizePlan(deployment.project.plan)
+  const primary = getPrimaryApp(deployment.project.apps)
+  const app = deployment.app ?? primary
+  const plan = summarizePlan(app?.plan)
   const summary = maskProjectLogs(deployment.project.id, deployment.project.envVars, deployment.logsSummary)
   const cause = deployment.status === 'failed' ? probableFailureCause(summary) : null
   const timing = deploymentDuration(deployment, now)
@@ -79,7 +86,8 @@ export default async function AdminDeploymentPage({ params }: { params: Promise<
           <Link href={`/admin/projects/${deployment.project.id}`} className="font-medium text-foreground hover:underline">
             {deployment.project.name}
           </Link>{' '}
-          · {deployment.project.organization.name} · créé{' '}
+          · {deployment.project.organization.name}
+          {app ? ` · ${app.name}` : ''} · créé{' '}
           <time dateTime={deployment.createdAt.toISOString()}>{relativeTime(deployment.createdAt, now)}</time>
         </p>
         <p className="flex items-center gap-1.5 break-all font-mono text-sm">
@@ -166,12 +174,16 @@ export default async function AdminDeploymentPage({ params }: { params: Promise<
         {plan ? (
           <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
             <div className="flex flex-wrap justify-between gap-2">
+              <dt className="text-muted-foreground">Application</dt>
+              <dd>{app?.name ?? '—'}{app?.domain ? ` · ${app.domain}` : ''}</dd>
+            </div>
+            <div className="flex flex-wrap justify-between gap-2">
               <dt className="text-muted-foreground">Stack</dt>
-              <dd>{frameworkLabel(plan.framework)}</dd>
+              <dd>{frameworkLabel(app?.framework ?? plan.framework)}</dd>
             </div>
             <div className="flex flex-wrap justify-between gap-2">
               <dt className="text-muted-foreground">Runtime</dt>
-              <dd>{plan.runtime ? runtimeLabel(plan.runtime) : '—'}</dd>
+              <dd>{(app?.runtime ?? plan.runtime) ? runtimeLabel((app?.runtime ?? plan.runtime) as string) : '—'}</dd>
             </div>
             <div className="flex flex-wrap justify-between gap-2">
               <dt className="text-muted-foreground">Racine</dt>
@@ -185,7 +197,7 @@ export default async function AdminDeploymentPage({ params }: { params: Promise<
               <dt className="text-muted-foreground">Dossier publié</dt>
               <dd className="font-mono text-xs">{plan.publish ?? '—'}</dd>
             </div>
-            <div className="flex flex-wrap justify-between gap-2">
+            <div className="flex flex-wrap justify-between gap-2 sm:col-span-2">
               <dt className="text-muted-foreground">Dockerfile</dt>
               <dd className="font-mono text-xs">{plan.dockerfile ?? (plan.framework === 'docker' ? 'Dockerfile' : '—')}</dd>
             </div>
@@ -215,11 +227,11 @@ export default async function AdminDeploymentPage({ params }: { params: Promise<
           </dl>
         ) : (
           <p className="mt-2 text-sm text-muted-foreground">
-            Plan indisponible : le projet n’a pas de BuildPlan enregistré. Le déploiement a échoué avant l’analyse.
+            Plan indisponible : aucune application ou BuildPlan enregistré pour ce déploiement.
           </p>
         )}
         <p className="mt-3 text-xs text-muted-foreground">
-          Le plan affiché est celui enregistré pour le projet à sa création ; il n’est pas versionné par déploiement.
+          Plan de l’application déployée (ou de l’application principale si l’historique ne précise pas l’application).
         </p>
       </Card>
 

@@ -60,7 +60,15 @@ export default async function AdminOrganizationPage({ params }: { params: Promis
       },
       projects: {
         orderBy: { updatedAt: 'desc' },
-        select: { id: true, name: true, framework: true, domain: true, updatedAt: true },
+        select: {
+          id: true,
+          name: true,
+          updatedAt: true,
+          apps: {
+            orderBy: { position: 'asc' },
+            select: { id: true, name: true, position: true, framework: true, domain: true },
+          },
+        },
       },
       invitations: {
         where: { status: 'pending' },
@@ -273,17 +281,23 @@ export default async function AdminOrganizationPage({ params }: { params: Promis
               <p className="text-sm text-muted-foreground">Aucun projet.</p>
             ) : (
               <ul className="divide-y divide-border">
-                {organization.projects.map((project) => (
-                  <li key={project.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                    <Link href={`/admin/projects/${project.id}`} className="min-w-0 font-medium hover:underline">
-                      <span className="block truncate">{project.name}</span>
-                      <span className="block truncate text-xs font-normal text-muted-foreground">
-                        {project.framework} · {project.domain ?? 'sans domaine'}
-                      </span>
-                    </Link>
-                    <TimeFr value={project.updatedAt} className="text-xs text-muted-foreground" />
-                  </li>
-                ))}
+                {organization.projects.map((project) => {
+                  const primary = project.apps
+                    .slice()
+                    .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))[0] ?? null
+                  return (
+                    <li key={project.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                      <Link href={`/admin/projects/${project.id}`} className="min-w-0 font-medium hover:underline">
+                        <span className="block truncate">{project.name}</span>
+                        <span className="block truncate text-xs font-normal text-muted-foreground">
+                          {primary?.framework ?? '—'} · {primary?.domain ?? 'sans domaine'}
+                          {project.apps.length > 1 ? ` · ${project.apps.length} applications` : ''}
+                        </span>
+                      </Link>
+                      <TimeFr value={project.updatedAt} className="text-xs text-muted-foreground" />
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </CardContent>

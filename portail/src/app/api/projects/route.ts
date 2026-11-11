@@ -15,6 +15,7 @@ import { projectDomain, uniqueSlug } from '@/lib/project-slug'
 import {
   appDomain,
   appNameFromRoot,
+  getPrimaryApp,
   normalizeAppRoot,
   uniqueAppName,
 } from '@/lib/project-apps'
@@ -104,13 +105,8 @@ async function reserveAppDomain(candidate: string | null): Promise<string | null
   let label = firstLabel
   for (let index = 1; index <= 20; index += 1) {
     const next = `${label}.${rest.join('.')}`
-    // `ProjectApp.domain` est unique, mais un projet antérieur à D2 peut encore
-    // router ce domaine via `Project.domain` (aucune ligne ProjectApp).
     const takenApp = await prisma.projectApp.findUnique({ where: { domain: next }, select: { id: true } })
-    const takenProject = takenApp
-      ? null
-      : await prisma.project.findFirst({ where: { domain: next }, select: { id: true } })
-    if (!takenApp && !takenProject) return next
+    if (!takenApp) return next
     const suffix = `-${index + 1}`
     label = `${firstLabel.slice(0, 63 - suffix.length).replace(/-$/, '')}${suffix}`
   }
@@ -436,13 +432,14 @@ export async function POST(request: NextRequest) {
   const deploymentByApp = new Map(deployments.map((deployment) => [deployment.appId, deployment]))
   const firstDeployment = deployments[0] ?? null
 
+  const primaryCreated = getPrimaryApp(created.apps)
   return NextResponse.json(
     {
       project: {
         id: created.project.id,
         name: created.project.name,
         slug: created.project.slug,
-        domain: created.project.domain,
+        domain: primaryCreated?.domain ?? primaryApp.domain,
       },
       apps: created.apps.map((app) => ({
         id: app.id,
@@ -487,10 +484,6 @@ export async function GET() {
       slug: true,
       repoUrl: true,
       branch: true,
-      framework: true,
-      runtime: true,
-      domain: true,
-      coolifyAppId: true,
       createdAt: true,
       updatedAt: true,
       deployments: { take: 1, orderBy: { createdAt: 'desc' }, select: { status: true, createdAt: true } },
@@ -501,7 +494,9 @@ export async function GET() {
           id: true,
           name: true,
           root: true,
+          position: true,
           framework: true,
+          runtime: true,
           port: true,
           domain: true,
           coolifyAppId: true,
@@ -513,13 +508,24 @@ export async function GET() {
   })
 
   return NextResponse.json({
-    projects: projects.map(({ apps, ...project }) => ({
-      ...project,
-      apps: apps.map(({ deployments, ...app }) => ({
-        ...app,
-        lastStatus: deployments[0]?.status ?? null,
-        lastDeployedAt: deployments[0]?.createdAt ?? null,
-      })),
-    })),
+    projects: projects.map(({ apps, ...project }) => {
+      const primary = getPrimaryApp(apps)
+      return {
+        ...project,
+        framework: primary?.framework ?? null,
+        runtime: primary?.runtime ?? null,
+        domain: primary?.domain ?? null,
+        coolifyAppId: primary?.coolifyAppId ?? null,
+        appCount: apps.length,
+        apps: apps.map(({ deployments, position, ...app }) => {
+          void position
+          return {
+            ...app,
+            lastStatus: deployments[0]?.status ?? null,
+            lastDeployedAt: deployments[0]?.createdAt ?? null,
+          }
+        }),
+      }
+    }),
   })
 }

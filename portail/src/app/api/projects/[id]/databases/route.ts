@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { audit } from '@/lib/audit'
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { DATABASE_KINDS, createProjectDatabase, isDatabaseKind, refreshProjectDatabase } from '@/lib/project-databases'
 
@@ -76,7 +77,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { id } = await params
   const project = await prisma.project.findFirst({
     where: { id, organizationId: org.organizationId },
-    select: { id: true, slug: true, name: true, organizationId: true, coolifyAppId: true },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      organizationId: true,
+      coolifyAppId: true,
+      apps: { select: { coolifyAppId: true } },
+    },
   })
   if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
 
@@ -93,6 +101,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const result = await createProjectDatabase(project, parsed.data.kind)
   if ('error' in result) return NextResponse.json({ error: result.error }, { status: result.status })
+  await audit({
+    actor: { id: session.user.id, email: session.user.email },
+    action: 'project.database.create',
+    target: { type: 'project_database', id: result.database.id },
+    organizationId: org.organizationId,
+    details: { projectId: project.id, kind: result.database.kind, deploymentId: result.deploymentId },
+    request,
+  })
   return NextResponse.json(
     {
       database: {

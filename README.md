@@ -50,10 +50,10 @@ Dépôt GitHub (snapshot)
 BuildPlan (framework, runtime, install, build, start, port, services, postDeploy)
    │  packages/renderer → buildDeploymentArtifacts()
    ▼
-Dockerfile + docker-compose.yml + nginx/default.conf + .env.example
+Artefacts déterministes (Dockerfile/compose/nginx/.env.example) + réglages Coolify
    │  portail → POST /api/projects (202) → worker BullMQ → Coolify
    ▼
-build_pack dockerfile (Dockerfile du dépôt) ou nixpacks (commandes du plan)
+build_pack explicite : dockercompose (compose fourni D1) | dockerfile (Dockerfile du dépôt) | nixpacks (commandes du plan)
 + ports_exposes = port réel du plan + variables d'environnement chiffrées
 + domaine https://<slug>.<PORTAL_DOMAIN> + labels Traefik websecure
 ```
@@ -61,11 +61,13 @@ build_pack dockerfile (Dockerfile du dépôt) ou nixpacks (commandes du plan)
 Points clés :
 
 - **Port réel** : Python 8000, statique 80, Node 3000… ce n'est plus `3000` par défaut.
-- **Laravel** : le compose décrit `app` (php-fpm), `web` (nginx), `queue`, `scheduler`, plus un service one-shot `migrate` qui exécute les `postDeploy` (`php artisan migrate --force`, caches…).
-- **Aucun `nixpacks` implicite** : `build_pack` est toujours explicite. Coolify 4.6 ne déployant pas un compose brut sans `docker-compose.yaml` dans le dépôt, les plans multi-services sont refusés avec un message explicite : seuls les dépôts avec leur propre Dockerfile (`dockerfile`) ou les frameworks mono-service (`nixpacks`) sont déployés.
-- **Domaine public** : chaque projet reçoit `<slug>.<PORTAL_DOMAIN>` (défaut `eflex.app`, DNS wildcard). Les labels Traefik (`websecure`, réseau `proxy`, `letsencrypt`) sont réappliqués par `PATCH` après création, car Coolify écrase les `custom_labels` avec ses propres entrypoints `http`/`https`.
+- **`build_pack` explicite** : `dockercompose` si le dépôt fournit un `docker-compose.yml`/`compose.yaml` (voie D1, fichier déployé tel quel), `dockerfile` si le dépôt fournit son propre Dockerfile, sinon `nixpacks` avec les commandes du plan. Aucun choix implicite laissé à Coolify.
+- **Plans multi-services générés sans compose fourni** : refusés avec un message explicite orientant vers l’ajout d’un `docker-compose.yml`/`compose.yaml` à la racine de l’application (voie D1). La plateforme ne génère pas de compose multi-services ; les plans Laravel/PHP multi-services du renderer restent descriptifs tant qu’aucun compose fourni n’est présent.
+- **Volumes** : les volumes du plan sont traduits, mais la création des stockages Coolify n’est effectuée que si `EFLEX_PERSISTENT_VOLUMES` est activé (désactivé par défaut) ; aucun volume n’est supprimé automatiquement, et sauvegardes/quotas de stockage ne sont pas implémentés.
+- **Monorepo / multi-applications (D2)** : lots A–F livrés, lot G en cours. `EFLEX_MULTI_APP` est désactivé par défaut en production et activé en staging.
+- **Domaine public** : chaque projet reçoit `<slug>.<PORTAL_DOMAIN>` (défaut `eflex.app`, DNS wildcard). Les labels Traefik (`websecure`, réseau `proxy`, `letsencrypt`) sont gérés selon les contraintes du mode (réappliqués par `PATCH` pour les applications non compose ; pour un compose fourni, les labels `websecure` doivent être déclarés dans le fichier).
 - **Secrets** : jamais dans le plan, le Dockerfile ou le compose ; uniquement via les variables d'environnement Coolify, chiffrées au repos dans PostgreSQL (AES-256-GCM).
-- `framework === 'docker'` : le Dockerfile du dépôt fait foi, Eflex n'en génère pas.
+- `framework === 'docker'` : le Dockerfile du dépôt fait foi, Eflex n'en génère pas. `framework === 'compose'` : le compose du dépôt fait foi (D1).
 
 ## Feuille de route de l'unification
 

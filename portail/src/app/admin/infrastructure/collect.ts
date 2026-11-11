@@ -531,7 +531,7 @@ async function collectDeployments(): Promise<DeploymentsSnapshot> {
 async function collectProjects(): Promise<ProjectsAttempt> {
   const attempt = await measure('Projets', () =>
     withTimeout(
-      prisma.project.findMany({ select: { coolifyAppId: true, apps: { select: { coolifyAppId: true } } } }),
+      prisma.project.findMany({ select: { id: true, coolifyAppId: true, apps: { select: { coolifyAppId: true } } } }),
       DATABASE_TIMEOUT_MS,
       'Projets',
     ),
@@ -549,10 +549,10 @@ async function collectProjects(): Promise<ProjectsAttempt> {
   let withApplication = 0
   for (const project of attempt.value) {
     let hasApp = false
-    const ids =
-      project.apps.length > 0
-        ? [project.coolifyAppId, ...project.apps.map((app) => app.coolifyAppId)]
-        : [project.coolifyAppId]
+    // Vérité : `ProjectApp.coolifyAppId`. Repli miroir uniquement si aucune
+    // application n'est chargée/enregistrée (transition).
+    const appIds = project.apps.map((app) => app.coolifyAppId)
+    const ids = project.apps.length > 0 ? appIds : [project.coolifyAppId]
     for (const id of ids) {
       if (typeof id !== 'string' || id.length === 0) continue
       known.add(id)
@@ -609,10 +609,16 @@ async function collectCertificates(): Promise<CertificatesSnapshot> {
   const attempt = await measure('Certificats', () =>
     withTimeout(
       (async () => {
-        const [projects, domains] = await Promise.all([
-          prisma.project.findMany({
+        const [apps, domains] = await Promise.all([
+          prisma.projectApp.findMany({
             where: { tlsExpiresAt: { not: null } },
-            select: { id: true, name: true, domain: true, tlsExpiresAt: true },
+            select: {
+              id: true,
+              name: true,
+              domain: true,
+              tlsExpiresAt: true,
+              project: { select: { name: true } },
+            },
             orderBy: { tlsExpiresAt: 'asc' },
             take: 500,
           }),
@@ -628,7 +634,7 @@ async function collectCertificates(): Promise<CertificatesSnapshot> {
             take: 500,
           }),
         ])
-        return { projects, domains }
+        return { apps, domains }
       })(),
       DATABASE_TIMEOUT_MS,
       'Certificats',
@@ -649,12 +655,12 @@ async function collectCertificates(): Promise<CertificatesSnapshot> {
   }
 
   const summary = summarizeCertificates([
-    ...attempt.value.projects.map((project) => ({
-      id: project.id,
-      hostname: project.domain ?? project.name,
-      projectName: project.name,
+    ...attempt.value.apps.map((app) => ({
+      id: app.id,
+      hostname: app.domain ?? `${app.project.name} (${app.name})`,
+      projectName: app.project.name,
       kind: 'project' as const,
-      expiresAt: project.tlsExpiresAt,
+      expiresAt: app.tlsExpiresAt,
     })),
     ...attempt.value.domains.map((domain) => ({
       id: domain.id,

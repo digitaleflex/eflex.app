@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { audit } from '@/lib/audit'
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { platformDomain, validateCustomDomain } from '@/lib/custom-domain'
 import { effectivePlan } from '@/lib/billing'
+import { getPrimaryApp, resolveEffectiveApp } from '@/lib/project-primary'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -54,7 +56,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       domain: true,
       apps: {
         orderBy: [{ position: 'asc' }, { name: 'asc' }],
-        select: { id: true, name: true, domain: true },
+        select: { id: true, name: true, position: true, domain: true, coolifyAppId: true },
       },
       domains: { orderBy: { createdAt: 'asc' } },
     },
@@ -68,8 +70,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const filteredDomains = requestedAppId
     ? project.domains.filter((domain) => domain.appId === requestedAppId)
     : project.domains
-  const primary = requestedAppId
-    ? (project.apps.find((app) => app.id === requestedAppId)?.domain ?? null)
+  const targetApp = requestedAppId
+    ? resolveEffectiveApp(project, requestedAppId)
+    : (getPrimaryApp(project.apps) ?? null)
+  const primary = targetApp
+    ? (targetApp.domain ?? (targetApp.position === 0 ? project.domain : null))
     : project.domain
 
   return NextResponse.json(
@@ -101,7 +106,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     select: {
       id: true,
       domain: true,
-      apps: { select: { id: true, domain: true } },
+      apps: {
+        orderBy: [{ position: 'asc' }, { name: 'asc' }],
+        select: { id: true, name: true, position: true, domain: true, coolifyAppId: true },
+      },
       _count: { select: { domains: true } },
     },
   })
@@ -123,11 +131,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const hostname = validation.hostname
 
   const appId = parsed.data.appId ?? null
-  if (appId && !project.apps.some((app) => app.id === appId)) {
+  const targetApp = appId ? resolveEffectiveApp(project, appId) : (getPrimaryApp(project.apps) ?? null)
+  if (appId && !targetApp) {
     return NextResponse.json({ error: 'Application introuvable.' }, { status: 404 })
   }
 
-  const primaryDomain = appId ? project.apps.find((app) => app.id === appId)?.domain : project.domain
+  const primaryDomain = targetApp
+    ? (targetApp.domain ?? (targetApp.position === 0 ? project.domain : null))
+    : project.domain
   if (hostname === primaryDomain) {
     return NextResponse.json({ error: 'Ce domaine est déjà le domaine principal de cette application.' }, { status: 409 })
   }
@@ -142,6 +153,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const domain = await prisma.projectDomain.create({
       data: { projectId: project.id, hostname, appId },
+    })
+    await audit({
+      actor: { id: session.user.id, email: session.user.email },
+      action: 'project.domain.create',
+      target: { type: 'project_domain', id: domain.id },
+      organizationId: org.organizationId,
+      details: { projectId: project.id, hostname, appId },
+      request,
     })
     return NextResponse.json(
       {

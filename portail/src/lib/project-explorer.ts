@@ -7,16 +7,28 @@
 import { frameworkLabel } from '@/lib/frameworks'
 import { attentionRank, statusInfo } from '@/lib/project-status'
 
+export type ExplorerProjectApp = {
+  id?: string
+  framework?: string | null
+  domain?: string | null
+  name?: string | null
+  position?: number
+}
+
 /** Champs strictement nécessaires pour filtrer/trier ; `DashboardProject` les fournit. */
 export type ExplorerProject = {
   id: string
   name: string
+  /** Miroir projet (compatibilité) ; l'app principale prévaut quand `apps` est fourni. */
   domain: string | null
   repoUrl: string
+  /** Miroir projet (compatibilité) ; l'app principale prévaut quand `apps` est fourni. */
   framework: string | null
   lastStatus: string | null
   lastAt: string | null
   updatedAt: string
+  /** Applications du projet : source de vérité pour domaine/framework. */
+  apps?: readonly ExplorerProjectApp[]
 }
 
 export type ProjectFilter = 'all' | 'live' | 'active' | 'failed'
@@ -62,12 +74,31 @@ export function projectFilterCounts(projects: readonly ExplorerProject[]): Recor
   return counts
 }
 
+function primaryAppOf(apps: readonly ExplorerProjectApp[] | undefined): ExplorerProjectApp | null {
+  if (!apps || apps.length === 0) return null
+  return (
+    [...apps].sort(
+      (a, b) =>
+        (a.position ?? 0) - (b.position ?? 0) ||
+        (a.name ?? '').localeCompare(b.name ?? '') ||
+        (a.id ?? '').localeCompare(b.id ?? ''),
+    )[0] ?? null
+  )
+}
+
 function matchesQuery(project: ExplorerProject, query: string): boolean {
   if (query === '') return true
-  const framework = project.framework ? frameworkLabel(project.framework) : ''
-  return [project.name, project.domain ?? '', project.repoUrl, framework, project.framework ?? ''].some((value) =>
-    value.toLowerCase().includes(query),
-  )
+  const primary = primaryAppOf(project.apps)
+  const primaryDomain = primary?.domain ?? project.domain ?? ''
+  const primaryFramework = primary?.framework ?? project.framework ?? ''
+  const values = [project.name, primaryDomain, project.repoUrl, primaryFramework ? frameworkLabel(primaryFramework) : '', primaryFramework]
+  for (const app of project.apps ?? []) {
+    if (app.domain) values.push(app.domain)
+    if (app.framework) {
+      values.push(app.framework, frameworkLabel(app.framework))
+    }
+  }
+  return values.some((value) => value.toLowerCase().includes(query))
 }
 
 function byName(a: ExplorerProject, b: ExplorerProject): number {

@@ -160,13 +160,17 @@ export async function processDeployment(
 ): Promise<void> {
   const deployment = await prisma.deployment.findUnique({
     where: { id: deploymentId },
-    include: { project: { include: { domains: true } }, app: true },
+    include: {
+      project: { include: { domains: true, apps: { orderBy: [{ position: 'asc' }, { name: 'asc' }] } } },
+      app: true,
+    },
   })
   if (!deployment) return
   if (isTerminal(deployment.status)) return // idempotence
 
   const project = deployment.project
   const app = deployment.app
+  const effectiveApp = app ?? project.apps[0] ?? null
 
   // Retour arrière : la cible est le commit enregistré sur le déploiement. On
   // valide avant toute transition pour ne pas laisser un déploiement bloqué en
@@ -183,10 +187,20 @@ export async function processDeployment(
   // Annulé avant même le démarrage (job encore en file) : rien à faire.
   if (!(await setStatus(deploymentId, 'analyzing'))) return
 
-  // Résolution du contexte (lot C de D2) : plan, dossier, domaine et nom Coolify
-  // viennent de `ProjectApp` quand `Deployment.appId` est renseigné ; sinon des
-  // colonnes `Project.*` (chemin historique, strictement inchangé).
-  const resolved = resolveDeploymentContext({ project, app })
+  // Résolution du contexte : source ProjectApp (Lot G) avec repli miroirs Project.*.
+  const resolved = resolveDeploymentContext({
+    project: { ...project, apps: project.apps },
+    app: effectiveApp
+      ? {
+          id: effectiveApp.id,
+          name: effectiveApp.name,
+          root: effectiveApp.root,
+          position: effectiveApp.position,
+          plan: effectiveApp.plan,
+          domain: effectiveApp.domain,
+        }
+      : null,
+  })
   if ('error' in resolved) {
     await fail(deploymentId, resolved.error)
     return
@@ -205,17 +219,17 @@ export async function processDeployment(
   if (kind === 'invalid-compose') {
     await fail(
       deploymentId,
-      'Ce plan déclare un compose mais aucun fichier compose exploitable. ' +
-        'Ajoutez `docker-compose.yml` (ou `compose.yaml`) à la racine du dépôt, puis relancez le déploiement.',
+      'Ce plan indique un déploiement compose, mais aucun fichier `docker-compose.yml`, `docker-compose.yaml`, `compose.yml` ou `compose.yaml` exploitable n’a été trouvé dans le dépôt. ' +
+        "Action : ajoutez un fichier compose à la racine de l’application dans votre dépôt (chemin D1, compose fourni), vérifiez qu’il décrit bien vos services, puis relancez le déploiement.",
     )
     return
   }
   if (kind === 'multiple-without-compose') {
     await fail(
       deploymentId,
-      `Ce plan nécessite plusieurs services (${artifacts.services.join(', ')}). ` +
-        'La plateforme ne génère pas de compose multi-services : ajoutez un fichier `docker-compose.yml` (ou `compose.yaml`) au dépôt, puis relancez. ' +
-        'Les services décrits par le plan restent disponibles comme référence, mais aucun compose n’est écrit dans le dépôt.',
+      `Ce plan nécessite plusieurs services (${artifacts.services.join(', ')}), mais la plateforme ne génère pas de compose multi-services. ` +
+        "Action : ajoutez un fichier `docker-compose.yml` (ou `compose.yaml`) à la racine de l’application dans votre dépôt, avec tous les services nécessaires. " +
+        "Eflex déploiera alors ce compose fourni tel quel (voie D1). Sans ce fichier, le déploiement ne peut pas continuer et aucun compose n’est écrit dans le dépôt.",
     )
     return
   }
@@ -268,20 +282,20 @@ export async function processDeployment(
     !composeSource && artifacts.buildPack === 'dockerfile' && artifacts.dockerfile === null
   const attachedDomains = composeDomains(hosts, composeService)
 
-  let appId = app ? app.coolifyAppId : project.coolifyAppId
+  let appId = effectiveApp ? effectiveApp.coolifyAppId : project.coolifyAppId
   let privateKeyUuid = project.coolifyPrivateKeyUuid ?? undefined
   const repoRef = parseGitHubUrl(project.repoUrl)
 
-  /** Écrit l'identifiant Coolify sur l'application et, pour l'app principale, sur le miroir `Project.*`. */
+  /** Écrit l'identifiant Coolify sur l'application ciblée (et miroir Project.* en transition). */
   const saveCoolifyAppId = async (value: string): Promise<void> => {
-    if (app) {
-      await prisma.projectApp.update({ where: { id: app.id }, data: { coolifyAppId: value } })
+    if (effectiveApp) {
+      await prisma.projectApp.update({ where: { id: effectiveApp.id }, data: { coolifyAppId: value } })
       if (context.primary) {
-        await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: value } })
+        await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: value } }).catch(() => undefined)
       }
       return
     }
-    await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: value } })
+    await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: value } }).catch(() => undefined)
   }
 
   // Dépôt privé : Coolify a besoin d'une deploy key. On la crée à la première
@@ -365,11 +379,9 @@ export async function processDeployment(
     await saveCoolifyAppId(appId)
   }
 
-  // Miroir `Project.*` de l'application principale : même quand l'Application
-  // Coolify existait déjà, l'identifiant doit rester lisible par les routes qui
-  // n'ont pas encore été converties (logs, runtime, admin).
-  if (app && context.primary && appId && project.coolifyAppId !== appId) {
-    await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: appId } })
+  // Transition Lot G : miroir Project.coolifyAppId conservé pour compat lecteurs non migrés.
+  if (effectiveApp && context.primary && appId && project.coolifyAppId !== appId) {
+    await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: appId } }).catch(() => undefined)
   }
 
   // Le plan stocké peut évoluer (détection, correction de commande) alors que
@@ -442,13 +454,21 @@ export async function processDeployment(
     } else {
       const ensured = await ensureApplicationStorages(appId, artifacts.persistentVolumes)
       if ('error' in ensured) {
-        await fail(deploymentId, `Volumes persistants non configurés : ${ensured.error}`)
+        await fail(
+          deploymentId,
+          `Volumes persistants non configurés (EFLEX_PERSISTENT_VOLUMES actif) : ${ensured.error}`,
+        )
         return
       }
       if (ensured.created > 0) {
         await appendLogs(
           deploymentId,
           `[volumes] ${ensured.created} stockage(s) persistant(s) créé(s) : ${artifacts.persistentVolumes.map((volume) => volume.mountPath).join(', ')}.`,
+        )
+      } else if (ensured.existing > 0) {
+        await appendLogs(
+          deploymentId,
+          `[volumes] stockages persistants déjà présents (${ensured.existing}), aucun changement : ${artifacts.persistentVolumes.map((volume) => volume.mountPath).join(', ')}.`,
         )
       }
     }

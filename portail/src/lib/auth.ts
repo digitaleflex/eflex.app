@@ -406,9 +406,10 @@ export const auth = betterAuth({
       enabled: true,
       // Même garde que pour la suppression d'organisation : des applications
       // déployées resteraient orphelines chez Coolify si le compte disparaissait.
+      // « Déployé » = au moins une application (ProjectApp) provisionnée.
       async beforeDelete(user) {
         const deployed = await prisma.project.count({
-          where: { userId: user.id, coolifyAppId: { not: null } },
+          where: { userId: user.id, apps: { some: { coolifyAppId: { not: null } } } },
         })
         if (deployed > 0) {
           throw new APIError('BAD_REQUEST', {

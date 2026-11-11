@@ -68,11 +68,12 @@ export function parseProjectListQuery(input: {
 
 /**
  * Restriction Prisma de premier niveau. Les filtres qui portent sur le
- * **dernier** déploiement sont complétés par `matchesProjectFilter`.
+ * **dernier** déploiement sont complétés par `matchesProjectFilter`. Le filtre
+ * `stack` est appliqué en mémoire depuis l'application principale (vérité
+ * `ProjectApp`) et n'est pas imposé ici pour éviter de dépendre du miroir.
  */
 export function projectListWhere(query: ProjectListQuery): Prisma.ProjectWhereInput {
   const where: Prisma.ProjectWhereInput = {}
-  if (query.stack) where.framework = query.stack
   if (query.query) {
     where.OR = [
       { name: { contains: query.query, mode: 'insensitive' } },
@@ -318,7 +319,10 @@ export interface AdminProjectRef {
   /** Miroir de l'application principale (compatibilité mono-app / transition). */
   coolifyAppId: string | null
   organizationName: string
-  /** Ensemble des références d'applications du projet. Dérivé de `coolifyAppId` si absent. */
+  /**
+   * Références des applications du projet (vérité quand chargé). Omettre
+   * uniquement si aucune application n'a été chargée (repli transition).
+   */
   appRefs?: readonly AdminProjectAppRef[]
 }
 
@@ -342,9 +346,13 @@ export interface ReconciliationResult {
   missing: MissingApplicationRef[]
 }
 
-/** Références d'applications effectives d'un projet (ProjectApp + miroir pour compatibilité). */
+/**
+ * Références d'applications effectives d'un projet. Vérité = ensemble des
+ * `ProjectApp.coolifyAppId` chargées (`appRefs`). Repli sur le miroir projet
+ * uniquement pendant la transition, quand aucune application n'a été chargée.
+ */
 export function projectAppRefs(project: AdminProjectRef): readonly AdminProjectAppRef[] {
-  if (project.appRefs && project.appRefs.length > 0) return project.appRefs
+  if (project.appRefs !== undefined) return project.appRefs
   return [{ label: 'Application principale', coolifyAppId: project.coolifyAppId }]
 }
 

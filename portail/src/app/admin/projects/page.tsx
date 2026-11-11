@@ -7,6 +7,7 @@ import { StatusPill } from '@/components/dashboard/status-pill'
 import { frameworkLabel } from '@/lib/frameworks'
 import { relativeTime } from '@/lib/relative-time'
 import { repoLabel } from '@/lib/repo'
+import { getPrimaryApp } from '@/lib/project-apps'
 import { deploymentTimeoutMs } from '@/lib/deployment-watchdog'
 import {
   ADMIN_PAGE_SIZE,
@@ -53,10 +54,12 @@ export default async function AdminProjectsPage({
       name: true,
       slug: true,
       repoUrl: true,
-      framework: true,
-      domain: true,
       createdAt: true,
       organization: { select: { id: true, name: true } },
+      apps: {
+        orderBy: { position: 'asc' },
+        select: { id: true, name: true, position: true, framework: true, domain: true, coolifyAppId: true },
+      },
       deployments: {
         orderBy: { createdAt: 'desc' },
         take: 1,
@@ -66,9 +69,15 @@ export default async function AdminProjectsPage({
   })
 
   const truncated = loaded.length > PROJECT_LIST_LIMIT
-  const filtered = loaded
-    .slice(0, PROJECT_LIST_LIMIT)
-    .filter((project) => matchesProjectFilter(project.deployments[0] ?? null, query.filter, now, timeoutMs))
+  const withPrimary = loaded.slice(0, PROJECT_LIST_LIMIT).map((project) => ({
+    project,
+    primary: getPrimaryApp(project.apps),
+  }))
+  const filtered = withPrimary.filter(({ project, primary }) => {
+    if (!matchesProjectFilter(project.deployments[0] ?? null, query.filter, now, timeoutMs)) return false
+    if (query.stack && primary?.framework !== query.stack) return false
+    return true
+  })
   const pages = Math.max(1, Math.ceil(filtered.length / ADMIN_PAGE_SIZE))
   const page = Math.min(query.page, pages)
   const rows = filtered.slice((page - 1) * ADMIN_PAGE_SIZE, page * ADMIN_PAGE_SIZE)
@@ -195,8 +204,10 @@ export default async function AdminProjectsPage({
         ) : (
           <>
             <ul className="divide-y divide-border sm:hidden" aria-label="Liste des projets">
-              {rows.map((project) => {
+              {rows.map(({ project, primary }) => {
                 const last = project.deployments[0] ?? null
+                const framework = primary?.framework ?? null
+                const domain = primary?.domain ?? null
                 return (
                   <li key={project.id} className="space-y-2 p-4">
                     <div className="flex items-start justify-between gap-3">
@@ -210,8 +221,8 @@ export default async function AdminProjectsPage({
                     </div>
                     <p className="break-all text-xs text-muted-foreground">{repoLabel(project.repoUrl)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {frameworkLabel(project.framework)}
-                      {project.domain ? ` · ${project.domain}` : ' · aucun domaine'}
+                      {frameworkLabel(framework)}
+                      {domain ? ` · ${domain}` : ' · aucun domaine'}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {last ? (
@@ -244,8 +255,10 @@ export default async function AdminProjectsPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {rows.map((project) => {
+                  {rows.map(({ project, primary }) => {
                     const last = project.deployments[0] ?? null
+                    const framework = primary?.framework ?? null
+                    const domain = primary?.domain ?? null
                     return (
                       <tr key={project.id}>
                         <td className="px-4 py-3">
@@ -259,9 +272,9 @@ export default async function AdminProjectsPage({
                         <td className="max-w-48 px-4 py-3">
                           <span className="block truncate text-xs text-muted-foreground">{repoLabel(project.repoUrl)}</span>
                         </td>
-                        <td className="px-4 py-3 text-xs">{frameworkLabel(project.framework)}</td>
+                        <td className="px-4 py-3 text-xs">{frameworkLabel(framework)}</td>
                         <td className="hidden max-w-48 px-4 py-3 text-xs lg:table-cell">
-                          <span className="block truncate">{project.domain ?? '—'}</span>
+                          <span className="block truncate">{domain ?? '—'}</span>
                         </td>
                         <td className="px-4 py-3">
                           <StatusPill status={last?.status} />

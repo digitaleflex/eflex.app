@@ -14,6 +14,8 @@ import { getApplicationRuntime } from '@/lib/coolify'
 import { relativeTime } from '@/lib/relative-time'
 import { repoLabel } from '@/lib/repo'
 import { deploymentDuration } from '@/lib/admin-projects'
+import { getPrimaryApp } from '@/lib/project-apps'
+import { collectCoolifyAppIds } from '@/lib/project-primary'
 import { ACTIVE_DEPLOYMENT_STATUSES } from '@/lib/deployment-state'
 
 export const metadata = { title: 'Projet — Administration Eflex' }
@@ -36,13 +38,6 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
       repoFullName: true,
       branch: true,
       productionBranch: true,
-      framework: true,
-      runtime: true,
-      domain: true,
-      coolifyAppId: true,
-      tlsValid: true,
-      tlsExpiresAt: true,
-      tlsCheckedAt: true,
       createdAt: true,
       organization: { select: { id: true, name: true, slug: true } },
       deployments: {
@@ -56,8 +51,10 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
         select: {
           id: true,
           name: true,
+          position: true,
           coolifyAppId: true,
           framework: true,
+          runtime: true,
           domain: true,
           tlsValid: true,
           tlsExpiresAt: true,
@@ -69,12 +66,8 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
   })
   if (!project) notFound()
 
-  const appRefs =
-    project.apps.length > 0
-      ? project.apps.map((app) => ({ label: app.name, coolifyAppId: app.coolifyAppId, app }))
-      : project.coolifyAppId
-        ? [{ label: 'Application principale', coolifyAppId: project.coolifyAppId, app: null as null }]
-        : []
+  const primary = getPrimaryApp(project.apps)
+  const appRefs = project.apps.map((app) => ({ label: app.name, coolifyAppId: app.coolifyAppId, app }))
 
   const [active, runtimes] = await Promise.all([
     prisma.deployment.findFirst({
@@ -90,8 +83,9 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
     ),
   ])
 
-  const anyApplication = appRefs.some((ref) => ref.coolifyAppId)
-  const certificate = tlsHealth(project.tlsValid, project.tlsExpiresAt, project.tlsCheckedAt, now.getTime())
+  const coolifyIds = collectCoolifyAppIds({ apps: project.apps })
+  const anyApplication = coolifyIds.length > 0
+  const primaryDomain = primary?.domain ?? null
   const last = project.deployments[0] ?? null
 
   return (
@@ -103,7 +97,7 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
 
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-4">
-          <FrameworkTile framework={project.framework} name={project.name} size="lg" />
+          <FrameworkTile framework={primary?.framework ?? null} name={project.name} size="lg" />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="truncate text-2xl font-bold tracking-tight">{project.name}</h1>
@@ -124,15 +118,15 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
             <ExternalLink className="h-4 w-4" aria-hidden="true" />
             Dépôt<span className="sr-only"> (nouvel onglet)</span>
           </a>
-          {project.domain && (
+          {primaryDomain && (
             <a
-              href={`https://${project.domain}`}
+              href={`https://${primaryDomain}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <Globe className="h-4 w-4" aria-hidden="true" />
-              Site<span className="sr-only"> {project.domain} (nouvel onglet)</span>
+              Site<span className="sr-only"> {primaryDomain} (nouvel onglet)</span>
             </a>
           )}
         </div>
@@ -172,15 +166,16 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
               <dd className="font-mono text-xs">{project.productionBranch ?? project.branch}</dd>
             </div>
             <div className="flex flex-wrap justify-between gap-2">
-              <dt className="text-muted-foreground">Stack</dt>
+              <dt className="text-muted-foreground">Stack (principale)</dt>
               <dd>
-                {frameworkLabel(project.framework)}
-                {project.runtime ? ` · ${runtimeLabel(project.runtime)}` : ''}
+                {frameworkLabel(primary?.framework ?? null)}
+                {primary?.runtime ? ` · ${runtimeLabel(primary.runtime)}` : ''}
+                {project.apps.length > 1 ? ` · ${project.apps.length} applications` : ''}
               </dd>
             </div>
             <div className="flex flex-wrap justify-between gap-2">
               <dt className="text-muted-foreground">Domaine principal</dt>
-              <dd>{project.domain ?? '—'}</dd>
+              <dd>{primaryDomain ?? '—'}</dd>
             </div>
             <div className="flex flex-wrap justify-between gap-2">
               <dt className="text-muted-foreground">Domaine(s) personnalisé(s)</dt>
@@ -206,7 +201,7 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
           </h2>
           {runtimes.length === 0 ? (
             <p className="mt-3 text-sm text-muted-foreground">
-              Aucune application sur l’infrastructure : un déploiement la créera.
+              Aucune application enregistrée : un déploiement la créera.
             </p>
           ) : (
             <ul className="mt-3 space-y-3">
@@ -216,9 +211,7 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
                 const appHealth = ref.coolifyAppId
                   ? applicationHealth(runtimeStatus)
                   : { label: 'Pas encore déployé', detail: 'Aucune application sur l’infrastructure.', tone: 'muted' as const }
-                const appCert = ref.app
-                  ? tlsHealth(ref.app.tlsValid, ref.app.tlsExpiresAt, ref.app.tlsCheckedAt, now.getTime())
-                  : certificate
+                const appCert = tlsHealth(ref.app.tlsValid, ref.app.tlsExpiresAt, ref.app.tlsCheckedAt, now.getTime())
                 return (
                   <li key={ref.label} className="rounded-lg border border-border p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -241,6 +234,12 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
                           {appCert.label}
                         </dd>
                       </div>
+                      {ref.app.domain && (
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <dt className="text-muted-foreground">Domaine</dt>
+                          <dd className="break-all text-right text-xs">{ref.app.domain}</dd>
+                        </div>
+                      )}
                     </dl>
                     {appCert.detail && <p className="mt-1 text-xs text-muted-foreground">{appCert.detail}</p>}
                     {appRuntimeError && (
@@ -252,11 +251,6 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
                 )
               })}
             </ul>
-          )}
-          {!anyApplication && runtimes.length > 0 && (
-            <p className="mt-3 text-xs text-muted-foreground">
-              Aucune application provisionnée : un déploiement les créera.
-            </p>
           )}
         </Card>
       </div>
@@ -304,7 +298,7 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
         Les valeurs des variables d’environnement ne sont jamais affichées dans la console d’administration. Pour agir sur
         la configuration du projet, utilisez la console client avec un compte membre de l’organisation.
       </p>
-      {project.tlsValid === false && <Badge variant="destructive">Certificat invalide au dernier contrôle</Badge>}
+      {primary?.tlsValid === false && <Badge variant="destructive">Certificat invalide au dernier contrôle (application principale)</Badge>}
     </div>
   )
 }

@@ -14,6 +14,7 @@
  * de forcer la cible sans découverte.
  */
 import { isCommitSha } from '@/lib/deployment-rollback'
+import { normalizeApplicationMetrics, unavailableMetrics, type ApplicationMetrics } from '@/lib/app-metrics'
 
 const COOLIFY_URL = process.env.COOLIFY_API_URL || ''
 const COOLIFY_TOKEN = process.env.COOLIFY_API_TOKEN || ''
@@ -913,6 +914,50 @@ export async function applicationAction(
   })
   if (res.error) return { error: res.error }
   return { ok: true }
+}
+
+/**
+ * Métriques CPU/RAM d'une application. Coolify 4.6/4.7 n'expose pas toujours
+ * ces données : on tente plusieurs endpoints connus et on retourne un état
+ * « indisponible » explicite plutôt qu'une erreur bloquante.
+ */
+export async function getApplicationMetrics(
+  appId: string,
+  timeoutMs = 5_000,
+): Promise<ApplicationMetrics> {
+  if (!COOLIFY_URL || !COOLIFY_TOKEN) {
+    return unavailableMetrics('Service de déploiement non configuré.')
+  }
+
+  const encoded = encodeURIComponent(appId)
+  const paths = [
+    `/applications/${encoded}/metrics`,
+    `/applications/${encoded}/stats`,
+    `/applications/${encoded}/resources`,
+  ]
+
+  for (const path of paths) {
+    const res = await coolifyFetch<unknown>(path, {
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (res.error) {
+      // Endpoint absent, non exposé ou interdit : on tente le suivant sans casser.
+      if (
+        res.error.includes('Hébergement API 404') ||
+        res.error.includes('Hébergement API 501') ||
+        res.error.includes('Hébergement API 403') ||
+        res.error.includes('Hébergement API 405')
+      ) {
+        continue
+      }
+      return unavailableMetrics('Métriques indisponibles pour le moment.')
+    }
+
+    const metrics = normalizeApplicationMetrics(res.data)
+    if (metrics.available) return metrics
+  }
+
+  return unavailableMetrics('Métriques indisponibles : votre hébergement ne les expose pas pour cette application.')
 }
 
 /**

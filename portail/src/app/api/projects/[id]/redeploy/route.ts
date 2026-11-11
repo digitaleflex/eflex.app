@@ -5,6 +5,7 @@ import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
 import { multiAppEnabled } from '@/lib/multi-app'
 import { allow } from '@/lib/rate-limit'
+import { getPrimaryApp } from '@/lib/project-primary'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,7 +46,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       organizationId: true,
       apps: {
         orderBy: [{ position: 'asc' }, { name: 'asc' }],
-        select: { id: true, name: true },
+        select: { id: true, name: true, position: true, coolifyAppId: true },
       },
     },
   })
@@ -54,16 +55,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const multi = multiAppEnabled()
-  const apps = appId
-    ? project.apps.filter((app) => app.id === appId)
-    : multi
-      ? project.apps
-      : []
-  if (appId && apps.length === 0) {
-    return NextResponse.json(
-      { error: 'Application introuvable dans ce projet.', code: 'app_not_found' },
-      { status: 404 },
-    )
+  let apps = project.apps
+  if (appId) {
+    apps = project.apps.filter((app) => app.id === appId)
+    if (apps.length === 0) {
+      return NextResponse.json(
+        { error: 'Application introuvable dans ce projet.', code: 'app_not_found' },
+        { status: 404 },
+      )
+    }
+  } else if (!multi && project.apps.length > 0) {
+    // Mono-app / drapeau désactivé : cibler l’app principale ou déjà déployée
+    // (source ProjectApp), jamais un déploiement de portée projet basé sur les miroirs.
+    const target = project.apps.find((app) => app.coolifyAppId) ?? getPrimaryApp(project.apps)
+    apps = target ? [target] : []
+  } else if (!multi) {
+    // Aucune application connue : repli historique de portée projet.
+    apps = []
   }
 
   const queued = await enqueueProjectDeployment(project, {

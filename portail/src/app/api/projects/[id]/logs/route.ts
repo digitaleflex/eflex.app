@@ -7,6 +7,7 @@ import { getApplicationLogs } from '@/lib/coolify'
 import { decrypt } from '@/lib/crypto'
 import { maskSecrets, parseLogs } from '@/lib/log-lines'
 import { allow } from '@/lib/rate-limit'
+import { getPrimaryApp } from '@/lib/project-primary'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       envVars: { select: { key: true, value: true, appId: true } },
       apps: {
         orderBy: [{ position: 'asc' }, { name: 'asc' }],
-        select: { id: true, name: true, coolifyAppId: true, plan: true },
+        select: { id: true, name: true, position: true, coolifyAppId: true, plan: true },
       },
     },
   })
@@ -45,22 +46,26 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const search = new URL(request.url).searchParams
   const requestedAppId = search.get('appId')?.trim() || null
 
-  let targetApp = null as null | { id: string; name: string; coolifyAppId: string | null; plan: unknown }
+  let targetApp = null as null | { id: string; name: string; position: number; coolifyAppId: string | null; plan: unknown }
   if (requestedAppId) {
     targetApp = project.apps.find((app) => app.id === requestedAppId) ?? null
     if (!targetApp) {
       return NextResponse.json({ error: 'Application introuvable.' }, { status: 404 })
     }
   } else if (project.apps.length > 0) {
-    targetApp = project.apps.find((app) => app.coolifyAppId) ?? project.apps[0] ?? null
+    targetApp =
+      project.apps.find((app) => app.coolifyAppId) ??
+      getPrimaryApp(project.apps) ??
+      project.apps[0] ??
+      null
   }
 
-  const coolifyAppId = targetApp?.coolifyAppId ?? project.coolifyAppId
+  const coolifyAppId = project.apps.length > 0 ? (targetApp?.coolifyAppId ?? null) : project.coolifyAppId
   if (!coolifyAppId) {
     return NextResponse.json({ error: "Cette application n'a pas encore été déployée." }, { status: 409 })
   }
 
-  const plan = (targetApp?.plan ?? project.plan) as unknown as BuildPlan | null
+  const plan = (project.apps.length > 0 ? targetApp?.plan : project.plan) as unknown as BuildPlan | null
 
   const linesParam = Number.parseInt(search.get('lines') ?? '', 10)
   const lines = Number.isFinite(linesParam) ? Math.min(500, Math.max(50, linesParam)) : 200

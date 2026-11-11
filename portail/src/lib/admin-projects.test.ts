@@ -33,10 +33,11 @@ describe('filtres de la liste des projets', () => {
 
   it('construit la restriction Prisma de premier niveau', () => {
     expect(projectListWhere(parseProjectListQuery({ etat: 'never' }))).toEqual({ deployments: { none: {} } })
+    // Le filtre stack est appliqué en mémoire depuis l'application principale.
     expect(projectListWhere(parseProjectListQuery({ etat: 'stuck', stack: 'node' }))).toMatchObject({
-      framework: 'node',
       deployments: { some: { status: { in: ['queued', 'analyzing', 'provisioning', 'building', 'deploying'] } } },
     })
+    expect(projectListWhere(parseProjectListQuery({ etat: 'stuck', stack: 'node' }))).not.toHaveProperty('framework')
     const search = projectListWhere(parseProjectListQuery({ q: 'awa' }))
     expect(search.OR).toHaveLength(4)
   })

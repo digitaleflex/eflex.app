@@ -56,7 +56,7 @@ const steps = [
 const faqs = [
   {
     q: 'Quelles technologies sont prises en charge ?',
-    a: "Next.js, Nuxt, Astro, Vite, SvelteKit, Remix, SolidStart, RedwoodJS, Node.js (Express, Fastify, NestJS…), PHP, Python (Django, FastAPI, Flask) et les sites HTML statiques. Laravel est détecté, mais son plan multi-services (PHP-FPM + Nginx, files d'attente, planificateur) n'est pas encore déployé. Pour tout le reste, un Dockerfile suffit.",
+    a: "Next.js, Nuxt, Astro, Vite, SvelteKit, Remix, SolidStart, RedwoodJS, Node.js (Express, Fastify, NestJS…), PHP, Python (Django, FastAPI, Flask) et les sites HTML statiques. Laravel est détecté ; si son plan nécessite plusieurs services, ajoutez un `docker-compose.yml` (ou `compose.yaml`) au dépôt pour un déploiement via compose fourni (D1). Sans ce fichier, le plan multi-services généré est refusé avec un message explicite. Pour tout le reste, un Dockerfile suffit.",
   },
   {
     q: 'Dois-je écrire un Dockerfile ?',
@@ -80,7 +80,7 @@ const faqs = [
   },
   {
     q: "Qu'est-ce qui n'est pas encore pris en charge ?",
-    a: "Le déploiement multi-services (files d'attente et planificateur Laravel, plusieurs applications d'un même monorepo déployées ensemble) et les métriques CPU/RAM. Un projet ne publie qu'un service : les plans qui en nécessitent plusieurs sont refusés avec un message explicite.",
+    a: "Les plans multi-services générés sans compose fourni dans le dépôt sont refusés : pour Laravel (services annexes, files d'attente, planificateur, etc.) ou plusieurs applications d'un même monorepo, ajoutez un `docker-compose.yml`/`compose.yaml` à la racine de l'application. Les volumes sont traduits mais leur création Coolify n'est activée que si `EFLEX_PERSISTENT_VOLUMES` est activé (désactivé par défaut) ; sauvegardes et quotas de stockage ne sont pas implémentés. Les métriques CPU/RAM ne sont pas disponibles.",
   },
 ]
 
@@ -207,8 +207,10 @@ export default function HomePage() {
               ))}
             </ul>
             <p className="mx-auto mt-7 max-w-2xl text-center text-xs text-muted-foreground text-pretty">
-              Laravel est reconnu, mais son plan multi-services n&apos;est pas encore déployé : un seul service par
-              projet aujourd&apos;hui.
+              Laravel est reconnu. Les plans multi-services générés sans compose fourni sont refusés : ajoutez un
+              fichier <code className="font-mono">docker-compose.yml</code>/
+              <code className="font-mono">compose.yaml</code> au dépôt pour déployer ces services via compose fourni
+              (D1).
             </p>
           </div>
         </section>
@@ -309,9 +311,10 @@ export default function HomePage() {
                 icon={Layers}
                 title="Laravel détecté, PHP déployé"
                 description={
-                  "Laravel est reconnu (PHP-FPM, Nginx, files d'attente, planificateur), mais le portail ne publie " +
-                  "encore qu'un service par projet. Les applications PHP sans Laravel passent en ligne dès " +
-                  "aujourd'hui ; le déploiement Laravel complet arrive bientôt."
+                  "Laravel et PHP sont reconnus. Un plan Laravel multi-services généré sans compose fourni est refusé : " +
+                  "ajoutez un fichier `docker-compose.yml`/`compose.yaml` au dépôt pour déployer vos services (files " +
+                  "d'attente, planificateur, etc.) via compose fourni (D1). Les applications PHP simples passent en ligne " +
+                  "dès aujourd'hui."
                 }
               />
 

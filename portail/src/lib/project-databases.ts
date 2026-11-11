@@ -9,6 +9,11 @@ import {
   type ManagedDatabaseKind,
 } from '@/lib/coolify'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
+import { isAppDeployed } from '@/lib/project-primary'
+
+type DeployableProject = Pick<Project, 'id' | 'slug' | 'name' | 'organizationId' | 'coolifyAppId'> & {
+  apps?: ReadonlyArray<{ coolifyAppId?: string | null }>
+}
 
 export const DATABASE_KINDS = {
   postgresql: {
@@ -49,7 +54,7 @@ async function waitUntilReady(id: string): Promise<{ status: string; internalUrl
 
 /** Crée la base, stocke son URL chiffrée et injecte la variable d'environnement. */
 export async function createProjectDatabase(
-  project: Pick<Project, 'id' | 'slug' | 'name' | 'organizationId' | 'coolifyAppId'>,
+  project: DeployableProject,
   kind: ManagedDatabaseKind,
 ): Promise<{ database: ProjectDatabase; deploymentId: string | null; ready: boolean } | { error: string; status: number }> {
   const config = DATABASE_KINDS[kind]
@@ -104,7 +109,7 @@ export async function createProjectDatabase(
     })
 
     let deploymentId: string | null = null
-    if (project.coolifyAppId && ready) {
+    if (isAppDeployed(project) && ready) {
       const queued = await enqueueProjectDeployment(project)
       if (!('error' in queued)) deploymentId = queued.deploymentId
     }
@@ -120,7 +125,7 @@ export async function createProjectDatabase(
 
 /** Supprime la base et la variable d'environnement associée. */
 export async function deleteProjectDatabase(
-  project: Pick<Project, 'id' | 'slug' | 'name' | 'organizationId' | 'coolifyAppId'>,
+  project: DeployableProject,
   database: Pick<ProjectDatabase, 'id' | 'kind' | 'coolifyId'>,
 ): Promise<{ deploymentId: string | null } | { error: string; status: number }> {
   const deleted = await deleteManagedDatabase(database.coolifyId)
@@ -135,7 +140,7 @@ export async function deleteProjectDatabase(
   })
 
   let deploymentId: string | null = null
-  if (project.coolifyAppId) {
+  if (isAppDeployed(project)) {
     const queued = await enqueueProjectDeployment(project)
     if (!('error' in queued)) deploymentId = queued.deploymentId
   }

@@ -4,6 +4,7 @@ import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { applicationAction, getApplicationRuntime, type ApplicationAction } from '@/lib/coolify'
+import { getPrimaryApp } from '@/lib/project-primary'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -29,6 +30,7 @@ async function findProject(id: string, organizationId: string) {
         select: {
           id: true,
           name: true,
+          position: true,
           coolifyAppId: true,
           domain: true,
           tlsValid: true,
@@ -55,7 +57,7 @@ function resolveTarget(
     return { target: { id: app.id, coolifyAppId: app.coolifyAppId, tlsValid: app.tlsValid, tlsExpiresAt: app.tlsExpiresAt, tlsCheckedAt: app.tlsCheckedAt }, notFound: false }
   }
   if (project.apps.length > 0) {
-    const app = project.apps.find((item) => item.coolifyAppId) ?? project.apps[0]!
+    const app = project.apps.find((item) => item.coolifyAppId) ?? getPrimaryApp(project.apps) ?? project.apps[0]!
     return { target: { id: app.id, coolifyAppId: app.coolifyAppId, tlsValid: app.tlsValid, tlsExpiresAt: app.tlsExpiresAt, tlsCheckedAt: app.tlsCheckedAt }, notFound: false }
   }
   return {
