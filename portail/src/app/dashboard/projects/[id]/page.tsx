@@ -34,6 +34,7 @@ import { GithubMark } from '@/components/icons/github-mark'
 import { RedeployButton } from '@/components/redeploy-button'
 import { CancelDeploymentButton } from '@/components/cancel-deployment-button'
 import { RollbackDeploymentButton } from '@/components/rollback-deployment-button'
+import { ProjectAppsSection } from '@/components/project-apps'
 import { EmptyState } from '@/components/ui/empty-state'
 import { isCommitSha } from '@/lib/deployment-rollback'
 import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
@@ -362,103 +363,29 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
       {/* Applications du projet (lot C de D2) : visible seulement en multi-app. */}
       {multiApp && (
-        <SectionCard
-          id="apps"
-          title={
-            <>
-              Applications
-              <span className="rounded-full bg-muted px-1.5 text-xs font-normal tabular-nums text-muted-foreground">
-                {project.apps.length}
-              </span>
-            </>
-          }
-          icon={Layers}
-          description="Chaque application a son propre build, son dossier et son domaine. Elle peut être relancée séparément."
-        >
-          <ul className="divide-y divide-border">
-            {project.apps.map((app) => {
-              const appLast = app.deployments[0]
-              const appDomains = project.domains.filter(
-                (domain) => domain.verifiedAt && domain.appId === app.id,
-              )
-              const appPendingDomains = project.domains.filter(
-                (domain) => !domain.verifiedAt && domain.appId === app.id,
-              )
-              return (
-                <li key={app.id} className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center sm:px-5">
-                  <div className="min-w-0">
-                    <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                      {app.name}
-                      {app.position === 0 && (
-                        <span className="rounded-full border border-border px-1.5 text-[11px] font-normal text-muted-foreground">
-                          Principale
-                        </span>
-                      )}
-                      <span className="text-xs font-normal text-muted-foreground">{frameworkLabel(app.framework)}</span>
-                    </p>
-                    <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-                      {app.root === '' ? 'Racine du dépôt' : app.root}
-                    </p>
-                  </div>
-
-                  <div className="min-w-0 space-y-1">
-                    {app.domain ? (
-                      <a
-                        href={`https://${app.domain}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex max-w-full items-center gap-1 break-all text-sm text-primary hover:underline"
-                      >
-                        {app.domain}
-                        <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
-                        <span className="sr-only"> (nouvel onglet)</span>
-                      </a>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">Non exposée</p>
-                    )}
-                    {appDomains.length > 0 && (
-                      <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                        <span>Aussi :</span>
-                        {appDomains.map((domain) => (
-                          <a
-                            key={domain.id}
-                            href={`https://${domain.hostname}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-mono text-primary hover:underline"
-                          >
-                            {domain.hostname}
-                          </a>
-                        ))}
-                      </p>
-                    )}
-                    {appPendingDomains.length > 0 && (
-                      <p className="text-xs text-warning">
-                        {appPendingDomains.length} domaine{appPendingDomains.length > 1 ? 's' : ''} en attente de vérification
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                    <StatusPill status={appLast?.status} />
-                    {appLast && (
-                      <time dateTime={appLast.createdAt.toISOString()} className="text-xs text-muted-foreground" suppressHydrationWarning>
-                        {relativeTime(appLast.createdAt)}
-                      </time>
-                    )}
-                    {canManage && (
-                      <RedeployButton
-                        projectId={project.id}
-                        appId={app.id}
-                        srLabel={`l’application ${app.name}`}
-                      />
-                    )}
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        </SectionCard>
+        <ProjectAppsSection
+          projectId={project.id}
+          canManage={canManage}
+          apps={project.apps.map((app) => ({
+            id: app.id,
+            name: app.name,
+            root: app.root,
+            framework: app.framework,
+            domain: app.domain,
+            position: app.position,
+            deployments: app.deployments.map((deployment) => ({
+              status: deployment.status,
+              commitSha: deployment.commitSha,
+              createdAt: deployment.createdAt,
+            })),
+          }))}
+          domains={project.domains.map((domain) => ({
+            id: domain.id,
+            hostname: domain.hostname,
+            appId: domain.appId,
+            verifiedAt: domain.verifiedAt,
+          }))}
+        />
       )}
 
       {tab === 'overview' && (
