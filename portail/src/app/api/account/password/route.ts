@@ -4,9 +4,13 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { getSession } from '@/lib/session'
 import { allow } from '@/lib/rate-limit'
+import { PASSPHRASE_MAX_LENGTH, PASSPHRASE_MIN_LENGTH } from '@/lib/auth-validation'
 
 const schema = z.object({
-  newPassword: z.string().min(8, 'Le mot de passe doit contenir au moins 8 caractères.').max(72, 'Le mot de passe est trop long (72 caractères maximum).'),
+  newPassword: z
+    .string()
+    .min(PASSPHRASE_MIN_LENGTH, `La phrase secrète doit contenir au moins ${PASSPHRASE_MIN_LENGTH} caractères.`)
+    .max(PASSPHRASE_MAX_LENGTH, `La phrase secrète est trop longue (${PASSPHRASE_MAX_LENGTH} caractères maximum).`),
 })
 
 /**
@@ -33,8 +37,8 @@ export async function POST(request: Request) {
     const code = (error as { body?: { code?: string } })?.body?.code
     const message =
       code === 'PASSWORD_ALREADY_SET'
-        ? 'Un mot de passe est déjà défini. Utilisez le formulaire de changement de mot de passe.'
-        : 'Impossible de définir le mot de passe. Réessayez dans un instant.'
+        ? 'Une phrase secrète est déjà définie. Utilisez le formulaire de changement de phrase secrète.'
+        : 'Impossible de définir la phrase secrète. Réessayez dans un instant.'
     return NextResponse.json({ error: message, code }, { status: 400 })
   }
 }

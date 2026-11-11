@@ -80,11 +80,11 @@ export function verificationEmail(url: string): EmailTemplate {
 
 export function resetPasswordEmail(url: string): EmailTemplate {
   return layout(
-    'Réinitialiser votre mot de passe',
-    'Une demande de réinitialisation a été faite pour votre compte Eflex. Choisissez un nouveau mot de passe.',
-    'Choisir un nouveau mot de passe',
+    'Réinitialiser votre phrase secrète',
+    'Une demande de réinitialisation a été faite pour votre compte Eflex. Choisissez une nouvelle phrase secrète.',
+    'Choisir une nouvelle phrase secrète',
     url,
-    'Ce lien expire dans 1 heure et ne peut être utilisé qu’une fois. Si vous n’avez rien demandé, ignorez cet e-mail : votre mot de passe reste inchangé.',
+    'Ce lien expire dans 1 heure et ne peut être utilisé qu’une fois. Si vous n’avez rien demandé, ignorez cet e-mail : votre phrase secrète reste inchangée.',
   )
 }
 

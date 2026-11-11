@@ -9,6 +9,11 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { ThemeSwitcher } from '@/components/theme-switcher'
 import { authClient, authErrorMessage } from '@/lib/auth-client'
+import {
+  PASSPHRASE_HINT,
+  validatePassphrase,
+  validatePassphraseConfirmation,
+} from '@/lib/auth-validation'
 
 const NETWORK_ERROR = 'Impossible de contacter le serveur. Vérifiez votre connexion et réessayez.'
 
@@ -94,16 +99,14 @@ export function AccountSettings({
   async function savePassword(e: React.FormEvent) {
     e.preventDefault()
     setPasswordFeedback(null)
-    if (newPassword.length < 8) {
-      setPasswordFeedback({ tone: 'error', message: 'Le nouveau mot de passe doit contenir au moins 8 caractères.' })
+    const passphraseError = validatePassphrase(newPassword)
+    if (passphraseError) {
+      setPasswordFeedback({ tone: 'error', message: passphraseError })
       return
     }
-    if (newPassword.length > 72) {
-      setPasswordFeedback({ tone: 'error', message: 'Le nouveau mot de passe est trop long (72 caractères maximum).' })
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      setPasswordFeedback({ tone: 'error', message: 'Les deux mots de passe ne correspondent pas.' })
+    const confirmationError = validatePassphraseConfirmation(newPassword, confirmPassword)
+    if (confirmationError) {
+      setPasswordFeedback({ tone: 'error', message: confirmationError })
       return
     }
     setSavingPassword(true)
@@ -122,7 +125,7 @@ export function AccountSettings({
       setConfirmPassword('')
       setPasswordFeedback({
         tone: 'success',
-        message: 'Mot de passe mis à jour. Les autres sessions ont été déconnectées.',
+        message: 'Phrase secrète mise à jour. Les autres sessions ont été déconnectées.',
       })
     } catch {
       setPasswordFeedback({ tone: 'error', message: NETWORK_ERROR })
@@ -169,7 +172,7 @@ export function AccountSettings({
       return
     }
     if (hasPassword && deletePassword === '') {
-      setDeleteError('Indiquez votre mot de passe pour confirmer.')
+      setDeleteError('Indiquez votre phrase secrète pour confirmer.')
       return
     }
     setDeleting(true)
@@ -197,10 +200,10 @@ export function AccountSettings({
     <div className="space-y-8">
       <Card>
         <CardHeader>
-          <h2 className="font-semibold flex items-center gap-2">
+          <h3 className="font-semibold flex items-center gap-2">
             <User className="w-4 h-4" aria-hidden="true" />
             Profil
-          </h2>
+          </h3>
           <p className="text-sm text-muted-foreground mt-1">
             Le nom affiché dans la console et dans les e-mails.
           </p>
@@ -230,10 +233,10 @@ export function AccountSettings({
 
       <Card>
         <CardHeader>
-          <h2 className="font-semibold flex items-center gap-2">
+          <h3 className="font-semibold flex items-center gap-2">
             <Palette className="w-4 h-4" aria-hidden="true" />
             Apparence
-          </h2>
+          </h3>
           <p className="text-sm text-muted-foreground mt-1">
             Choisissez le thème de l’interface. « Système » suit le réglage de votre appareil.
           </p>
@@ -245,14 +248,14 @@ export function AccountSettings({
 
       <Card>
         <CardHeader>
-          <h2 className="font-semibold flex items-center gap-2">
+          <h3 className="font-semibold flex items-center gap-2">
             <KeyRound className="w-4 h-4" aria-hidden="true" />
-            Mot de passe
-          </h2>
+            Phrase secrète (mot de passe)
+          </h3>
           <p className="text-sm text-muted-foreground mt-1">
             {hasPassword
-              ? 'Changez votre mot de passe. Les autres sessions seront déconnectées.'
-              : 'Vous vous connectez avec Google : ce compte n’a pas de mot de passe Eflex.'}
+              ? 'Changez votre phrase secrète. Les autres sessions seront déconnectées.'
+              : 'Vous vous connectez avec Google : ce compte n’a pas de phrase secrète Eflex.'}
           </p>
         </CardHeader>
         <CardContent>
@@ -261,7 +264,7 @@ export function AccountSettings({
               <FeedbackMessage feedback={passwordFeedback} id="account-password-feedback" />
               <Input
                 id="current-password"
-                label="Mot de passe actuel"
+                label="Phrase secrète actuelle (mot de passe)"
                 type="password"
                 autoComplete="current-password"
                 value={currentPassword}
@@ -273,10 +276,10 @@ export function AccountSettings({
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
                   id="new-password"
-                  label="Nouveau mot de passe"
+                  label="Nouvelle phrase secrète (mot de passe)"
                   type="password"
                   autoComplete="new-password"
-                  hint="8 caractères minimum."
+                  hint={PASSPHRASE_HINT}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   aria-invalid={passwordFeedback?.tone === 'error' ? true : undefined}
@@ -285,7 +288,7 @@ export function AccountSettings({
                 />
                 <Input
                   id="confirm-password"
-                  label="Confirmer le mot de passe"
+                  label="Confirmer la phrase secrète"
                   type="password"
                   autoComplete="new-password"
                   value={confirmPassword}
@@ -297,13 +300,13 @@ export function AccountSettings({
               </div>
               <div className="flex justify-end">
                 <Button type="submit" loading={savingPassword}>
-                  Mettre à jour le mot de passe
+                  Mettre à jour la phrase secrète
                 </Button>
               </div>
             </form>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Aucun mot de passe à gérer : la connexion se fait via Google.
+              Aucune phrase secrète à gérer : la connexion se fait via Google.
             </p>
           )}
         </CardContent>
@@ -311,10 +314,10 @@ export function AccountSettings({
 
       <Card>
         <CardHeader>
-          <h2 className="font-semibold flex items-center gap-2">
+          <h3 className="font-semibold flex items-center gap-2">
             <Mail className="w-4 h-4" aria-hidden="true" />
             Adresse e-mail
-          </h2>
+          </h3>
           <p className="text-sm text-muted-foreground mt-1">
             Adresse actuelle : <span className="font-medium text-foreground">{user.email}</span>
           </p>
@@ -353,10 +356,10 @@ export function AccountSettings({
 
       <Card className="border-destructive/30">
         <CardHeader>
-          <h2 className="font-semibold flex items-center gap-2 text-destructive">
+          <h3 className="font-semibold flex items-center gap-2 text-destructive">
             <TriangleAlert className="w-4 h-4" aria-hidden="true" />
             Zone de danger
-          </h2>
+          </h3>
           <p className="text-sm text-muted-foreground mt-1">
             La suppression du compte est définitive : projets, déploiements et variables d’environnement
             sont effacés.
@@ -398,7 +401,7 @@ export function AccountSettings({
               {hasPassword && (
                 <Input
                   id="delete-password"
-                  label="Mot de passe"
+                  label="Phrase secrète (mot de passe)"
                   type="password"
                   autoComplete="current-password"
                   value={deletePassword}
