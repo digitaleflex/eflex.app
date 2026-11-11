@@ -12,6 +12,8 @@ export const NOTIFICATION_TYPES = {
   'membership.removed': { label: 'Retrait d’une organisation', description: 'Quand vous êtes retiré d’une organisation.' },
   'billing.grace_started': { label: 'Abonnement en retard', description: 'Quand le paiement d’un abonnement est en retard et qu’une période de grâce démarre.' },
   'billing.grace_ended': { label: 'Fin de période de grâce', description: 'Quand la période de grâce d’un abonnement impayé se termine ; les applications restent en ligne, les nouveaux déploiements sont bloqués.' },
+  'support.ticket_created': { label: 'Nouveau ticket de support', description: 'Quand un membre de votre organisation soumet un ticket de support (administrateurs).' },
+  'support.ticket_updated': { label: 'Mise à jour d’un ticket', description: 'Quand le statut ou le suivi de votre ticket de support change.' },
 } as const
 
 export type NotificationType = keyof typeof NOTIFICATION_TYPES

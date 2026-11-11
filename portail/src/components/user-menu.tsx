@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Bell, LogOut, Settings, Users } from 'lucide-react'
+import { Bell, LifeBuoy, LogOut, Settings, Users } from 'lucide-react'
 import { signOut } from '@/lib/auth-client'
 import { ThemeIcons } from '@/components/theme-switcher'
 import { useConnectionState } from '@/hooks/events-provider'
@@ -58,6 +58,7 @@ export function UserMenu({ name, email }: { name: string; email: string }) {
           <div className="my-1 h-px bg-border" />
           <Link href="/dashboard/notifications" onClick={() => setOpen(false)} className={item}><Bell className="h-4 w-4 text-muted-foreground" aria-hidden="true" />Notifications</Link>
           <Link href="/dashboard/organization" onClick={() => setOpen(false)} className={item}><Users className="h-4 w-4 text-muted-foreground" aria-hidden="true" />Équipe</Link>
+          <Link href="/dashboard/support" onClick={() => setOpen(false)} className={item}><LifeBuoy className="h-4 w-4 text-muted-foreground" aria-hidden="true" />Aide & support</Link>
           <Link href="/dashboard/settings" onClick={() => setOpen(false)} className={item}><Settings className="h-4 w-4 text-muted-foreground" aria-hidden="true" />Paramètres</Link>
           <div className="my-1 h-px bg-border" />
           <div className="flex items-center justify-between gap-2 px-2.5 py-1.5">

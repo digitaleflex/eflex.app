@@ -34,6 +34,8 @@ model User {
   gitInstallations        GitInstallation[]
   gitPat                  GitPat?
   payments                Payment[]
+  supportTickets          SupportTicket[]          @relation("SupportTicketAuthor")
+  assignedSupportTickets  SupportTicket[]          @relation("SupportTicketAssignee")
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
 }
@@ -175,6 +177,7 @@ model Project {
    * principale pendant la transition.
    */
   apps                  ProjectApp[]
+  supportTickets        SupportTicket[]
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 
@@ -324,6 +327,7 @@ model Deployment {
   coolifyBuildId String?
   logsSummary    String?     @db.Text
   createdAt      DateTime    @default(now())
+  supportTickets SupportTicket[]
 
   @@index([projectId])
   @@index([status])
@@ -510,6 +514,7 @@ model Organization {
   projects         Project[]
   subscription     Subscription?
   payments         Payment[]
+  supportTickets   SupportTicket[]
 
   @@index([suspendedAt])
 }
@@ -612,4 +617,36 @@ model NotificationPreference {
   enabled Boolean
 
   @@unique([userId, type, channel])
+}
+
+// ─── Support (tickets) ───────────────────────────────────────────────────────
+// Tickets de support soumis par les utilisateurs (problème côté dépôt/client,
+// question, incident). Les contenus ne doivent pas inclure de secrets.
+model SupportTicket {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation("SupportTicketAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  projectId      String?
+  project        Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  deploymentId   String?
+  deployment     Deployment?   @relation(fields: [deploymentId], references: [id], onDelete: SetNull)
+  subject        String
+  category       String        @default("general") // general | build | deploy | billing | account | other
+  body           String        @db.Text
+  status         String        @default("open") // open | in_progress | waiting_user | resolved | closed
+  priority       String        @default("normal") // low | normal | high
+  assignedToId   String?
+  assignedTo     User?         @relation("SupportTicketAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  adminNote      String?       @db.Text
+  resolvedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([organizationId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([projectId])
+  @@index([deploymentId])
 }

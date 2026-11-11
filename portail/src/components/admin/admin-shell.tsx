@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeft, Building2, CreditCard, FolderGit2, LayoutDashboard, Radio, Rocket, ScrollText, Server, Users } from 'lucide-react'
+import { ArrowLeft, Building2, CreditCard, FolderGit2, LayoutDashboard, LifeBuoy, Radio, Rocket, ScrollText, Server, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ConnectionBadge } from '@/components/connection-badge'
 
@@ -14,6 +14,7 @@ const NAV = [
   { label: 'Utilisateurs', href: '/admin/users', icon: Users },
   { label: 'Organisations', href: '/admin/organizations', icon: Building2 },
   { label: 'Paiements', href: '/admin/payments', icon: CreditCard },
+  { label: 'Support', href: '/admin/support', icon: LifeBuoy },
   { label: 'Infrastructure', href: '/admin/infrastructure', icon: Server },
   { label: 'Journal d’audit', href: '/admin/audit', icon: ScrollText },
 ] as const
