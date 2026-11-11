@@ -7,6 +7,7 @@ import { Check, ExternalLink, KeyRound, ListOrdered, Lock, Trash2, Unplug } from
 import { GithubMark } from '@/components/icons/github-mark'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
@@ -86,6 +87,9 @@ export function GitHubConnection({ isAdmin }: { isAdmin: boolean }) {
   const [saving, setSaving] = useState(false)
   const [removing, setRemoving] = useState(false)
   const [removingInstallation, setRemovingInstallation] = useState<string | null>(null)
+  const [confirmRemove, setConfirmRemove] = useState<
+    null | { kind: 'pat' } | { kind: 'installation'; id: string; login: string }
+  >(null)
   const [repoCount, setRepoCount] = useState<number | null>(null)
   const [feedback, setFeedback] = useState<Feedback>(null)
 
@@ -198,10 +202,10 @@ export function GitHubConnection({ isAdmin }: { isAdmin: boolean }) {
   return (
     <Card id="github" className="scroll-mt-24">
       <CardHeader>
-        <h2 className="font-semibold flex items-center gap-2">
+        <h3 className="font-semibold flex items-center gap-2">
           <GithubMark className="w-4 h-4" aria-hidden="true" />
           Connexion GitHub
-        </h2>
+        </h3>
         <p className="text-sm text-muted-foreground mt-1">
           Connectez vos dépôts publics et privés. La GitHub App est recommandée ; le jeton personnel
           reste disponible pour les comptes ou organisations où elle ne peut pas être installée.
@@ -375,7 +379,13 @@ export function GitHubConnection({ isAdmin }: { isAdmin: boolean }) {
                       variant="outline"
                       size="sm"
                       loading={removingInstallation === installation.installationId}
-                      onClick={() => void unlinkInstallation(installation.installationId)}
+                      onClick={() =>
+                        setConfirmRemove({
+                          kind: 'installation',
+                          id: installation.installationId,
+                          login: installation.accountLogin,
+                        })
+                      }
                     >
                       <Unplug className="h-3.5 w-3.5" aria-hidden="true" />
                       Retirer
@@ -447,7 +457,7 @@ export function GitHubConnection({ isAdmin }: { isAdmin: boolean }) {
                   {connection.pat.scopes.length > 0 ? `Portées : ${connection.pat.scopes.join(', ')}` : 'Jeton fine-grained'}
                 </p>
               </div>
-              <Button type="button" variant="outline" loading={removing} onClick={() => void removeToken()}>
+              <Button type="button" variant="outline" loading={removing} onClick={() => setConfirmRemove({ kind: 'pat' })}>
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
                 Supprimer
               </Button>
@@ -488,6 +498,32 @@ export function GitHubConnection({ isAdmin }: { isAdmin: boolean }) {
           envoyés au navigateur d’un autre utilisateur.
         </p>
       </CardContent>
+
+      <ConfirmDialog
+        open={confirmRemove?.kind === 'pat'}
+        destructive
+        title="Supprimer le jeton GitHub ?"
+        description="Les dépôts privés ne pourront plus être analysés ni clonés avec ce jeton. Les applications déjà déployées restent en ligne ; leurs prochains déploiements pourront échouer."
+        confirmLabel="Supprimer le jeton"
+        onCancel={() => setConfirmRemove(null)}
+        onConfirm={async () => {
+          setConfirmRemove(null)
+          await removeToken()
+        }}
+      />
+      <ConfirmDialog
+        open={confirmRemove?.kind === 'installation'}
+        destructive
+        title={confirmRemove?.kind === 'installation' ? `Retirer ${confirmRemove.login} ?` : 'Retirer ce compte GitHub ?'}
+        description="Eflex ne pourra plus lister ni cloner les dépôts de ce compte. Les projets déjà déployés restent en ligne. Vous pourrez reconnecter le compte plus tard."
+        confirmLabel="Retirer le compte"
+        onCancel={() => setConfirmRemove(null)}
+        onConfirm={async () => {
+          const target = confirmRemove
+          setConfirmRemove(null)
+          if (target?.kind === 'installation') await unlinkInstallation(target.id)
+        }}
+      />
     </Card>
   )
 }

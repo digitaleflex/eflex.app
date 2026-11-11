@@ -1,271 +1,362 @@
 'use client'
 
 import { nextFromLocation, withNext } from '@/lib/safe-next'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
-import { ThemeToggle } from '@/components/theme-switcher'
-import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card } from '@/components/ui/card'
-import { CAPTCHA_ENABLED, Turnstile, captchaHeaders } from '@/components/auth/turnstile'
-import { authClient, authErrorMessage, signIn } from '@/lib/auth-client'
 import { Fingerprint } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+
+import { AuthDivider, AuthLayout } from '@/components/auth/auth-layout'
+import { FormAlert } from '@/components/auth/form-alert'
+import { GoogleButton } from '@/components/auth/google-button'
+import { PassphraseField } from '@/components/auth/passphrase-field'
+import { useAuthConfig, useOAuthError } from '@/components/auth/use-auth-config'
+import { useValidatedField } from '@/components/auth/use-validated-field'
+import { CAPTCHA_ENABLED, Turnstile, captchaHeaders } from '@/components/auth/turnstile'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { authClient, authErrorMessage, signIn } from '@/lib/auth-client'
+import { validateEmail, validateLoginPassword } from '@/lib/auth-validation'
+
+const LOGIN_PASSPHRASE_HINT =
+  'Les espaces sont acceptés. Collez votre phrase secrète ou utilisez votre gestionnaire de mots de passe.'
+
+function focusFirst(
+  errors: (string | null)[],
+  refs: React.RefObject<HTMLInputElement | null>[],
+) {
+  const index = errors.findIndex(Boolean)
+  if (index >= 0) refs[index]?.current?.focus()
+}
+
+/** Ajoute `email` à un lien qui peut déjà porter `?next=`. */
+function verifyEmailHref(email: string): string {
+  const base = withNext('/verify-email')
+  return `${base}${base.includes('?') ? '&' : '?'}email=${encodeURIComponent(email.trim())}`
+}
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+  const { config } = useAuthConfig()
+  const oauthError = useOAuthError()
+
+  const email = useValidatedField('', validateEmail)
+  const passphrase = useValidatedField('', validateLoginPassword)
+
+  const [formError, setFormError] = useState('')
+  const [needsVerification, setNeedsVerification] = useState(false)
   const [loading, setLoading] = useState(false)
   const [twoFactor, setTwoFactor] = useState(false)
   const [code, setCode] = useState('')
+  const [codeError, setCodeError] = useState<string | null>(null)
   const [useBackupCode, setUseBackupCode] = useState(false)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [passkeyLoading, setPasskeyLoading] = useState(false)
   const [passkeySupported, setPasskeySupported] = useState(false)
-  // Masqué par défaut : le bouton Google n'apparaît que si l'instance a des
-  // identifiants OAuth, sinon Better Auth renvoie PROVIDER_NOT_FOUND.
-  const [googleEnabled, setGoogleEnabled] = useState(false)
-  const errorId = 'login-error'
+
+  const emailRef = useRef<HTMLInputElement>(null)
+  const passphraseRef = useRef<HTMLInputElement>(null)
+  const codeRef = useRef<HTMLInputElement>(null)
+  const alertRef = useRef<HTMLDivElement>(null)
+  const submittingRef = useRef(false)
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('two-factor') === '1') {
       setTwoFactor(true)
     }
     setPasskeySupported(typeof window !== 'undefined' && 'PublicKeyCredential' in window)
-
-    let active = true
-    fetch('/api/auth/config', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((config: { googleEnabled?: boolean }) => {
-        if (active) setGoogleEnabled(config.googleEnabled === true)
-      })
-      .catch(() => {
-        // Endpoint indisponible : on garde le bouton plutôt que de retirer
-        // silencieusement une méthode de connexion qui pourrait fonctionner.
-        if (active) setGoogleEnabled(true)
-      })
-    return () => {
-      active = false
-    }
   }, [])
+
+  useEffect(() => {
+    if (oauthError) setFormError(oauthError)
+  }, [oauthError])
+
+  const focusAlert = () => {
+    requestAnimationFrame(() => alertRef.current?.focus())
+  }
 
   const finish = () => {
     router.push(nextFromLocation())
     router.refresh()
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (submittingRef.current) return
+    setFormError('')
+    setNeedsVerification(false)
+
+    const emailError = email.showError()
+    const passphraseError = passphrase.showError()
+    if (emailError || passphraseError) {
+      focusFirst([emailError, passphraseError], [emailRef, passphraseRef])
+      return
+    }
+
+    if (CAPTCHA_ENABLED && !captchaToken) {
+      setFormError('Complétez la vérification anti-robot avant de continuer.')
+      focusAlert()
+      return
+    }
+
+    submittingRef.current = true
     setLoading(true)
-    setError('')
     try {
-      if (CAPTCHA_ENABLED && !captchaToken) {
-        setError('Complétez la vérification anti-robot avant de continuer.')
-        return
-      }
       const result = await signIn.email(
-        { email: email.trim(), password },
+        { email: email.value.trim(), password: passphrase.value },
         captchaHeaders(captchaToken),
       )
       if (result.error) {
-        setError(authErrorMessage(result.error, 'Email ou mot de passe incorrect.'))
+        setNeedsVerification(result.error.code === 'EMAIL_NOT_VERIFIED')
+        setFormError(authErrorMessage(result.error, 'Email ou phrase secrète incorrecte.'))
+        focusAlert()
         return
       }
       if ((result.data as { twoFactorRedirect?: boolean } | null)?.twoFactorRedirect) {
         setTwoFactor(true)
+        setFormError('')
+        requestAnimationFrame(() => codeRef.current?.focus())
         return
       }
       finish()
     } catch {
-      setError('Impossible de contacter le serveur. Vérifiez votre connexion et réessayez.')
+      setFormError('Impossible de contacter le serveur. Vérifiez votre connexion et réessayez.')
+      focusAlert()
     } finally {
       setLoading(false)
+      submittingRef.current = false
     }
   }
 
-  const verifyTwoFactor = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const verifyTwoFactor = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (submittingRef.current) return
+    setFormError('')
+    const trimmed = code.trim()
+    if (!trimmed) {
+      setCodeError('Saisissez le code de vérification.')
+      codeRef.current?.focus()
+      return
+    }
+    if (!useBackupCode && !/^\d{6}$/.test(trimmed)) {
+      setCodeError('Le code contient 6 chiffres.')
+      codeRef.current?.focus()
+      return
+    }
+    setCodeError(null)
+
+    submittingRef.current = true
     setLoading(true)
-    setError('')
     try {
       const result = useBackupCode
-        ? await authClient.twoFactor.verifyBackupCode({ code: code.trim() })
-        : await authClient.twoFactor.verifyTotp({ code: code.trim() })
+        ? await authClient.twoFactor.verifyBackupCode({ code: trimmed })
+        : await authClient.twoFactor.verifyTotp({ code: trimmed })
       if (result.error) {
-        setError(authErrorMessage(result.error, 'Code incorrect.'))
+        setFormError(authErrorMessage(result.error, 'Code incorrect.'))
+        focusAlert()
         return
       }
       finish()
     } catch {
-      setError('Impossible de contacter le serveur. Réessayez.')
+      setFormError('Impossible de contacter le serveur. Réessayez.')
+      focusAlert()
     } finally {
       setLoading(false)
+      submittingRef.current = false
     }
-  }
-
-  const handleGoogle = async () => {
-    setError('')
-    const { error: authError } = await signIn.social({ provider: 'google', callbackURL: nextFromLocation() })
-    if (authError) setError(authErrorMessage(authError, 'La connexion avec Google est indisponible pour le moment.'))
   }
 
   const handlePasskey = async () => {
+    if (passkeyLoading) return
     setPasskeyLoading(true)
-    setError('')
+    setFormError('')
     try {
       const result = await authClient.signIn.passkey()
       if (result.error) {
-        setError(authErrorMessage(result.error, 'Connexion par passkey impossible sur cet appareil.'))
+        setFormError(authErrorMessage(result.error, 'Connexion par passkey impossible sur cet appareil.'))
+        focusAlert()
         return
       }
       finish()
     } catch {
-      setError('Connexion par passkey impossible sur cet appareil. Utilisez votre mot de passe.')
+      setFormError('Connexion par passkey impossible sur cet appareil. Utilisez votre phrase secrète.')
+      focusAlert()
     } finally {
       setPasskeyLoading(false)
     }
   }
 
+  const resetTwoFactor = () => {
+    setTwoFactor(false)
+    setCode('')
+    setCodeError(null)
+    setFormError('')
+    setUseBackupCode(false)
+    requestAnimationFrame(() => passphraseRef.current?.focus())
+  }
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-50 glass">
-        <nav className="container flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-bold text-xl tracking-tight">
-            <Image src="/logo-horizontal.webp" alt="Eflex — accueil" width={1200} height={312} className="h-8 w-auto" priority />
+    <AuthLayout
+      title="Connexion"
+      description="Retrouvez vos projets et vos déploiements."
+      footer={
+        <>
+          Pas encore de compte ?{' '}
+          <Link suppressHydrationWarning href={withNext('/register')} className="font-medium text-primary hover:underline">
+            Créer un compte
           </Link>
-          <ThemeToggle />
-        </nav>
-      </header>
+        </>
+      }
+    >
+      <Card className="space-y-6 p-6">
+        {twoFactor ? (
+          <form onSubmit={verifyTwoFactor} className="space-y-4">
+            <div className="space-y-1.5 text-center">
+              <h2 className="text-lg font-semibold">Vérification en deux étapes</h2>
+              <p className="text-sm text-muted-foreground">
+                {useBackupCode
+                  ? 'Saisissez l’un de vos codes de secours.'
+                  : 'Saisissez le code à 6 chiffres de votre application d’authentification.'}
+              </p>
+            </div>
 
-      <main id="contenu" tabIndex={-1} className="flex-1 flex items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-8 animate-fade-in">
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight">Connexion</h1>
-            <p className="text-muted-foreground">Retrouvez vos projets et vos déploiements.</p>
-          </div>
+            {formError && (
+              <FormAlert ref={alertRef} id="login-error">
+                {formError}
+              </FormAlert>
+            )}
 
-          <Card className="p-6 space-y-6">
-            {twoFactor ? (
-              <form onSubmit={verifyTwoFactor} className="space-y-4">
-                <div className="space-y-1.5 text-center">
-                  <h2 className="text-lg font-semibold">Vérification en deux étapes</h2>
-                  <p className="text-sm text-muted-foreground">
-                    {useBackupCode
-                      ? 'Saisissez l’un de vos codes de secours.'
-                      : 'Saisissez le code à 6 chiffres de votre application d’authentification.'}
-                  </p>
-                </div>
-                {error && (
-                  <div id={errorId} role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-                    {error}
-                  </div>
-                )}
-                <Input
-                  id="two-factor-code"
-                  label={useBackupCode ? 'Code de secours' : 'Code à 6 chiffres'}
-                  inputMode={useBackupCode ? 'text' : 'numeric'}
-                  autoComplete="one-time-code"
-                  autoFocus
-                  value={code}
-                  onChange={(e) => setCode(useBackupCode ? e.target.value : e.target.value.replace(/\D/g, ''))}
-                  maxLength={useBackupCode ? 32 : 6}
-                  aria-invalid={error ? true : undefined}
-                  aria-describedby={error ? errorId : undefined}
-                  required
-                />
-                <Button type="submit" size="lg" className="w-full" loading={loading}>
-                  Vérifier
-                </Button>
-                <div className="flex flex-col gap-2 text-center text-sm">
-                  <button
-                    type="button"
-                    className="min-h-11 font-medium text-primary hover:underline"
-                    onClick={() => { setUseBackupCode((v) => !v); setCode(''); setError('') }}
-                  >
-                    {useBackupCode ? 'Utiliser un code TOTP' : 'Utiliser un code de secours'}
-                  </button>
-                  <button
-                    type="button"
-                    className="min-h-11 text-muted-foreground hover:text-foreground"
-                    onClick={() => { setTwoFactor(false); setCode(''); setError(''); setUseBackupCode(false) }}
-                  >
-                    Revenir à la connexion
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <>
-            {googleEnabled && (
-              <>
-            <Button
-              variant="outline"
-              size="lg"
-              className="w-full justify-center gap-3 font-normal"
-              onClick={handleGoogle}
+            <Input
+              ref={codeRef}
+              id="two-factor-code"
+              label={useBackupCode ? 'Code de secours' : 'Code à 6 chiffres'}
+              inputMode={useBackupCode ? 'text' : 'numeric'}
+              autoComplete="one-time-code"
+              autoFocus
+              value={code}
+              onChange={(event) => {
+                const next = useBackupCode ? event.target.value : event.target.value.replace(/\D/g, '')
+                setCode(next)
+                if (codeError) {
+                  if (!next.trim()) setCodeError('Saisissez le code de vérification.')
+                  else if (!useBackupCode && !/^\d{6}$/.test(next.trim())) {
+                    setCodeError('Le code contient 6 chiffres.')
+                  } else setCodeError(null)
+                }
+              }}
+              onBlur={() => {
+                if (!code.trim()) setCodeError('Saisissez le code de vérification.')
+              }}
+              maxLength={useBackupCode ? 32 : 6}
+              error={codeError ?? undefined}
               disabled={loading}
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09" />
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23" />
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 9.99 1 12.48 1 15.23c0 2.74 1.02 5.24 2.81 7.07z" />
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 6.31l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53" />
-              </svg>
-              Continuer avec Google
+              required
+            />
+
+            <Button type="submit" size="lg" className="w-full" loading={loading}>
+              Vérifier
             </Button>
 
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">ou</span>
-              </div>
+            <div className="flex flex-col gap-2 text-center text-sm">
+              <button
+                type="button"
+                className="min-h-11 font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                disabled={loading}
+                onClick={() => {
+                  setUseBackupCode((current) => !current)
+                  setCode('')
+                  setCodeError(null)
+                  setFormError('')
+                  requestAnimationFrame(() => codeRef.current?.focus())
+                }}
+              >
+                {useBackupCode ? 'Utiliser un code TOTP' : 'Utiliser un code de secours'}
+              </button>
+              <button
+                type="button"
+                className="min-h-11 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                disabled={loading}
+                onClick={resetTwoFactor}
+              >
+                Revenir à la connexion
+              </button>
             </div>
+          </form>
+        ) : (
+          <>
+            {config?.googleEnabled && (
+              <>
+                <GoogleButton disabled={loading} onError={(message) => {
+                  setFormError(message)
+                  focusAlert()
+                }} />
+                <AuthDivider />
               </>
             )}
 
-            {error && (
-              <div id={errorId} role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-                {error}
-              </div>
+            {formError && (
+              <FormAlert ref={alertRef} id="login-error">
+                {formError}
+              </FormAlert>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <Input
+                ref={emailRef}
                 id="email"
                 label="Adresse e-mail"
                 type="email"
                 placeholder="vous@exemple.com"
                 autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                aria-invalid={error ? true : undefined}
-                aria-describedby={error ? errorId : undefined}
+                inputMode="email"
+                value={email.value}
+                onChange={(event) => email.change(event.target.value)}
+                onBlur={email.blur}
+                error={email.error ?? undefined}
+                disabled={loading}
                 required
               />
-              <Input
+
+              <PassphraseField
+                ref={passphraseRef}
                 id="password"
-                label="Mot de passe"
-                type="password"
-                placeholder="••••••••"
+                label="Phrase secrète (mot de passe)"
                 autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                aria-invalid={error ? true : undefined}
-                aria-describedby={error ? errorId : undefined}
+                value={passphrase.value}
+                onChange={passphrase.change}
+                onBlur={passphrase.blur}
+                error={passphrase.error}
+                hint={LOGIN_PASSPHRASE_HINT}
+                disabled={loading}
                 required
               />
+
               <div className="flex justify-end">
                 <Link href="/forgot-password" className="text-sm font-medium text-primary hover:underline">
-                  Mot de passe oublié ?
+                  Phrase secrète oubliée ?
                 </Link>
               </div>
+
               {CAPTCHA_ENABLED && <Turnstile onToken={setCaptchaToken} />}
+
               <Button type="submit" size="lg" className="w-full" loading={loading}>
                 Se connecter
               </Button>
             </form>
+
+            {needsVerification && (
+              <p className="text-center text-sm text-muted-foreground">
+                <Link
+                  suppressHydrationWarning
+                  href={verifyEmailHref(email.value)}
+                  className="font-medium text-primary hover:underline"
+                >
+                  Renvoyer l’e-mail de vérification
+                </Link>
+              </p>
+            )}
+
             {passkeySupported && (
               <Button
                 type="button"
@@ -274,30 +365,15 @@ export default function LoginPage() {
                 className="w-full justify-center gap-2"
                 onClick={() => void handlePasskey()}
                 loading={passkeyLoading}
+                disabled={loading}
               >
                 <Fingerprint className="h-5 w-5" aria-hidden="true" />
                 Se connecter avec une passkey
               </Button>
             )}
-            {error.startsWith('Vérifiez votre adresse') && (
-              <p className="text-center text-sm text-muted-foreground">
-                <Link href={`/verify-email?email=${encodeURIComponent(email.trim())}`} className="font-medium text-primary hover:underline">
-                  Renvoyer l&apos;e-mail de vérification
-                </Link>
-              </p>
-            )}
-              </>
-            )}
-          </Card>
-
-          <p className="text-center text-sm text-muted-foreground">
-            Pas encore de compte ?{' '}
-            <Link suppressHydrationWarning href={withNext('/register')} className="font-medium text-primary hover:underline">
-              Créer un compte
-            </Link>
-          </p>
-        </div>
-      </main>
-    </div>
+          </>
+        )}
+      </Card>
+    </AuthLayout>
   )
 }

@@ -47,7 +47,7 @@ export interface StatusSnapshot {
   status: OverallState
   checkedAt: string
   components: ComponentResult[]
-  uptime: { window: string; percent: number | null }[]
+  uptime: { window: string; percent: number | null; samples: number }[]
   incidents: IncidentView[]
   maintenance: { enabled: boolean; message: string | null }
 }
@@ -78,6 +78,14 @@ function withTimeout<T>(promise: Promise<T>): Promise<T> {
         reject(error)
       }
     )
+  })
+}
+
+/** Une sonde ne doit jamais faire échouer la page entière : elle retombe en « indisponible ». */
+function safeProbe(component: ComponentKey, probe: Promise<Probe>, detail: string): Promise<Probe> {
+  return probe.catch((error) => {
+    logProbeFailure(component, error)
+    return { state: 'down', latencyMs: null, detail }
   })
 }
 
@@ -172,10 +180,10 @@ async function probeEngine(): Promise<Probe> {
 
 async function probeAll(): Promise<ComponentResult[]> {
   const [database, redis, coolify, engine] = await Promise.all([
-    probeDatabase(),
-    probeRedis(),
-    probeCoolify(),
-    probeEngine(),
+    safeProbe('database', probeDatabase(), 'Base de données injoignable'),
+    safeProbe('redis', probeRedis(), 'Cache injoignable'),
+    safeProbe('coolify', probeCoolify(), 'Service de déploiement injoignable'),
+    safeProbe('engine', probeEngine(), 'Moteur Axiom injoignable'),
   ])
 
   const probes: Record<ComponentKey, Probe> = {
@@ -202,8 +210,13 @@ async function recordSnapshot(components: ComponentResult[]): Promise<void> {
     })
     if (last && Date.now() - last.checkedAt.getTime() < SNAPSHOT_INTERVAL_MS) return
 
+    // Un composant non configuré n'apporte aucune information de disponibilité :
+    // l'enregistrer fausserait le pourcentage (il ne peut jamais être « ok »).
+    const observed = components.filter((c) => c.state !== 'unknown')
+    if (observed.length === 0) return
+
     await prisma.statusCheck.createMany({
-      data: components.map((c) => ({
+      data: observed.map((c) => ({
         component: c.key,
         status: c.state,
         latencyMs: c.latencyMs,
@@ -224,15 +237,17 @@ async function uptimeWindows(): Promise<StatusSnapshot['uptime']> {
     windows.map(async ({ window, days }) => {
       try {
         const since = new Date(Date.now() - days * 86_400_000)
+        // Les anciens relevés « unknown » restent en base : ils sont exclus du calcul.
+        const observed = { checkedAt: { gte: since }, status: { in: ['ok', 'degraded', 'down'] } }
         const [total, ok] = await Promise.all([
-          prisma.statusCheck.count({ where: { checkedAt: { gte: since } } }),
+          prisma.statusCheck.count({ where: observed }),
           prisma.statusCheck.count({
-            where: { checkedAt: { gte: since }, status: 'ok' },
+            where: { ...observed, status: 'ok' },
           }),
         ])
-        return { window, percent: uptimePercent(ok, total) }
+        return { window, percent: uptimePercent(ok, total), samples: total }
       } catch {
-        return { window, percent: null }
+        return { window, percent: null, samples: 0 }
       }
     })
   )

@@ -1,7 +1,10 @@
 import { APIError, betterAuth } from 'better-auth'
+import { createAuthMiddleware } from 'better-auth/api'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { nextCookies } from 'better-auth/next-js'
-import { compare, hash } from 'bcryptjs'
+import { hashPassword, verifyPassword } from '@/lib/password'
+import { sanitizeOAuthRedirect } from '@/lib/auth-oauth'
+import { PASSPHRASE_MAX_LENGTH, PASSPHRASE_MIN_LENGTH } from '@/lib/auth-validation'
 import { prisma } from '@/lib/prisma'
 import { isEmailConfigured, sendEmail } from '@/lib/email'
 import { resetPasswordEmail, verificationEmail } from '@/lib/email-templates'
@@ -121,21 +124,23 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
-    minPasswordLength: 8,
-    // bcrypt ignore tout ce qui dépasse 72 octets : on refuse plutôt que de tronquer.
-    maxPasswordLength: 72,
+    // Phrases secrètes : 12 caractères minimum, 256 maximum. L'interface
+    // recommande 4 à 5 mots sans composition imposée (issue #55).
+    minPasswordLength: PASSPHRASE_MIN_LENGTH,
+    maxPasswordLength: PASSPHRASE_MAX_LENGTH,
     requireEmailVerification: emailVerificationRequired,
-    // Garde bcrypt (et non scrypt) pour que les mots de passe créés avec l'ancien
-    // système (migration 20261107120000_better_auth) restent valides.
+    // Hachage versionné : SHA-256 puis bcrypt (`v2$…`), pour qu'une phrase de
+    // plus de 72 octets ne soit jamais tronquée. Les anciens hachages bcrypt
+    // directs restent vérifiés (voir lib/password.ts).
     password: {
-      hash: (password) => hash(password, 12),
-      verify: ({ hash: stored, password }) => compare(password, stored),
+      hash: (password) => hashPassword(password),
+      verify: ({ hash: stored, password }) => verifyPassword({ hash: stored, password }),
     },
     async sendResetPassword({ user, url }) {
       const template = resetPasswordEmail(url)
       await sendEmail({
         to: user.email,
-        subject: 'Réinitialiser votre mot de passe Eflex',
+        subject: 'Réinitialiser votre phrase secrète Eflex',
         ...template,
       })
     },
@@ -193,6 +198,9 @@ export const auth = betterAuth({
       '/sign-up/email': { window: 60, max: 5 },
       '/forget-password': { window: 60, max: 5 },
       '/reset-password': { window: 60, max: 10 },
+      // Renvoi de l'e-mail de vérification : limite serveur, en plus du délai
+      // de 60 s affiché par l'interface (issue #57).
+      '/send-verification-email': { window: 60, max: 3 },
       '/two-factor/verify-totp': { window: 60, max: 10 },
       '/two-factor/verify-backup-code': { window: 60, max: 10 },
       '/passkey/verify-authentication': { window: 60, max: 10 },
@@ -203,6 +211,23 @@ export const auth = betterAuth({
 
   advanced: {
     ipAddress: { ipAddressHeaders: ['x-forwarded-for'] },
+  },
+
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      // Validation serveur des redirections OAuth : le client envoie déjà un
+      // chemin validé, mais un appel direct à l'API ne doit pas transformer le
+      // callback Google en redirection ouverte (issue #57).
+      if (ctx.path !== '/sign-in/social' && ctx.path !== '/link-social') return
+      const body = (ctx.body ?? {}) as Record<string, unknown>
+      const sanitized: Record<string, string> = {}
+      const callbackURL = sanitizeOAuthRedirect(body.callbackURL)
+      if (callbackURL) sanitized.callbackURL = callbackURL
+      const errorCallbackURL = sanitizeOAuthRedirect(body.errorCallbackURL, '/login')
+      if (errorCallbackURL) sanitized.errorCallbackURL = errorCallbackURL
+      if (Object.keys(sanitized).length === 0) return
+      return { context: { body: { ...body, ...sanitized } } }
+    }),
   },
 
   databaseHooks: {

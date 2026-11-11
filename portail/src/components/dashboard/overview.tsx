@@ -45,6 +45,7 @@ export function OverviewStrip({ data }: { data: DashboardData }) {
   const { summary, successRate, deploymentsInWindow, series, windowDays, activity } = data
   const last = activity[0]
   return (
+    <div className="space-y-2">
     <section aria-label="Aperçu" className="grid overflow-hidden rounded-xl border border-border bg-card sm:grid-cols-2 lg:grid-cols-4 [&>*]:border-border [&>*:not(:last-child)]:border-b sm:[&>*:nth-child(odd)]:border-r lg:[&>*]:border-b-0 lg:[&>*:not(:last-child)]:border-r">
       <div className="p-4">
         <p className="text-xs font-medium text-muted-foreground">Projets en ligne</p>
@@ -88,6 +89,12 @@ export function OverviewStrip({ data }: { data: DashboardData }) {
         )}
       </div>
     </section>
+    <p className="text-xs text-muted-foreground">
+      Chiffres calculés sur les {windowDays} derniers jours à partir des déploiements enregistrés.
+      « Taux de réussite » : part des déploiements terminés (réussis ou en échec) qui sont en ligne ;
+      un déploiement encore en cours n’entre pas dans ce taux.
+    </p>
+    </div>
   )
 }
 
@@ -96,7 +103,16 @@ export function AttentionList({ items }: { items: DashboardData['attention'] }) 
   if (items.length === 0) return null
   return (
     <section aria-labelledby="attention-title" className="overflow-hidden rounded-xl border border-border bg-card">
-      <h2 id="attention-title" className="border-b border-border px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">À regarder</h2>
+      <div className="border-b border-border px-4 py-2.5">
+        <h2 id="attention-title" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          À regarder
+          <span className="rounded-full bg-muted px-1.5 text-[11px] font-medium tabular-nums text-muted-foreground">{items.length}</span>
+        </h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Déploiements en échec ou en cours, les plus urgents d’abord. Un échec déjà corrigé par un
+          déploiement réussi plus récent n’apparaît pas.
+        </p>
+      </div>
       <ul className="divide-y divide-border">
         {items.map((item) => {
           const failed = item.kind === 'failed'
@@ -115,7 +131,7 @@ export function AttentionList({ items }: { items: DashboardData['attention'] }) 
                 </span>
               </p>
               <Link
-                href={`/dashboard/projects/${item.projectId}${failed ? '?tab=deployments' : ''}`}
+                href={`/dashboard/projects/${item.projectId}?tab=deployments`}
                 className="ml-7 inline-flex min-h-11 shrink-0 items-center gap-1 text-sm font-medium text-primary hover:underline sm:ml-0 sm:min-h-0"
               >
                 {failed ? 'Voir les journaux' : 'Suivre'}

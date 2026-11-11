@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
-import { resolveOrganization } from '@/lib/organizations'
+import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { loadDashboard } from '@/lib/dashboard-data'
 import { prisma } from '@/lib/prisma'
 import { LiveRefresh } from '@/components/live-refresh'
 import { ActivityFeed, AttentionList, OverviewStrip } from '@/components/dashboard/overview'
+import { DashboardOnboarding } from '@/components/dashboard/onboarding'
 import { ProjectsExplorer } from '@/components/dashboard/projects-explorer'
 
 export const metadata = { title: 'Projets — Eflex' }
@@ -26,6 +27,9 @@ export default async function DashboardPage() {
     prisma.organization.findUnique({ where: { id: org.organizationId }, select: { name: true } }),
   ])
   const firstName = session.user.name.split(' ')[0]
+  const organizationName = organization?.name ?? 'cette organisation'
+  const hasProjects = data.summary.total > 0
+  const canManage = canManageProjects(org.role)
 
   return (
     <div className="space-y-6">
@@ -37,25 +41,33 @@ export default async function DashboardPage() {
           {greeting()}, {firstName}
         </h1>
         <p className="text-sm text-muted-foreground">
-          {data.summary.total === 0
-            ? `Aucun projet dans ${organization?.name ?? 'cette organisation'} pour l’instant.`
+          {!hasProjects
+            ? `Aucun projet dans ${organizationName} pour l’instant.`
             : data.summary.needsAttention > 0
-              ? `${data.summary.needsAttention} projet${data.summary.needsAttention > 1 ? 's demandent' : ' demande'} votre attention dans ${organization?.name}.`
-              : `Tous les projets de ${organization?.name} sont en ordre.`}
+              ? `${data.summary.needsAttention} projet${data.summary.needsAttention > 1 ? 's demandent' : ' demande'} votre attention dans ${organizationName}.`
+              : `Tous les projets de ${organizationName} sont en ordre.`}
         </p>
       </header>
 
-      {data.summary.total > 0 && <OverviewStrip data={data} />}
-      <AttentionList items={data.attention} />
+      {hasProjects ? (
+        <>
+          <OverviewStrip data={data} />
+          <AttentionList items={data.attention} />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <ProjectsExplorer projects={data.projects} />
-        {data.summary.total > 0 && (
-          <aside className="xl:sticky xl:top-28 xl:self-start">
-            <ActivityFeed items={data.activity.slice(0, 8)} />
-          </aside>
-        )}
-      </div>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <ProjectsExplorer
+              projects={data.projects}
+              canManage={canManage}
+              initialSort={data.summary.needsAttention > 0 ? 'status' : 'recent'}
+            />
+            <aside className="xl:sticky xl:top-28 xl:self-start">
+              <ActivityFeed items={data.activity.slice(0, 8)} />
+            </aside>
+          </div>
+        </>
+      ) : (
+        <DashboardOnboarding organizationName={organizationName} canManage={canManage} />
+      )}
     </div>
   )
 }

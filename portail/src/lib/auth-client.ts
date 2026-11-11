@@ -18,14 +18,15 @@ export const authClient = createAuthClient({
 export const { signIn, signUp, signOut, useSession } = authClient
 
 const MESSAGES: Record<string, string> = {
-  INVALID_EMAIL_OR_PASSWORD: 'Email ou mot de passe incorrect.',
+  INVALID_EMAIL_OR_PASSWORD: 'Adresse e-mail ou phrase secrète incorrecte.',
   INVALID_EMAIL: 'Adresse e-mail invalide.',
   USER_ALREADY_EXISTS: 'Un compte existe déjà avec cette adresse. Connectez-vous ou utilisez une autre adresse.',
   USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL:
     'Un compte existe déjà avec cette adresse. Connectez-vous ou utilisez une autre adresse.',
-  PASSWORD_TOO_SHORT: 'Le mot de passe doit contenir au moins 8 caractères.',
-  PASSWORD_TOO_LONG: 'Le mot de passe est trop long (72 caractères maximum).',
-  INVALID_PASSWORD: 'Mot de passe incorrect.',
+  PASSWORD_TOO_SHORT: 'La phrase secrète doit contenir au moins 12 caractères.',
+  PASSWORD_TOO_LONG: 'La phrase secrète est trop longue (256 caractères maximum).',
+  INVALID_PASSWORD: 'Phrase secrète incorrecte.',
+  EMAIL_NOT_VERIFIED: 'Vérifiez votre adresse e-mail avant de vous connecter.',
   CREDENTIAL_ACCOUNT_NOT_FOUND: "Ce compte n'a pas de mot de passe (connexion Google).",
   SESSION_EXPIRED: 'Votre session a expiré. Reconnectez-vous pour continuer.',
   CHANGE_EMAIL_DISABLED: "Le changement d'adresse e-mail n'est pas disponible.",

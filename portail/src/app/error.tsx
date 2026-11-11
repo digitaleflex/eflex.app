@@ -2,6 +2,8 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
+import { AlertTriangle } from 'lucide-react'
+import { SystemLink, SystemScreen, systemActionClass } from '@/components/system-screen'
 
 export default function ErrorPage({
   error,
@@ -15,32 +17,37 @@ export default function ErrorPage({
   }, [error])
 
   return (
-    <main id="contenu" tabIndex={-1} className="min-h-screen flex flex-col items-center justify-center gap-7 bg-background px-4 text-center">
-      <div className="space-y-3">
-        <h1 className="text-display-sm font-bold">Une erreur est survenue</h1>
-        <p className="max-w-md text-muted-foreground">
-          Nous n&apos;avons pas pu afficher cette page. Réessayez : si le problème persiste, consultez le statut des services.
+    <SystemScreen
+      icon={AlertTriangle}
+      tone="destructive"
+      title="Cette page n’a pas pu s’afficher"
+      description={
+        <>
+          <p>
+            Une erreur inattendue a interrompu le chargement de cette page. « Réessayer » relance le
+            chargement de la section en erreur.
+          </p>
+          <p>
+            Si vous veniez de lancer une action (déploiement, suppression, modification), vérifiez son
+            résultat avant de la relancer.
+          </p>
+        </>
+      }
+      reference={error.digest ?? null}
+      footer={
+        <p>
+          Si l’erreur se répète,{' '}
+          <Link href="/status" className="font-medium text-foreground underline underline-offset-2 hover:no-underline">
+            consultez le statut des services
+          </Link>
+          .
         </p>
-        {error.digest && (
-          <p className="font-mono text-xs text-muted-foreground">Référence : {error.digest}</p>
-        )}
-      </div>
-
-      <div className="flex flex-wrap items-center justify-center gap-3">
-        <button
-          type="button"
-          onClick={reset}
-          className="inline-flex h-11 items-center rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          Réessayer
-        </button>
-        <Link
-          href="/status"
-          className="inline-flex h-11 items-center rounded-lg border border-input bg-background px-5 text-sm font-medium hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          Statut des services
-        </Link>
-      </div>
-    </main>
+      }
+    >
+      <button type="button" onClick={reset} className={systemActionClass('primary')}>
+        Réessayer
+      </button>
+      <SystemLink href="/dashboard">Retour à la console</SystemLink>
+    </SystemScreen>
   )
 }

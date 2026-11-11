@@ -1,9 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Activity, ArrowRightLeft, Database, Globe, KeyRound, Plus, Trash2, TriangleAlert } from 'lucide-react'
+import {
+  Activity,
+  ArrowLeft,
+  ArrowRightLeft,
+  Database,
+  Globe,
+  KeyRound,
+  Lock,
+  Plus,
+  Settings,
+  Trash2,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -47,6 +60,36 @@ function FeedbackMessage({ feedback, id }: { feedback: Feedback; id: string }) {
     <p id={id} role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
       {feedback.message}
     </p>
+  )
+}
+
+/** Section de réglages : même en-tête, ancre stable pour les liens directs. */
+function SettingsSection({
+  id,
+  title,
+  icon: Icon,
+  description,
+  children,
+}: {
+  id: string
+  title: string
+  icon?: LucideIcon
+  description: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-28">
+      <Card>
+        <CardHeader>
+          <h2 id={`${id}-title`} className="flex items-center gap-2 font-semibold">
+            {Icon && <Icon className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />}
+            {title}
+          </h2>
+          <div className="mt-1 text-sm text-muted-foreground">{description}</div>
+        </CardHeader>
+        <CardContent>{children}</CardContent>
+      </Card>
+    </section>
   )
 }
 
@@ -192,31 +235,35 @@ export function ProjectSettings({ project, envVars: initialEnvVars, transferTarg
   }
 
   return (
-    <div className="space-y-8 max-w-3xl">
-      <Link
-        href={`/dashboard/projects/${project.id}`}
-        className="inline-flex items-center gap-2 min-h-11 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-        Retour au projet
-      </Link>
-
+    <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Paramètres du projet</h1>
+        <Link
+          href={`/dashboard/projects/${project.id}`}
+          className="inline-flex items-center gap-2 min-h-11 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+          Retour au projet
+        </Link>
+      </div>
+
+      <header>
+        <h1 className="font-display text-2xl font-bold tracking-tight">Paramètres du projet</h1>
         <p className="text-sm text-muted-foreground mt-1">
           {project.name} · <span className="font-mono">{project.slug}</span>
         </p>
-      </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Ces réglages ne concernent que ce projet. Les valeurs des variables ne sont jamais
+          réaffichées ; seuls leurs noms et leurs dates de mise à jour sont transmis à cette page.
+        </p>
+      </header>
 
-      <Card>
-        <CardHeader>
-          <h2 className="font-semibold">Général</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Le nom est modifiable. Le domaine et l’identifiant technique restent stables pour ne pas casser
-            les URLs ni les labels Traefik.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <SettingsSection
+        id="general"
+        title="Général"
+        icon={Settings}
+        description="Le nom est modifiable. Le domaine et l’identifiant technique restent stables pour ne pas casser les URLs ni les labels Traefik."
+      >
+        <div className="space-y-4">
           <FeedbackMessage feedback={generalFeedback} id="project-general-feedback" />
           <form onSubmit={saveGeneral} className="space-y-4">
             <Input
@@ -268,136 +315,81 @@ export function ProjectSettings({ project, envVars: initialEnvVars, transferTarg
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </SettingsSection>
 
-      <Card>
-        <CardHeader>
-          <h2 className="font-semibold flex items-center gap-2">
-            <ArrowRightLeft className="w-4 h-4" aria-hidden="true" />
-            Transfert
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Déplacez le projet vers une autre organisation dont vous êtes propriétaire ou administrateur.
-            Le transfert est immédiat et modifie l’accès, la facturation et les quotas.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <ProjectTransfer
-            projectId={project.id}
-            projectName={project.name}
-            targets={transferTargets}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <h2 className="font-semibold flex items-center gap-2">
-            <Globe className="w-4 h-4" aria-hidden="true" />
-            Domaines
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Le domaine Eflex reste stable. Ajoutez vos propres domaines avec un CNAME ; le certificat
-            SSL est émis automatiquement après vérification.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <ProjectDomains projectId={project.id} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <h2 className="font-semibold flex items-center gap-2">
-            <Database className="w-4 h-4" aria-hidden="true" />
-            Bases de données
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Créez une base PostgreSQL ou un cache Redis privé sur l’infrastructure. La variable
-            <code className="mx-1 font-mono">DATABASE_URL</code> ou
-            <code className="mx-1 font-mono">REDIS_URL</code>
-            est injectée automatiquement au déploiement.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <ProjectDatabases projectId={project.id} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <h2 className="font-semibold flex items-center gap-2">
-            <Activity className="w-4 h-4" aria-hidden="true" />
-            Disponibilité & actions
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Statut du conteneur sur la plateforme et actions immédiates. Le redéploiement complet reste
-            disponible depuis la page du projet.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <ProjectRuntimeControls projectId={project.id} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <h2 className="font-semibold flex items-center gap-2">
-            <KeyRound className="w-4 h-4" aria-hidden="true" />
-            Variables d’environnement
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Les valeurs sont chiffrées au repos et ne sont jamais réaffichées. Une modification
-            s’applique au prochain déploiement.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-5">
+      <SettingsSection
+        id="variables"
+        title="Variables d’environnement"
+        icon={KeyRound}
+        description="Les valeurs sont chiffrées au repos et ne sont jamais réaffichées. Une modification s’applique au prochain déploiement."
+      >
+        <div className="space-y-5">
           <FeedbackMessage feedback={envFeedback} id="project-env-feedback" />
 
           {envVars.length === 0 ? (
             <p className="text-sm text-muted-foreground">Aucune variable définie.</p>
           ) : (
-            <ul className="divide-y divide-border rounded-lg border border-border">
-              {envVars.map((item) => (
-                <li key={item.key} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="font-mono text-sm break-all">{item.key}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Mise à jour le {dateFormat.format(new Date(item.updatedAt))}
-                    </p>
-                  </div>
-                  {pendingDelete === item.key ? (
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        loading={deletingKey === item.key}
-                        onClick={() => removeEnvVar(item.key)}
-                      >
-                        Confirmer
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setPendingDelete(null)}>
-                        Annuler
-                      </Button>
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {envVars.length} variable{envVars.length > 1 ? 's' : ''} · valeurs masquées
+              </p>
+              <ul className="divide-y divide-border rounded-lg border border-border">
+                {envVars.map((item) => (
+                  <li key={item.key} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="font-mono text-sm break-all">{item.key}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Mise à jour le {dateFormat.format(new Date(item.updatedAt))}
+                      </p>
                     </div>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="self-start text-muted-foreground hover:text-destructive"
-                      onClick={() => setPendingDelete(item.key)}
-                    >
-                      <Trash2 className="w-4 h-4" aria-hidden="true" />
-                      Supprimer
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
+                    <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
+                      <span className="inline-flex items-center gap-1.5 font-mono text-sm tracking-widest text-muted-foreground">
+                        <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                        <span aria-hidden="true">••••••••</span>
+                        <span className="sr-only">Valeur masquée</span>
+                      </span>
+                      {pendingDelete === item.key ? (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            loading={deletingKey === item.key}
+                            onClick={() => removeEnvVar(item.key)}
+                            aria-label={`Confirmer la suppression de la variable ${item.key}`}
+                          >
+                            Confirmer
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setPendingDelete(null)}
+                            aria-label={`Annuler la suppression de la variable ${item.key}`}
+                          >
+                            Annuler
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="self-start text-muted-foreground hover:text-destructive"
+                          onClick={() => setPendingDelete(item.key)}
+                          aria-label={`Supprimer la variable ${item.key}`}
+                        >
+                          <Trash2 className="w-4 h-4" aria-hidden="true" />
+                          Supprimer
+                        </Button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           <form onSubmit={saveEnvVar} className="space-y-4 rounded-lg border border-border bg-muted/20 p-4">
+            <p className="text-sm font-medium">Ajouter ou remplacer une variable</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
                 id="env-key"
@@ -414,63 +406,107 @@ export function ProjectSettings({ project, envVars: initialEnvVars, transferTarg
               <Input
                 id="env-value"
                 label="Valeur"
+                type="password"
                 placeholder="valeur secrète"
                 value={newValue}
                 onChange={(e) => setNewValue(e.target.value)}
                 spellCheck={false}
-                autoComplete="off"
+                autoComplete="new-password"
+                hint="La valeur est chiffrée et ne sera plus jamais affichée."
                 aria-invalid={envFeedback?.tone === 'error' ? true : undefined}
                 aria-describedby={envFeedback?.tone === 'error' ? 'project-env-feedback' : undefined}
               />
             </div>
-            <div className="flex justify-end">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground">
+                Pour remplacer une valeur existante, saisissez-la à nouveau : l’ancienne ne peut pas
+                être relue.
+              </p>
               <Button type="submit" loading={savingEnv}>
                 <Plus className="w-4 h-4" aria-hidden="true" />
                 Ajouter ou mettre à jour
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </SettingsSection>
 
-      <Card className="border-destructive/30">
-        <CardHeader>
-          <h2 className="font-semibold flex items-center gap-2 text-destructive">
-            <TriangleAlert className="w-4 h-4" aria-hidden="true" />
-            Supprimer le projet
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
+      <SettingsSection
+        id="domaines"
+        title="Domaines"
+        icon={Globe}
+        description="Le domaine Eflex reste stable. Ajoutez vos propres domaines avec un CNAME ; le certificat SSL est émis automatiquement après vérification."
+      >
+        <ProjectDomains projectId={project.id} />
+      </SettingsSection>
+
+      <SettingsSection
+        id="bases"
+        title="Bases de données"
+        icon={Database}
+        description="Créez une base PostgreSQL ou un cache Redis privé sur l’infrastructure. La variable DATABASE_URL ou REDIS_URL est injectée automatiquement au déploiement."
+      >
+        <ProjectDatabases projectId={project.id} />
+      </SettingsSection>
+
+      <SettingsSection
+        id="disponibilite"
+        title="Disponibilité & actions"
+        icon={Activity}
+        description="Statut du conteneur sur la plateforme et actions immédiates. Le redéploiement complet reste disponible depuis la page du projet."
+      >
+        <ProjectRuntimeControls projectId={project.id} />
+      </SettingsSection>
+
+      <SettingsSection
+        id="transfert"
+        title="Transfert"
+        icon={ArrowRightLeft}
+        description="Déplacez le projet vers une autre organisation dont vous êtes propriétaire ou administrateur. Le transfert est immédiat et modifie l’accès, la facturation et les quotas."
+      >
+        <ProjectTransfer
+          projectId={project.id}
+          projectName={project.name}
+          targets={transferTargets}
+        />
+      </SettingsSection>
+
+      <SettingsSection
+        id="suppression"
+        title="Supprimer le projet"
+        icon={TriangleAlert}
+        description={
+          <>
             Le projet, ses variables et son historique de déploiements sont supprimés.
             {project.coolifyAppId
               ? ' L’application et ses conteneurs sont arrêtés au passage.'
               : ' Aucune application n’a encore été déployée.'}
-          </p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={deleteProject} className="space-y-4">
-            {deleteError && (
-              <p id="project-delete-feedback" role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-                {deleteError}
-              </p>
-            )}
-            <Input
-              id="delete-project-confirm"
-              label={`Saisissez « ${project.name} » pour confirmer`}
-              value={deleteConfirm}
-              onChange={(e) => setDeleteConfirm(e.target.value)}
-              autoComplete="off"
-              aria-invalid={deleteError ? true : undefined}
-              aria-describedby={deleteError ? 'project-delete-feedback' : undefined}
-              required
-            />
-            <div className="flex justify-end">
-              <Button type="submit" variant="destructive" loading={deleting}>
-                Supprimer définitivement
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          </>
+        }
+      >
+        <form onSubmit={deleteProject} className="space-y-4">
+          {deleteError && (
+            <p id="project-delete-feedback" role="alert" className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+              {deleteError}
+            </p>
+          )}
+          <Input
+            id="delete-project-confirm"
+            label={`Saisissez « ${project.name} » pour confirmer`}
+            value={deleteConfirm}
+            onChange={(e) => setDeleteConfirm(e.target.value)}
+            autoComplete="off"
+            aria-invalid={deleteError ? true : undefined}
+            aria-describedby={deleteError ? 'project-delete-feedback' : undefined}
+            required
+          />
+          <div className="flex justify-end">
+            <Button type="submit" variant="destructive" loading={deleting}>
+              Supprimer définitivement
+            </Button>
+          </div>
+        </form>
+      </SettingsSection>
     </div>
   )
 }

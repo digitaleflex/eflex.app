@@ -52,9 +52,19 @@ export function ProjectCard({ project }: { project: DashboardProject }) {
     project.tlsExpiresAt ? new Date(project.tlsExpiresAt) : null,
     null,
   )
+  const status = statusInfo(project.lastStatus)
 
   return (
-    <article className="group relative flex flex-col gap-4 rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/25 focus-within:border-foreground/25">
+    <article
+      className={cn(
+        'group relative flex flex-col gap-4 rounded-xl border bg-card p-4 transition-colors hover:border-foreground/25 focus-within:border-foreground/25',
+        status.tone === 'danger'
+          ? 'border-destructive/40'
+          : status.inProgress && status.tone === 'warning'
+            ? 'border-warning/40'
+            : 'border-border',
+      )}
+    >
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
         <FrameworkTile framework={project.framework} name={project.name} />
         <div className="min-w-0">

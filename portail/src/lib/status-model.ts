@@ -11,9 +11,9 @@ export const STATE_LABELS: Record<ComponentState, string> = {
 }
 
 export const OVERALL_LABELS: Record<OverallState, string> = {
-  ok: 'Tous les services sont opérationnels',
-  degraded: 'Service dégradé',
-  down: 'Service indisponible',
+  ok: 'Tous les composants surveillés répondent',
+  degraded: 'Au moins un service est dégradé',
+  down: 'Un service essentiel est indisponible',
 }
 
 /**

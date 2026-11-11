@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { RefreshCw } from 'lucide-react'
 import { SiteHeader } from '@/components/marketing/site-header'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -10,14 +11,21 @@ import {
   type ComponentState,
   type OverallState,
 } from '@/lib/status-model'
+import {
+  formatStatusDate,
+  observedAge,
+  sampleCountLabel,
+  uptimePercentLabel,
+} from '@/lib/status-view'
 import type { IncidentView as Incident } from '@/lib/status'
+import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'Statut des services — Eflex',
   description:
-    'Disponibilité en temps réel de la plateforme Eflex : portail, base de données, cache, déploiement et moteur Axiom.',
+    'État observé des services Eflex : portail, base de données, cache, déploiement et moteur Axiom, avec l’historique des relevés et des incidents déclarés.',
 }
 
 type BadgeVariant = 'success' | 'warning' | 'destructive' | 'outline'
@@ -31,15 +39,28 @@ const STATE_VARIANT: Record<ComponentState, BadgeVariant> = {
 
 const STATE_DOT: Record<ComponentState, string> = {
   ok: 'bg-success',
-  degraded: 'bg-amber-500',
+  degraded: 'bg-warning',
   down: 'bg-destructive',
   unknown: 'bg-muted-foreground/50',
+}
+
+const STATE_HINT: Record<ComponentState, string> = {
+  ok: 'Réponse reçue dans le délai imparti.',
+  degraded: 'Réponse reçue, mais incomplète ou anormale.',
+  down: 'Aucune réponse dans le délai de 3 secondes.',
+  unknown: 'Service non configuré ou non déployé : il n’est pas sondé.',
 }
 
 const OVERALL_VARIANT: Record<OverallState, BadgeVariant> = {
   ok: 'success',
   degraded: 'warning',
   down: 'destructive',
+}
+
+const OVERALL_BADGE: Record<OverallState, string> = {
+  ok: 'Aucune anomalie détectée',
+  degraded: 'Dégradé',
+  down: 'Indisponible',
 }
 
 const INCIDENT_STATUS: Record<string, string> = {
@@ -53,14 +74,6 @@ const INCIDENT_SEVERITY: Record<string, string> = {
   minor: 'Mineur',
   major: 'Majeur',
   critical: 'Critique',
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', {
-    dateStyle: 'long',
-    timeStyle: 'short',
-    timeZone: 'UTC',
-  }) + ' UTC'
 }
 
 function IncidentItem({ incident }: { incident: Incident }) {
@@ -77,8 +90,10 @@ function IncidentItem({ incident }: { incident: Incident }) {
         <p className="mt-1.5 text-sm text-muted-foreground">{incident.description}</p>
       )}
       <p className="mt-1.5 text-xs text-muted-foreground">
-        Début : {formatDate(incident.startedAt)}
-        {incident.resolvedAt && ` · Résolu le ${formatDate(incident.resolvedAt)}`}
+        Début : <time dateTime={incident.startedAt}>{formatStatusDate(incident.startedAt)}</time>
+        {incident.resolvedAt && (
+          <> · Résolu le <time dateTime={incident.resolvedAt}>{formatStatusDate(incident.resolvedAt)}</time></>
+        )}
       </p>
     </li>
   )
@@ -86,101 +101,230 @@ function IncidentItem({ incident }: { incident: Incident }) {
 
 export default async function StatusPage() {
   const snapshot = await collectStatus()
+  const okCount = snapshot.components.filter((c) => c.state === 'ok').length
+  const watchedCount = snapshot.components.filter((c) => c.state !== 'unknown').length
+  const unknownCount = snapshot.components.length - watchedCount
+  const age = observedAge(snapshot.checkedAt)
 
   return (
     <div className="min-h-screen flex flex-col">
       <SiteHeader />
 
       <main id="contenu" tabIndex={-1} className="container flex-1 py-10 sm:py-14 space-y-10">
-        <header className="space-y-3">
-          <h1 className="text-display-sm font-bold">Statut des services</h1>
-          <p className="text-muted-foreground">
-            État en temps réel de la plateforme. Dernière vérification : {formatDate(snapshot.checkedAt)}.
+        <header className="space-y-4">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h1 className="text-display-sm font-bold">Statut des services</h1>
+            <Badge variant="outline">État instantané</Badge>
+          </div>
+          <p className="max-w-3xl text-muted-foreground">
+            Cette page décrit l’état constaté par les sondages du serveur à l’ouverture de la page. Elle
+            ne constitue ni une garantie de disponibilité ni un engagement de service.
           </p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            <p>
+              Dernière vérification :{' '}
+              <time dateTime={snapshot.checkedAt} className="font-medium text-foreground">
+                {formatStatusDate(snapshot.checkedAt)}
+              </time>{' '}
+              <span className="text-muted-foreground">({age})</span>
+            </p>
+            <Link
+              href="/status"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-md font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+              Actualiser l’état
+            </Link>
+          </div>
         </header>
 
-        <Card className="p-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
+        {snapshot.maintenance.enabled && (
+          <Card className="border-warning/40 bg-warning/10 p-5">
+            <div role="status" className="space-y-1">
+              <p className="font-semibold text-warning">Maintenance en cours</p>
+              <p className="text-sm text-foreground">
+                {snapshot.maintenance.message ||
+                  'Les services peuvent être momentanément indisponibles pendant l’opération.'}
+              </p>
+              <Link href="/maintenance" className="inline-block text-sm font-medium underline underline-offset-2 hover:no-underline">
+                Voir la page de maintenance
+              </Link>
+            </div>
+          </Card>
+        )}
+
+        <Card className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
             <span
               aria-hidden
-              className={`h-3 w-3 shrink-0 rounded-full ${STATE_DOT[snapshot.status]}`}
+              className={cn('mt-1.5 h-3 w-3 shrink-0 rounded-full', STATE_DOT[snapshot.status])}
             />
             <div>
               <p className="font-semibold">{OVERALL_LABELS[snapshot.status]}</p>
-              <p className="text-sm text-muted-foreground">
-                {snapshot.components.filter((c) => c.state === 'ok').length} composant(s) opérationnel(s)
-                {' '}sur {snapshot.components.length}
+              <p className="mt-1 text-sm text-muted-foreground">
+                {okCount} composant{okCount === 1 ? '' : 's'} sur {watchedCount} surveillé
+                {watchedCount === 1 ? '' : 's'} signalé{okCount === 1 ? '' : 's'} opérationnel
+                {okCount === 1 ? '' : 's'}
+                {unknownCount > 0 &&
+                  ` · ${unknownCount} non surveillé${unknownCount > 1 ? 's' : ''}`}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Relevé {age}. Une panne d’un service périphérique dégrade l’ensemble ; une panne du
+                portail ou de la base le rend indisponible.
               </p>
             </div>
           </div>
           <Badge variant={OVERALL_VARIANT[snapshot.status]} className="w-fit">
-            {snapshot.status === 'ok' ? 'Tout va bien' : snapshot.status === 'degraded' ? 'Dégradé' : 'Indisponible'}
+            {OVERALL_BADGE[snapshot.status]}
           </Badge>
         </Card>
 
         <section aria-labelledby="composants" className="space-y-4">
-          <h2 id="composants" className="text-xl font-semibold">Composants</h2>
-          <Card className="divide-y divide-border">
-            {snapshot.components.map((component) => (
-              <div key={component.key} className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
-                <div className="flex items-center gap-3">
-                  <span aria-hidden className={`h-2.5 w-2.5 rounded-full ${STATE_DOT[component.state]}`} />
-                  <div>
-                    <p className="font-medium">{component.label}</p>
-                    <p className="text-xs text-muted-foreground">{component.detail}</p>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id="composants" className="text-xl font-semibold">
+              Composants sondés
+            </h2>
+            <p className="text-sm text-muted-foreground">Relevé {age}</p>
+          </div>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Chaque composant est interrogé avec un délai maximal de 3 secondes. Un composant
+            « non surveillé » n’est pas configuré : il n’est pas testé et n’entre pas dans l’état global.
+          </p>
+          <Card>
+            <ul className="divide-y divide-border">
+              {snapshot.components.map((component) => (
+                <li
+                  key={component.key}
+                  className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5"
+                >
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span
+                      aria-hidden
+                      className={cn('mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full', STATE_DOT[component.state])}
+                    />
+                    <div className="min-w-0">
+                      <p className="font-medium">{component.label}</p>
+                      <p className="text-xs text-muted-foreground">{component.detail}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  {component.latencyMs !== null && (
-                    <span className="text-xs text-muted-foreground font-mono">{component.latencyMs} ms</span>
-                  )}
-                  <Badge variant={STATE_VARIANT[component.state]}>
-                    {STATE_LABELS[component.state]}
-                  </Badge>
-                </div>
-              </div>
-            ))}
+                  <div className="flex items-center gap-3">
+                    {component.latencyMs !== null && (
+                      <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                        {component.latencyMs} ms
+                      </span>
+                    )}
+                    <Badge variant={STATE_VARIANT[component.state]}>
+                      {STATE_LABELS[component.state]}
+                    </Badge>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </Card>
+          <div className="grid gap-2 rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground sm:grid-cols-2">
+            {(Object.keys(STATE_HINT) as ComponentState[]).map((state) => (
+              <p key={state} className="flex items-start gap-2">
+                <span
+                  aria-hidden
+                  className={cn('mt-1 h-2 w-2 shrink-0 rounded-full', STATE_DOT[state])}
+                />
+                <span>
+                  <span className="font-medium text-foreground">{STATE_LABELS[state]}</span> —{' '}
+                  {STATE_HINT[state]}
+                </span>
+              </p>
+            ))}
+          </div>
         </section>
 
         <section aria-labelledby="disponibilite" className="space-y-4">
-          <div>
-            <h2 id="disponibilite" className="text-xl font-semibold">Disponibilité</h2>
-            <p className="text-sm text-muted-foreground">
-              Part des relevés de composants « opérationnels » sur la période. Les données se constituent au fil des vérifications.
-            </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h2 id="disponibilite" className="text-xl font-semibold">
+              Disponibilité observée
+            </h2>
+            <Badge variant="outline">Historique</Badge>
           </div>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Part des relevés de composants marqués « opérationnels » sur chaque fenêtre. La collecte
+            démarre à la première ouverture de cette page (ou au premier appel de l’API) et se poursuit
+            au plus une fois par minute.
+          </p>
           <div className="grid gap-4 sm:grid-cols-3">
             {snapshot.uptime.map((entry) => (
               <Card key={entry.window} className="p-5 space-y-3">
-                <p className="text-sm font-medium text-muted-foreground">{entry.window}</p>
-                <p className="text-2xl font-bold">
-                  {entry.percent === null ? '—' : `${entry.percent.toFixed(1)} %`}
-                </p>
-                <div className="h-2 rounded-full bg-muted overflow-hidden" aria-hidden>
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="text-sm font-medium text-muted-foreground">{entry.window}</p>
+                  {entry.samples > 0 && (
+                    <p className="text-xs text-muted-foreground">{sampleCountLabel(entry.samples)}</p>
+                  )}
+                </div>
+                <p className="text-2xl font-bold tabular-nums">{uptimePercentLabel(entry.percent)}</p>
+                <div className="h-2 overflow-hidden rounded-full bg-muted" aria-hidden>
                   <div
-                    className="h-full rounded-full bg-success transition-[width] duration-500 ease-out-expo"
+                    className={cn(
+                      'h-full rounded-full',
+                      entry.percent === null ? 'bg-transparent' : 'bg-success',
+                    )}
                     style={{ width: `${entry.percent ?? 0}%` }}
                   />
                 </div>
-                {entry.percent === null && (
-                  <p className="text-xs text-muted-foreground">Collecte en cours</p>
+                {entry.percent === null ? (
+                  <p className="text-xs text-muted-foreground">
+                    Pas encore assez de relevés pour calculer un pourcentage.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Calculé sur {sampleCountLabel(entry.samples)} de composants.
+                  </p>
                 )}
               </Card>
             ))}
           </div>
         </section>
 
+        <section aria-labelledby="limites" className="space-y-4">
+          <h2 id="limites" className="text-xl font-semibold">
+            Ce que ces indicateurs ne mesurent pas
+          </h2>
+          <Card className="p-5 sm:p-6">
+            <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+              <li>
+                La collecte n’est pas continue : un relevé au plus par minute, déclenché par la
+                consultation de cette page ou par un appel à <code className="font-mono text-xs">/api/status</code>.
+              </li>
+              <li>
+                Les services non configurés restent « non surveillés » et sont exclus des pourcentages.
+              </li>
+              <li>
+                Les incidents sont déclarés manuellement par l’équipe ; seuls les 20 plus récents sont
+                conservés.
+              </li>
+              <li>
+                Les sondages vérifient la réponse des services de la plateforme, pas le rendu de chaque
+                application déployée.
+              </li>
+            </ul>
+          </Card>
+        </section>
+
         <section aria-labelledby="incidents" className="space-y-4">
-          <div>
-            <h2 id="incidents" className="text-xl font-semibold">Historique des incidents</h2>
-            <p className="text-sm text-muted-foreground">Les 20 derniers événements déclarés.</p>
+          <div className="space-y-1">
+            <h2 id="incidents" className="text-xl font-semibold">
+              Incidents déclarés
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Déclarés manuellement, du plus récent au plus ancien. Les 20 derniers sont conservés.
+            </p>
           </div>
           <Card className="px-5">
             {snapshot.incidents.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                Aucun incident signalé. Tout s&apos;est bien passé jusqu&apos;ici.
-              </p>
+              <div className="py-8 text-center">
+                <p className="text-sm font-medium">Aucun incident déclaré dans l’historique conservé.</p>
+                <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
+                  Cette absence ne prouve pas l’absence de panne : seuls les incidents consignés par
+                  l’équipe apparaissent ici.
+                </p>
+              </div>
             ) : (
               <ul>
                 {snapshot.incidents.map((incident) => (
@@ -193,9 +337,9 @@ export default async function StatusPage() {
 
         <footer className="flex flex-wrap items-center gap-4 border-t border-border pt-6 text-sm text-muted-foreground">
           <Link href="/" className="hover:text-foreground hover:underline">
-            Retour à l&apos;accueil
+            Retour à l’accueil
           </Link>
-          <Link href="/api/status" className="hover:text-foreground hover:underline font-mono text-xs">
+          <Link href="/api/status" className="font-mono text-xs hover:text-foreground hover:underline">
             /api/status (JSON)
           </Link>
           <Link href="/maintenance" className="hover:text-foreground hover:underline">

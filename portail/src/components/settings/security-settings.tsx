@@ -8,6 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { authClient, authErrorMessage } from '@/lib/auth-client'
+import {
+  PASSPHRASE_HINT,
+  validatePassphrase,
+  validatePassphraseConfirmation,
+} from '@/lib/auth-validation'
 
 interface SessionView {
   id: string
@@ -80,6 +85,7 @@ export function SecuritySettings({
   const [deletingPasskey, setDeletingPasskey] = useState<string | null>(null)
 
   const [newAccountPassword, setNewAccountPassword] = useState('')
+  const [newAccountPasswordConfirm, setNewAccountPasswordConfirm] = useState('')
   const [passwordBusy, setPasswordBusy] = useState(false)
   const [unlinking, setUnlinking] = useState<string | null>(null)
 
@@ -153,8 +159,14 @@ export function SecuritySettings({
 
   async function definePassword(e: React.FormEvent) {
     e.preventDefault()
-    if (newAccountPassword.length < 8) {
-      setFeedback({ tone: 'error', message: 'Le mot de passe doit contenir au moins 8 caractères.' })
+    const passphraseError = validatePassphrase(newAccountPassword)
+    if (passphraseError) {
+      setFeedback({ tone: 'error', message: passphraseError })
+      return
+    }
+    const confirmationError = validatePassphraseConfirmation(newAccountPassword, newAccountPasswordConfirm)
+    if (confirmationError) {
+      setFeedback({ tone: 'error', message: confirmationError })
       return
     }
     setPasswordBusy(true)
@@ -167,12 +179,13 @@ export function SecuritySettings({
       })
       const data = (await response.json().catch(() => ({}))) as { error?: string }
       if (!response.ok) {
-        setFeedback({ tone: 'error', message: data.error ?? 'Impossible de définir le mot de passe.' })
+        setFeedback({ tone: 'error', message: data.error ?? 'Impossible de définir la phrase secrète.' })
         return
       }
       setHasPassword(true)
       setNewAccountPassword('')
-      setFeedback({ tone: 'success', message: 'Mot de passe défini. Vous pouvez aussi vous connecter avec votre adresse e-mail.' })
+      setNewAccountPasswordConfirm('')
+      setFeedback({ tone: 'success', message: 'Phrase secrète définie. Vous pouvez aussi vous connecter avec votre adresse e-mail.' })
       router.refresh()
     } catch {
       setFeedback({ tone: 'error', message: 'Impossible de contacter le serveur.' })
@@ -399,7 +412,7 @@ export function SecuritySettings({
             {hasPassword && (
               <Input
                 id="two-factor-password"
-                label="Mot de passe actuel"
+                label="Phrase secrète actuelle (mot de passe)"
                 type="password"
                 autoComplete="current-password"
                 value={password}
@@ -453,11 +466,11 @@ export function SecuritySettings({
 
         {enabled && (
           <div className="space-y-2 rounded-lg border border-border p-3">
-            <p className="text-sm text-muted-foreground">La 2FA protège votre compte même si votre mot de passe est compromis.</p>
+            <p className="text-sm text-muted-foreground">La 2FA protège votre compte même si votre phrase secrète est compromise.</p>
             {hasPassword && (
               <Input
                 id="two-factor-disable-password"
-                label="Mot de passe actuel pour désactiver"
+                label="Phrase secrète actuelle pour désactiver"
                 type="password"
                 autoComplete="current-password"
                 value={password}
@@ -478,7 +491,7 @@ export function SecuritySettings({
             Moyens de connexion
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Associez Google et un mot de passe à la même identité : vous choisissez la méthode à chaque connexion.
+            Associez Google et une phrase secrète à la même identité : vous choisissez la méthode à chaque connexion.
           </p>
         </div>
 
@@ -486,9 +499,9 @@ export function SecuritySettings({
           <li className="flex flex-wrap items-center gap-3 p-3 text-sm">
             <KeyRound className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             <div className="min-w-0 flex-1">
-              <p className="font-medium">Adresse e-mail et mot de passe</p>
+              <p className="font-medium">Adresse e-mail et phrase secrète</p>
               <p className="text-xs text-muted-foreground">
-                {hasPassword ? 'Mot de passe défini.' : 'Aucun mot de passe : vous vous connectez uniquement avec Google.'}
+                {hasPassword ? 'Phrase secrète définie.' : 'Aucune phrase secrète : vous vous connectez uniquement avec Google.'}
               </p>
             </div>
             {hasPassword ? (
@@ -521,7 +534,7 @@ export function SecuritySettings({
                 size="sm"
                 loading={unlinking === googleAccount.id}
                 disabled={!hasPassword && passkeyCount === 0}
-                title={!hasPassword && passkeyCount === 0 ? 'Définissez un mot de passe ou ajoutez une passkey avant de retirer Google.' : undefined}
+                title={!hasPassword && passkeyCount === 0 ? 'Définissez une phrase secrète ou ajoutez une passkey avant de retirer Google.' : undefined}
                 onClick={() => void unlink(googleAccount.id)}
               >
                 <Unlink className="h-3.5 w-3.5" aria-hidden="true" />
@@ -553,26 +566,35 @@ export function SecuritySettings({
         {!hasPassword && (
           <form onSubmit={definePassword} className="space-y-3 rounded-lg border border-border p-3">
             <div>
-              <p className="text-sm font-medium">Définir un mot de passe</p>
+              <p className="text-sm font-medium">Définir une phrase secrète</p>
               <p className="text-xs text-muted-foreground">
                 Utile si vous perdez l’accès à votre compte Google. Vous pourrez vous connecter avec votre adresse e-mail.
               </p>
             </div>
-            <Input
-              id="set-account-password"
-              label="Nouveau mot de passe"
-              type="password"
-              autoComplete="new-password"
-              hint="Entre 8 et 72 caractères."
-              minLength={8}
-              maxLength={72}
-              value={newAccountPassword}
-              onChange={(e) => setNewAccountPassword(e.target.value)}
-              required
-            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Input
+                id="set-account-password"
+                label="Nouvelle phrase secrète (mot de passe)"
+                type="password"
+                autoComplete="new-password"
+                hint={PASSPHRASE_HINT}
+                value={newAccountPassword}
+                onChange={(e) => setNewAccountPassword(e.target.value)}
+                required
+              />
+              <Input
+                id="set-account-password-confirm"
+                label="Confirmer la phrase secrète"
+                type="password"
+                autoComplete="new-password"
+                value={newAccountPasswordConfirm}
+                onChange={(e) => setNewAccountPasswordConfirm(e.target.value)}
+                required
+              />
+            </div>
             <Button type="submit" variant="outline" loading={passwordBusy}>
               <KeyRound className="h-4 w-4" aria-hidden="true" />
-              Définir le mot de passe
+              Définir la phrase secrète
             </Button>
           </form>
         )}

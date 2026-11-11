@@ -119,7 +119,7 @@ describe('gabarits', () => {
     const tpl = resetPasswordEmail('https://eflex.app/reset-password?token=xyz')
     expect(tpl.html).toContain('https://eflex.app/reset-password?token=xyz')
     expect(tpl.html).toContain('1 heure')
-    expect(tpl.text).toContain('Choisir un nouveau mot de passe')
+    expect(tpl.text).toContain('Choisir une nouvelle phrase secrète')
   })
 
   it('le mail de notification reprend le titre, le corps, le lien direct et les préférences', () => {
