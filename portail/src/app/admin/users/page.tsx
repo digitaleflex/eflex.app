@@ -1,76 +1,175 @@
-import Link from 'next/link'
-import { MailWarning, Search, ShieldCheck, UserX, Users } from 'lucide-react'
+import {
+  MailWarning,
+  Search,
+  ShieldCheck,
+  SlidersHorizontal,
+  UserX,
+  Users,
+} from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
+import { Input } from '@/components/ui/input'
 import { Pagination } from '@/components/ui/pagination'
+import { Select } from '@/components/ui/select'
 import { StatCard } from '@/components/ui/stat-card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { UserActions } from '@/components/admin/user-actions'
+import { PageHeader } from '@/components/page-header'
+import { LinkButton } from '@/components/link-button'
 import { requireAdminPage } from '@/lib/admin'
 import { formatInteger } from '@/lib/table'
+import {
+  ADMIN_USERS_PAGE_SIZE,
+  USER_ROLE_FILTERS,
+  USER_ROLE_LABEL,
+  USER_STATUS_FILTERS,
+  USER_STATUS_LABEL,
+  USER_VERIFICATION_FILTERS,
+  USER_VERIFICATION_LABEL,
+  isUserListFiltered,
+  parseUserListQuery,
+  userListHrefTemplate,
+  userListWhere,
+} from '@/lib/admin-users'
 
 export const metadata = { title: 'Utilisateurs — Administration Eflex' }
+export const dynamic = 'force-dynamic'
 
-const PAGE_SIZE = 20
 const date = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' })
+const dateTime = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
 
-export default async function UsersPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
+const roleOptions = USER_ROLE_FILTERS.map((value) => ({ value, label: USER_ROLE_LABEL[value] }))
+const statusOptions = USER_STATUS_FILTERS.map((value) => ({ value, label: USER_STATUS_LABEL[value] }))
+const verificationOptions = USER_VERIFICATION_FILTERS.map((value) => ({
+  value,
+  label: USER_VERIFICATION_LABEL[value],
+}))
+
+export default async function UsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; role?: string; statut?: string; email?: string; page?: string }>
+}) {
   const session = await requireAdminPage()
-  const { q = '', page: pageParam } = await searchParams
-  const query = q.trim().slice(0, 100)
-  const page = Math.max(1, Number.parseInt(pageParam ?? '1', 10) || 1)
+  const query = parseUserListQuery(await searchParams)
+  const where = userListWhere(query)
+  const filtered = isUserListFiltered(query)
 
-  const where = query
-    ? { OR: [{ email: { contains: query, mode: 'insensitive' as const } }, { name: { contains: query, mode: 'insensitive' as const } }] }
-    : {}
-  const [total, accounts, admins, suspended, unverified, users] = await Promise.all([
-    prisma.user.count({ where }),
+  const [accounts, admins, suspended, unverified] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { role: 'admin' } }),
     prisma.user.count({ where: { banned: true } }),
     prisma.user.count({ where: { emailVerified: false } }),
-    prisma.user.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-      select: { id: true, name: true, email: true, role: true, banned: true, banReason: true, emailVerified: true, createdAt: true, _count: { select: { members: true } } },
-    }),
   ])
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  // Chaîne sérialisable : `Pagination` est un composant client, il ne peut pas recevoir de fonction.
-  const hrefTemplate = `/admin/users?${query ? `q=${encodeURIComponent(query)}&` : ''}page=`
+
+  const total = await prisma.user.count({ where })
+  const pages = Math.max(1, Math.ceil(total / ADMIN_USERS_PAGE_SIZE))
+  const page = Math.min(query.page, pages)
+
+  const users = await prisma.user.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    skip: (page - 1) * ADMIN_USERS_PAGE_SIZE,
+    take: ADMIN_USERS_PAGE_SIZE,
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      banned: true,
+      banReason: true,
+      banExpires: true,
+      emailVerified: true,
+      createdAt: true,
+      _count: { select: { members: true } },
+    },
+  })
+
+  const countLabel = `${formatInteger(total)} compte${total > 1 ? 's' : ''}`
+  const summary = filtered
+    ? `${countLabel} ${total > 1 ? 'correspondants' : 'correspondant'} aux filtres, sur ${formatInteger(accounts)} au total.`
+    : `${countLabel} au total, toutes organisations confondues.`
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Utilisateurs</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {formatInteger(total)} compte{total > 1 ? 's' : ''}{query && ` correspondant à « ${query} »`}.
-        </p>
-      </div>
+      <PageHeader
+        title="Utilisateurs"
+        description="Comptes de la plateforme, du plus récent au plus ancien. Rôle plateforme, vérification de l’e-mail et suspension sont trois informations distinctes."
+      />
 
       <section aria-label="Indicateurs des comptes" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Comptes" value={formatInteger(accounts)} hint="Toutes organisations confondues" icon={Users} />
-        <StatCard label="Administrateurs" value={formatInteger(admins)} hint="Accès complet à la console" icon={ShieldCheck} tone="info" />
-        <StatCard label="Comptes suspendus" value={formatInteger(suspended)} hint="Connexion bloquée" icon={UserX} tone={suspended > 0 ? 'critical' : 'neutral'} />
-        <StatCard label="E-mails non vérifiés" value={formatInteger(unverified)} hint="Relance possible depuis le compte" icon={MailWarning} tone={unverified > 0 ? 'warning' : 'neutral'} />
+        <StatCard
+          label="Comptes"
+          value={formatInteger(accounts)}
+          hint="Toutes organisations confondues"
+          icon={Users}
+          href="/admin/users"
+        />
+        <StatCard
+          label="Administrateurs"
+          value={formatInteger(admins)}
+          hint={`Sur ${formatInteger(accounts)} comptes · rôle plateforme « admin », accès complet à la console`}
+          icon={ShieldCheck}
+          tone="info"
+          href="/admin/users?role=admin"
+        />
+        <StatCard
+          label="Comptes suspendus"
+          value={formatInteger(suspended)}
+          hint={`Sur ${formatInteger(accounts)} comptes · connexion bloquée, applications toujours en ligne`}
+          icon={UserX}
+          tone={suspended > 0 ? 'critical' : 'neutral'}
+          href="/admin/users?statut=suspended"
+        />
+        <StatCard
+          label="E-mails non vérifiés"
+          value={formatInteger(unverified)}
+          hint={`Sur ${formatInteger(accounts)} comptes · adresse non confirmée par la personne`}
+          icon={MailWarning}
+          tone={unverified > 0 ? 'warning' : 'neutral'}
+          href="/admin/users?email=unverified"
+        />
       </section>
 
-      <form role="search" className="flex flex-col gap-2 sm:flex-row">
-        <label htmlFor="q" className="sr-only">Rechercher par nom ou adresse e-mail</label>
-        <input
-          id="q"
-          name="q"
-          type="search"
-          defaultValue={query}
-          placeholder="Nom ou adresse e-mail"
-          className="h-11 rounded-control border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-1"
-        />
-        <Button type="submit">Rechercher</Button>
+      <form
+        role="search"
+        method="get"
+        action="/admin/users"
+        className="space-y-4 rounded-xl border border-border bg-card p-4"
+      >
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <h2 className="text-sm font-semibold">Rechercher et filtrer</h2>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="sm:col-span-2 xl:col-span-1">
+            <Input
+              id="q"
+              name="q"
+              type="search"
+              label="Nom ou adresse e-mail"
+              defaultValue={query.query}
+              placeholder="ex. awa ou awa@exemple.com"
+              hint="Recherche sans distinction de casse."
+            />
+          </div>
+          <Select name="role" label="Rôle plateforme" defaultValue={query.role} options={roleOptions} />
+          <Select name="statut" label="Suspension" defaultValue={query.status} options={statusOptions} />
+          <Select name="email" label="Vérification de l’e-mail" defaultValue={query.verification} options={verificationOptions} />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="submit">
+            <Search className="h-4 w-4" aria-hidden="true" />
+            Appliquer les filtres
+          </Button>
+          {filtered ? <LinkButton href="/admin/users">Réinitialiser</LinkButton> : null}
+          <p aria-live="polite" className="text-xs text-muted-foreground">
+            {summary}
+          </p>
+        </div>
       </form>
 
       <Card>
@@ -79,102 +178,147 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
             icon={Search}
             title="Aucun utilisateur trouvé"
             description={
-              query
-                ? "Aucun compte ne correspond à cette recherche. Vérifiez l'orthographe ou essayez une partie de l'adresse e-mail."
-                : "Aucun compte n'est encore inscrit. Les nouvelles inscriptions apparaîtront ici."
+              filtered
+                ? 'Aucun compte ne correspond à cette recherche et à ces filtres. Vérifiez l’orthographe ou élargissez les filtres.'
+                : "Aucun compte n’est encore inscrit. Les nouvelles inscriptions apparaîtront ici."
             }
-            action={
-              query ? (
-                <Link
-                  href="/admin/users"
-                  className="inline-flex min-h-11 items-center justify-center rounded-control border border-input bg-background px-4 text-sm font-medium hover:bg-secondary hover:text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                >
-                  Réinitialiser la recherche
-                </Link>
-              ) : undefined
-            }
+            action={filtered ? <LinkButton href="/admin/users">Réinitialiser la recherche</LinkButton> : undefined}
           />
         ) : (
           <>
-          <ul className="divide-y divide-border sm:hidden" aria-label="Liste des utilisateurs">
-            {users.map((u) => (
-              <li key={u.id} className="space-y-3 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 gap-3">
-                    <Avatar name={u.name || u.email} decorative size="sm" />
+            <ul className="divide-y divide-border sm:hidden" aria-label="Liste des utilisateurs">
+              {users.map((user) => (
+                <li key={user.id} className="space-y-3 p-4">
+                  <div className="flex items-start gap-3">
+                    <Avatar name={user.name || user.email} decorative size="sm" />
                     <div className="min-w-0">
-                      <p className="font-medium">
-                        {u.name}
-                        {u.role === 'admin' && <StatusBadge status="admin" label="Admin" tone="info" dot={false} className="ml-2" />}
-                      </p>
-                      <p className="break-words text-xs text-muted-foreground [overflow-wrap:anywhere]">{u.email}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Inscrit le {date.format(u.createdAt)}{!u.emailVerified && ' · e-mail non vérifié'}</p>
+                      <p className="font-medium">{user.name}</p>
+                      <p className="break-words text-xs text-muted-foreground [overflow-wrap:anywhere]">{user.email}</p>
                     </div>
                   </div>
-                  {u.banned ? (
-                    <StatusBadge status="suspended" title={u.banReason ?? undefined} />
-                  ) : (
-                    <StatusBadge status="active" />
-                  )}
-                </div>
-                {u.banned && u.banReason && <p className="text-xs text-muted-foreground">Motif : {u.banReason}</p>}
-                {u.id !== session.user.id && u.role !== 'admin' && (
-                  <UserActions id={u.id} name={u.name} banned={Boolean(u.banned)} />
-                )}
-              </li>
-            ))}
-          </ul>
-          <table className="hidden w-full text-left text-sm sm:table">
-            <caption className="sr-only">Liste des utilisateurs, du plus récent au plus ancien</caption>
-            <thead className="border-b border-border text-xs text-muted-foreground">
-              <tr>
-                <th scope="col" className="px-4 py-3 font-medium">Utilisateur</th>
-                <th scope="col" className="hidden px-4 py-3 font-medium md:table-cell">Organisations</th>
-                <th scope="col" className="px-4 py-3 font-medium">Inscrit le</th>
-                <th scope="col" className="px-4 py-3 font-medium">Statut</th>
-                <th scope="col" className="px-4 py-3 text-right font-medium">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {users.map((u) => (
-                <tr key={u.id}>
-                  <td className="px-4 py-3">
-                    <div className="flex items-start gap-3">
-                      <Avatar name={u.name || u.email} decorative size="sm" className="mt-0.5" />
-                      <div className="min-w-0">
-                        <p className="font-medium">
-                          {u.name}
-                          {u.role === 'admin' && <StatusBadge status="admin" label="Admin" tone="info" dot={false} className="ml-2" />}
-                        </p>
-                        <p className="break-all text-xs text-muted-foreground">{u.email}{!u.emailVerified && ' · e-mail non vérifié'}</p>
-                      </div>
+
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                    <div>
+                      <dt className="text-muted-foreground">Rôle</dt>
+                      <dd className="mt-1">
+                        {user.role === 'admin' ? (
+                          <StatusBadge status="admin" label="Administrateur" tone="info" dot={false} />
+                        ) : (
+                          <StatusBadge status="member" label="Compte standard" tone="neutral" dot={false} />
+                        )}
+                      </dd>
                     </div>
-                  </td>
-                  <td className="hidden px-4 py-3 md:table-cell">{u._count.members}</td>
-                  <td className="px-4 py-3">{date.format(u.createdAt)}</td>
-                  <td className="px-4 py-3">
-                    {u.banned ? (
-                      <StatusBadge status="suspended" title={u.banReason ?? undefined} />
-                    ) : (
-                      <StatusBadge status="active" />
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {u.id === session.user.id || u.role === 'admin' ? (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    ) : (
-                      <UserActions id={u.id} name={u.name} banned={Boolean(u.banned)} />
-                    )}
-                  </td>
-                </tr>
+                    <div>
+                      <dt className="text-muted-foreground">E-mail</dt>
+                      <dd className="mt-1">
+                        <StatusBadge status={user.emailVerified ? 'verified' : 'unverified'} />
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Suspension</dt>
+                      <dd className="mt-1">
+                        <StatusBadge
+                          status={user.banned ? 'suspended' : 'active'}
+                          title={user.banned ? (user.banReason ?? undefined) : undefined}
+                        />
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Inscrit le</dt>
+                      <dd className="mt-1">{date.format(user.createdAt)}</dd>
+                    </div>
+                  </dl>
+
+                  {user.banned && (user.banReason || user.banExpires) ? (
+                    <p className="text-xs text-muted-foreground">
+                      {user.banReason ? `Motif : ${user.banReason}` : 'Motif non renseigné'}
+                      {user.banExpires ? ` · jusqu’au ${dateTime.format(user.banExpires)}` : ''}
+                    </p>
+                  ) : null}
+
+                  {user.id !== session.user.id && user.role !== 'admin' ? (
+                    <UserActions id={user.id} name={user.name} banned={Boolean(user.banned)} />
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      {user.id === session.user.id
+                        ? 'Votre compte : aucune action de suspension.'
+                        : 'Un administrateur ne se suspend pas depuis cette page.'}
+                    </p>
+                  )}
+                </li>
               ))}
-            </tbody>
-          </table>
+            </ul>
+
+            <table className="hidden w-full text-left text-sm sm:table">
+              <caption className="sr-only">
+                Liste des utilisateurs, du plus récent au plus ancien. Rôle plateforme, vérification de l’e-mail et
+                suspension sont affichés séparément.
+              </caption>
+              <thead className="border-b border-border text-xs text-muted-foreground">
+                <tr>
+                  <th scope="col" className="px-4 py-3 font-medium">Utilisateur</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Rôle</th>
+                  <th scope="col" className="px-4 py-3 font-medium">E-mail</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Suspension</th>
+                  <th scope="col" className="hidden px-4 py-3 font-medium md:table-cell">Organisations</th>
+                  <th scope="col" className="hidden px-4 py-3 font-medium lg:table-cell">Inscrit le</th>
+                  <th scope="col" className="px-4 py-3 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {users.map((user) => (
+                  <tr key={user.id}>
+                    <td className="px-4 py-3">
+                      <div className="flex items-start gap-3">
+                        <Avatar name={user.name || user.email} decorative size="sm" className="mt-0.5" />
+                        <div className="min-w-0">
+                          <p className="font-medium">{user.name}</p>
+                          <p className="break-all text-xs text-muted-foreground">{user.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {user.role === 'admin' ? (
+                        <StatusBadge status="admin" label="Administrateur" tone="info" dot={false} />
+                      ) : (
+                        <StatusBadge status="member" label="Compte standard" tone="neutral" dot={false} />
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={user.emailVerified ? 'verified' : 'unverified'} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge
+                        status={user.banned ? 'suspended' : 'active'}
+                        title={user.banned ? (user.banReason ?? undefined) : undefined}
+                      />
+                      {user.banned && (user.banReason || user.banExpires) ? (
+                        <p className="mt-1 max-w-56 text-xs text-muted-foreground">
+                          {user.banReason ?? 'Motif non renseigné'}
+                          {user.banExpires ? ` · jusqu’au ${dateTime.format(user.banExpires)}` : ''}
+                        </p>
+                      ) : null}
+                    </td>
+                    <td className="hidden px-4 py-3 md:table-cell">{user._count.members}</td>
+                    <td className="hidden px-4 py-3 lg:table-cell">{date.format(user.createdAt)}</td>
+                    <td className="px-4 py-3 text-right">
+                      {user.id === session.user.id || user.role === 'admin' ? (
+                        <span className="text-xs text-muted-foreground">
+                          {user.id === session.user.id ? 'Vous' : '—'}
+                        </span>
+                      ) : (
+                        <UserActions id={user.id} name={user.name} banned={Boolean(user.banned)} />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </>
         )}
       </Card>
 
-      <Pagination page={page} pages={pages} hrefTemplate={hrefTemplate} />
+      <Pagination page={page} pages={pages} hrefTemplate={userListHrefTemplate(query)} label="Pagination des utilisateurs" />
     </div>
   )
 }

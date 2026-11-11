@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { CheckCircle2, CircleAlert, Info } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { frameworkLabel } from '@/lib/frameworks'
 import { cn } from '@/lib/utils'
@@ -47,18 +46,6 @@ export function ExportCsvLink({ days }: { days: PeriodDays }) {
     >
       Exporter en CSV<span className="sr-only"> pour la période de {days} jours</span>
     </a>
-  )
-}
-
-export function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <Card>
-      <CardContent className="space-y-1 p-5">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="text-3xl font-bold tracking-tight tabular-nums">{value}</p>
-        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-      </CardContent>
-    </Card>
   )
 }
 
