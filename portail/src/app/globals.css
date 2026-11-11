@@ -276,3 +276,65 @@
   }
   .demo-step, .animate-reveal { opacity: 1; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Portée homepage : la page d'accueil reste CLAIRE quel que soit le réglage
+   global (cookie `dark` ou thème système), sans toucher à `:root`, au bloc
+   `dark` global ni aux tokens des routes authentifiées. Une déclaration locale
+   de custom-property l'emporte sur l'héritage de `:root.dark` : il suffit de
+   la poser sur le body qui contient la page (canvas + bandeau) et sur la
+   racine de la page elle-même. Le hero, lui, reste explicitement navy/blanc
+   (bg-eflexnavy / text-white dans page.tsx).
+   ───────────────────────────────────────────────────────────────────────────── */
+@layer base {
+  .homepage-light,
+  body:has(.homepage-light) {
+    --background: 220 20% 98%;
+    --foreground: 215 45% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 45% 11%;
+    --primary: 221 83% 51%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 16% 95%;
+    --secondary-foreground: 215 40% 16%;
+    --muted: 220 16% 95%;
+    --muted-foreground: 220 9% 40%;
+    --accent: 198 93% 60%;
+    --accent-foreground: 215 69% 14%;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 72% 26%;
+    --success-foreground: 0 0% 100%;
+    --warning: 32 95% 30%;
+    --warning-foreground: 0 0% 100%;
+    --info: 199 89% 32%;
+    --info-foreground: 0 0% 100%;
+    --border: 220 14% 89%;
+    --input: 220 14% 55%;
+    --ring: 221 83% 51%;
+    --surface-raised: 0 0% 100%;
+    --surface-raised-foreground: 215 45% 11%;
+    --shadow-color: 215 45% 18%;
+    --shadow-sm: 0 1px 2px hsl(var(--shadow-color) / 0.06), 0 1px 3px hsl(var(--shadow-color) / 0.04);
+    --shadow-md: 0 4px 6px -1px hsl(var(--shadow-color) / 0.08), 0 10px 24px -6px hsl(var(--shadow-color) / 0.10);
+    --shadow-lg: 0 12px 24px -8px hsl(var(--shadow-color) / 0.14), 0 24px 48px -12px hsl(var(--shadow-color) / 0.12);
+    color-scheme: light;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
+  /* Le `glass` global (85 % d'opacité) descend sous 4,5:1 quand le hero navy
+     défile derrière l'en-tête collant : dans la portée homepage, on opacifie
+     légèrement pour garder la navigation lisible. */
+  .homepage-light header.glass {
+    background-color: hsl(var(--background) / 0.95);
+  }
+
+  /* En thème sombre, la plaque blanche réservée au logo n'a plus lieu d'être
+     sur une homepage explicitement claire : le logo reprend sa place exacte. */
+  :root.dark .homepage-light img[alt^='Eflex'] {
+    background-color: transparent;
+    border-radius: 0;
+    padding: 0;
+  }
+}
