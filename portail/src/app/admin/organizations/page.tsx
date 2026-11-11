@@ -17,7 +17,11 @@ type Search = { plan?: string; paiement?: string; suspendue?: string; inactive?:
 const INACTIVE_DAYS = [30, 60, 90] as const
 
 /** Statut lisible d'une organisation pour la liste et la vue « à surveiller ». */
-function flags(state: ReturnType<typeof computeBillingState>, inactiveDays: number | null, usage: { projects: number; members: number }) {
+function flags(
+  state: ReturnType<typeof computeBillingState>,
+  inactiveDays: number | null,
+  usage: { apps: number; members: number },
+) {
   const out: { label: string; tone: 'warning' | 'destructive' | 'outline' | 'success' }[] = []
   if (state.suspended) out.push({ label: 'Suspendue', tone: 'destructive' })
   if (state.phase === 'past_due') {
@@ -28,7 +32,8 @@ function flags(state: ReturnType<typeof computeBillingState>, inactiveDays: numb
     )
   }
   if (state.phase === 'expired') out.push({ label: 'Période échue', tone: 'warning' })
-  if (usage.projects >= state.limits.projects || usage.members >= state.limits.members) {
+  // Le quota « projets » de `limits` est compté en applications (D2).
+  if (usage.apps >= state.limits.projects || usage.members >= state.limits.members) {
     out.push({ label: 'Quota atteint', tone: 'warning' })
   }
   if (inactiveDays != null && inactiveDays >= 60) out.push({ label: `Inactive ${inactiveDays} j`, tone: 'outline' })
@@ -79,7 +84,7 @@ export default async function AdminOrganizationsPage({
   })
 
   const ids = organizations.map((org) => org.id)
-  const [auditMax, projectMax, pendingInvitations] = await Promise.all([
+  const [auditMax, projectMax, pendingInvitations, appRows, implicitProjectRows] = await Promise.all([
     prisma.auditLog.groupBy({
       by: ['organizationId'],
       where: { organizationId: { in: ids } },
@@ -95,10 +100,27 @@ export default async function AdminOrganizationsPage({
       where: { organizationId: { in: ids }, status: 'pending' },
       _count: { _all: true },
     }),
+    prisma.projectApp.findMany({
+      where: { project: { organizationId: { in: ids } } },
+      select: { project: { select: { organizationId: true } } },
+    }),
+    prisma.project.findMany({
+      where: { organizationId: { in: ids }, apps: { none: {} } },
+      select: { organizationId: true },
+    }),
   ])
   const lastAudit = new Map(auditMax.map((row) => [row.organizationId, row._max.createdAt]))
   const lastProject = new Map(projectMax.map((row) => [row.organizationId, row._max.updatedAt]))
   const pending = new Map(pendingInvitations.map((row) => [row.organizationId, row._count._all]))
+  const appCounts = new Map<string, number>()
+  for (const row of appRows) {
+    const orgId = row.project.organizationId
+    appCounts.set(orgId, (appCounts.get(orgId) ?? 0) + 1)
+  }
+  const implicitCounts = new Map<string, number>()
+  for (const row of implicitProjectRows) {
+    implicitCounts.set(row.organizationId, (implicitCounts.get(row.organizationId) ?? 0) + 1)
+  }
 
   const rows = organizations
     .map((organization) => {
@@ -111,7 +133,11 @@ export default async function AdminOrganizationsPage({
         },
         now,
       )
-      const usage = { projects: organization._count.projects, members: organization._count.members }
+      const usage = {
+        projects: organization._count.projects,
+        members: organization._count.members,
+        apps: (appCounts.get(organization.id) ?? 0) + (implicitCounts.get(organization.id) ?? 0),
+      }
       const activity = [lastAudit.get(organization.id), lastProject.get(organization.id), organization.createdAt]
         .filter((value): value is Date => value instanceof Date)
         .reduce((latest, value) => (value > latest ? value : latest), organization.createdAt)
@@ -122,7 +148,7 @@ export default async function AdminOrganizationsPage({
 
   const attention = rows.filter((row) =>
     row.state.suspended || row.state.blocked || row.state.phase === 'past_due' || row.state.phase === 'expired' ||
-    row.usage.projects >= row.state.limits.projects || row.usage.members >= row.state.limits.members || row.inactive >= 60,
+    row.usage.apps >= row.state.limits.projects || row.usage.members >= row.state.limits.members || row.inactive >= 60,
   )
   const displayed = filters.vue === 'attention' ? attention : rows
 
@@ -242,7 +268,8 @@ export default async function AdminOrganizationsPage({
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {organization.slug} · {usage.members} membre{usage.members > 1 ? 's' : ''} ·{' '}
-                    {usage.projects} / <span className="tabular-nums">{state.limits.projects}</span> projet{usage.projects > 1 ? 's' : ''} ·{' '}
+                    {usage.projects} projet{usage.projects > 1 ? 's' : ''} ·{' '}
+                    {usage.apps} / <span className="tabular-nums">{state.limits.projects}</span> application{state.limits.projects > 1 ? 's' : ''} ·{' '}
                     <span className="tabular-nums">{pending.get(organization.id) ?? 0}</span> invitation
                     {(pending.get(organization.id) ?? 0) > 1 ? 's' : ''} en attente · créée le{' '}
                     <TimeFr value={organization.createdAt} dateOnly />
