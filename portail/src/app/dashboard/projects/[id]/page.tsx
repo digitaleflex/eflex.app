@@ -64,6 +64,17 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       envVars: { select: { key: true, updatedAt: true }, orderBy: { key: 'asc' } },
       deployments: { orderBy: { createdAt: 'desc' }, take: 20 },
       domains: { orderBy: { createdAt: 'asc' } },
+      // Applications du projet (lot C de D2) : liste minimale avec leur statut.
+      apps: {
+        orderBy: [{ position: 'asc' }, { name: 'asc' }],
+        include: {
+          deployments: {
+            take: 1,
+            orderBy: { createdAt: 'desc' },
+            select: { status: true, commitSha: true, createdAt: true },
+          },
+        },
+      },
     },
   })
   if (!project) notFound()
@@ -173,6 +184,87 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       <p role="status" aria-live="polite" className="sr-only">
         {last ? `Dernier déploiement : ${statusInfo(last.status).label}.` : 'Aucun déploiement pour ce projet.'}
       </p>
+
+      {/* Applications du projet (lot C de D2) : visible seulement en multi-app. */}
+      {project.apps.length > 1 && (
+        <section aria-labelledby="apps-title" className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="border-b border-border px-5 py-3">
+            <h2 id="apps-title" className="flex items-center gap-2 text-sm font-semibold">
+              <Layers className="h-4 w-4 text-primary" aria-hidden="true" />
+              Applications
+              <span className="rounded-full bg-muted px-1.5 text-xs font-normal tabular-nums text-muted-foreground">
+                {project.apps.length}
+              </span>
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Chaque application a son propre build, son dossier et son domaine. Le redéploiement
+              global les relance ensemble.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[36rem] text-left text-sm">
+              <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th scope="col" className="px-5 py-2 font-medium">Application</th>
+                  <th scope="col" className="px-3 py-2 font-medium">Dossier</th>
+                  <th scope="col" className="px-3 py-2 font-medium">Domaine</th>
+                  <th scope="col" className="px-5 py-2 font-medium">Dernier déploiement</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {project.apps.map((app) => {
+                  const appLast = app.deployments[0]
+                  return (
+                    <tr key={app.id}>
+                      <th scope="row" className="px-5 py-3 font-medium">
+                        <span className="flex items-center gap-2">
+                          {app.name}
+                          {app.position === 0 && (
+                            <span className="rounded-full border border-border px-1.5 text-[11px] font-normal text-muted-foreground">
+                              Principale
+                            </span>
+                          )}
+                        </span>
+                      </th>
+                      <td className="px-3 py-3">
+                        <code className="font-mono text-xs text-muted-foreground">
+                          {app.root === '' ? 'Racine du dépôt' : app.root}
+                        </code>
+                      </td>
+                      <td className="px-3 py-3">
+                        {app.domain ? (
+                          <a
+                            href={`https://${app.domain}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 break-all text-primary hover:underline"
+                          >
+                            {app.domain}
+                            <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
+                            <span className="sr-only">(nouvel onglet)</span>
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Non exposée</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <StatusPill status={appLast?.status} />
+                          {appLast && (
+                            <time dateTime={appLast.createdAt.toISOString()} className="text-xs text-muted-foreground">
+                              {dateFormat.format(appLast.createdAt)}
+                            </time>
+                          )}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {tab === 'overview' && (
         <div className="space-y-6">

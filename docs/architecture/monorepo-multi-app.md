@@ -28,6 +28,44 @@ migration lancée, aucune application créée ou déployée, aucun secret reprod
 > `ProjectApp` ni `Deployment.appId`, et le drapeau `EFLEX_MULTI_APP` **n'est pas
 > branché**. Voir § 8.
 
+> **Statut au 10 novembre 2026 — lot C livré (création multi-app + fan-out).**
+> Derrière `EFLEX_MULTI_APP` (désactivé par défaut) :
+> - `POST /api/projects` accepte `apps: [{ root, framework?, primary? }]`
+>   (1 à 10 entrées). Chaque dossier est **re-analysé côté serveur** sur le même
+>   `commitSha` ; un `framework` qui ne correspond plus renvoie **409**
+>   (`app_framework_changed`), un dossier indéployable **422** ;
+> - une **`ProjectApp` est toujours créée**, même pour une création mono-app ;
+>   `Project.plan|framework|runtime|port|domain|coolifyAppId|tls*` restent le
+>   miroir de l'application `position = 0` ;
+> - le quota compte les **applications** (`ProjectApp` + un projet sans app =
+>   une application implicite) et refuse N apps d'un coup (`required`, `limit`,
+>   `used` dans la réponse 403) ;
+> - `enqueueProjectDeployment(project, { apps, groupId, commitSha, exclusive,
+>   rollback })` crée une ligne `Deployment` **par application** dans une
+>   transaction, avec un `groupId` commun ; le worker garde **1 job = 1 app** ;
+> - le verrou est **par application** : une app déjà en cours est `skipped`,
+>   les autres partent ; l'annulation de course reste par ligne ;
+> - le worker résout son contexte avec `lib/deployment-context.ts`
+>   (`ProjectApp.plan|root|domain` + nom Coolify `<slug>-<app>`), met à jour
+>   `ProjectApp.coolifyAppId|tls*` et, pour l'app principale seulement, le miroir
+>   `Project.*` ;
+> - routes : `GET /api/projects` et `GET /api/projects/[id]` exposent `apps`
+>   (dont le dernier statut), `POST /redeploy` fan-out toutes les apps ou
+>   `?appId=`, `GET /deployments` expose `appId/appName` et filtre `?appId=`,
+>   la suppression d'un projet boucle sur les applications Coolify ;
+> - UI minimale : `/dashboard/new` envoie `apps[]` quand `/api/auth/config`
+>   expose `multiApp`, la page projet affiche le tableau des applications quand
+>   il y en a plus d'une. **Aucun changement de schéma Prisma.**
+>
+> Restent aux lots D/E/F : édition/suppression d'une app, ajout d'app à un
+> projet existant, sélecteur de logs/runtime par app, webhook filtré par app,
+> rollback « tout le lot », agrégat de statut et notifications par lot, admin et
+> réconciliation multi-app, `billingSummary.usage.apps`.
+>
+> Drapeau désactivé : plus d'une application est **refusée** (403,
+> `multi_app_disabled`) plutôt que tronquée silencieusement ; une seule entrée
+> `apps` est acceptée et suit le chemin mono-app.
+
 
 > ⚠️ `worker.ts`, `coolify.ts` et l'interface de déploiement viennent d'être
 > réécrits par les lots D1 (#6, compose fourni par le dépôt) et retour arrière
@@ -462,19 +500,24 @@ de projet proposé : le client ne décide jamais du domaine.
 ```
 
 - `apps` absent ou de longueur 1 → comportement actuel (un `ProjectApp` créé,
-  `Project.*` en miroir).
+  `Project.*` en miroir). Plus de 10 applications → 400.
 - Chaque entrée est **re-analysée** par le serveur sur le même `commitSha`
   (`analyzeGitHubRepo` avec `root`) ; un `framework` inconnu pour ce `root`
   renvoie **409** (« le dépôt a changé, relancez l'analyse »), jamais un plan
-  fabriqué.
-- Quota : `assertAppQuota(organizationId, apps.length)` avant toute écriture.
+  fabriqué. Deux entrées sur le même dossier → 400.
+- Drapeau `EFLEX_MULTI_APP` désactivé : `apps` > 1 est refusé (403,
+  `multi_app_disabled`) ; l'interface n'envoie `apps[]` que si
+  `/api/auth/config` renvoie `multiApp: true`.
+- Quota : `assertProjectQuota(organizationId, apps.length)` avant toute écriture.
   Message explicite : « Cette création ajoute 3 applications ; le plan Pro en
-  autorise 30 (28 utilisées). »
+  autorise 30 (28 déjà utilisées). »
 - Transaction : projet + apps + variables, puis N `Deployment` (`groupId`
   commun, `commitSha` du commit analysé) et N enfilements. Réponse **202** avec
-  `{ project, apps: [{ id, name, domain, deploymentId }], groupId, warning }`.
+  `{ project, apps: [{ id, name, root, domain, deploymentId }], deployments,
+  groupId, warning }`.
 - Un app dont le plan est multi-services **sans** compose dans le dépôt est
   refusée à la création (422, même message que D1), pas au milieu du build.
+  *(Reporté : le worker refuse déjà ce plan avec le même message.)*
 
 ### 6.3 Lecture et actions
 
@@ -627,18 +670,22 @@ Tests :
   déploiements, portée projet des variables/domaines, double exécution = 0
   doublon, vérifiée sur PostgreSQL 16 jetable.
 
-### Phase D — dual (lots C, D, E)
+### Phase D — dual (lots C, D, E) — **lot C livré**
 
 - le worker écrit `ProjectApp.coolifyAppId` **et** le miroir `Project.coolifyAppId`
   de l'app principale ;
-- les routes écrivent/lisent les apps, avec repli sur `Project.*` si
-  `apps.length === 0` ;
+- les routes de création, de redéploiement et de suppression écrivent/lisent les
+  apps, avec repli sur `Project.*` si `apps.length === 0` ;
 - `EFLEX_MULTI_APP=1` active la création multi-apps ; à `0`, la création
   n'accepte qu'une app et le comportement est celui d'aujourd'hui.
 
-> **Drapeau non branché au lot B.** Aucun code ne lit `EFLEX_MULTI_APP` : le
-> schéma et le backfill sont prêts, mais la création, le worker, l'enfilement,
-> les routes et l'UI restent strictement mono-application.
+> **Drapeau branché au lot C.** `lib/multi-app.ts` lit `EFLEX_MULTI_APP` côté
+> serveur ; `/api/auth/config` l'expose (`multiApp`) et l'écran de création ne
+> propose la sélection multiple que s'il est actif. Le worker ne consulte **pas**
+> le drapeau : il suit `Deployment.appId`, ce qui permet de redéployer une app
+> déjà créée même après un retour du drapeau à `0`. L'enfilement sans `apps`
+> explicite (webhook GitHub, domaines, bases) ne fan-out que si le drapeau est
+> actif ; à `0`, il crée un déploiement de portée projet (`appId = null`).
 
 ### Phase C — contract (lot G, après un cycle de release)
 
@@ -655,9 +702,11 @@ Tests :
 - L'unité facturée devient l'**application**. `projectLimit` garde son nom
   (compatibilité `Subscription.projectLimitOverride`) mais sa sémantique est
   documentée « applications ».
-- `assertProjectQuota(organizationId)` → `assertAppQuota(organizationId, count)`
-  qui compte `ProjectApp` (et, pour un projet sans apps — données non
-  backfillées —, compte 1).
+- `assertProjectQuota(organizationId, count)` (nom conservé) compte les
+  `ProjectApp` et, pour un projet sans apps — données non backfillées —, une
+  application implicite. `count` (défaut 1) permet de refuser **N** apps d'un
+  coup. Le message expose `required`, `limit` et `used` dans la réponse 403
+  (`code: plan_limit`).
 - `billingSummary.usage` expose `{ projects, apps, members }` ; l'UI affiche
   « applications ».
 - Impact tarifaire explicite dans le message d'erreur et dans
@@ -685,8 +734,8 @@ Unitaires (sans infrastructure, `pnpm test`) :
   `--batch`) ;
 - **agrégation** : `aggregateGroupStatus([...])` → `in_progress`, `live`,
   `failed`, `cancelled`, `partial` ; lot vide refusé ;
-- **quotas** : `assertAppQuota` avec 0/4/5 apps sur le plan gratuit, dérive
-  `projectLimitOverride`, création de N apps refusée en bloc ;
+- **quotas** : `assertProjectQuota(org, n)` avec 0/4/5 apps sur le plan
+  gratuit, dérive `projectLimitOverride`, création de N apps refusée en bloc ;
 - **fan-out** (avec `prisma` et `coolify` simulés, comme
   `deployments-route.test.ts`) : 3 apps → 3 `Deployment` avec le même
   `groupId` ; une app déjà active est ignorée sans bloquer les autres ; un
@@ -727,7 +776,7 @@ Matrice staging (projet jetable, **jamais** sur `eflex.app`) :
 | --- | --- | --- | --- |
 | **A** | `detectApplications`, noms stables, profondeur 3, `apps` dans `analyze`, tests détecteur — **livré le 10/11/2026** | 1,5 j | l'analyse liste **toutes** les apps (aucune écriture en base) ; aucune régression des fixtures |
 | **B** | `ProjectApp` + `Deployment.appId/groupId` + `EnvVar.appId` + `ProjectDomain.appId`, index partiel, script de backfill — **livré le 10/11/2026** (sans dual-write ni drapeau : lot C) | 2 j | migration + backfill idempotents ; comportement inchangé |
-| **C** | Création multi-apps (`POST` avec `apps[]`), fan-out à l'enfilement, domaines par app, worker par app, logs/runtime `?appId=`, suppression en boucle | 2 j | un monorepo de 2 apps se déploie en un clic (staging #1, #3, #4) |
+| **C** | Création multi-apps (`POST` avec `apps[]`), fan-out à l'enfilement, domaines par app, worker par app, quota en applications, redéploiement/suppression par app — **livré le 10/11/2026** | 2 j | un monorepo de 2 apps se déploie en un clic (staging #1, #3, #4) ; tests unitaires et intégration base |
 | **D** | UI projet (tableau des apps, sélecteur de logs, redéployer tout/une app), écran de création multi-sélection, paramètres | 2 j | parcours complet utilisable, mono-app inchangé |
 | **E** | Webhook fan-out, rollback par app, statut agrégé, notifications par lot, admin + réconciliation | 1,5 j | staging #6, #7, #8 ; admin cohérent |
 | **F** | Quotas par application, `billingSummary.usage.apps`, doc `docs/operations/billing.md`, matrice staging complète | 1 j | staging #10, #11 ; tests verts |

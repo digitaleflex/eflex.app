@@ -265,7 +265,9 @@ run('cycle de vie de la facturation', () => {
     const quota = await assertProjectQuota(organization.id)
     expect('error' in quota).toBe(true)
     if ('error' in quota) {
-      expect(quota.error).toContain('5 projets')
+      // L'unité du quota est l'application (D2, lot C), pas le projet.
+      expect(quota.error).toContain('application')
+      expect(quota.error).toContain('5')
       expect(quota.error).toContain('plan supérieur')
     }
   })

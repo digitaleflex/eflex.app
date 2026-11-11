@@ -43,6 +43,9 @@ services:
       - DEPLOYMENT_TIMEOUT_MINUTES=${DEPLOYMENT_TIMEOUT_MINUTES:-30}
       # Volumes persistants Coolify : validés sur staging, activés en production.
       - EFLEX_PERSISTENT_VOLUMES=${EFLEX_PERSISTENT_VOLUMES:-}
+      # Multi-applications (D2, lot C) : 1 pour autoriser plusieurs applications
+      # d'un même dépôt dans un seul projet. Désactivé par défaut.
+      - EFLEX_MULTI_APP=${EFLEX_MULTI_APP:-0}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:?sourcer config/domains.sh}
       - ADMIN_EMAILS=${ADMIN_EMAILS:-}

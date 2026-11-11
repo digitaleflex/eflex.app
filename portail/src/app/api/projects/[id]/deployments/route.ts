@@ -43,6 +43,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const before = url.searchParams.get('before')
+  const appIdParam = url.searchParams.get('appId')
+  if (appIdParam) {
+    const app = await prisma.projectApp.findFirst({
+      where: { id: appIdParam, projectId: project.id },
+      select: { id: true },
+    })
+    if (!app) {
+      return NextResponse.json(
+        { error: 'Application introuvable dans ce projet.', code: 'app_not_found' },
+        { status: 404 },
+      )
+    }
+  }
   const cursor = before
     ? await prisma.deployment.findFirst({
         where: { id: before, projectId: project.id },
@@ -56,6 +69,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const where: Prisma.DeploymentWhereInput = {
     projectId: project.id,
     ...(status ? { status } : {}),
+    ...(appIdParam ? { appId: appIdParam } : {}),
     // Tri décroissant sur (createdAt, id) : le curseur reste stable même si plusieurs
     // déploiements partagent la même seconde.
     ...(cursor
@@ -74,6 +88,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     take: limit + 1,
     select: {
       id: true,
+      appId: true,
+      app: { select: { name: true } },
       status: true,
       commitSha: true,
       coolifyBuildId: true,
@@ -86,8 +102,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   return NextResponse.json(
     {
-      deployments: page.map((deployment) => ({
+      deployments: page.map(({ app, ...deployment }) => ({
         ...deployment,
+        appName: app?.name ?? null,
         label: isDeploymentStatus(deployment.status) ? STATUS_LABELS[deployment.status] : deployment.status,
         createdAt: deployment.createdAt.toISOString(),
       })),

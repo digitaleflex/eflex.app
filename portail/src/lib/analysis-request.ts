@@ -4,6 +4,19 @@ import { AnalysisError } from '@/lib/repo-analysis'
 
 const ROOT_RE = /^[A-Za-z0-9._/-]{1,200}$/
 
+/**
+ * Dossier d'application normalisé (sans slash initial ou final). Lève une
+ * `AnalysisError` 400 si le chemin sort du dépôt ou contient un segment vide.
+ * Exporté pour le contrat `apps[]` de la création multi-applications.
+ */
+export function normalizeRoot(value: string | null | undefined): string {
+  const root = (value ?? '').replace(/^\/+|\/+$/g, '')
+  if (root !== '' && (!ROOT_RE.test(root) || root.split('/').some((s) => s === '..' || s === '.' || s === ''))) {
+    throw new AnalysisError("Dossier de l'application invalide.", 400)
+  }
+  return root
+}
+
 /** Champs communs à « analyser » et « créer le projet ». */
 export const repoFields = {
   repoUrl: z.string().trim().min(1, "Indiquez l'adresse du dépôt GitHub.").max(300),
@@ -37,10 +50,7 @@ export function resolveRepo(input: RepoFields): { ref: GitHubRepoRef; root: stri
   const branch = input.branch || parsed.branch
   if (branch && !isValidBranch(branch)) throw new AnalysisError('Nom de branche invalide.', 400)
 
-  const root = (input.root ?? '').replace(/^\/+|\/+$/g, '')
-  if (root !== '' && (!ROOT_RE.test(root) || root.split('/').some((s) => s === '..' || s === '.' || s === ''))) {
-    throw new AnalysisError("Dossier de l'application invalide.", 400)
-  }
+  const root = normalizeRoot(input.root)
 
   return { ref: { owner: parsed.owner, repo: parsed.repo, branch: branch || null }, root }
 }
