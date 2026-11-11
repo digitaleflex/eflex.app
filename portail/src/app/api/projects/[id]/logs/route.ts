@@ -33,30 +33,49 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       id: true,
       coolifyAppId: true,
       plan: true,
-      envVars: { select: { key: true, value: true } },
+      envVars: { select: { key: true, value: true, appId: true } },
+      apps: {
+        orderBy: [{ position: 'asc' }, { name: 'asc' }],
+        select: { id: true, name: true, coolifyAppId: true, plan: true },
+      },
     },
   })
   if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
-  if (!project.coolifyAppId) {
-    return NextResponse.json({ error: "Ce projet n'a pas encore été déployé." }, { status: 409 })
-  }
 
   const search = new URL(request.url).searchParams
+  const requestedAppId = search.get('appId')?.trim() || null
+
+  let targetApp = null as null | { id: string; name: string; coolifyAppId: string | null; plan: unknown }
+  if (requestedAppId) {
+    targetApp = project.apps.find((app) => app.id === requestedAppId) ?? null
+    if (!targetApp) {
+      return NextResponse.json({ error: 'Application introuvable.' }, { status: 404 })
+    }
+  } else if (project.apps.length > 0) {
+    targetApp = project.apps.find((app) => app.coolifyAppId) ?? project.apps[0] ?? null
+  }
+
+  const coolifyAppId = targetApp?.coolifyAppId ?? project.coolifyAppId
+  if (!coolifyAppId) {
+    return NextResponse.json({ error: "Cette application n'a pas encore été déployée." }, { status: 409 })
+  }
+
+  const plan = (targetApp?.plan ?? project.plan) as unknown as BuildPlan | null
+
   const linesParam = Number.parseInt(search.get('lines') ?? '', 10)
   const lines = Number.isFinite(linesParam) ? Math.min(500, Math.max(50, linesParam)) : 200
 
   // Logs par service : uniquement pour un compose fourni par le dépôt, et
   // uniquement un service réellement déclaré (jamais un nom arbitraire).
-  const plan = project.plan as unknown as BuildPlan | null
   const composeServices =
     plan && plan.framework === 'compose' ? (plan.compose?.services ?? []) : []
   const requestedService = search.get('service')?.trim() ?? ''
   if (requestedService !== '' && !composeServices.includes(requestedService)) {
-    return NextResponse.json({ error: 'Service inconnu pour ce projet.' }, { status: 400 })
+    return NextResponse.json({ error: 'Service inconnu pour cette application.' }, { status: 400 })
   }
 
   const result = await getApplicationLogs(
-    project.coolifyAppId,
+    coolifyAppId,
     lines,
     requestedService === '' ? undefined : requestedService,
   )
@@ -66,6 +85,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const secrets: string[] = []
   for (const variable of project.envVars) {
+    // Les variables projet (sans appId) s'appliquent à toutes les apps ; les
+    // variables d'app (lot ultérieur) gardent la même AAD `projectId:key`.
+    if (variable.appId && targetApp && variable.appId !== targetApp.id) continue
     try {
       secrets.push(decrypt(variable.value, `${project.id}:${variable.key}`))
     } catch {
@@ -81,7 +103,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   )
 
   return NextResponse.json(
-    { logs: text, updatedAt: new Date().toISOString() },
+    { logs: text, updatedAt: new Date().toISOString(), appId: targetApp?.id ?? null },
     { headers: { 'Cache-Control': 'no-store, max-age=0' } },
   )
 }

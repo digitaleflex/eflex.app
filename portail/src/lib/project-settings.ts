@@ -48,6 +48,7 @@ export const envVarSchema = z.object({
   value: z
     .string()
     .max(ENV_VALUE_MAX, `La valeur est trop longue (${ENV_VALUE_MAX} caractères maximum).`),
+  appId: z.string().trim().min(1, "L'application est invalide.").optional(),
 })
 
 export type ProjectUpdate = z.infer<typeof projectUpdateSchema>

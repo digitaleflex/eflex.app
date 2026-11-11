@@ -9,7 +9,7 @@ import { analyzeGitHubRepo, type RepoAnalysis } from '@/lib/repo-analysis'
 import { errorResponse, normalizeRoot, repoFields, resolveRepo } from '@/lib/analysis-request'
 import { resolveUserRepoToken } from '@/lib/git-credentials'
 import { assertCryptoConfig, encrypt } from '@/lib/crypto'
-import { buildProjectArtifacts } from '@/lib/deploy-plan'
+import { buildProjectArtifacts, effectiveBuildPack } from '@/lib/deploy-plan'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
 import { projectDomain, uniqueSlug } from '@/lib/project-slug'
 import {
@@ -458,7 +458,7 @@ export async function POST(request: NextRequest) {
       groupId,
       plan: {
         framework: primaryApp.plan.framework,
-        buildPack: artifacts.buildPack,
+        buildPack: effectiveBuildPack(primaryApp.plan),
         port: artifacts.portsExposes,
         services: artifacts.services,
         postDeploy: artifacts.postDeploy,

@@ -9,11 +9,16 @@ import { effectivePlan } from '@/lib/billing'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const schema = z.object({ hostname: z.string().trim().min(1).max(300) })
+const schema = z.object({
+  hostname: z.string().trim().min(1).max(300),
+  /** Application ciblée (multi-app). Par défaut : domaine de portée projet/principale. */
+  appId: z.string().trim().min(1).optional(),
+})
 
 function serialize(domain: {
   id: string
   hostname: string
+  appId: string | null
   verifiedAt: Date | null
   tlsValid: boolean | null
   tlsExpiresAt: Date | null
@@ -23,6 +28,7 @@ function serialize(domain: {
   return {
     id: domain.id,
     hostname: domain.hostname,
+    appId: domain.appId,
     verifiedAt: domain.verifiedAt?.toISOString() ?? null,
     tlsValid: domain.tlsValid,
     tlsExpiresAt: domain.tlsExpiresAt?.toISOString() ?? null,
@@ -32,7 +38,7 @@ function serialize(domain: {
 }
 
 /** Liste le domaine plateforme et les domaines personnalisés du projet. */
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
@@ -40,24 +46,39 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
 
   const { id } = await params
+  const requestedAppId = new URL(request.url).searchParams.get('appId')?.trim() || null
   const project = await prisma.project.findFirst({
     where: { id, organizationId: org.organizationId },
     select: {
       id: true,
       domain: true,
+      apps: {
+        orderBy: [{ position: 'asc' }, { name: 'asc' }],
+        select: { id: true, name: true, domain: true },
+      },
       domains: { orderBy: { createdAt: 'asc' } },
     },
   })
   if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  if (requestedAppId && !project.apps.some((app) => app.id === requestedAppId)) {
+    return NextResponse.json({ error: 'Application introuvable.' }, { status: 404 })
+  }
+
   const plan = await effectivePlan(org.organizationId)
+  const filteredDomains = requestedAppId
+    ? project.domains.filter((domain) => domain.appId === requestedAppId)
+    : project.domains
+  const primary = requestedAppId
+    ? (project.apps.find((app) => app.id === requestedAppId)?.domain ?? null)
+    : project.domain
 
   return NextResponse.json(
     {
-      primary: project.domain,
+      primary,
       target: platformDomain(),
       max: plan.customDomainLimit,
       plan: plan.id,
-      domains: project.domains.map(serialize),
+      domains: filteredDomains.map(serialize),
     },
     { headers: { 'Cache-Control': 'no-store, max-age=0' } },
   )
@@ -77,7 +98,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { id } = await params
   const project = await prisma.project.findFirst({
     where: { id, organizationId: org.organizationId },
-    select: { id: true, domain: true, _count: { select: { domains: true } } },
+    select: {
+      id: true,
+      domain: true,
+      apps: { select: { id: true, domain: true } },
+      _count: { select: { domains: true } },
+    },
   })
   if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
 
@@ -96,8 +122,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if ('error' in validation) return NextResponse.json({ error: validation.error }, { status: 400 })
   const hostname = validation.hostname
 
-  if (hostname === project.domain) {
-    return NextResponse.json({ error: 'Ce domaine est déjà le domaine principal du projet.' }, { status: 409 })
+  const appId = parsed.data.appId ?? null
+  if (appId && !project.apps.some((app) => app.id === appId)) {
+    return NextResponse.json({ error: 'Application introuvable.' }, { status: 404 })
+  }
+
+  const primaryDomain = appId ? project.apps.find((app) => app.id === appId)?.domain : project.domain
+  if (hostname === primaryDomain) {
+    return NextResponse.json({ error: 'Ce domaine est déjà le domaine principal de cette application.' }, { status: 409 })
   }
   const plan = await effectivePlan(org.organizationId)
   if (project._count.domains >= plan.customDomainLimit) {
@@ -109,7 +141,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   try {
     const domain = await prisma.projectDomain.create({
-      data: { projectId: project.id, hostname },
+      data: { projectId: project.id, hostname, appId },
     })
     return NextResponse.json(
       {

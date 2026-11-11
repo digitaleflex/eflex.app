@@ -19,6 +19,8 @@ export type DashboardProject = {
   lastAt: string | null
   /** Statuts des derniers déploiements, du plus ancien au plus récent (pour la frise). */
   history: string[]
+  /** Nombre d'applications du projet (1 en mono-app). */
+  appCount: number
 }
 
 export type DashboardActivity = {
@@ -45,6 +47,7 @@ export async function loadDashboard(organizationId: string, now = new Date()) {
         id: true, name: true, framework: true, runtime: true, repoUrl: true, branch: true, domain: true, updatedAt: true,
         tlsValid: true, tlsExpiresAt: true,
         deployments: { orderBy: { createdAt: 'desc' }, take: 8, select: { id: true, status: true, commitSha: true, createdAt: true } },
+        _count: { select: { apps: true } },
       },
     }),
     prisma.deployment.findMany({
@@ -71,6 +74,7 @@ export async function loadDashboard(organizationId: string, now = new Date()) {
       lastCommit: last && last.commitSha !== 'pending' ? last.commitSha.slice(0, 7) : null,
       lastAt: last?.createdAt.toISOString() ?? null,
       history: [...p.deployments].reverse().map((d) => d.status),
+      appCount: p._count.apps,
     }
   })
 

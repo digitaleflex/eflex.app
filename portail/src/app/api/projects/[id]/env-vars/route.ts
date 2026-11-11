@@ -11,7 +11,8 @@ import { envVarSchema, firstIssue } from '@/lib/project-settings'
  * Ajoute ou met à jour une variable d'environnement.
  *
  * La valeur est chiffrée en AES-256-GCM avec l'AAD `projectId:key` et n'est
- * jamais renvoyée : seuls le nom et la date de mise à jour sortent du serveur.
+ * jamais renvoyée : seuls le nom, la date de mise à jour et le scope sortent du serveur.
+ * Portée : projet (sans `appId`) ou application (`appId`).
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
@@ -64,15 +65,46 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
   }
 
-  const { key, value } = parsed.data
+  const { key, value, appId } = parsed.data
+  if (appId) {
+    const app = await prisma.projectApp.findFirst({
+      where: { id: appId, projectId: project.id },
+      select: { id: true },
+    })
+    if (!app) {
+      return NextResponse.json({ error: 'Application introuvable.' }, { status: 404 })
+    }
+  }
+
+  // AAD conservée (`projectId:key`) pour compatibilité avec le déchiffrement existant.
   const encrypted = encrypt(value, `${project.id}:${key}`)
 
-  const envVar = await prisma.envVar.upsert({
-    where: { projectId_key: { projectId: project.id, key } },
-    create: { projectId: project.id, key, value: encrypted },
-    update: { value: encrypted },
-    select: { key: true, updatedAt: true },
-  })
+  let envVar: { key: string; updatedAt: Date; appId: string | null }
+  if (!appId) {
+    envVar = await prisma.envVar.upsert({
+      where: { projectId_key: { projectId: project.id, key } },
+      create: { projectId: project.id, key, value: encrypted },
+      update: { value: encrypted },
+      select: { key: true, updatedAt: true, appId: true },
+    })
+  } else {
+    const existing = await prisma.envVar.findFirst({
+      where: { projectId: project.id, appId, key },
+      select: { id: true },
+    })
+    if (existing) {
+      envVar = await prisma.envVar.update({
+        where: { id: existing.id },
+        data: { value: encrypted },
+        select: { key: true, updatedAt: true, appId: true },
+      })
+    } else {
+      envVar = await prisma.envVar.create({
+        data: { projectId: project.id, appId, key, value: encrypted },
+        select: { key: true, updatedAt: true, appId: true },
+      })
+    }
+  }
 
   await publish({
     type: 'project.updated',

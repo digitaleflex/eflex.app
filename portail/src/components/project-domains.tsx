@@ -11,12 +11,15 @@ import { cn } from '@/lib/utils'
 interface ProjectDomain {
   id: string
   hostname: string
+  appId: string | null
   verifiedAt: string | null
   tlsValid: boolean | null
   tlsExpiresAt: string | null
   tlsCheckedAt: string | null
   createdAt: string
 }
+
+type DomainApp = { id: string; name: string }
 
 interface DomainsResponse {
   primary: string | null
@@ -28,7 +31,15 @@ interface DomainsResponse {
 type Feedback = { tone: 'success' | 'error'; message: string } | null
 
 /** Gestion des domaines personnalisés : ajout, vérification DNS, état SSL, retrait. */
-export function ProjectDomains({ projectId }: { projectId: string }) {
+export function ProjectDomains({
+  projectId,
+  apps = [],
+}: {
+  projectId: string
+  /** Applications du projet (multi-app) ; vide ou 1 élément = pas de sélecteur. */
+  apps?: readonly DomainApp[]
+}) {
+  const [selectedAppId, setSelectedAppId] = useState<string>(apps[0]?.id ?? '')
   const [data, setData] = useState<DomainsResponse | null>(null)
   const [hostname, setHostname] = useState('')
   const [loading, setLoading] = useState(true)
@@ -38,7 +49,8 @@ export function ProjectDomains({ projectId }: { projectId: string }) {
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/domains`, { cache: 'no-store' })
+      const query = apps.length > 1 && selectedAppId ? `?appId=${encodeURIComponent(selectedAppId)}` : ''
+      const response = await fetch(`/api/projects/${projectId}/domains${query}`, { cache: 'no-store' })
       const body = await response.json().catch(() => ({}))
       if (!response.ok) {
         setFeedback({ tone: 'error', message: body.error ?? 'Domaines indisponibles.' })
@@ -50,9 +62,10 @@ export function ProjectDomains({ projectId }: { projectId: string }) {
     } finally {
       setLoading(false)
     }
-  }, [projectId])
+  }, [projectId, apps.length, selectedAppId])
 
   useEffect(() => {
+    setLoading(true)
     void load()
   }, [load])
 
@@ -64,7 +77,10 @@ export function ProjectDomains({ projectId }: { projectId: string }) {
       const response = await fetch(`/api/projects/${projectId}/domains`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hostname }),
+        body: JSON.stringify({
+          hostname,
+          ...(apps.length > 1 && selectedAppId ? { appId: selectedAppId } : {}),
+        }),
       })
       const body = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -123,6 +139,22 @@ export function ProjectDomains({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-4">
+      {apps.length > 1 && (
+        <label className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm [@media(pointer:coarse)]:min-h-11">
+          <span className="text-muted-foreground">Application</span>
+          <select
+            value={selectedAppId}
+            onChange={(e) => setSelectedAppId(e.target.value)}
+            className="min-h-7 bg-transparent text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {apps.map((app) => (
+              <option key={app.id} value={app.id}>
+                {app.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {feedback && (
         <p
           role={feedback.tone === 'error' ? 'alert' : 'status'}

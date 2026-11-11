@@ -10,6 +10,8 @@ export const runtime = 'nodejs'
 
 const actionSchema = z.object({
   action: z.enum(['start', 'stop', 'restart']),
+  /** Application ciblée (multi-app). Par défaut : application principale. */
+  appId: z.string().trim().min(1).optional(),
 })
 
 async function findProject(id: string, organizationId: string) {
@@ -22,12 +24,56 @@ async function findProject(id: string, organizationId: string) {
       tlsValid: true,
       tlsExpiresAt: true,
       tlsCheckedAt: true,
+      apps: {
+        orderBy: [{ position: 'asc' }, { name: 'asc' }],
+        select: {
+          id: true,
+          name: true,
+          coolifyAppId: true,
+          domain: true,
+          tlsValid: true,
+          tlsExpiresAt: true,
+          tlsCheckedAt: true,
+        },
+      },
     },
   })
 }
 
+function resolveTarget(
+  project: NonNullable<Awaited<ReturnType<typeof findProject>>>,
+  requestedAppId: string | null,
+): { target: { id: string | null; coolifyAppId: string | null; tlsValid: boolean | null; tlsExpiresAt: Date | null; tlsCheckedAt: Date | null }; notFound: boolean } {
+  if (requestedAppId) {
+    const app = project.apps.find((item) => item.id === requestedAppId)
+    if (!app) {
+      return {
+        target: { id: null, coolifyAppId: null, tlsValid: null, tlsExpiresAt: null, tlsCheckedAt: null },
+        notFound: true,
+      }
+    }
+    return { target: { id: app.id, coolifyAppId: app.coolifyAppId, tlsValid: app.tlsValid, tlsExpiresAt: app.tlsExpiresAt, tlsCheckedAt: app.tlsCheckedAt }, notFound: false }
+  }
+  if (project.apps.length > 0) {
+    const app = project.apps.find((item) => item.coolifyAppId) ?? project.apps[0]!
+    return { target: { id: app.id, coolifyAppId: app.coolifyAppId, tlsValid: app.tlsValid, tlsExpiresAt: app.tlsExpiresAt, tlsCheckedAt: app.tlsCheckedAt }, notFound: false }
+  }
+  return {
+    target: { id: null, coolifyAppId: project.coolifyAppId, tlsValid: project.tlsValid, tlsExpiresAt: project.tlsExpiresAt, tlsCheckedAt: project.tlsCheckedAt },
+    notFound: false,
+  }
+}
+
+function tlsPayload(target: { tlsValid: boolean | null; tlsExpiresAt: Date | null; tlsCheckedAt: Date | null }) {
+  return {
+    valid: target.tlsValid,
+    expiresAt: target.tlsExpiresAt?.toISOString() ?? null,
+    checkedAt: target.tlsCheckedAt?.toISOString() ?? null,
+  }
+}
+
 /** Statut runtime Coolify + dernier contrôle TLS (lecture seule). */
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
@@ -38,21 +84,21 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const project = await findProject(id, org.organizationId)
   if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
 
-  const tls = {
-    valid: project.tlsValid,
-    expiresAt: project.tlsExpiresAt?.toISOString() ?? null,
-    checkedAt: project.tlsCheckedAt?.toISOString() ?? null,
+  const requestedAppId = new URL(request.url).searchParams.get('appId')?.trim() || null
+  const { target, notFound } = resolveTarget(project, requestedAppId)
+  if (notFound) return NextResponse.json({ error: 'Application introuvable.' }, { status: 404 })
+
+  const tls = tlsPayload(target)
+
+  if (!target.coolifyAppId) {
+    return NextResponse.json({ deployed: false, app: null, tls, appId: target.id })
   }
 
-  if (!project.coolifyAppId) {
-    return NextResponse.json({ deployed: false, app: null, tls })
-  }
-
-  const runtime = await getApplicationRuntime(project.coolifyAppId)
+  const runtime = await getApplicationRuntime(target.coolifyAppId)
   if ('error' in runtime) {
-    return NextResponse.json({ deployed: true, app: null, tls, error: runtime.error })
+    return NextResponse.json({ deployed: true, app: null, tls, appId: target.id, error: runtime.error })
   }
-  return NextResponse.json({ deployed: true, app: runtime, tls })
+  return NextResponse.json({ deployed: true, app: runtime, tls, appId: target.id })
 }
 
 /** Démarre, arrête ou redémarre l'application Coolify du projet. */
@@ -69,9 +115,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { id } = await params
   const project = await findProject(id, org.organizationId)
   if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
-  if (!project.coolifyAppId) {
-    return NextResponse.json({ error: "Ce projet n'a pas encore été déployé." }, { status: 409 })
-  }
 
   let body: unknown
   try {
@@ -84,7 +127,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Action invalide.' }, { status: 400 })
   }
 
-  const result = await applicationAction(project.coolifyAppId, parsed.data.action as ApplicationAction)
+  const requestedAppId = parsed.data.appId ?? new URL(request.url).searchParams.get('appId')?.trim() ?? null
+  const { target, notFound } = resolveTarget(project, requestedAppId)
+  if (notFound) return NextResponse.json({ error: 'Application introuvable.' }, { status: 404 })
+  if (!target.coolifyAppId) {
+    return NextResponse.json({ error: "Cette application n'a pas encore été déployée." }, { status: 409 })
+  }
+
+  const result = await applicationAction(target.coolifyAppId, parsed.data.action as ApplicationAction)
   if ('error' in result) return NextResponse.json({ error: result.error }, { status: 502 })
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, appId: target.id })
 }

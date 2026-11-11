@@ -34,6 +34,7 @@ import { GithubMark } from '@/components/icons/github-mark'
 import { RedeployButton } from '@/components/redeploy-button'
 import { CancelDeploymentButton } from '@/components/cancel-deployment-button'
 import { RollbackDeploymentButton } from '@/components/rollback-deployment-button'
+import { ProjectAppsSection } from '@/components/project-apps'
 import { EmptyState } from '@/components/ui/empty-state'
 import { isCommitSha } from '@/lib/deployment-rollback'
 import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
@@ -79,9 +80,10 @@ const smallLinkClass =
   'inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9'
 
 /** Action prioritaire du projet : même emplacement et même style quel que soit l'état. */
-function PrimaryAction({ action, projectId }: { action: NextProjectAction; projectId: string }) {
+function PrimaryAction({ action, projectId, multiApp }: { action: NextProjectAction; projectId: string; multiApp?: boolean }) {
   if (action.kind === 'deploy' || action.kind === 'redeploy') {
-    return <RedeployButton projectId={projectId} variant="primary" label={action.label} />
+    const label = multiApp && action.kind === 'redeploy' ? 'Redéployer toutes les applications' : action.label
+    return <RedeployButton projectId={projectId} variant="primary" label={label} />
   }
   if (action.kind === 'visit') {
     return (
@@ -173,6 +175,14 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
     storedPlan?.framework === 'compose' && Array.isArray(storedPlan.compose?.services)
       ? storedPlan.compose.services.filter((name): name is string => typeof name === 'string')
       : []
+  const runtimeLogApps = project.apps.map((app) => {
+    const appPlan = app.plan as unknown as { framework?: string; compose?: { services?: unknown } } | null
+    const appServices =
+      appPlan?.framework === 'compose' && Array.isArray(appPlan.compose?.services)
+        ? appPlan.compose.services.filter((name): name is string => typeof name === 'string')
+        : []
+    return { id: app.id, name: app.name, services: appServices }
+  })
   const last = deployments[0]
   const production = latestLiveDeployment ?? deployments.find((deployment) => deployment.status === 'live')
   const inProgress = last !== undefined && statusInfo(last.status).inProgress
@@ -240,9 +250,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-2">
-          {primaryAction && <PrimaryAction action={primaryAction} projectId={project.id} />}
-          {canManage && situation === 'failed' && <RedeployButton projectId={project.id} />}
-          {canManage && situation === 'live' && primaryAction?.kind === 'visit' && <RedeployButton projectId={project.id} />}
+          {primaryAction && <PrimaryAction action={primaryAction} projectId={project.id} multiApp={multiApp} />}
+          {canManage && situation === 'failed' && <RedeployButton projectId={project.id} label={multiApp ? 'Tout redéployer' : 'Redéployer'} />}
+          {canManage && situation === 'live' && primaryAction?.kind === 'visit' && <RedeployButton projectId={project.id} label={multiApp ? 'Tout redéployer' : 'Redéployer'} />}
           {canManage && last && statusInfo(last.status).inProgress && (
             <CancelDeploymentButton projectId={project.id} deploymentId={last.id} />
           )}
@@ -307,7 +317,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 <TerminalSquare className="h-4 w-4" aria-hidden="true" />
                 Voir les journaux
               </Link>
-              {canManage && <RedeployButton projectId={project.id} />}
+              {canManage && <RedeployButton projectId={project.id} label={multiApp ? 'Tout redéployer' : 'Redéployer'} />}
             </>
           }
         >
@@ -353,103 +363,29 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
       {/* Applications du projet (lot C de D2) : visible seulement en multi-app. */}
       {multiApp && (
-        <SectionCard
-          id="apps"
-          title={
-            <>
-              Applications
-              <span className="rounded-full bg-muted px-1.5 text-xs font-normal tabular-nums text-muted-foreground">
-                {project.apps.length}
-              </span>
-            </>
-          }
-          icon={Layers}
-          description="Chaque application a son propre build, son dossier et son domaine. Elle peut être relancée séparément."
-        >
-          <ul className="divide-y divide-border">
-            {project.apps.map((app) => {
-              const appLast = app.deployments[0]
-              const appDomains = project.domains.filter(
-                (domain) => domain.verifiedAt && domain.appId === app.id,
-              )
-              const appPendingDomains = project.domains.filter(
-                (domain) => !domain.verifiedAt && domain.appId === app.id,
-              )
-              return (
-                <li key={app.id} className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center sm:px-5">
-                  <div className="min-w-0">
-                    <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                      {app.name}
-                      {app.position === 0 && (
-                        <span className="rounded-full border border-border px-1.5 text-[11px] font-normal text-muted-foreground">
-                          Principale
-                        </span>
-                      )}
-                      <span className="text-xs font-normal text-muted-foreground">{frameworkLabel(app.framework)}</span>
-                    </p>
-                    <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-                      {app.root === '' ? 'Racine du dépôt' : app.root}
-                    </p>
-                  </div>
-
-                  <div className="min-w-0 space-y-1">
-                    {app.domain ? (
-                      <a
-                        href={`https://${app.domain}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex max-w-full items-center gap-1 break-all text-sm text-primary hover:underline"
-                      >
-                        {app.domain}
-                        <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
-                        <span className="sr-only"> (nouvel onglet)</span>
-                      </a>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">Non exposée</p>
-                    )}
-                    {appDomains.length > 0 && (
-                      <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                        <span>Aussi :</span>
-                        {appDomains.map((domain) => (
-                          <a
-                            key={domain.id}
-                            href={`https://${domain.hostname}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-mono text-primary hover:underline"
-                          >
-                            {domain.hostname}
-                          </a>
-                        ))}
-                      </p>
-                    )}
-                    {appPendingDomains.length > 0 && (
-                      <p className="text-xs text-warning">
-                        {appPendingDomains.length} domaine{appPendingDomains.length > 1 ? 's' : ''} en attente de vérification
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                    <StatusPill status={appLast?.status} />
-                    {appLast && (
-                      <time dateTime={appLast.createdAt.toISOString()} className="text-xs text-muted-foreground" suppressHydrationWarning>
-                        {relativeTime(appLast.createdAt)}
-                      </time>
-                    )}
-                    {canManage && (
-                      <RedeployButton
-                        projectId={project.id}
-                        appId={app.id}
-                        srLabel={`l’application ${app.name}`}
-                      />
-                    )}
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        </SectionCard>
+        <ProjectAppsSection
+          projectId={project.id}
+          canManage={canManage}
+          apps={project.apps.map((app) => ({
+            id: app.id,
+            name: app.name,
+            root: app.root,
+            framework: app.framework,
+            domain: app.domain,
+            position: app.position,
+            deployments: app.deployments.map((deployment) => ({
+              status: deployment.status,
+              commitSha: deployment.commitSha,
+              createdAt: deployment.createdAt,
+            })),
+          }))}
+          domains={project.domains.map((domain) => ({
+            id: domain.id,
+            hostname: domain.hostname,
+            appId: domain.appId,
+            verifiedAt: domain.verifiedAt,
+          }))}
+        />
       )}
 
       {tab === 'overview' && (
@@ -690,12 +626,21 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           id="deployments"
           title="Historique des déploiements"
           description={`${deployments.length} déploiement${deployments.length > 1 ? 's' : ''}, du plus récent au plus ancien. Les journaux sont en lecture seule et les secrets connus y sont masqués.`}
+          actions={
+            canManage && deployments.length > 0 ? (
+              <RedeployButton
+                projectId={project.id}
+                variant={multiApp ? 'primary' : 'outline'}
+                label={multiApp ? 'Redéployer toutes les applications' : 'Nouveau déploiement'}
+              />
+            ) : undefined
+          }
         >
           {deployments.length === 0 ? (
             <EmptyState
               title="Aucun déploiement pour ce projet"
               description="Lancez un premier déploiement : son statut et ses journaux s’afficheront ici."
-              action={canManage ? <RedeployButton projectId={project.id} variant="primary" label="Lancer le déploiement" /> : undefined}
+              action={canManage ? <RedeployButton projectId={project.id} variant="primary" label={multiApp ? 'Déployer toutes les applications' : 'Lancer le déploiement'} /> : undefined}
               className="py-10"
             />
           ) : (
@@ -834,16 +779,13 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       )}
 
       {tab === 'logs' &&
-        (project.coolifyAppId ? (
+        (project.coolifyAppId || project.apps.some((app) => app.coolifyAppId) ? (
           <div className="space-y-3">
-            {multiApp && (
-              <Notice tone="info" title="Journaux de l’application principale">
-                En mode multi-applications, cet écran suit les journaux d’exécution de l’application
-                principale. Chaque application conserve ses propres journaux de déploiement dans
-                l’onglet Déploiements.
-              </Notice>
-            )}
-            <RuntimeLogs projectId={project.id} services={composeServices} />
+            <RuntimeLogs
+              projectId={project.id}
+              services={composeServices}
+              apps={multiApp ? runtimeLogApps : []}
+            />
           </div>
         ) : (
           <SectionCard
