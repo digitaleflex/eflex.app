@@ -56,6 +56,9 @@ services:
       - DATABASE_URL=${DATABASE_URL:?definir DATABASE_URL dans .env.staging}
       - REDIS_URL=${REDIS_URL:?definir REDIS_URL dans .env.staging}
       - DEPLOYMENT_TIMEOUT_MINUTES=${DEPLOYMENT_TIMEOUT_MINUTES:-30}
+      # Multi-applications (D2, lot C) : 1 pour autoriser plusieurs applications
+      # d'un même dépôt. Désactivé par défaut.
+      - EFLEX_MULTI_APP=${EFLEX_MULTI_APP:-0}
       # L'authentification du staging est autonome : secret dédié, URL dédiée.
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?definir BETTER_AUTH_SECRET dans .env.staging}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:-https://staging.eflex.app}

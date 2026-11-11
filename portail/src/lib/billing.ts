@@ -319,20 +319,52 @@ export function upgradeMessage(plan: Plan, resource: string, limit: number): str
 }
 
 /**
- * Vérifie le quota de projets avant création. Le plan gratuit est volontairement
- * généreux pour les débuts d'Eflex ; les plans payants augmentent les limites.
+ * Message de quota exprimé en **applications** (lot C de D2) : `projectLimit`
+ * garde son nom pour la compatibilité de `Subscription`, mais son unité est
+ * l'application déployable.
+ */
+export function appQuotaMessage(
+  plan: Plan,
+  additional: number,
+  limit: number,
+  used: number,
+): string {
+  const added = Math.max(1, additional)
+  const plural = added > 1 ? 's' : ''
+  const usedLabel = used > 1 ? 'utilisées' : 'utilisée'
+  const upgrade =
+    plan.id === 'free'
+      ? 'Choisissez un plan supérieur dans Équipe → Abonnement pour continuer.'
+      : 'Passez à un plan supérieur dans Équipe → Abonnement pour continuer.'
+  return `Cette création ajoute ${added} application${plural} ; le plan ${plan.label} en autorise ${limit} (${used} déjà ${usedLabel}). ${upgrade}`
+}
+
+/**
+ * Vérifie le quota avant création. L'unité comptée est l'**application**
+ * (`ProjectApp`) : un projet sans application backfillée (données antérieures
+ * à D2) compte pour une application implicite. `additional` permet de refuser
+ * en bloc une création de N applications avant toute analyse et toute écriture.
  */
 export async function assertProjectQuota(
   organizationId: string,
-): Promise<{ ok: true } | { error: string; plan: Plan }> {
-  const [state, projects] = await Promise.all([
+  additional = 1,
+): Promise<{ ok: true } | { error: string; plan: Plan; required: number; limit: number; used: number }> {
+  const [state, apps, implicitProjects] = await Promise.all([
     loadBillingState(organizationId),
-    prisma.project.count({ where: { organizationId } }),
+    prisma.projectApp.count({ where: { project: { organizationId } } }),
+    // Projet historique sans `ProjectApp` : une application implicite.
+    prisma.project.count({ where: { organizationId, apps: { none: {} } } }),
   ])
-  if (projects >= state.limits.projects) {
+  const used = apps + implicitProjects
+  const required = Math.max(1, additional)
+  const limit = state.limits.projects
+  if (used + required > limit) {
     return {
       plan: state.plan,
-      error: upgradeMessage(state.plan, 'projets', state.limits.projects),
+      required,
+      limit,
+      used,
+      error: appQuotaMessage(state.plan, required, limit, used),
     }
   }
   return { ok: true }

@@ -3,6 +3,7 @@ import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
+import { multiAppEnabled } from '@/lib/multi-app'
 import { allow } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 import {
@@ -64,6 +65,8 @@ export async function POST(
       status: true,
       commitSha: true,
       createdAt: true,
+      appId: true,
+      app: { select: { id: true, name: true } },
       project: { select: { id: true, name: true, organizationId: true } },
     },
   })
@@ -101,6 +104,12 @@ export async function POST(
     exclusive: true,
     commitSha: target.commitSha,
     rollback: true,
+    // Retour arrière **par application** (lot C) : on ne reconstruit que l'app
+    // du déploiement ciblé. Drapeau désactivé : portée projet, comme avant.
+    apps:
+      multiAppEnabled() && target.app
+        ? [{ id: target.app.id, name: target.app.name }]
+        : [],
   })
   if ('error' in queued) {
     // Un déploiement tourne déjà : 409. La facturation renvoie 402/403 pour que

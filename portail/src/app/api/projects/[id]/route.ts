@@ -38,8 +38,39 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       updatedAt: true,
       // Seulement les noms des variables : les valeurs ne quittent jamais le serveur.
       envVars: { select: { key: true, updatedAt: true }, orderBy: { key: 'asc' } },
+      // Applications du projet (D2) : nom, dossier, domaine, TLS et dernier déploiement.
+      apps: {
+        orderBy: [{ position: 'asc' }, { name: 'asc' }],
+        select: {
+          id: true,
+          name: true,
+          root: true,
+          position: true,
+          framework: true,
+          runtime: true,
+          port: true,
+          domain: true,
+          coolifyAppId: true,
+          tlsValid: true,
+          tlsExpiresAt: true,
+          tlsCheckedAt: true,
+          deployments: {
+            take: 1,
+            orderBy: { createdAt: 'desc' },
+            select: { id: true, status: true, commitSha: true, createdAt: true },
+          },
+        },
+      },
       deployments: {
-        select: { id: true, status: true, commitSha: true, logsSummary: true, createdAt: true },
+        select: {
+          id: true,
+          appId: true,
+          status: true,
+          commitSha: true,
+          logsSummary: true,
+          createdAt: true,
+          app: { select: { id: true, name: true } },
+        },
         orderBy: { createdAt: 'desc' },
         take: 10,
       },
@@ -50,7 +81,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
   }
 
-  return NextResponse.json({ project })
+  const { apps, ...rest } = project
+  return NextResponse.json({
+    project: {
+      ...rest,
+      apps: apps.map(({ deployments, ...app }) => ({
+        ...app,
+        lastDeployment: deployments[0] ?? null,
+      })),
+      primaryAppId: apps.find((app) => app.position === 0)?.id ?? apps[0]?.id ?? null,
+    },
+  })
 }
 
 /**
@@ -151,6 +192,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
       name: true,
       userId: true,
       coolifyAppId: true,
+      apps: { select: { name: true, coolifyAppId: true } },
       installationId: true,
       repoUrl: true,
       repoFullName: true,
@@ -163,12 +205,23 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
   }
 
-  if (project.coolifyAppId) {
-    const deleted = await deleteApplication(project.coolifyAppId)
+  // Applications Coolify du projet (D2) : une par `ProjectApp`, plus le miroir
+  // `Project.coolifyAppId` de l'application principale. Un échec annule la
+  // suppression locale, jamais de conteneur orphelin silencieux.
+  const coolifyAppIds = [
+    ...new Set(
+      [project.coolifyAppId, ...project.apps.map((app) => app.coolifyAppId)].filter(
+        (appId): appId is string => Boolean(appId),
+      ),
+    ),
+  ]
+  for (const coolifyAppId of coolifyAppIds) {
+    const deleted = await deleteApplication(coolifyAppId)
     if ('error' in deleted) {
+      const appName = project.apps.find((app) => app.coolifyAppId === coolifyAppId)?.name
       return NextResponse.json(
         {
-          error: `L'application n'a pas pu être supprimée côté hébergement : ${deleted.error}`,
+          error: `L'application ${appName ? `« ${appName} » ` : ''}n'a pas pu être supprimée côté hébergement : ${deleted.error}`,
         },
         { status: 502 },
       )

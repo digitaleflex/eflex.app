@@ -8,9 +8,9 @@
  * donc une reprise ne provoque jamais de doublon côté Coolify.
  */
 import { Worker, type Job } from 'bullmq'
-import type { BuildPlan } from '@eflex/detector'
 import { prisma } from '@/lib/prisma'
 import { decrypt } from '@/lib/crypto'
+import { resolveDeploymentContext } from '@/lib/deployment-context'
 import {
   buildProjectArtifacts,
   buildApplicationLabels,
@@ -146,22 +146,19 @@ async function appendLogs(id: string, line: string): Promise<void> {
   })
 }
 
-function isBuildPlan(value: unknown): value is BuildPlan {
-  return typeof value === 'object' && value !== null && 'framework' in value && 'port' in value
-}
-
 export async function processDeployment(
   deploymentId: string,
   options: { rollback?: boolean } = {},
 ): Promise<void> {
   const deployment = await prisma.deployment.findUnique({
     where: { id: deploymentId },
-    include: { project: { include: { domains: true } } },
+    include: { project: { include: { domains: true } }, app: true },
   })
   if (!deployment) return
   if (isTerminal(deployment.status)) return // idempotence
 
   const project = deployment.project
+  const app = deployment.app
 
   // Retour arrière : la cible est le commit enregistré sur le déploiement. On
   // valide avant toute transition pour ne pas laisser un déploiement bloqué en
@@ -178,18 +175,17 @@ export async function processDeployment(
   // Annulé avant même le démarrage (job encore en file) : rien à faire.
   if (!(await setStatus(deploymentId, 'analyzing'))) return
 
-  const plan = project.plan as unknown
-  if (!isBuildPlan(plan)) {
-    await fail(deploymentId, 'Plan de build absent ou invalide : relancez la création du projet.')
+  // Résolution du contexte (lot C de D2) : plan, dossier, domaine et nom Coolify
+  // viennent de `ProjectApp` quand `Deployment.appId` est renseigné ; sinon des
+  // colonnes `Project.*` (chemin historique, strictement inchangé).
+  const resolved = resolveDeploymentContext({ project, app })
+  if ('error' in resolved) {
+    await fail(deploymentId, resolved.error)
     return
   }
-
-  const customHosts = project.domains
-    .filter((item) => item.verifiedAt !== null)
-    .map((item) => item.hostname)
-  const hosts = [project.domain, ...customHosts].filter((host): host is string => Boolean(host))
-  const domain = project.domain ?? hosts[0]
-  const artifacts = buildProjectArtifacts(plan, project.slug, domain)
+  const context = resolved.context
+  const { plan, hosts, domain } = context
+  const artifacts = buildProjectArtifacts(plan, context.deployKey, domain ?? undefined)
   const settings = coolifyApplicationSettings(plan)
   const composeSource = artifacts.repositoryCompose
   const kind = deploymentKind(plan, artifacts)
@@ -264,9 +260,21 @@ export async function processDeployment(
     !composeSource && artifacts.buildPack === 'dockerfile' && artifacts.dockerfile === null
   const attachedDomains = composeDomains(hosts, composeService)
 
-  let appId = project.coolifyAppId
+  let appId = app ? app.coolifyAppId : project.coolifyAppId
   let privateKeyUuid = project.coolifyPrivateKeyUuid ?? undefined
   const repoRef = parseGitHubUrl(project.repoUrl)
+
+  /** Écrit l'identifiant Coolify sur l'application et, pour l'app principale, sur le miroir `Project.*`. */
+  const saveCoolifyAppId = async (value: string): Promise<void> => {
+    if (app) {
+      await prisma.projectApp.update({ where: { id: app.id }, data: { coolifyAppId: value } })
+      if (context.primary) {
+        await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: value } })
+      }
+      return
+    }
+    await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: value } })
+  }
 
   // Dépôt privé : Coolify a besoin d'une deploy key. On la crée à la première
   // création d'application, puis on réutilise la clé stockée sur le projet.
@@ -304,7 +312,7 @@ export async function processDeployment(
 
   if (!appId) {
     const created = await createApplication({
-      name: project.slug,
+      name: context.deployKey,
       // Une deploy key ne fonctionne qu'avec l'URL SSH.
       gitRepository:
         privateKeyUuid && repoRef
@@ -331,11 +339,11 @@ export async function processDeployment(
             buildCommand: repoHasDockerfile ? undefined : settings.buildCommand,
             startCommand: repoHasDockerfile ? undefined : settings.startCommand,
             publishDirectory: repoHasDockerfile ? undefined : settings.publishDirectory,
-            fqdn: domain,
+            fqdn: domain ?? undefined,
             domains: hosts,
             customLabels:
               hosts.length > 0
-                ? buildApplicationLabels(project.slug, hosts, artifacts.portsExposes)
+                ? buildApplicationLabels(context.deployKey, hosts, artifacts.portsExposes)
                 : undefined,
             postDeploymentCommand:
               artifacts.postDeploy.length > 0 ? artifacts.postDeploy.join(' && ') : undefined,
@@ -346,6 +354,13 @@ export async function processDeployment(
       return
     }
     appId = created.id
+    await saveCoolifyAppId(appId)
+  }
+
+  // Miroir `Project.*` de l'application principale : même quand l'Application
+  // Coolify existait déjà, l'identifiant doit rester lisible par les routes qui
+  // n'ont pas encore été converties (logs, runtime, admin).
+  if (app && context.primary && appId && project.coolifyAppId !== appId) {
     await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: appId } })
   }
 
@@ -467,7 +482,7 @@ export async function processDeployment(
       )
     }
   } else if (hosts.length > 0) {
-    const labels = buildApplicationLabels(project.slug, hosts, artifacts.portsExposes)
+    const labels = buildApplicationLabels(context.deployKey, hosts, artifacts.portsExposes)
     const labeled = await setApplicationLabels(appId, labels, hosts)
     if ('error' in labeled) {
       await fail(deploymentId, `Configuration réseau non appliquée : ${labeled.error}`)
@@ -476,8 +491,14 @@ export async function processDeployment(
   }
 
   // Variables d'environnement : déchiffrées juste avant l'envoi, jamais en clair
-  // dans un fichier ou un log. Chaque erreur est vérifiée.
-  const envVars = await prisma.envVar.findMany({ where: { projectId: project.id } })
+  // dans un fichier ou un log. Chaque erreur est vérifiée. Les variables de
+  // portée projet sont diffusées à toutes les applications (lot C).
+  const envVars = await prisma.envVar.findMany({
+    where: {
+      projectId: project.id,
+      ...(app ? { OR: [{ appId: null }, { appId: app.id }] } : {}),
+    },
+  })
   for (const variable of envVars) {
     let value: string
     try {
@@ -582,11 +603,27 @@ export async function processDeployment(
           tlsExpiresAt: tls.expiresAt ? new Date(tls.expiresAt) : null,
           tlsCheckedAt: new Date(),
         }
+        // Domaine principal de l'application : `ProjectApp` (lot C) et miroir
+        // `Project.*` pour l'application principale. Les alias restent des
+        // `ProjectDomain`, rattachés à l'application quand `appId` est renseigné.
         if (host === domain) {
-          await prisma.project.update({ where: { id: project.id }, data })
+          if (app) {
+            await prisma.projectApp.update({ where: { id: app.id }, data })
+            if (context.primary) {
+              await prisma.project.update({ where: { id: project.id }, data })
+            }
+          } else {
+            await prisma.project.update({ where: { id: project.id }, data })
+          }
         } else {
           await prisma.projectDomain.updateMany({
-            where: { projectId: project.id, hostname: host },
+            where: {
+              projectId: project.id,
+              hostname: host,
+              ...(app
+                ? { OR: [{ appId: app.id }, ...(context.primary ? [{ appId: null }] : [])] }
+                : {}),
+            },
             data,
           })
         }

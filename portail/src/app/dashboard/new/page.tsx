@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { FrameworkIcon } from '@/components/framework-icon'
 import { DetectionCard } from '@/components/new-project/detection-card'
 import { ApplicationPicker } from '@/components/new-project/application-picker'
+import { ApplicationMultiSelect } from '@/components/new-project/application-multi-select'
 import { GitHubPicker } from '@/components/new-project/github-picker'
 import { frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 
@@ -40,6 +41,11 @@ export default function NewProjectPage() {
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzeError, setAnalyzeError] = useState('')
 
+  // Drapeau serveur `EFLEX_MULTI_APP` (lot C de D2) et applications
+  // supplémentaires cochées. Désactivé : l'écran reste mono-application.
+  const [multiApp, setMultiApp] = useState(false)
+  const [extraRoots, setExtraRoots] = useState<string[]>([])
+
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
@@ -47,6 +53,30 @@ export default function NewProjectPage() {
   const plans: BuildPlan[] = detection?.plan ? [detection.plan, ...detection.alternatives] : []
   const selectedPlan = plans.find((p) => p.framework === chosen) ?? plans[0] ?? null
   const applications = analysis?.apps ?? []
+
+  // Capacités de l'instance : le drapeau multi-applications est lu côté serveur.
+  useEffect(() => {
+    let active = true
+    fetch('/api/auth/config')
+      .then((response) => response.json())
+      .then((data: { multiApp?: boolean }) => {
+        if (active) setMultiApp(data.multiApp === true)
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [])
+
+  // Par défaut, toutes les autres applications détectées sont incluses : un
+  // monorepo se déploie en un clic, chaque case reste décochable.
+  useEffect(() => {
+    if (!multiApp || !analysis) {
+      setExtraRoots([])
+      return
+    }
+    setExtraRoots(analysis.apps.filter((app) => app.root !== root).map((app) => app.root))
+  }, [multiApp, analysis, root])
 
   // Place le focus sur le résultat dès qu'il arrive, pour les lecteurs d'écran et le clavier.
   useEffect(() => {
@@ -106,6 +136,19 @@ export default function NewProjectPage() {
     if (!analysis || !selectedPlan) return
     setSubmitting(true)
     setSubmitError('')
+    // Multi-applications : l'app analysée est principale, les autres sont
+    // ajoutées au même projet (le serveur re-analyse chaque dossier).
+    const extraApps = multiApp
+      ? analysis.apps.filter((app) => extraRoots.includes(app.root))
+      : []
+    const appsPayload = [
+      { root, framework: selectedPlan.framework, primary: true },
+      ...extraApps.map((app) => ({
+        root: app.root,
+        framework: app.framework ?? undefined,
+        primary: false,
+      })),
+    ]
     try {
       const res = await fetch('/api/projects', {
         method: 'POST',
@@ -117,6 +160,7 @@ export default function NewProjectPage() {
           commitSha: analysis.repo.commitSha,
           root: root || undefined,
           framework: selectedPlan.framework,
+          ...(appsPayload.length > 1 ? { apps: appsPayload } : {}),
           installationId: installationId || undefined,
           usePat: usePat || undefined,
           envVars: envVars.filter((v) => v.key.trim() !== ''),
@@ -241,6 +285,7 @@ export default function NewProjectPage() {
             apps={applications}
             selectedRoot={root}
             analyzing={analyzing}
+            multiApp={multiApp}
             onSelect={(appRoot) => void analyze(appRoot)}
             headingRef={selectedPlan ? undefined : resultHeading}
           />
@@ -333,6 +378,19 @@ export default function NewProjectPage() {
                   ))}
                 </fieldset>
               </details>
+            )}
+
+            {multiApp && applications.length > 1 && (
+              <ApplicationMultiSelect
+                apps={applications}
+                primaryRoot={root}
+                selected={extraRoots}
+                onToggle={(appRoot, checked) =>
+                  setExtraRoots((roots) =>
+                    checked ? [...new Set([...roots, appRoot])] : roots.filter((item) => item !== appRoot),
+                  )
+                }
+              />
             )}
 
             {/* 3. Création */}

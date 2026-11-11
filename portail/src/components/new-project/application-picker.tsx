@@ -18,12 +18,15 @@ export function ApplicationPicker({
   analyzing,
   onSelect,
   headingRef,
+  multiApp = false,
 }: {
   apps: DetectedApplication[]
   selectedRoot: string
   analyzing: boolean
   onSelect: (root: string) => void
   headingRef?: React.Ref<HTMLHeadingElement>
+  /** Drapeau `EFLEX_MULTI_APP` : la sélection multiple suit cette analyse. */
+  multiApp?: boolean
 }) {
   return (
     <Card>
@@ -32,8 +35,9 @@ export function ApplicationPicker({
           {apps.length} applications détectées
         </h2>
         <p className="text-sm text-muted-foreground">
-          Choisissez l&apos;application à analyser. Dans cette version, Eflex déploie une seule
-          application par projet.
+          {multiApp
+            ? "Choisissez l'application principale à analyser. Les autres pourront rejoindre le même projet juste après."
+            : "Choisissez l'application à analyser. Dans cette version, Eflex déploie une seule application par projet."}
         </p>
       </CardHeader>
       <CardContent>
