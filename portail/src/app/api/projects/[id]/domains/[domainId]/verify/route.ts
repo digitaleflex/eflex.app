@@ -28,6 +28,8 @@ export async function POST(
     select: {
       id: true,
       hostname: true,
+      appId: true,
+      app: { select: { id: true, name: true } },
       project: { select: { id: true, name: true, organizationId: true, coolifyAppId: true } },
     },
   })
@@ -47,15 +49,17 @@ export async function POST(
   })
 
   let deploymentId: string | null = null
-  if (domain.project.coolifyAppId) {
-    const queued = await enqueueProjectDeployment(domain.project)
+  if (domain.project.coolifyAppId || domain.app) {
+    const queued = await enqueueProjectDeployment(domain.project, {
+      apps: domain.app ? [{ id: domain.app.id, name: domain.app.name }] : undefined,
+    })
     if ('error' in queued) {
       return NextResponse.json(
         { error: `DNS vérifié, mais le déploiement n’a pas pu démarrer : ${queued.error}` },
         { status: 503 },
       )
     }
-    deploymentId = queued.deploymentId
+    deploymentId = queued.deploymentId ?? queued.deployments?.[0]?.id ?? null
   }
 
   return NextResponse.json({

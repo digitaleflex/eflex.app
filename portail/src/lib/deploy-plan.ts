@@ -200,6 +200,19 @@ export function deploymentKind(plan: BuildPlan, artifacts: DeploymentArtifacts):
   return artifacts.services.length > 1 ? 'multiple-without-compose' : 'single'
 }
 
+/**
+ * Mode de construction réellement utilisé par Coolify pour ce plan (affichage
+ * et logique portail). Le renderer n'expose que dockercompose/dockerfile ; les
+ * frameworks sans Dockerfile ni compose fourni sont construits avec Nixpacks.
+ */
+export function effectiveBuildPack(
+  plan: BuildPlan,
+): 'dockercompose' | 'dockerfile' | 'nixpacks' {
+  if (plan.framework === 'compose') return 'dockercompose'
+  if (plan.framework === 'docker') return 'dockerfile'
+  return 'nixpacks'
+}
+
 /** Normalise un domaine en nom d'hôte (sans schéma ni chemin). */
 export function normalizeHost(domain: string): string {
   return domain.trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '')

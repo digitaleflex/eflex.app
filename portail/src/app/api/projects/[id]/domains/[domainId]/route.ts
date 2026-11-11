@@ -26,6 +26,8 @@ export async function DELETE(
     where: { id: domainId, projectId: id, project: { organizationId: org.organizationId } },
     select: {
       id: true,
+      appId: true,
+      app: { select: { id: true, name: true } },
       project: { select: { id: true, name: true, organizationId: true, coolifyAppId: true } },
     },
   })
@@ -34,9 +36,11 @@ export async function DELETE(
   await prisma.projectDomain.delete({ where: { id: domain.id } })
 
   let deploymentId: string | null = null
-  if (domain.project.coolifyAppId) {
-    const queued = await enqueueProjectDeployment(domain.project)
-    if (!('error' in queued)) deploymentId = queued.deploymentId
+  if (domain.project.coolifyAppId || domain.app) {
+    const queued = await enqueueProjectDeployment(domain.project, {
+      apps: domain.app ? [{ id: domain.app.id, name: domain.app.name }] : undefined,
+    })
+    if (!('error' in queued)) deploymentId = queued.deploymentId ?? queued.deployments?.[0]?.id ?? null
   }
 
   return NextResponse.json({

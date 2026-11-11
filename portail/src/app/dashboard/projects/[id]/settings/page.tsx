@@ -29,7 +29,11 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
         domain: true,
         coolifyAppId: true,
         // Les valeurs ne quittent jamais le serveur : on n'envoie que les noms.
-        envVars: { select: { key: true, updatedAt: true }, orderBy: { key: 'asc' } },
+        envVars: { select: { key: true, updatedAt: true, appId: true }, orderBy: { key: 'asc' } },
+        apps: {
+          orderBy: [{ position: 'asc' }, { name: 'asc' }],
+          select: { id: true, name: true, root: true, domain: true, framework: true },
+        },
       },
     }),
     // Organisations de destination possibles : rôles autorisés uniquement, jamais les
@@ -60,10 +64,18 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
           domain: project.domain,
           coolifyAppId: project.coolifyAppId,
         }}
+        apps={project.apps.map((app) => ({
+          id: app.id,
+          name: app.name,
+          root: app.root,
+          domain: app.domain,
+          framework: app.framework,
+        }))}
         transferTargets={transferTargets}
         envVars={project.envVars.map((item) => ({
           key: item.key,
           updatedAt: item.updatedAt.toISOString(),
+          appId: item.appId,
         }))}
       />
     </div>

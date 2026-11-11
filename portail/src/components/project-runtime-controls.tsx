@@ -38,9 +38,19 @@ const TONE: Record<'success' | 'warning' | 'danger' | 'muted', string> = {
   muted: 'bg-muted-foreground/50',
 }
 
+export type RuntimeControlApp = { id: string; name: string }
+
 /** Statut du conteneur et actions Coolify (démarrer / arrêter / redémarrer). */
-export function ProjectRuntimeControls({ projectId }: { projectId: string }) {
+export function ProjectRuntimeControls({
+  projectId,
+  apps = [],
+}: {
+  projectId: string
+  /** Applications du projet (multi-app) ; vide ou 1 élément = pas de sélecteur. */
+  apps?: readonly RuntimeControlApp[]
+}) {
   const router = useRouter()
+  const [selectedAppId, setSelectedAppId] = useState<string>(apps[0]?.id ?? '')
   const [runtime, setRuntime] = useState<Runtime | null>(null)
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState<Action | null>(null)
@@ -49,10 +59,12 @@ export function ProjectRuntimeControls({ projectId }: { projectId: string }) {
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/runtime`, { cache: 'no-store' })
+      const query = apps.length > 1 && selectedAppId ? `?appId=${encodeURIComponent(selectedAppId)}` : ''
+      const response = await fetch(`/api/projects/${projectId}/runtime${query}`, { cache: 'no-store' })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
         setFeedback({ tone: 'error', message: data.error ?? 'Statut indisponible.' })
+        setRuntime(null)
         return
       }
       setRuntime(data as Runtime)
@@ -62,9 +74,10 @@ export function ProjectRuntimeControls({ projectId }: { projectId: string }) {
     } finally {
       setLoading(false)
     }
-  }, [projectId])
+  }, [projectId, apps.length, selectedAppId])
 
   useEffect(() => {
+    setLoading(true)
     void load()
   }, [load])
 
@@ -75,7 +88,7 @@ export function ProjectRuntimeControls({ projectId }: { projectId: string }) {
       const response = await fetch(`/api/projects/${projectId}/runtime`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, ...(apps.length > 1 && selectedAppId ? { appId: selectedAppId } : {}) }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -111,6 +124,23 @@ export function ProjectRuntimeControls({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-4">
+      {apps.length > 1 && (
+        <label className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm [@media(pointer:coarse)]:min-h-11">
+          <span className="text-muted-foreground">Application</span>
+          <select
+            value={selectedAppId}
+            onChange={(e) => setSelectedAppId(e.target.value)}
+            className="min-h-7 bg-transparent text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {apps.map((app) => (
+              <option key={app.id} value={app.id}>
+                {app.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
       {feedback && (
         <p
           role={feedback.tone === 'error' ? 'alert' : 'status'}
@@ -124,7 +154,7 @@ export function ProjectRuntimeControls({ projectId }: { projectId: string }) {
         </p>
       )}
 
-      {runtime.error && (
+      {runtime?.error && (
         <p className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-foreground">
           Statut de l’hébergement indisponible : {runtime.error}
         </p>

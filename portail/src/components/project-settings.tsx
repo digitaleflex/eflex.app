@@ -32,6 +32,15 @@ type Feedback = { tone: 'success' | 'error'; message: string } | null
 interface EnvVarKey {
   key: string
   updatedAt: string
+  appId?: string | null
+}
+
+interface SettingsApp {
+  id: string
+  name: string
+  root: string
+  domain: string | null
+  framework: string
 }
 
 interface ProjectSettingsProps {
@@ -43,6 +52,7 @@ interface ProjectSettingsProps {
     domain: string | null
     coolifyAppId: string | null
   }
+  apps?: SettingsApp[]
   envVars: EnvVarKey[]
   transferTargets: TransferTarget[]
 }
@@ -98,8 +108,10 @@ const dateFormat = new Intl.DateTimeFormat('fr-FR', {
   timeStyle: 'short',
 })
 
-export function ProjectSettings({ project, envVars: initialEnvVars, transferTargets }: ProjectSettingsProps) {
+export function ProjectSettings({ project, apps = [], envVars: initialEnvVars, transferTargets }: ProjectSettingsProps) {
   const router = useRouter()
+  const appNameById = new Map(apps.map((app) => [app.id, app.name]))
+  const multiApp = apps.length > 1
 
   const [name, setName] = useState(project.name)
   const [branch, setBranch] = useState(project.branch)
@@ -338,7 +350,14 @@ export function ProjectSettings({ project, envVars: initialEnvVars, transferTarg
                 {envVars.map((item) => (
                   <li key={item.key} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
-                      <p className="font-mono text-sm break-all">{item.key}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-mono text-sm break-all">{item.key}</p>
+                        {multiApp && (
+                          <span className="rounded-full border border-border px-1.5 text-[11px] text-muted-foreground">
+                            {item.appId ? `App : ${appNameById.get(item.appId) ?? 'inconnue'}` : 'Toutes les apps'}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         Mise à jour le {dateFormat.format(new Date(item.updatedAt))}
                       </p>
@@ -431,13 +450,47 @@ export function ProjectSettings({ project, envVars: initialEnvVars, transferTarg
         </div>
       </SettingsSection>
 
+      {multiApp && (
+        <SettingsSection
+          id="applications"
+          title="Applications"
+          icon={Settings}
+          description={`${apps.length} applications déployées depuis ce dépôt. Les domaines, l’exécution et les journaux se consultent par application.`}
+        >
+          <ul className="divide-y divide-border rounded-lg border border-border">
+            {apps.map((app) => (
+              <li key={app.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium">{app.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-mono">{app.root || '/'}</span> · {app.framework}
+                  </p>
+                </div>
+                {app.domain ? (
+                  <a
+                    href={`https://${app.domain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="truncate text-xs font-medium text-primary hover:underline"
+                  >
+                    {app.domain}
+                  </a>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Non exposée</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </SettingsSection>
+      )}
+
       <SettingsSection
         id="domaines"
         title="Domaines"
         icon={Globe}
         description="Le domaine Eflex reste stable. Ajoutez vos propres domaines avec un CNAME ; le certificat SSL est émis automatiquement après vérification."
       >
-        <ProjectDomains projectId={project.id} />
+        <ProjectDomains projectId={project.id} apps={apps.map((app) => ({ id: app.id, name: app.name }))} />
       </SettingsSection>
 
       <SettingsSection
@@ -455,7 +508,7 @@ export function ProjectSettings({ project, envVars: initialEnvVars, transferTarg
         icon={Activity}
         description="Statut du conteneur sur la plateforme et actions immédiates. Le redéploiement complet reste disponible depuis la page du projet."
       >
-        <ProjectRuntimeControls projectId={project.id} />
+        <ProjectRuntimeControls projectId={project.id} apps={apps.map((app) => ({ id: app.id, name: app.name }))} />
       </SettingsSection>
 
       <SettingsSection

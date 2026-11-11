@@ -68,10 +68,15 @@ export function ProjectCard({ project }: { project: DashboardProject }) {
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
         <FrameworkTile framework={project.framework} name={project.name} />
         <div className="min-w-0">
-          <h3 className="truncate text-sm font-semibold leading-5">
-            <Link href={`/dashboard/projects/${project.id}`} className="after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none">
+          <h3 className="flex items-center gap-2 truncate text-sm font-semibold leading-5">
+            <Link href={`/dashboard/projects/${project.id}`} className="min-w-0 truncate after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none">
               {project.name}
             </Link>
+            {project.appCount > 1 && (
+              <span className="shrink-0 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                {project.appCount} apps
+              </span>
+            )}
           </h3>
           {project.domain ? (
             <div className="flex items-center gap-1.5">
@@ -142,8 +147,13 @@ export function ProjectRow({ project }: { project: DashboardProject }) {
     <li className="relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 hover:bg-muted/50 sm:grid-cols-[auto_minmax(0,2fr)_minmax(0,1.5fr)_8rem_auto]">
       <FrameworkTile framework={project.framework} name={project.name} size="sm" />
       <div className="min-w-0">
-        <Link href={`/dashboard/projects/${project.id}`} className="block truncate text-sm font-semibold after:absolute after:inset-0 focus-visible:outline-none">
-          {project.name}
+        <Link href={`/dashboard/projects/${project.id}`} className="flex min-w-0 items-center gap-2 truncate text-sm font-semibold after:absolute after:inset-0 focus-visible:outline-none">
+          <span className="truncate">{project.name}</span>
+          {project.appCount > 1 && (
+            <span className="shrink-0 rounded-full border border-border bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {project.appCount} apps
+            </span>
+          )}
         </Link>
         <p className="truncate text-xs text-muted-foreground">{project.domain ?? 'Pas encore de domaine'}</p>
       </div>

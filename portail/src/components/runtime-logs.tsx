@@ -1,24 +1,35 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RefreshCw, TerminalSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
+export type RuntimeLogApp = {
+  id: string
+  name: string
+  /** Services compose déclarés par le plan de l'application. */
+  services?: readonly string[]
+}
+
 /**
  * Journaux d'exécution du conteneur (Coolify), rafraîchis automatiquement.
- * Pour un compose, un sélecteur permet de lire les logs d'un service précis
- * (`service_name` dans l'API Coolify). Les valeurs des variables
- * d'environnement connues sont masquées côté serveur.
+ * Pour un compose, un sélecteur permet de lire les logs d'un service précis.
+ * En multi-app, un sélecteur d'application cible l'instance à consulter.
+ * Les valeurs des variables d'environnement connues sont masquées côté serveur.
  */
 export function RuntimeLogs({
   projectId,
   services = [],
+  apps = [],
 }: {
   projectId: string
   /** Services compose ; vide pour une application mono-service. */
   services?: readonly string[]
+  /** Applications du projet (multi-app) ; vide ou 1 élément = pas de sélecteur. */
+  apps?: readonly RuntimeLogApp[]
 }) {
+  const [selectedAppId, setSelectedAppId] = useState<string>(apps[0]?.id ?? '')
   const [logs, setLogs] = useState('')
   const [updatedAt, setUpdatedAt] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -28,10 +39,23 @@ export function RuntimeLogs({
   const [service, setService] = useState('')
   const timer = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  const activeServices = useMemo(() => {
+    if (apps.length > 1) {
+      const current = apps.find((app) => app.id === selectedAppId) ?? apps[0]
+      return current?.services ?? []
+    }
+    return services
+  }, [apps, selectedAppId, services])
+
+  useEffect(() => {
+    setService('')
+  }, [selectedAppId])
+
   const load = useCallback(async () => {
     try {
       const query = new URLSearchParams({ lines: '200' })
       if (service !== '') query.set('service', service)
+      if (apps.length > 1 && selectedAppId) query.set('appId', selectedAppId)
       const response = await fetch(`/api/projects/${projectId}/logs?${query.toString()}`, {
         cache: 'no-store',
       })
@@ -48,9 +72,10 @@ export function RuntimeLogs({
     } finally {
       setLoading(false)
     }
-  }, [projectId, service])
+  }, [projectId, service, apps.length, selectedAppId])
 
   useEffect(() => {
+    setLoading(true)
     void load()
   }, [load])
 
@@ -93,7 +118,23 @@ export function RuntimeLogs({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {services.length > 0 && (
+          {apps.length > 1 && (
+            <label className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm [@media(pointer:coarse)]:min-h-11">
+              <span className="text-muted-foreground">Application</span>
+              <select
+                value={selectedAppId}
+                onChange={(e) => setSelectedAppId(e.target.value)}
+                className="min-h-7 bg-transparent text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {apps.map((app) => (
+                  <option key={app.id} value={app.id}>
+                    {app.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {activeServices.length > 0 && (
             <label className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm [@media(pointer:coarse)]:min-h-11">
               <span className="text-muted-foreground">Service</span>
               <select
@@ -102,7 +143,7 @@ export function RuntimeLogs({
                 className="min-h-7 bg-transparent font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="">tous</option>
-                {services.map((name) => (
+                {activeServices.map((name) => (
                   <option key={name} value={name}>
                     {name}
                   </option>
