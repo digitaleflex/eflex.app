@@ -59,6 +59,9 @@ export async function POST(
       id: true,
       status: true,
       coolifyBuildId: true,
+      groupId: true,
+      appId: true,
+      app: { select: { name: true } },
       project: { select: { id: true, name: true, organizationId: true } },
     },
   })
@@ -102,6 +105,9 @@ export async function POST(
     projectName: deployment.project.name,
     deploymentId: deployment.id,
     status: 'cancelled',
+    groupId: deployment.groupId,
+    appId: deployment.appId,
+    appName: deployment.app?.name ?? null,
   })
 
   return NextResponse.json({

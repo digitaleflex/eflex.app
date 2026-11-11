@@ -86,7 +86,7 @@ export default async function AdminOrganizationPage({ params }: { params: Promis
   })
   if (!organization) notFound()
 
-  const [auditLogs, projectCount, memberCount, pendingInvitations] = await Promise.all([
+  const [auditLogs, projectCount, memberCount, pendingInvitations, appCount, implicitProjectCount] = await Promise.all([
     prisma.auditLog.findMany({
       where: { organizationId: organization.id },
       orderBy: { createdAt: 'desc' },
@@ -96,6 +96,8 @@ export default async function AdminOrganizationPage({ params }: { params: Promis
     prisma.project.count({ where: { organizationId: organization.id } }),
     prisma.member.count({ where: { organizationId: organization.id } }),
     prisma.invitation.count({ where: { organizationId: organization.id, status: 'pending' } }),
+    prisma.projectApp.count({ where: { project: { organizationId: organization.id } } }),
+    prisma.project.count({ where: { organizationId: organization.id, apps: { none: {} } } }),
   ])
 
   const state = computeBillingState(
@@ -107,7 +109,7 @@ export default async function AdminOrganizationPage({ params }: { params: Promis
     },
     now,
   )
-  const usage = { projects: projectCount, members: memberCount }
+  const usage = { projects: projectCount, members: memberCount, apps: appCount + implicitProjectCount }
   const periodPrice = organization.subscription?.priceFcfa ?? 0
 
   return (
@@ -186,11 +188,11 @@ export default async function AdminOrganizationPage({ params }: { params: Promis
         <Card>
           <CardHeader><h2 className="font-semibold">Consommation et quotas</h2></CardHeader>
           <CardContent className="space-y-4 text-sm">
-            <Usage label="Projets" value={usage.projects} limit={state.limits.projects} />
+            <Usage label="Applications" value={usage.apps} limit={state.limits.projects} />
             <Usage label="Membres" value={usage.members} limit={state.limits.members} />
             <p className="text-xs text-muted-foreground">
-              Domaines personnalisés : <span className="tabular-nums">{state.limits.customDomains}</span> par projet
-              (non consommés ici).
+              Projets réels : <span className="font-medium tabular-nums">{usage.projects}</span>. Domaines personnalisés :{' '}
+              <span className="tabular-nums">{state.limits.customDomains}</span> par projet (non consommés ici).
             </p>
             {(organization.subscription?.projectLimitOverride != null || organization.subscription?.memberLimitOverride != null) && (
               <p className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">

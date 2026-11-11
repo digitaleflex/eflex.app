@@ -62,7 +62,12 @@ async function announce(deploymentId: string, status: string): Promise<void> {
   try {
     const d = await prisma.deployment.findUnique({
       where: { id: deploymentId },
-      select: { project: { select: { id: true, name: true, organizationId: true } } },
+      select: {
+        groupId: true,
+        appId: true,
+        app: { select: { name: true } },
+        project: { select: { id: true, name: true, organizationId: true } },
+      },
     })
     if (!d) return
     await announceDeploymentStatus({
@@ -71,6 +76,9 @@ async function announce(deploymentId: string, status: string): Promise<void> {
       projectName: d.project.name,
       deploymentId,
       status,
+      groupId: d.groupId,
+      appId: d.appId,
+      appName: d.app?.name ?? null,
     })
   } catch (error) {
     console.error('[eflex/worker] annonce du statut impossible :', error instanceof Error ? error.message : error)

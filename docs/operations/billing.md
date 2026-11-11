@@ -9,6 +9,24 @@ facture jamais, n'appelle ni Kkiapay ni FedaPay et ne supprime aucune donnée :
 elle constate les échéances, ouvre/ferme la période de grâce et expire les
 paiements abandonnés.
 
+## Unité de quota (D2)
+
+Depuis le lot D2, le quota « projets » des plans (`limits.projects` /
+`Subscription.projectLimitOverride`, exposé comme `projectLimit` dans les plans
+et l'API admin) est compté en **applications déployables** et non en projets.
+
+- **Consommation quota** (`usage.apps` dans `billingSummary`) : nombre de lignes
+  `ProjectApp` de l’organisation **+** nombre de projets historiques sans aucune
+  `ProjectApp` (une application implicite par projet, même formule que
+  `assertProjectQuota`).
+- **Projets réels** (`usage.projects` dans `billingSummary`, conservé pour
+  compatibilité) : `Project.count` de l’organisation.
+- **Limite** : `limits.projects` (issue du plan effectif ou d’une dérogation
+  `projectLimitOverride`) exprime le **nombre maximal d’applications** autorisées.
+  Le nom du champ est conservé pour compatibilité de schéma/API.
+- Les créations refusées au quota, les barres de consommation et les alertes
+  admin se basent sur `usage.apps` face à `limits.projects`.
+
 ## 1. Règles appliquées
 
 | Situation constatée | Action | Statut après | Limites / accès |
@@ -105,6 +123,18 @@ abonnements, même si l'échéance est ancienne. Un administrateur peut les fair
 - Aucun montant, secret, jeton ou valeur de variable n'est inclus.
 
 ## 5. Exploitation
+
+### Résumé de facturation (`billingSummary`)
+
+`billingSummary(organizationId)` (`portail/src/lib/billing.ts`) expose notamment :
+
+- `plan`, `subscribedPlan`, `phase`, `status`, dates et blocages ;
+- `limits.projects` : quota maximal d’**applications** (unité D2 ; le nom du champ
+  reste `projects` pour compatibilité) ;
+- `usage.projects` : nombre réel de projets (compatibilité) ;
+- `usage.apps` : consommation du quota d’applications (`ProjectApp` + projets
+  implicites sans app) ;
+- `usage.members` : membres de l’organisation.
 
 ### Vérifier les abonnements concernés
 

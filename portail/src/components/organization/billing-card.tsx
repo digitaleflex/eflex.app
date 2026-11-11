@@ -25,7 +25,7 @@ interface BillingSummary {
   blockCode: string | null
   message: string | null
   manualOverride: boolean
-  usage: { projects: number; members: number }
+  usage: { projects: number; members: number; apps: number }
   limits: { projects: number; members: number; customDomains: number }
   canManage: boolean
   providers: { kkiapay: boolean; fedapay: boolean }
@@ -349,10 +349,13 @@ export function BillingCard() {
             )}
           </div>
           <div className="space-y-3 rounded-lg border border-border p-4">
-            <UsageBar label="Projets" value={data.usage.projects} limit={data.limits.projects} />
+            <UsageBar label="Applications" value={data.usage.apps} limit={data.limits.projects} />
             <UsageBar label="Membres" value={data.usage.members} limit={data.limits.members} />
             <p className="text-xs text-muted-foreground">
               Domaines personnalisés : {data.limits.customDomains} par projet.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Projets réels : <span className="font-medium tabular-nums">{data.usage.projects}</span>.
             </p>
           </div>
         </div>
@@ -379,7 +382,7 @@ export function BillingCard() {
                   <p className="mt-1 text-xs text-muted-foreground">{plan.tagline}</p>
                 </div>
                 <ul className="space-y-1 text-xs text-muted-foreground">
-                  <li>{plan.projectLimit} projets</li>
+                  <li>{plan.projectLimit} applications</li>
                   <li>{plan.memberLimit} membres</li>
                   <li>{plan.customDomainLimit} domaines par projet</li>
                 </ul>

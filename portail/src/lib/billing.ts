@@ -275,18 +275,24 @@ export interface BillingSummary {
   message: string | null
   manualOverride: boolean
   usage: {
+    /** Nombre réel de projets de l’organisation (compatibilité). */
     projects: number
     members: number
+    /** Consommation du quota d’applications (`ProjectApp` + projets implicites sans app). */
+    apps: number
   }
   limits: BillingLimits
 }
 
 /** Résumé complet pour l'interface (plan, statut, consommation). */
 export async function billingSummary(organizationId: string): Promise<BillingSummary> {
-  const [state, projects, members] = await Promise.all([
+  const [state, projects, members, apps, implicitProjects] = await Promise.all([
     loadBillingState(organizationId),
     prisma.project.count({ where: { organizationId } }),
     prisma.member.count({ where: { organizationId } }),
+    prisma.projectApp.count({ where: { project: { organizationId } } }),
+    // Projet historique sans `ProjectApp` : une application implicite (même formule que `assertProjectQuota`).
+    prisma.project.count({ where: { organizationId, apps: { none: {} } } }),
   ])
 
   return {
@@ -305,7 +311,7 @@ export async function billingSummary(organizationId: string): Promise<BillingSum
     blockCode: state.blockCode,
     message: state.message,
     manualOverride: state.manualOverride,
-    usage: { projects, members },
+    usage: { projects, members, apps: apps + implicitProjects },
     limits: state.limits,
   }
 }

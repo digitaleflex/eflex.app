@@ -256,7 +256,7 @@ export function OrganizationAdminActions({
         </h3>
         <div className="flex flex-wrap items-end gap-3">
           <label className="space-y-1 text-sm">
-            <span className="block text-muted-foreground">Projets</span>
+            <span className="block text-muted-foreground">Applications (quota)</span>
             <input
               type="number"
               min={0}
@@ -264,7 +264,7 @@ export function OrganizationAdminActions({
               value={projectLimit}
               onChange={(e) => setProjectLimit(e.target.value)}
               placeholder="—"
-              className="h-11 w-28 rounded-lg border border-input bg-background px-3 text-sm tabular-nums"
+              className="h-11 w-32 rounded-lg border border-input bg-background px-3 text-sm tabular-nums"
             />
           </label>
           <label className="space-y-1 text-sm">

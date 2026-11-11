@@ -35,19 +35,30 @@ export default async function AdminReconciliationPage() {
       slug: true,
       coolifyAppId: true,
       organization: { select: { name: true } },
+      apps: {
+        orderBy: { position: 'asc' },
+        select: { id: true, name: true, coolifyAppId: true },
+      },
     },
   })
 
   const listed = await listApplications(8_000)
   const checkedAt = new Date()
 
-  const refs = projects.map((project) => ({
-    id: project.id,
-    name: project.name,
-    slug: project.slug,
-    coolifyAppId: project.coolifyAppId,
-    organizationName: project.organization.name,
-  }))
+  const refs = projects.map((project) => {
+    const appRefs =
+      project.apps.length > 0
+        ? project.apps.map((app) => ({ label: app.name, coolifyAppId: app.coolifyAppId }))
+        : [{ label: 'Application principale', coolifyAppId: project.coolifyAppId }]
+    return {
+      id: project.id,
+      name: project.name,
+      slug: project.slug,
+      coolifyAppId: project.coolifyAppId,
+      organizationName: project.organization.name,
+      appRefs,
+    }
+  })
 
   const applications = 'applications' in listed
     ? listed.applications.map(applicationRef).filter((app): app is AdminApplicationRef => app !== null)
@@ -125,31 +136,36 @@ export default async function AdminReconciliationPage() {
 
           <Card>
             <div className="flex flex-wrap items-center justify-between gap-2 p-4 pb-2">
-              <h2 className="text-sm font-semibold">Projets sans application côté hébergement</h2>
+              <h2 className="text-sm font-semibold">Références d’applications absentes côté hébergement</h2>
               <Badge variant={result.missing.length === 0 ? 'success' : 'warning'}>{result.missing.length}</Badge>
             </div>
             {result.missing.length === 0 ? (
               <p className="p-4 pt-0 text-sm text-muted-foreground">
-                Toutes les références d’application existent côté hébergement.
+                Toutes les références d’applications des projets existent côté hébergement.
               </p>
             ) : (
               <ul className="divide-y divide-border">
-                {result.missing.map((project) => (
-                  <li key={project.id} className="space-y-1 px-4 py-3">
-                    <Link href={`/admin/projects/${project.id}`} className="text-sm font-medium hover:underline">
-                      {project.name}
+                {result.missing.map((entry) => (
+                  <li key={`${entry.id}:${entry.missingCoolifyAppId}`} className="space-y-1 px-4 py-3">
+                    <Link href={`/admin/projects/${entry.id}`} className="text-sm font-medium hover:underline">
+                      {entry.name}
                     </Link>
                     <p className="text-xs text-muted-foreground">
-                      {project.organizationName} · <span className="font-mono">{project.slug}</span>
+                      {entry.organizationName} · <span className="font-mono">{entry.slug}</span>
                     </p>
-                    <p className="break-all font-mono text-xs text-muted-foreground">Référence : {project.coolifyAppId}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Application : <span className="font-medium text-foreground">{entry.missingAppLabel}</span>
+                    </p>
+                    <p className="break-all font-mono text-xs text-muted-foreground">
+                      Référence : {entry.missingCoolifyAppId}
+                    </p>
                   </li>
                 ))}
               </ul>
             )}
             <p className="px-4 pb-4 pt-2 text-xs text-muted-foreground">
-              Application supprimée hors Eflex ? Ouvrez la fiche du projet : vous pouvez effacer la référence locale en
-              supprimant l’application côté infrastructure, ou relancer un déploiement pour la recréer.
+              Application supprimée hors Eflex ? Ouvrez la fiche du projet : vous pouvez relancer un déploiement pour la
+              recréer ou corriger la référence depuis les opérations d’infrastructure.
             </p>
           </Card>
         </div>
