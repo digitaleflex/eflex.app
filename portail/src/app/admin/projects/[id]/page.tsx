@@ -51,24 +51,46 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
         select: { id: true, commitSha: true, status: true, createdAt: true },
       },
       domains: { orderBy: { createdAt: 'asc' }, select: { id: true, hostname: true, verifiedAt: true } },
+      apps: {
+        orderBy: { position: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          coolifyAppId: true,
+          framework: true,
+          domain: true,
+          tlsValid: true,
+          tlsExpiresAt: true,
+          tlsCheckedAt: true,
+        },
+      },
       _count: { select: { envVars: true } },
     },
   })
   if (!project) notFound()
 
-  const [active, runtime] = await Promise.all([
+  const appRefs =
+    project.apps.length > 0
+      ? project.apps.map((app) => ({ label: app.name, coolifyAppId: app.coolifyAppId, app }))
+      : project.coolifyAppId
+        ? [{ label: 'Application principale', coolifyAppId: project.coolifyAppId, app: null as null }]
+        : []
+
+  const [active, runtimes] = await Promise.all([
     prisma.deployment.findFirst({
       where: { projectId: project.id, status: { in: [...ACTIVE_DEPLOYMENT_STATUSES] } },
       orderBy: { createdAt: 'desc' },
       select: { id: true, status: true },
     }),
-    project.coolifyAppId ? getApplicationRuntime(project.coolifyAppId, 3_000) : Promise.resolve(null),
+    Promise.all(
+      appRefs.map(async (ref) => ({
+        ...ref,
+        runtime: ref.coolifyAppId ? await getApplicationRuntime(ref.coolifyAppId, 3_000) : null,
+      })),
+    ),
   ])
-  const runtimeStatus = runtime && !('error' in runtime) ? runtime.status : null
-  const runtimeError = runtime && 'error' in runtime ? runtime.error : null
-  const health = project.coolifyAppId
-    ? applicationHealth(runtimeStatus)
-    : { label: 'Pas encore déployé', detail: 'Aucune application sur l’infrastructure.', tone: 'muted' as const }
+
+  const anyApplication = appRefs.some((ref) => ref.coolifyAppId)
   const certificate = tlsHealth(project.tlsValid, project.tlsExpiresAt, project.tlsCheckedAt, now.getTime())
   const last = project.deployments[0] ?? null
 
@@ -124,7 +146,7 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
         <AdminProjectActions
           projectId={project.id}
           projectName={project.name}
-          hasApplication={Boolean(project.coolifyAppId)}
+          hasApplication={anyApplication}
           activeDeploymentId={active?.id ?? null}
           activeDeploymentStatus={active?.status ?? null}
         />
@@ -182,36 +204,58 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
             <Server className="h-4 w-4 text-primary" aria-hidden="true" />
             Infrastructure
           </h2>
-          <dl className="mt-3 space-y-2 text-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <dt className="text-muted-foreground">Application Coolify</dt>
-              <dd className="break-all font-mono text-xs">{project.coolifyAppId ?? 'Aucune'}</dd>
-            </div>
-            <div className="flex flex-wrap justify-between gap-2">
-              <dt className="text-muted-foreground">Statut runtime</dt>
-              <dd>{health.label}</dd>
-            </div>
-            <div className="flex flex-wrap justify-between gap-2">
-              <dt className="text-muted-foreground">Certificat</dt>
-              <dd className="flex items-center gap-1.5">
-                {certificate.tone === 'success' ? (
-                  <ShieldCheck className="h-4 w-4 text-success" aria-hidden="true" />
-                ) : (
-                  <ShieldAlert className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                )}
-                {certificate.label}
-              </dd>
-            </div>
-          </dl>
-          {certificate.detail && <p className="mt-2 text-xs text-muted-foreground">{certificate.detail}</p>}
-          {runtimeError && (
-            <p role="status" className="mt-3 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs">
-              Statut runtime indisponible : {runtimeError}
-            </p>
-          )}
-          {!project.coolifyAppId && (
-            <p className="mt-3 text-xs text-muted-foreground">
+          {runtimes.length === 0 ? (
+            <p className="mt-3 text-sm text-muted-foreground">
               Aucune application sur l’infrastructure : un déploiement la créera.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-3">
+              {runtimes.map((ref) => {
+                const runtimeStatus = ref.runtime && !('error' in ref.runtime) ? ref.runtime.status : null
+                const appRuntimeError = ref.runtime && 'error' in ref.runtime ? ref.runtime.error : null
+                const appHealth = ref.coolifyAppId
+                  ? applicationHealth(runtimeStatus)
+                  : { label: 'Pas encore déployé', detail: 'Aucune application sur l’infrastructure.', tone: 'muted' as const }
+                const appCert = ref.app
+                  ? tlsHealth(ref.app.tlsValid, ref.app.tlsExpiresAt, ref.app.tlsCheckedAt, now.getTime())
+                  : certificate
+                return (
+                  <li key={ref.label} className="rounded-lg border border-border p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-medium">{ref.label}</p>
+                      <span className="text-xs text-muted-foreground">{appHealth.label}</span>
+                    </div>
+                    <dl className="mt-2 space-y-1 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <dt className="text-muted-foreground">Application Coolify</dt>
+                        <dd className="break-all font-mono text-xs">{ref.coolifyAppId ?? 'Aucune'}</dd>
+                      </div>
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <dt className="text-muted-foreground">Certificat</dt>
+                        <dd className="flex items-center gap-1.5">
+                          {appCert.tone === 'success' ? (
+                            <ShieldCheck className="h-4 w-4 text-success" aria-hidden="true" />
+                          ) : (
+                            <ShieldAlert className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                          )}
+                          {appCert.label}
+                        </dd>
+                      </div>
+                    </dl>
+                    {appCert.detail && <p className="mt-1 text-xs text-muted-foreground">{appCert.detail}</p>}
+                    {appRuntimeError && (
+                      <p role="status" className="mt-2 rounded-lg border border-warning/30 bg-warning/10 p-2 text-xs">
+                        Statut runtime indisponible : {appRuntimeError}
+                      </p>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          {!anyApplication && runtimes.length > 0 && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Aucune application provisionnée : un déploiement les créera.
             </p>
           )}
         </Card>

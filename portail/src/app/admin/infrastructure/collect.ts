@@ -531,7 +531,7 @@ async function collectDeployments(): Promise<DeploymentsSnapshot> {
 async function collectProjects(): Promise<ProjectsAttempt> {
   const attempt = await measure('Projets', () =>
     withTimeout(
-      prisma.project.findMany({ select: { coolifyAppId: true } }),
+      prisma.project.findMany({ select: { coolifyAppId: true, apps: { select: { coolifyAppId: true } } } }),
       DATABASE_TIMEOUT_MS,
       'Projets',
     ),
@@ -544,10 +544,24 @@ async function collectProjects(): Promise<ProjectsAttempt> {
       error: attempt.error ?? 'Projets indisponibles.',
     }
   }
-  const appIds = attempt.value
-    .map((project) => project.coolifyAppId)
-    .filter((id): id is string => typeof id === 'string' && id.length > 0)
-  return { total: attempt.value.length, withApplication: appIds.length, appIds, error: null }
+
+  const known = new Set<string>()
+  let withApplication = 0
+  for (const project of attempt.value) {
+    let hasApp = false
+    const ids =
+      project.apps.length > 0
+        ? [project.coolifyAppId, ...project.apps.map((app) => app.coolifyAppId)]
+        : [project.coolifyAppId]
+    for (const id of ids) {
+      if (typeof id !== 'string' || id.length === 0) continue
+      known.add(id)
+      hasApp = true
+    }
+    if (hasApp) withApplication += 1
+  }
+
+  return { total: attempt.value.length, withApplication, appIds: [...known], error: null }
 }
 
 /* ------------------------------------------------------------------ */

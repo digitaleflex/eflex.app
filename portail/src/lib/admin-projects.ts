@@ -303,12 +303,23 @@ export function summarizePlan(value: unknown): PlanSummary | null {
 /* Réconciliation (lecture seule)                                             */
 /* -------------------------------------------------------------------------- */
 
+/** Référence d'une application Coolify rattachée à un projet (app principale ou secondaire). */
+export interface AdminProjectAppRef {
+  /** Libellé lisible (nom de l'application, ou « Application principale » pour le miroir). */
+  label: string
+  /** Identifiant Coolify, ou null si l'application n'a pas encore été provisionnée. */
+  coolifyAppId: string | null
+}
+
 export interface AdminProjectRef {
   id: string
   name: string
   slug: string
+  /** Miroir de l'application principale (compatibilité mono-app / transition). */
   coolifyAppId: string | null
   organizationName: string
+  /** Ensemble des références d'applications du projet. Dérivé de `coolifyAppId` si absent. */
+  appRefs?: readonly AdminProjectAppRef[]
 }
 
 export interface AdminApplicationRef {
@@ -316,37 +327,71 @@ export interface AdminApplicationRef {
   name: string
 }
 
+/** Référence d'application manquante côté hébergement, rattachée à son projet. */
+export interface MissingApplicationRef extends AdminProjectRef {
+  /** Application du projet concernée (utile en multi-app). */
+  missingAppLabel: string
+  /** Identifiant Coolify attendu mais absent côté hébergement. */
+  missingCoolifyAppId: string
+}
+
 export interface ReconciliationResult {
   /** Applications présentes côté Coolify mais liées à aucun projet en base. */
   orphans: AdminApplicationRef[]
-  /** Projets dont `coolifyAppId` ne correspond à aucune application Coolify. */
-  missing: AdminProjectRef[]
+  /** Références d'applications de projets absentes côté hébergement (une entrée par app manquante). */
+  missing: MissingApplicationRef[]
+}
+
+/** Références d'applications effectives d'un projet (ProjectApp + miroir pour compatibilité). */
+export function projectAppRefs(project: AdminProjectRef): readonly AdminProjectAppRef[] {
+  if (project.appRefs && project.appRefs.length > 0) return project.appRefs
+  return [{ label: 'Application principale', coolifyAppId: project.coolifyAppId }]
 }
 
 /**
  * Compare les applications Coolify et les projets en base. **Aucune suppression** :
  * le résultat est seulement affiché pour une intervention manuelle.
+ *
+ * Un projet est « manquant » si **l'une** de ses références d'application (non
+ * nulles) n'existe pas côté hébergement : chaque référence absente est rapportée.
+ * Une application Coolify est « orpheline » si elle ne correspond à **aucune**
+ * référence d'aucun projet.
  */
 export function reconcileApplications(input: {
   projects: readonly AdminProjectRef[]
   applications: readonly AdminApplicationRef[]
 }): ReconciliationResult {
   const applicationIds = new Set(input.applications.map((app) => app.id))
-  const knownIds = new Set(
-    input.projects
-      .map((project) => project.coolifyAppId)
-      .filter((id): id is string => typeof id === 'string' && id !== ''),
-  )
+  const knownIds = new Set<string>()
+
+  for (const project of input.projects) {
+    for (const ref of projectAppRefs(project)) {
+      if (typeof ref.coolifyAppId === 'string' && ref.coolifyAppId !== '') knownIds.add(ref.coolifyAppId)
+    }
+  }
 
   const orphans = input.applications
     .filter((app) => !knownIds.has(app.id))
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
 
-  const missing = input.projects
-    .filter((project) => project.coolifyAppId !== null && !applicationIds.has(project.coolifyAppId))
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+  const missing: MissingApplicationRef[] = []
+  for (const project of input.projects) {
+    for (const ref of projectAppRefs(project)) {
+      if (typeof ref.coolifyAppId !== 'string' || ref.coolifyAppId === '') continue
+      if (applicationIds.has(ref.coolifyAppId)) continue
+      missing.push({
+        ...project,
+        missingAppLabel: ref.label,
+        missingCoolifyAppId: ref.coolifyAppId,
+      })
+    }
+  }
+  missing.sort((a, b) => {
+    const byProject = a.name.localeCompare(b.name, 'fr')
+    if (byProject !== 0) return byProject
+    return a.missingAppLabel.localeCompare(b.missingAppLabel, 'fr')
+  })
 
   return { orphans, missing }
 }

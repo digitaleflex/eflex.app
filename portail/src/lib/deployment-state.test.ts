@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEPLOYMENT_STATUSES,
+  aggregateDeploymentGroup,
   assertTransition,
   canTransition,
   isDeploymentStatus,
@@ -46,5 +47,46 @@ describe('machine à états des déploiements', () => {
 
   it('tous les états ont un libellé français', () => {
     expect(DEPLOYMENT_STATUSES.every((s) => Boolean(s))).toBe(true)
+  })
+})
+
+describe('agrégation d’un lot de déploiements', () => {
+  it('n’est pas terminé tant qu’un déploiement n’est pas terminal', () => {
+    const result = aggregateDeploymentGroup(['live', 'building', 'failed'])
+    expect(result).toEqual({
+      complete: false,
+      total: 3,
+      live: 1,
+      failed: 1,
+      cancelled: 0,
+      active: 1,
+      outcome: 'in-progress',
+    })
+  })
+
+  it('considère un statut inconnu comme non terminal', () => {
+    expect(aggregateDeploymentGroup(['live', 'pending']).complete).toBe(false)
+  })
+
+  it('reconnaît un lot entièrement en ligne', () => {
+    expect(aggregateDeploymentGroup(['live', 'live']).outcome).toBe('all-live')
+  })
+
+  it('reconnaît un lot entièrement en échec', () => {
+    expect(aggregateDeploymentGroup(['failed', 'failed']).outcome).toBe('all-failed')
+  })
+
+  it('reconnaît un lot entièrement annulé', () => {
+    expect(aggregateDeploymentGroup(['cancelled']).outcome).toBe('all-cancelled')
+  })
+
+  it('reconnaît un lot mixte quand tous sont terminaux', () => {
+    const result = aggregateDeploymentGroup(['live', 'failed', 'cancelled'])
+    expect(result.complete).toBe(true)
+    expect(result.outcome).toBe('mixed')
+  })
+
+  it('un lot vide n’est pas considéré comme terminé', () => {
+    expect(aggregateDeploymentGroup([]).complete).toBe(false)
   })
 })

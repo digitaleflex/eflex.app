@@ -2,15 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getWebhookSecret, verifyGitHubWebhook } from '@/lib/github-app'
 import { prisma } from '@/lib/prisma'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
+import { multiAppEnabled } from '@/lib/multi-app'
+import { normalizeAppRoot } from '@/lib/project-apps'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+
+interface GitHubPushCommit {
+  added?: unknown
+  modified?: unknown
+  removed?: unknown
+}
 
 interface GitHubPushPayload {
   ref?: string
   after?: string
   repository?: { full_name?: string; default_branch?: string }
   installation?: { id?: number }
+  commits?: GitHubPushCommit[]
+  head_commit?: GitHubPushCommit | null
 }
 
 interface InstallationPayload {
@@ -19,6 +29,51 @@ interface InstallationPayload {
 }
 
 const SHA_RE = /^[0-9a-f]{40}$/
+
+/** Normalise un chemin de fichier du dépôt (sans slash initial). */
+function normalizeChangedPath(path: string): string {
+  return path.replace(/^\/+/, '').replace(/\/+$/, '')
+}
+
+function collectPathList(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is string => typeof item === 'string')
+}
+
+/**
+ * Extrait les chemins modifiés d'un push (`commits[].added|modified|removed`
+ * et `head_commit.added|modified|removed`), dédupliqués. Renvoie `null` si
+ * aucun chemin exploitable n'est trouvé (payload incomplet, tableaux absents) :
+ * le webhook doit alors redéployer toutes les applications.
+ */
+function extractChangedPaths(payload: GitHubPushPayload): Set<string> | null {
+  const paths = new Set<string>()
+  let found = false
+  const sources: Array<GitHubPushCommit | null | undefined> = [
+    ...(Array.isArray(payload.commits) ? payload.commits : []),
+    payload.head_commit,
+  ]
+  for (const source of sources) {
+    if (!source) continue
+    for (const key of ['added', 'modified', 'removed'] as const) {
+      const list = source[key]
+      if (Array.isArray(list)) {
+        found = true
+        for (const item of collectPathList(list)) {
+          const normalized = normalizeChangedPath(item)
+          if (normalized) paths.add(normalized)
+        }
+      }
+    }
+  }
+  return found ? paths : null
+}
+
+/** Vrai si un fichier modifié touche l'application de racine `root`. */
+function pathTouchesRoot(path: string, root: string): boolean {
+  const normalizedRoot = normalizeAppRoot(root)
+  return normalizedRoot === '' || path === normalizedRoot || path.startsWith(`${normalizedRoot}/`)
+}
 
 /**
  * Webhook GitHub App (issue 07). La signature `X-Hub-Signature-256` est
@@ -75,17 +130,47 @@ export async function POST(request: NextRequest) {
           { repoUrl: { endsWith: `github.com/${fullName}` } },
         ],
       },
-      select: { id: true, name: true, organizationId: true, branch: true, productionBranch: true, installationId: true },
+      select: {
+        id: true,
+        name: true,
+        organizationId: true,
+        branch: true,
+        productionBranch: true,
+        installationId: true,
+        apps: {
+          orderBy: [{ position: 'asc' }, { name: 'asc' }],
+          select: { id: true, name: true, root: true },
+        },
+      },
     })
 
     const installationId = payload.installation?.id ? String(payload.installation.id) : null
+    const changedPaths = extractChangedPaths(payload)
     let queued = 0
     let skipped = 0
     for (const project of projects) {
       if ((project.productionBranch ?? project.branch) !== branch) continue
+
+      const multi = multiAppEnabled() && project.apps.length > 1
+      let appsToDeploy = undefined as Array<{ id: string; name: string }> | undefined
+      if (multi && changedPaths !== null) {
+        const touched = project.apps.filter((app) =>
+          [...changedPaths].some((path) => pathTouchesRoot(path, app.root)),
+        )
+        if (touched.length === 0) {
+          skipped += 1
+          continue
+        }
+        appsToDeploy = touched.map((app) => ({ id: app.id, name: app.name }))
+      }
+
       // Même verrou que le redéploiement manuel : un push pendant un build ne
       // crée pas un second déploiement concurrent.
-      const result = await enqueueProjectDeployment(project, { exclusive: true, commitSha: sha })
+      const result = await enqueueProjectDeployment(project, {
+        exclusive: true,
+        commitSha: sha,
+        ...(appsToDeploy ? { apps: appsToDeploy } : {}),
+      })
       if ('error' in result) {
         skipped += 1
         continue

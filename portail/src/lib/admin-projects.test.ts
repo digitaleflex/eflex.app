@@ -12,6 +12,7 @@ import {
   summarizePlan,
   unblockDeployment,
   UNBLOCK_NOTE,
+  projectAppRefs,
 } from './admin-projects'
 
 const NOW = new Date('2026-11-10T12:00:00.000Z')
@@ -155,7 +156,12 @@ describe('réconciliation en lecture seule', () => {
       ],
     })
     expect(result.orphans).toEqual([{ id: 'app-orpheline', name: 'zzz-outil' }])
-    expect(result.missing.map((project) => project.id)).toEqual(['p2'])
+    expect(result.missing).toHaveLength(1)
+    expect(result.missing[0]).toMatchObject({
+      id: 'p2',
+      missingAppLabel: 'Application principale',
+      missingCoolifyAppId: 'app-perdu',
+    })
   })
 
   it('ne signale rien quand tout est aligné', () => {
@@ -164,6 +170,65 @@ describe('réconciliation en lecture seule', () => {
       applications: [{ id: 'app-1', name: 'a' }],
     })
     expect(result).toEqual({ orphans: [], missing: [] })
+  })
+
+  it('rapporte une seule app manquante parmi plusieurs sans faux orphelin', () => {
+    const result = reconcileApplications({
+      projects: [
+        {
+          id: 'p1',
+          name: 'Plateforme',
+          slug: 'plateforme',
+          coolifyAppId: 'app-web',
+          organizationName: 'Awa',
+          appRefs: [
+            { label: 'web', coolifyAppId: 'app-web' },
+            { label: 'api', coolifyAppId: 'app-api-perdue' },
+          ],
+        },
+      ],
+      applications: [
+        { id: 'app-web', name: 'plateforme-web' },
+        { id: 'app-orpheline', name: 'outil' },
+      ],
+    })
+    expect(result.orphans).toEqual([{ id: 'app-orpheline', name: 'outil' }])
+    expect(result.missing).toEqual([
+      expect.objectContaining({
+        id: 'p1',
+        missingAppLabel: 'api',
+        missingCoolifyAppId: 'app-api-perdue',
+      }),
+    ])
+  })
+
+  it('ne considère pas orpheline une application rattachée à une app secondaire', () => {
+    const result = reconcileApplications({
+      projects: [
+        {
+          id: 'p1',
+          name: 'Mono',
+          slug: 'mono',
+          coolifyAppId: 'app-web',
+          organizationName: 'Awa',
+          appRefs: [
+            { label: 'web', coolifyAppId: 'app-web' },
+            { label: 'worker', coolifyAppId: 'app-worker' },
+          ],
+        },
+      ],
+      applications: [
+        { id: 'app-web', name: 'web' },
+        { id: 'app-worker', name: 'worker' },
+      ],
+    })
+    expect(result).toEqual({ orphans: [], missing: [] })
+  })
+
+  it('dérive les références du miroir quand aucune app n’est fournie', () => {
+    expect(projectAppRefs({ id: 'p', name: 'P', slug: 'p', coolifyAppId: 'x', organizationName: 'o' })).toEqual([
+      { label: 'Application principale', coolifyAppId: 'x' },
+    ])
   })
 })
 
