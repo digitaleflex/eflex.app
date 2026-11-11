@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { audit } from '@/lib/audit'
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { checkDomainDns } from '@/lib/custom-domain'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
+import { isAppDeployed } from '@/lib/project-primary'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 /** Vérifie le DNS puis programme un déploiement pour appliquer les labels/SSL. */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string; domainId: string }> },
 ) {
   const session = await getSession()
@@ -29,8 +31,16 @@ export async function POST(
       id: true,
       hostname: true,
       appId: true,
-      app: { select: { id: true, name: true } },
-      project: { select: { id: true, name: true, organizationId: true, coolifyAppId: true } },
+      app: { select: { id: true, name: true, coolifyAppId: true } },
+      project: {
+        select: {
+          id: true,
+          name: true,
+          organizationId: true,
+          coolifyAppId: true,
+          apps: { select: { id: true, name: true, coolifyAppId: true } },
+        },
+      },
     },
   })
   if (!domain) return NextResponse.json({ error: 'Domaine introuvable.' }, { status: 404 })
@@ -49,7 +59,10 @@ export async function POST(
   })
 
   let deploymentId: string | null = null
-  if (domain.project.coolifyAppId || domain.app) {
+  const shouldEnqueue = domain.app
+    ? Boolean(domain.app.coolifyAppId)
+    : isAppDeployed(domain.project)
+  if (shouldEnqueue) {
     const queued = await enqueueProjectDeployment(domain.project, {
       apps: domain.app ? [{ id: domain.app.id, name: domain.app.name }] : undefined,
     })
@@ -61,6 +74,15 @@ export async function POST(
     }
     deploymentId = queued.deploymentId ?? queued.deployments?.[0]?.id ?? null
   }
+
+  await audit({
+    actor: { id: session.user.id, email: session.user.email },
+    action: 'project.domain.verify',
+    target: { type: 'project_domain', id: domain.id },
+    organizationId: org.organizationId,
+    details: { projectId: id, hostname: domain.hostname, appId: domain.appId, deploymentId },
+    request,
+  })
 
   return NextResponse.json({
     ok: true,

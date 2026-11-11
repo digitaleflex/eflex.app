@@ -5,6 +5,7 @@ import { audit } from '@/lib/audit'
 import { prisma } from '@/lib/prisma'
 import { applicationAction, type ApplicationAction } from '@/lib/coolify'
 import { REASON_MAX, REASON_MIN } from '@/lib/admin-projects'
+import { collectCoolifyAppIds } from '@/lib/project-primary'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -22,7 +23,7 @@ const LABELS: Record<ApplicationAction, string> = {
   restart: 'redémarrée',
 }
 
-/** Démarre, arrête ou redémarre l'application d'un projet (action auditée). */
+/** Démarre, arrête ou redémarre les applications du projet (action auditée). */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireAdminApi()
   if ('response' in guard) return guard.response
@@ -45,24 +46,34 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const project = await prisma.project.findUnique({
     where: { id },
-    select: { id: true, name: true, organizationId: true, coolifyAppId: true },
+    select: {
+      id: true,
+      name: true,
+      organizationId: true,
+      coolifyAppId: true,
+      apps: { select: { coolifyAppId: true } },
+    },
   })
   if (!project) return NextResponse.json({ error: 'Projet introuvable.' }, { status: 404 })
-  if (!project.coolifyAppId) {
+
+  const appIds = project.apps.length > 0 ? collectCoolifyAppIds({ apps: project.apps }) : project.coolifyAppId ? [project.coolifyAppId] : []
+  if (appIds.length === 0) {
     return NextResponse.json({ error: 'Ce projet n’a pas encore d’application sur l’infrastructure.' }, { status: 409 })
   }
 
-  const result = await applicationAction(project.coolifyAppId, action)
-  if ('error' in result) return NextResponse.json({ error: result.error }, { status: 502 })
+  const results = await Promise.all(appIds.map((appId: string) => applicationAction(appId, action)))
+  const failure = results.find((result: { error?: string } | unknown): result is { error: string } => Boolean(result && typeof result === 'object' && 'error' in (result as Record<string, unknown>)))
+  if (failure) return NextResponse.json({ error: failure.error }, { status: 502 })
 
   await audit({
     actor: { id: session.user.id, email: session.user.email },
     action: 'project.runtime',
     target: { type: 'project', id: project.id },
     organizationId: project.organizationId,
-    details: { action, coolifyAppId: project.coolifyAppId, reason: reason || null },
+    details: { action, coolifyAppIds: appIds, reason: reason || null },
     request,
   })
 
-  return NextResponse.json({ ok: true, action, message: `Application ${LABELS[action]}.` })
+  const suffix = appIds.length > 1 ? ` (${appIds.length} applications)` : ''
+  return NextResponse.json({ ok: true, action, message: `Application ${LABELS[action]}${suffix}.` })
 }

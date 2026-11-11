@@ -3,7 +3,7 @@ import { getWebhookSecret, verifyGitHubWebhook } from '@/lib/github-app'
 import { prisma } from '@/lib/prisma'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
 import { multiAppEnabled } from '@/lib/multi-app'
-import { normalizeAppRoot } from '@/lib/project-apps'
+import { getPrimaryApp, normalizeAppRoot } from '@/lib/project-apps'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
         installationId: true,
         apps: {
           orderBy: [{ position: 'asc' }, { name: 'asc' }],
-          select: { id: true, name: true, root: true },
+          select: { id: true, name: true, root: true, position: true },
         },
       },
     })
@@ -162,6 +162,11 @@ export async function POST(request: NextRequest) {
           continue
         }
         appsToDeploy = touched.map((app) => ({ id: app.id, name: app.name }))
+      } else if (!multi && project.apps.length > 0) {
+        // Mono-app / legacy : cibler explicitement l’app principale via ProjectApp
+        // plutôt qu’un déploiement de portée projet basé sur les miroirs.
+        const primary = getPrimaryApp(project.apps)
+        if (primary) appsToDeploy = [{ id: primary.id, name: primary.name }]
       }
 
       // Même verrou que le redéploiement manuel : un push pendant un build ne

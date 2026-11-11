@@ -31,7 +31,7 @@ export default async function SettingsPage() {
       select: { id: true, providerId: true },
     }),
     prisma.project.count({
-      where: { userId: session.user.id, coolifyAppId: { not: null } },
+      where: { userId: session.user.id, apps: { some: { coolifyAppId: { not: null } } } },
     }),
     prisma.user.findUnique({
       where: { id: session.user.id },

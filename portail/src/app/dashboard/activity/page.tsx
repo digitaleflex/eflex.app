@@ -13,6 +13,7 @@ import { Pagination } from '@/components/ui/pagination'
 import { PageHeader } from '@/components/page-header'
 import { LinkButton } from '@/components/link-button'
 import { formatInteger } from '@/lib/table'
+import { getPrimaryApp } from '@/lib/project-apps'
 import {
   ACTIVITY_FILTERS,
   ACTIVITY_FILTER_LABEL,
@@ -59,7 +60,19 @@ export default async function ActivityPage({
       status: true,
       commitSha: true,
       createdAt: true,
-      project: { select: { id: true, name: true, framework: true, branch: true } },
+      app: { select: { framework: true } },
+      project: {
+        select: {
+          id: true,
+          name: true,
+          framework: true,
+          branch: true,
+          apps: {
+            orderBy: [{ position: 'asc' }, { name: 'asc' }],
+            select: { id: true, name: true, position: true, framework: true },
+          },
+        },
+      },
     },
   })
 
@@ -116,10 +129,13 @@ export default async function ActivityPage({
         <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
           {rows.map((deployment) => {
             const commit = deployment.commitSha === 'pending' ? null : deployment.commitSha.slice(0, 7)
+            const primaryApp = getPrimaryApp(deployment.project.apps)
+            const framework =
+              deployment.app?.framework ?? primaryApp?.framework ?? deployment.project.framework ?? null
             return (
               <li key={deployment.id} className="p-4 transition-colors duration-200 ease-out-expo hover:bg-muted/50">
                 <div className="flex min-w-0 items-start gap-3">
-                  <FrameworkTile framework={deployment.project.framework} name={deployment.project.name} size="sm" />
+                  <FrameworkTile framework={framework} name={deployment.project.name} size="sm" />
                   <div className="min-w-0">
                     <Link
                       href={`/dashboard/projects/${deployment.project.id}?tab=deployments`}

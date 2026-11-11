@@ -19,7 +19,7 @@ import { appDomain, appNameFromRoot, normalizeAppRoot, uniqueAppName } from '@/l
 
 export const dynamic = 'force-dynamic'
 
-/** Domaine libre pour une application (unicité globale `ProjectApp.domain` et `Project.domain`). */
+/** Domaine libre pour une application (unicité globale `ProjectApp.domain`). */
 async function reserveAppDomain(candidate: string | null): Promise<string | null> {
   if (!candidate) return null
   const [firstLabel, ...rest] = candidate.split('.')
@@ -28,10 +28,7 @@ async function reserveAppDomain(candidate: string | null): Promise<string | null
   for (let index = 1; index <= 20; index += 1) {
     const next = `${label}.${rest.join('.')}`
     const takenApp = await prisma.projectApp.findUnique({ where: { domain: next }, select: { id: true } })
-    const takenProject = takenApp
-      ? null
-      : await prisma.project.findFirst({ where: { domain: next }, select: { id: true } })
-    if (!takenApp && !takenProject) return next
+    if (!takenApp) return next
     const suffix = `-${index + 1}`
     label = `${firstLabel.slice(0, 63 - suffix.length).replace(/-$/, '')}${suffix}`
   }

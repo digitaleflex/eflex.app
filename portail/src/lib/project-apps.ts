@@ -117,3 +117,14 @@ export function deploymentSlug(projectSlug: string, appName: string | null | und
   const name = appName ? slugPart(appName, 32) : ''
   return name ? `${projectSlug}-${name}` : projectSlug
 }
+
+
+/** Application principale : position la plus basse (0), puis nom/id stables. */
+export function getPrimaryApp<T extends { id: string; name?: string; position: number }>(
+  apps: readonly T[] | null | undefined,
+): T | null {
+  if (!apps || apps.length === 0) return null
+  return [...apps].sort(
+    (a, b) => a.position - b.position || (a.name ?? '').localeCompare(b.name ?? '') || a.id.localeCompare(b.id),
+  )[0] ?? null
+}

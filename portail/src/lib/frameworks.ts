@@ -20,7 +20,8 @@ const FRAMEWORK_LABELS: Record<string, string> = {
   'eflex-config': 'eflex.json',
 }
 
-export function frameworkLabel(framework: string): string {
+export function frameworkLabel(framework: string | null | undefined): string {
+  if (!framework) return 'Inconnue'
   return FRAMEWORK_LABELS[framework] ?? framework
 }
 

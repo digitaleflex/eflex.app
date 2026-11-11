@@ -4,7 +4,8 @@
 # ═══════════════════════════════════════════════════════════════════════════
 # Vérifie :
 #   1. GET https://<portail>/api/health → HTTP 200 + `"status":"ok"` (timeout) ;
-#   2. l'expiration TLS de l'apex et de chaque `Project.domain` (openssl),
+#   2. l'expiration TLS de l'apex et de chaque domaine d'application
+#      (`ProjectApp.domain`, app principale incluse, openssl),
 #      alerte si < EFLEX_TLS_MIN_DAYS (21 j) ou certificat invalide ;
 #   3. l'état Docker : `eflex-portail` healthy, `eflex-postgres` et
 #      `eflex-redis` healthy + réponses pg_isready / redis-cli ping ;
@@ -212,7 +213,7 @@ skip_project_domains() {
 project_domains() {
   docker exec "$PG_CONTAINER" psql --username "$PG_USER" --dbname "$PG_DB" -At \
     -v ON_ERROR_STOP=1 \
-    -c "SELECT DISTINCT btrim(domain) FROM \"Project\" WHERE domain IS NOT NULL AND btrim(domain) <> '' ORDER BY 1;" \
+    -c "SELECT DISTINCT btrim(domain) FROM \"ProjectApp\" WHERE domain IS NOT NULL AND btrim(domain) <> '' ORDER BY 1;" \
     2>/dev/null
 }
 
@@ -221,12 +222,12 @@ tls_checks() {
   tls_check "$PORTAL_HOST"
 
   if skip_project_domains; then
-    log "INFO" "TLS : domaines de projets ignorés (EFLEX_HEALTHCHECK_SKIP_PROJECT_DOMAINS)"
+    log "INFO" "TLS : domaines des applications ignorés (EFLEX_HEALTHCHECK_SKIP_PROJECT_DOMAINS)"
     return
   fi
 
   domains="$(project_domains)" || {
-    record_fail "TLS : impossible de lire Project.domain (PostgreSQL)"
+    record_fail "TLS : impossible de lire ProjectApp.domain (PostgreSQL)"
     domains=""
   }
   while IFS= read -r host; do

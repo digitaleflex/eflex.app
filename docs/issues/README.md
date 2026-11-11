@@ -54,7 +54,7 @@ Ce qu'attendent les vrais projets clients.
 
 | Issue | Priorité | Sujet |
 |---|---|---|
-| [#6](https://github.com/digitaleflex/eflex.app/issues/6) | P1 | Volumes persistants et monorepos avec dépendances de workspace |
+| [#6](https://github.com/digitaleflex/eflex.app/issues/6) | P1 | Monorepos, compose fourni, multi-applications et volumes persistants *(D1 livré ; D2 A–F livré, G en cours ; volumes derrière drapeau, désactivés par défaut)* |
 | [#7](https://github.com/digitaleflex/eflex.app/issues/7) | P1 | Dépôts GitHub privés (GitHub App) |
 | [#8](https://github.com/digitaleflex/eflex.app/issues/8) | P1 | Domaines personnalisés avec HTTPS |
 
@@ -97,7 +97,7 @@ infrastructure, live), SSE, notifications e-mail, annulation/watchdog, facturati
 ### Encore ouvertes
 | Issue | Reste |
 |---|---|
-| #6 | Volumes et monorepos **détectés**, pas câblés au déploiement (Coolify mono-service) |
+| #6 | **D1** compose fourni par le dépôt livré ; **D2** multi-applications A–F livré (`EFLEX_MULTI_APP` : prod 0, staging 1), lot G en cours. Volumes traduits du plan mais création de stockages Coolify conditionnée à `EFLEX_PERSISTENT_VOLUMES` (désactivé par défaut). Les plans multi-services **générés** sans compose fourni restent refusés avec guidage vers l’ajout d’un `docker-compose.yml`/`compose.yaml` (voie D1). Sauvegardes et quotas de stockage non implémentés. |
 | #11–#13 | Preset Laravel Axiom, Traefik/DNS/TLS réels, agent distant réel |
 | #14 | Décision Coolify/Axiom (ADR-0011, Proposed) |
 | #16 | Nettoyage du dépôt — fait côté code (voir ci-dessous) ; clôture GitHub à faire |
@@ -108,20 +108,21 @@ infrastructure, live), SSE, notifications e-mail, annulation/watchdog, facturati
 
 ### Écarts de promesse détectés
 - La FAQ « dépôts privés : pas encore » était fausse : **corrigée**.
-- La homepage annonce « Laravel au complet » et « files d'attente / tâches planifiées », alors que le worker refuse les plans multi-services. À corriger ou à implémenter (#6 / #14).
+- Les promesses « Laravel au complet » / « files d’attente / tâches planifiées » sans compose fourni ont été **nuancées** : le portail refuse les plans multi-services générés sans compose et oriente vers l’ajout d’un `docker-compose.yml`/`compose.yaml` (voie D1, compose fourni). Pas de génération automatique de workers/planificateur par la plateforme.
 
 ### Prochaines priorités conseillées
-1. **#22 Quotas** et **#6 volumes/multi-services**.
-2. **#14 Décision Coolify/Axiom** puis #11–#13 si Axiom est retenu.
-3. **#35 Métriques**, **#32 Accessibilité**, puis **#37–#53 UX/UI**.
-4. Archiver le dépôt externe `digitaleflex/axiom` (action propriétaire, hors dépôt).
+1. **#6** : activer/valider les volumes persistants en conditions réelles (`EFLEX_PERSISTENT_VOLUMES`), lot G D2, puis sauvegardes/quotas de stockage.
+2. **#22** quotas/limites de ressources et audit d'isolation.
+3. **#14 Décision Coolify/Axiom** puis #11–#13 si Axiom est retenu.
+4. **#35 Métriques**, **#32 Accessibilité**, puis **#37–#53 UX/UI**.
+5. Archiver le dépôt externe `digitaleflex/axiom` (action propriétaire, hors dépôt).
 
 ## État des premiers brouillons
 
 | # | Sujet | État |
 |---|---|---|
 | 01 | [Intégrer le détecteur dans le portail](./01-integrer-detecteur-portail.md) | Fait |
-| 02 | [Déployer à partir du BuildPlan](./02-deployer-depuis-buildplan.md) | Fait via Coolify ; reste : voir #2, #4, #5, #6 |
+| 02 | [Déployer à partir du BuildPlan](./02-deployer-depuis-buildplan.md) | Fait via Coolify ; D1 (compose fourni) livré, D2 multi-app en cours (A–F livrés, G en cours). Reste : volumes en production derrière drapeau, backups/quotas (#6) |
 | 03 | [Renderer : couvrir tous les frameworks](./03-renderer-tous-frameworks.md) | Fait |
 | 04 | [Chiffrer les variables d'environnement](./04-chiffrer-variables-env.md) | Fait (AES-256-GCM, `lib/crypto.ts`) ; #3 à clôturer |
 | 05 | [Inscription et vérification d'e-mail](./05-inscription-verification-email.md) | Fait (Resend : vérification, mot de passe oublié) ; reste dans #9 : durcissement et invitations par e-mail |

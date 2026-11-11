@@ -20,6 +20,7 @@ import {
   isDeploymentStatus,
 } from '@/lib/deployment-state'
 import { publish } from '@/lib/event-bus'
+import { getPrimaryApp } from '@/lib/project-apps'
 import { canManageProjects } from '@/lib/organizations'
 
 export const transferProjectSchema = z.object({
@@ -119,7 +120,16 @@ export async function transferProject(input: {
 
   const project = await prisma.project.findFirst({
     where: { id: projectId, organizationId: sourceOrganizationId },
-    select: { id: true, name: true, slug: true, domain: true },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      domain: true,
+      apps: {
+        orderBy: [{ position: 'asc' }, { name: 'asc' }],
+        select: { id: true, name: true, position: true, domain: true },
+      },
+    },
   })
   if (!project) {
     return {
@@ -129,6 +139,7 @@ export async function transferProject(input: {
       error: 'Projet introuvable',
     }
   }
+  const primaryDomain = getPrimaryApp(project.apps)?.domain ?? project.domain ?? null
 
   const activeDeployment = await prisma.deployment.findFirst({
     where: { projectId: project.id, status: { in: [...ACTIVE_DEPLOYMENT_STATUSES] } },
@@ -207,7 +218,7 @@ export async function transferProject(input: {
 
   return {
     ok: true,
-    project: { id: project.id, name: project.name, slug: project.slug, domain: project.domain },
+    project: { id: project.id, name: project.name, slug: project.slug, domain: primaryDomain },
     from,
     to,
   }

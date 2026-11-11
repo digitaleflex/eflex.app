@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { audit } from '@/lib/audit'
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { projectDatabaseAction } from '@/lib/project-databases'
 
@@ -27,7 +28,7 @@ export async function POST(
   const { id, databaseId } = await params
   const database = await prisma.projectDatabase.findFirst({
     where: { id: databaseId, projectId: id, project: { organizationId: org.organizationId } },
-    select: { id: true, coolifyId: true },
+    select: { id: true, kind: true, coolifyId: true },
   })
   if (!database) return NextResponse.json({ error: 'Base introuvable.' }, { status: 404 })
 
@@ -42,5 +43,13 @@ export async function POST(
 
   const result = await projectDatabaseAction(database, parsed.data.action)
   if ('error' in result) return NextResponse.json({ error: result.error }, { status: 502 })
+  await audit({
+    actor: { id: session.user.id, email: session.user.email },
+    action: 'project.database.action',
+    target: { type: 'project_database', id: database.id },
+    organizationId: org.organizationId,
+    details: { projectId: id, kind: database.kind, dbAction: parsed.data.action },
+    request,
+  })
   return NextResponse.json({ ok: true })
 }

@@ -660,6 +660,18 @@ describe('ensureApplicationStorages', () => {
     await expect(ensureApplicationStorages('app', [])).resolves.toEqual({ created: 0, existing: 0 })
     expect(calls).toHaveLength(0)
   })
+
+  it('considère un volume déjà existant côté Coolify comme idempotent', async () => {
+    mockFetch((url, init) => {
+      if ((init?.method ?? 'GET') === 'GET') return json({ persistent_storages: [] })
+      return json({ message: 'Storage path already exists for this application.' }, 409)
+    })
+    const { ensureApplicationStorages } = await loadModule()
+
+    await expect(
+      ensureApplicationStorages('app', [{ name: 'eflex-storage', mountPath: '/app/storage' }]),
+    ).resolves.toEqual({ created: 0, existing: 1 })
+  })
 })
 
 describe('checkConnection', () => {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { audit } from '@/lib/audit'
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { deleteProjectDatabase } from '@/lib/project-databases'
 
@@ -9,7 +10,7 @@ export const runtime = 'nodejs'
 
 /** Supprime la base managée et la variable d'environnement associée. */
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string; databaseId: string }> },
 ) {
   const session = await getSession()
@@ -28,13 +29,30 @@ export async function DELETE(
       id: true,
       kind: true,
       coolifyId: true,
-      project: { select: { id: true, slug: true, name: true, organizationId: true, coolifyAppId: true } },
+      project: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          organizationId: true,
+          coolifyAppId: true,
+          apps: { select: { coolifyAppId: true } },
+        },
+      },
     },
   })
   if (!database) return NextResponse.json({ error: 'Base introuvable.' }, { status: 404 })
 
   const result = await deleteProjectDatabase(database.project, database)
   if ('error' in result) return NextResponse.json({ error: result.error }, { status: result.status })
+  await audit({
+    actor: { id: session.user.id, email: session.user.email },
+    action: 'project.database.delete',
+    target: { type: 'project_database', id: database.id },
+    organizationId: org.organizationId,
+    details: { projectId: id, kind: database.kind, deploymentId: result.deploymentId },
+    request,
+  })
   return NextResponse.json({
     ok: true,
     deploymentId: result.deploymentId,

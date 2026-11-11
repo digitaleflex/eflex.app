@@ -1,8 +1,15 @@
 # Déploiement : monorepos et volumes persistants (#6)
 
-État au 10 novembre 2026. Ce document décrit ce que la plateforme fait
+État mis à jour (#6, lot G en cours). Ce document décrit ce que la plateforme fait
 réellement, ce qui reste désactivé et pourquoi. Il complète
 `docs/architecture/deployment-policy.md` et `docs/issues/06-file-deploiement-redis.md`.
+
+## État de livraison (#6)
+
+- **D1 — Compose fourni par le dépôt** : livré. Un dépôt qui fournit `docker-compose.yml`/`compose.yaml` est déployé comme application Coolify `dockercompose` (le fichier fait foi), avec validation de sécurité et routage selon les contraintes Traefik/Coolify documentées ci-dessous.
+- **D2 — Multi-applications (monorepo)** : lots A–F livrés, lot G en cours. `EFLEX_MULTI_APP` est désactivé par défaut en production et activé en staging ; lorsque le drapeau est désactivé, le comportement mono-app reste inchangé.
+- **Volumes persistants** : traduits du plan/artefacts, mais **création des stockages Coolify conditionnée à `EFLEX_PERSISTENT_VOLUMES` (désactivé par défaut)**. Aucun stockage n’est créé si le drapeau est inactif ; en cas d’activation, les erreurs Coolify sont bloquantes. Idempotence conservée, aucune suppression automatique de volumes.
+- **Non implémenté** : sauvegardes et quotas de stockage. Les plans multi-services **générés** sans compose fourni restent refusés (voir limites).
 
 ## Contrat du plan
 
@@ -262,30 +269,11 @@ de l'hôte.
 
 ## Limites connues
 
-- **Multi-services généré refusé.** Un plan Laravel (`app`, `web`, `queue`,
-  `scheduler`) ou tout autre plan de plus d'un service est refusé tant que le
-  dépôt ne fournit pas son propre compose. Ce n'est plus une impasse : ajoutez
-  un `docker-compose.yml` à la racine de l'application, l'Application Coolify
-  `dockercompose` prend le relais (voir « Compose fourni par le dépôt »). Le
-  volume `storage` du plan reste descriptif et n'est pas monté par la
-  plateforme dans ce cas.
-- Le volume Laravel est monté sur `/app/storage` (Nixpacks) pour le chemin
-  mono-service. Un montage plus fin (`storage/app` seul) sera à décider lors de
-  l'implémentation du multi-services.
-- Les volumes sont **conservés par défaut** à la suppression d'une application
-  (`DELETE /applications/{uuid}?delete_volumes=false`). Une suppression
-  explicitement destructive doit demander `{ deleteVolumes: true }` ; sinon les
-  données persistent côté Coolify (choix conservateur, mais à nettoyer
-  manuellement).
-- Le renderer généré (`pnpm render`) reste destiné au compose/Dockerfile ; le
-  déploiement Coolify utilise Nixpacks pour les frameworks non-Docker, et le
-  fichier du dépôt pour `compose`. Les commandes préfixées `cd` du plan ne
-  modifient donc pas le compose.
-- **Compose** : pas de génération automatique, pas de fusion d'un
-  `docker-compose.override.yml` (Coolify ne lit qu'un fichier), pas de
-  migrations jouées, et les labels `websecure` doivent être dans le fichier.
-  Un compose avec `privileged`, `network_mode: host` ou un montage de l'hôte
-  est refusé avant tout appel Coolify.
-- L'API de stockage peut varier selon les versions de Coolify. La version
-  minimale vérifiée est **4.7.3** ; en cas d'erreur, le drapeau
-  `EFLEX_PERSISTENT_VOLUMES` doit être retiré avant de relancer.
+- **Plans multi-services générés sans compose fourni : refusés.** Un plan Laravel (`app`, `web`, `queue`, `scheduler`) ou tout autre plan de plus d’un service généré par la plateforme est refusé tant que le dépôt ne fournit pas son propre compose. La voie supportée est D1 : ajoutez un `docker-compose.yml`/`compose.yaml` à la racine de l’application, l’application Coolify `dockercompose` déploie ce fichier tel quel. Le worker renvoie un message actionnable pointant vers cet ajout ; aucun compose n’est généré ni écrit dans le dépôt.
+- **Multi-applications (D2)** : livré en lots A–F, lot G en cours. Le comportement multi-app dépend de `EFLEX_MULTI_APP` (désactivé par défaut en production, activé en staging).
+- **Volumes** : traduits, mais la création de stockages Coolify ne se fait que si `EFLEX_PERSISTENT_VOLUMES` est activé (désactivé par défaut). Sans activation, aucun stockage n’est créé et le déploiement continue avec une trace `[volumes]`. Si activé, toute erreur de lecture/création Coolify est bloquante. **Sauvegardes et quotas de stockage ne sont pas implémentés.**
+- Le volume Laravel est monté sur `/app/storage` (Nixpacks) pour le chemin mono-service. Un montage plus fin (`storage/app` seul) reste à décider si ce chemin mono-service évolue.
+- Les volumes sont **conservés par défaut** à la suppression d'une application (`DELETE /applications/{uuid}?delete_volumes=false`). Une suppression explicitement destructive doit demander `{ deleteVolumes: true }` ; sinon les données persistent côté Coolify (choix conservateur, nettoyage manuel possible).
+- Le renderer généré (`pnpm render`) reste destiné au compose/Dockerfile ; le déploiement Coolify utilise Nixpacks pour les frameworks non-Docker, et le fichier du dépôt pour `compose`. Les commandes préfixées `cd` du plan ne modifient donc pas le compose.
+- **Compose** : pas de génération automatique, pas de fusion d'un `docker-compose.override.yml` (Coolify ne lit qu'un fichier), pas de migrations jouées automatiquement, et les labels `websecure` doivent être dans le fichier. Un compose avec `privileged`, `network_mode: host` ou un montage de l'hôte est refusé avant tout appel Coolify.
+- L'API de stockage peut varier selon les versions de Coolify. La version minimale vérifiée est **4.7.3** ; en cas d'erreur, le drapeau `EFLEX_PERSISTENT_VOLUMES` doit être retiré avant de relancer.
