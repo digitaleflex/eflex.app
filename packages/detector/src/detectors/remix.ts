@@ -1,6 +1,6 @@
 import type { BuildPlan, Candidate, DetectionContext } from '../types.js';
 import { BASE_CONFIDENCE, scoreConfidence } from '../confidence.js';
-import { installCommand, nodeRuntimeFor } from './node.js';
+import { installCommand, nodeRuntimeFor, withJsTooling } from './node.js';
 
 /** Remix: dependency `remix`, configured with `remix.config.js`. */
 export function detectRemix(ctx: DetectionContext): Candidate | null {
@@ -26,7 +26,7 @@ export function detectRemix(ctx: DetectionContext): Candidate | null {
     port: 3000,
   };
 
-  return {
+  return withJsTooling(ctx, {
     framework: 'remix',
     plan,
     confidence: scoreConfidence(BASE_CONFIDENCE.remix, {
@@ -41,5 +41,5 @@ export function detectRemix(ctx: DetectionContext): Candidate | null {
       `Gestionnaire de paquets détecté : ${pm}.`,
     ],
     warnings: [],
-  };
+  });
 }

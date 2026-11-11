@@ -80,6 +80,22 @@
         }
       }
     },
+    "packageManager": {
+      "description": "Gestionnaire de paquets JavaScript détecté pour l'application (ex. bun).",
+      "enum": [
+        "pnpm",
+        "yarn",
+        "npm",
+        "bun"
+      ]
+    },
+    "packageManagerVersion": {
+      "description": "Version du gestionnaire de paquets quand elle peut être déterminée de façon fiable (ex. `1.2.3` pour Bun).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 50,
+      "pattern": "^[0-9A-Za-z][0-9A-Za-z.+_-]*$"
+    },
     "install": {
       "description": "Commande d'installation des dépendances.",
       "type": "string",

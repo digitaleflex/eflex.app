@@ -17,7 +17,7 @@ import {
   composeDomains,
   coolifyApplicationSettings,
   deploymentKind,
-  nixpacksRuntimeVariable,
+  nixpacksRuntimeVariables,
   persistentVolumesEnabled,
 } from '@/lib/deploy-plan'
 import { inspectCompose, type ComposeInspection } from '@/lib/compose-safety'
@@ -474,10 +474,10 @@ export async function processDeployment(
     }
   }
 
-  // Nixpacks : force la version du runtime connue du plan (variable de build).
+  // Nixpacks : force les versions connues du plan (runtime, Bun, etc.).
   if (!repoHasDockerfile && !composeSource) {
-    const runtimeVariable = nixpacksRuntimeVariable(plan.runtime)
-    if (runtimeVariable) {
+    const runtimeVariables = nixpacksRuntimeVariables(plan)
+    for (const runtimeVariable of runtimeVariables) {
       const result = await setEnvironmentVariable(
         appId,
         runtimeVariable.key,
@@ -485,7 +485,7 @@ export async function processDeployment(
         true,
       )
       if ('error' in result) {
-        await fail(deploymentId, `Version du runtime non transmise au constructeur : ${result.error}`)
+        await fail(deploymentId, `Version du runtime/outillage non transmise au constructeur (${runtimeVariable.key}) : ${result.error}`)
         return
       }
     }

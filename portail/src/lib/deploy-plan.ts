@@ -255,20 +255,37 @@ export function publishDirectoryForPlan(plan: BuildPlan): string | undefined {
 }
 
 /**
- * Variable d'environnement de build qui force la version du runtime Nixpacks
- * (le plan la connaît déjà : `node@22`, `python@3.12`, `php@8.3`).
+ * Variables d'environnement de build qui forcent les versions connues du plan
+ * (ex. `node@22`, `python@3.12`, `php@8.3`) et, le cas échéant, la version de
+ * Bun quand le projet l'utilise comme gestionnaire de paquets/outillage.
  */
+export function nixpacksRuntimeVariables(
+  plan: Pick<BuildPlan, 'runtime' | 'packageManager' | 'packageManagerVersion'>,
+): Array<{ key: string; value: string }> {
+  const variables: Array<{ key: string; value: string }> = []
+  const runtime = plan.runtime
+  const at = runtime.indexOf('@')
+  if (at !== -1) {
+    const name = runtime.slice(0, at)
+    const version = runtime.slice(at + 1).trim()
+    if (version) {
+      if (name === 'node') variables.push({ key: 'NIXPACKS_NODE_VERSION', value: version })
+      else if (name === 'python') variables.push({ key: 'NIXPACKS_PYTHON_VERSION', value: version })
+      else if (name === 'php') variables.push({ key: 'NIXPACKS_PHP_VERSION', value: version })
+    }
+  }
+
+  if (plan.packageManager === 'bun' && plan.packageManagerVersion) {
+    variables.push({ key: 'NIXPACKS_BUN_VERSION', value: plan.packageManagerVersion })
+  }
+
+  return variables
+}
+
+/** @deprecated Utilisez `nixpacksRuntimeVariables` (supporte Bun). */
 export function nixpacksRuntimeVariable(
   runtime: string,
 ): { key: string; value: string } | null {
-  const at = runtime.indexOf('@')
-  if (at === -1) return null
-  const name = runtime.slice(0, at)
-  const version = runtime.slice(at + 1).trim()
-  if (!version) return null
-
-  if (name === 'node') return { key: 'NIXPACKS_NODE_VERSION', value: version }
-  if (name === 'python') return { key: 'NIXPACKS_PYTHON_VERSION', value: version }
-  if (name === 'php') return { key: 'NIXPACKS_PHP_VERSION', value: version }
-  return null
+  const vars = nixpacksRuntimeVariables({ runtime })
+  return vars[0] ?? null
 }

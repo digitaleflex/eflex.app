@@ -1,6 +1,6 @@
 import type { BuildPlan, Candidate, DetectionContext } from '../types.js';
 import { BASE_CONFIDENCE, scoreConfidence } from '../confidence.js';
-import { installCommand, nodeRuntimeFor } from './node.js';
+import { installCommand, nodeRuntimeFor, withJsTooling } from './node.js';
 
 const NEXT_CONFIG_FILES = ['next.config.js', 'next.config.mjs', 'next.config.ts'];
 
@@ -36,7 +36,7 @@ export function detectNext(ctx: DetectionContext): Candidate | null {
   if (hasConfig) reasons.push('Fichier de configuration Next.js détecté.');
   reasons.push(`Gestionnaire de paquets détecté : ${pm}.`);
 
-  return {
+  return withJsTooling(ctx, {
     framework: 'nextjs',
     plan,
     confidence: scoreConfidence(BASE_CONFIDENCE.nextjs, {
@@ -46,5 +46,5 @@ export function detectNext(ctx: DetectionContext): Candidate | null {
     }),
     reasons,
     warnings: ["Pour un démarrage optimisé, activez `output: 'standalone'` dans next.config."],
-  };
+  });
 }

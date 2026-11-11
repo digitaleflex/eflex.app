@@ -7,6 +7,7 @@ import {
   coolifyApplicationSettings,
   deploymentKind,
   nixpacksRuntimeVariable,
+  nixpacksRuntimeVariables,
   normalizeHost,
   persistentVolumesEnabled,
   publishDirectoryForPlan,
@@ -297,5 +298,16 @@ describe('compose fourni par le dépôt', () => {
     const invalidCompose: BuildPlan = { ...composePlan, compose: undefined }
     const invalidArtifacts = buildProjectArtifacts(invalidCompose, 'api-proj')
     expect(deploymentKind(invalidCompose, invalidArtifacts)).toBe('invalid-compose')
+  })
+})
+
+describe('nixpacksRuntimeVariables', () => {
+  it('ajoute la version de Bun quand elle est connue', () => {
+    expect(
+      nixpacksRuntimeVariables({ runtime: 'node@22', packageManager: 'bun', packageManagerVersion: '1.3.0' }),
+    ).toEqual([
+      { key: 'NIXPACKS_NODE_VERSION', value: '22' },
+      { key: 'NIXPACKS_BUN_VERSION', value: '1.3.0' },
+    ])
   })
 })

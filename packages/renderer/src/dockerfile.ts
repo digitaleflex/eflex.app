@@ -25,8 +25,22 @@ function runtimeVersion(runtime: string, prefix: string, fallback: string): stri
   return /^[A-Za-z0-9._-]+$/.test(value) ? safe(value, 'runtime') : fallback;
 }
 
+function jsBaseImage(plan: BuildPlan): string {
+  if (plan.packageManager === 'bun') {
+    const version = plan.packageManagerVersion;
+    if (version && /^[A-Za-z0-9._-]+$/.test(version)) {
+      return `oven/bun:${safe(version, 'bun')} -alpine`.replace(' -alpine', '-alpine');
+    }
+    return 'oven/bun:1-alpine';
+  }
+  const r = plan.runtime || '';
+  if (r.startsWith('node@')) return `node:${runtimeVersion(r, 'node@', '22')}-alpine`;
+  return 'node:22-alpine';
+}
+
 function baseImage(plan: BuildPlan): string {
   const r = plan.runtime || '';
+  if (plan.packageManager === 'bun') return jsBaseImage(plan);
   if (r.startsWith('node@')) return `node:${runtimeVersion(r, 'node@', '22')}-alpine`;
   if (r.startsWith('php@')) return `php:${runtimeVersion(r, 'php@', '8.3')}-fpm-alpine`;
   if (r.startsWith('python@')) return `python:${runtimeVersion(r, 'python@', '3.12')}-slim`;
@@ -64,7 +78,7 @@ export function generateDockerfile(plan: BuildPlan): string | null {
   ];
 
   if (STATIC_FRAMEWORKS.has(plan.framework)) {
-    lines.push('FROM node:22-alpine AS assets');
+    lines.push(`FROM ${jsBaseImage(plan)} AS assets`);
     lines.push('WORKDIR /app');
     lines.push('COPY . .');
     const install = shell(plan.install, 'RUN');
@@ -85,7 +99,7 @@ export function generateDockerfile(plan: BuildPlan): string | null {
   const hasJsBuild = Boolean(plan.build && (php || STATIC_FRAMEWORKS.has(plan.framework)));
 
   if (hasJsBuild) {
-    lines.push('FROM node:22-alpine AS assets');
+    lines.push(`FROM ${jsBaseImage(plan)} AS assets`);
     lines.push('WORKDIR /app');
     lines.push('COPY . .');
     const build = shell(plan.build, 'RUN');

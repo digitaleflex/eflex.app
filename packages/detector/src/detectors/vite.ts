@@ -1,6 +1,6 @@
 import type { BuildPlan, Candidate, DetectionContext } from '../types.js';
 import { BASE_CONFIDENCE, scoreConfidence } from '../confidence.js';
-import { installCommand, runScriptCommand } from './node.js';
+import { installCommand, runScriptCommand, withJsTooling } from './node.js';
 
 /** Vite: dependency `vite`, built output served statically. */
 export function detectVite(ctx: DetectionContext): Candidate | null {
@@ -23,7 +23,7 @@ export function detectVite(ctx: DetectionContext): Candidate | null {
     port: 80,
   };
 
-  return {
+  return withJsTooling(ctx, {
     framework: 'vite',
     plan,
     confidence: scoreConfidence(BASE_CONFIDENCE.vite, {
@@ -36,5 +36,5 @@ export function detectVite(ctx: DetectionContext): Candidate | null {
       `Gestionnaire de paquets détecté : ${pm}.`,
     ],
     warnings: [],
-  };
+  });
 }

@@ -1,7 +1,7 @@
 import type { BuildPlan, Candidate, DetectionContext, ServiceSpec } from '../types.js';
 import { BASE_CONFIDENCE, scoreConfidence } from '../confidence.js';
 import { phpRuntime } from '../versions.js';
-import { installCommand, runScriptCommand } from './node.js';
+import { installCommand, runScriptCommand, withJsTooling } from './node.js';
 
 /** Laravel: laravel/framework in composer.json plus an artisan entrypoint. */
 export function detectLaravel(ctx: DetectionContext): Candidate | null {
@@ -70,7 +70,7 @@ export function detectLaravel(ctx: DetectionContext): Candidate | null {
     warnings.push('`public/index.php` est absent : la configuration du serveur web doit être vérifiée.');
   }
 
-  return {
+  const candidate: Candidate = {
     framework: 'laravel',
     plan,
     confidence: scoreConfidence(BASE_CONFIDENCE.laravel, {
@@ -81,4 +81,5 @@ export function detectLaravel(ctx: DetectionContext): Candidate | null {
     reasons,
     warnings,
   };
+  return hasBuildScript ? withJsTooling(ctx, candidate) : candidate;
 }

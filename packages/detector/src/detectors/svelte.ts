@@ -1,6 +1,6 @@
 import type { BuildPlan, Candidate, DetectionContext } from '../types.js';
 import { BASE_CONFIDENCE, scoreConfidence } from '../confidence.js';
-import { installCommand } from './node.js';
+import { installCommand, withJsTooling } from './node.js';
 
 /** Svelte: dependency `svelte`, built output served statically. */
 export function detectSvelte(ctx: DetectionContext): Candidate | null {
@@ -24,7 +24,7 @@ export function detectSvelte(ctx: DetectionContext): Candidate | null {
     port: 80,
   };
 
-  return {
+  return withJsTooling(ctx, {
     framework: 'svelte',
     plan,
     confidence: scoreConfidence(BASE_CONFIDENCE.svelte, {
@@ -37,5 +37,5 @@ export function detectSvelte(ctx: DetectionContext): Candidate | null {
       `Gestionnaire de paquets détecté : ${pm}.`,
     ],
     warnings: [],
-  };
+  });
 }

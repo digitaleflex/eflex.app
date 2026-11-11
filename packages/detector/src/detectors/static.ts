@@ -1,6 +1,6 @@
 import type { BuildPlan, Candidate, DetectionContext } from '../types.js';
 import { BASE_CONFIDENCE, scoreConfidence } from '../confidence.js';
-import { installCommand } from './node.js';
+import { installCommand, withJsTooling } from './node.js';
 
 /** A package.json with a build script plus a root index.html. */
 export function detectStaticBuild(ctx: DetectionContext): Candidate | null {
@@ -21,7 +21,7 @@ export function detectStaticBuild(ctx: DetectionContext): Candidate | null {
     port: 80,
   };
 
-  return {
+  return withJsTooling(ctx, {
     framework: 'static',
     plan,
     confidence: scoreConfidence(BASE_CONFIDENCE.static, {
@@ -33,7 +33,7 @@ export function detectStaticBuild(ctx: DetectionContext): Candidate | null {
       `Gestionnaire de paquets détecté : ${pm}.`,
     ],
     warnings: [],
-  };
+  });
 }
 
 /** A plain index.html without any build step. */

@@ -54,6 +54,10 @@ export interface BuildPlan {
    * dépendances internes soient visibles.
    */
   workspace?: WorkspaceContext;
+  /** Gestionnaire de paquets JavaScript détecté (utile notamment pour Bun). */
+  packageManager?: PackageManager;
+  /** Version du gestionnaire de paquets quand elle est déclarée (`bun@1.2.3`, `.bun-version`, etc.). */
+  packageManagerVersion?: string;
   install?: string;
   build?: string;
   start?: string;

@@ -55,6 +55,18 @@ export const nextjsWithBun = makeSnapshot({
   'bun.lockb': 'binary-placeholder\n',
 });
 
+/** Bun : lockfile texte récent (v2) avec version de Bun épinglée. */
+export const nextjsWithBunLockV2 = makeSnapshot({
+  'package.json': json({
+    name: 'next-app',
+    scripts: { build: 'next build', start: 'next start' },
+    dependencies: { next: '14.2.0' },
+    packageManager: 'bun@1.3.0',
+  }),
+  'next.config.js': 'module.exports = {};\n',
+  'bun.lock': '{\n  "lockfileVersion": 2,\n  "workspaces": {}\n}\n',
+});
+
 /** pnpm déclaré sans lockfile : installation sans --frozen-lockfile. */
 export const nextjsWithDeclaredPnpm = makeSnapshot({
   'package.json': json({
@@ -550,6 +562,7 @@ export function allFixtures(): Fixture[] {
     { name: 'nextjs-with-pnpm', snapshot: nextjsWithPnpm },
     { name: 'nextjs-with-yarn-berry', snapshot: nextjsWithYarnBerry },
     { name: 'nextjs-with-bun', snapshot: nextjsWithBun },
+    { name: 'nextjs-with-bun-lock-v2', snapshot: nextjsWithBunLockV2 },
     { name: 'nextjs-with-declared-pnpm', snapshot: nextjsWithDeclaredPnpm },
     { name: 'nextjs-with-pnpm-settings-only', snapshot: nextjsWithPnpmSettingsOnly },
     { name: 'nextjs-with-engines', snapshot: nextjsWithEngines },

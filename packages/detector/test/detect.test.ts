@@ -31,6 +31,7 @@ import {
   monorepoWorkspace,
   nextjs,
   nextjsWithBun,
+  nextjsWithBunLockV2,
   nextjsWithDeclaredPnpm,
   nextjsWithEngines,
   nextjsWithPnpm,
@@ -384,6 +385,19 @@ describe('detect', () => {
     const result = detect(nextjsWithBun);
 
     expect(result.plan?.install).toBe('bun install --frozen-lockfile');
+    expect(result.plan?.packageManager).toBe('bun');
+    expect(result.plan?.packageManagerVersion).toBe('1.1.0');
+    expect(result.reasons.join(' ')).toContain('Version de Bun détectée');
+  });
+
+  it('détecte un lockfile Bun texte récent et avertit sur la compatibilité du builder', () => {
+    const result = detect(nextjsWithBunLockV2);
+
+    expect(result.plan?.install).toBe('bun install --frozen-lockfile');
+    expect(result.plan?.packageManager).toBe('bun');
+    expect(result.plan?.packageManagerVersion).toBe('1.3.0');
+    expect(result.reasons.join(' ')).toContain('Format du lockfile Bun détecté');
+    expect(result.warnings.join(' ')).toContain('lockfileVersion');
   });
 
   it('n’impose pas --frozen-lockfile quand pnpm est déclaré sans lockfile', () => {

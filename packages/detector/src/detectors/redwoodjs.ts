@@ -1,6 +1,6 @@
 import type { BuildPlan, Candidate, DetectionContext } from '../types.js';
 import { BASE_CONFIDENCE, scoreConfidence } from '../confidence.js';
-import { installCommand } from './node.js';
+import { installCommand, withJsTooling } from './node.js';
 
 /** RedwoodJS: dépendances @redwoodjs/api, @redwoodjs/db, etc. */
 export function detectRedwoodjs(ctx: DetectionContext): Candidate | null {
@@ -28,7 +28,7 @@ export function detectRedwoodjs(ctx: DetectionContext): Candidate | null {
     port: 8910,
   };
 
-  return {
+  return withJsTooling(ctx, {
     framework: 'redwoodjs',
     plan,
     confidence: scoreConfidence(BASE_CONFIDENCE.redwoodjs, {
@@ -41,5 +41,5 @@ export function detectRedwoodjs(ctx: DetectionContext): Candidate | null {
       `Gestionnaire de paquets détecté : ${pm}.`,
     ],
     warnings: [],
-  };
+  });
 }

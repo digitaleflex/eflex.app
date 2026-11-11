@@ -1,6 +1,6 @@
 import type { BuildPlan, Candidate, DetectionContext } from '../types.js';
 import { BASE_CONFIDENCE, scoreConfidence } from '../confidence.js';
-import { installCommand, nodeRuntimeFor } from './node.js';
+import { installCommand, nodeRuntimeFor, withJsTooling } from './node.js';
 
 /** Nuxt: dependency `nuxt`, served by the Nitro Node server. */
 export function detectNuxt(ctx: DetectionContext): Candidate | null {
@@ -25,7 +25,7 @@ export function detectNuxt(ctx: DetectionContext): Candidate | null {
     port: 3000,
   };
 
-  return {
+  return withJsTooling(ctx, {
     framework: 'nuxt',
     plan,
     confidence: scoreConfidence(BASE_CONFIDENCE.nuxt, {
@@ -39,5 +39,5 @@ export function detectNuxt(ctx: DetectionContext): Candidate | null {
       `Gestionnaire de paquets détecté : ${pm}.`,
     ],
     warnings: [],
-  };
+  });
 }
