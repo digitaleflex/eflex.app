@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Activity, ArrowRight, CircleAlert, CircleCheck, Gauge, Layers, Loader2, Rocket, ShieldAlert } from 'lucide-react'
+import { Activity, ArrowRight, CircleAlert, CircleCheck, Gauge, Globe, Layers, Loader2, Rocket, ShieldAlert, UserPlus } from 'lucide-react'
 import { StatusDot } from '@/components/dashboard/status-pill'
 import { FrameworkTile } from '@/components/dashboard/project-card'
 import { relativeTime } from '@/lib/relative-time'
@@ -43,7 +43,7 @@ function DeploySparkbars({ series }: { series: DashboardData['series'] }) {
 /** Bandeau de chiffres utiles : chaque chiffre répond à une question qu'on se pose vraiment. */
 export function OverviewStrip({ data }: { data: DashboardData }) {
   const { summary, successRate, deploymentsInWindow, series, windowDays, activity } = data
-  const last = activity[0]
+  const last = activity.find((item): item is Extract<DashboardData['activity'][number], { kind: 'deployment' }> => item.kind === 'deployment') ?? null
   return (
     <div className="space-y-2">
     <section aria-label="Aperçu" className="grid overflow-hidden rounded-xl border border-border bg-card sm:grid-cols-2 lg:grid-cols-4 [&>*]:border-border [&>*:not(:last-child)]:border-b sm:[&>*:nth-child(odd)]:border-r lg:[&>*]:border-b-0 lg:[&>*:not(:last-child)]:border-r">
@@ -187,7 +187,7 @@ export function AttentionList({ items }: { items: DashboardData['attention'] }) 
   )
 }
 
-/** Fil d'activité : les derniers déploiements de l'organisation, mis à jour en direct. */
+/** Fil d'activité : derniers événements utiles de l'organisation (déploiements, domaines, équipe), mis à jour en direct. */
 export function ActivityFeed({ items }: { items: DashboardData['activity'] }) {
   return (
     <section aria-labelledby="activity-title" className="rounded-xl border border-border bg-card">
@@ -196,23 +196,55 @@ export function ActivityFeed({ items }: { items: DashboardData['activity'] }) {
         <Link href="/dashboard/activity" className="text-xs font-medium text-primary hover:underline">Tout voir</Link>
       </div>
       {items.length === 0 ? (
-        <p className="px-4 py-8 text-center text-sm text-muted-foreground">Les déploiements de vos projets apparaîtront ici.</p>
+        <p className="px-4 py-8 text-center text-sm text-muted-foreground">L’activité récente de vos projets apparaîtra ici.</p>
       ) : (
         <ol className="px-4 py-2">
-          {items.map((d, i) => (
-            <li key={d.id} className="relative flex gap-3 py-2.5">
+          {items.map((item, i) => (
+            <li key={item.id} className="relative flex gap-3 py-2.5">
               {i < items.length - 1 && <span aria-hidden="true" className="absolute left-4 top-11 h-[calc(100%-2rem)] w-px bg-border" />}
-              <FrameworkTile framework={d.framework} name={d.projectName} size="sm" />
-              <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-1.5 text-sm">
-                  <Link href={`/dashboard/projects/${d.projectId}`} className="truncate font-medium hover:underline">{d.projectName}</Link>
-                  <StatusDot status={d.status} className="shrink-0" />
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {statusInfo(d.status).label}
-                  {d.commitSha && <> · <span className="font-mono">{d.commitSha}</span></>} · <time dateTime={d.createdAt} suppressHydrationWarning>{relativeTime(d.createdAt)}</time>
-                </p>
-              </div>
+              {item.kind === 'deployment' ? (
+                <>
+                  <FrameworkTile framework={item.framework} name={item.projectName} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-1.5 text-sm">
+                      <Link href={`/dashboard/projects/${item.projectId}`} className="truncate font-medium hover:underline">{item.projectName}</Link>
+                      <StatusDot status={item.status} className="shrink-0" />
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {statusInfo(item.status).label}
+                      {item.commitSha && <> · <span className="font-mono">{item.commitSha}</span></>} · <time dateTime={item.createdAt} suppressHydrationWarning>{relativeTime(item.createdAt)}</time>
+                    </p>
+                  </div>
+                </>
+              ) : item.kind === 'domain_verified' ? (
+                <>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success" aria-hidden="true">
+                    <Globe className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-1.5 text-sm">
+                      <Link href={`/dashboard/projects/${item.projectId}`} className="truncate font-medium hover:underline">{item.projectName}</Link>
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      Domaine vérifié · <span className="font-mono">{item.hostname}</span> · <time dateTime={item.createdAt} suppressHydrationWarning>{relativeTime(item.createdAt)}</time>
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground" aria-hidden="true">
+                    <UserPlus className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-1.5 text-sm">
+                      <Link href="/dashboard/organization" className="truncate font-medium hover:underline">{item.memberName}</Link>
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      A rejoint l’équipe · <time dateTime={item.createdAt} suppressHydrationWarning>{relativeTime(item.createdAt)}</time>
+                    </p>
+                  </div>
+                </>
+              )}
             </li>
           ))}
         </ol>
