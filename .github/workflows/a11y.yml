@@ -1,7 +1,7 @@
 name: Accessibilité (axe + Playwright)
 
 # Issue #32 : zéro violation axe « serious » ou « critical » sur les pages publiques
-# et les parcours authentifiés, à 360 / 768 / 1280 px, en clair et en sombre.
+# et les parcours authentifiés, à 360 / 768 / 1440 px, en clair et en sombre.
 on:
   pull_request:
     paths:
