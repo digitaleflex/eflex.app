@@ -149,12 +149,15 @@ function ImpersonationBannerContent({ userName }: { userName: string }) {
   return (
     <div
       role="status"
+      aria-label={`Session d’usurpation active : ${userName}`}
       className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm"
     >
-      <span className="font-medium">Vous utilisez le compte de {userName}.</span>
-      <span className="min-w-0 flex-1 text-xs text-muted-foreground">
-        Usurpation administrateur : les actions effectuées sont enregistrées dans le journal d’audit.
-      </span>
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-foreground">Vous utilisez le compte de {userName}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Session d’administration : vos actions sont enregistrées dans le journal d’audit.
+        </p>
+      </div>
       {error && (
         <p role="alert" className="w-full text-xs text-destructive">
           {error}
@@ -166,9 +169,9 @@ function ImpersonationBannerContent({ userName }: { userName: string }) {
         size="sm"
         loading={busy}
         onClick={() => void stop()}
-        aria-label={`Quitter le compte de ${userName}`}
+        aria-label="Quitter la session d’usurpation et revenir à l’administration"
       >
-        Quitter ce compte
+        Revenir à mon compte
       </Button>
     </div>
   )
@@ -182,14 +185,15 @@ function BillingBannerContent({ message }: { message: string }) {
     >
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p className="font-medium text-foreground">Action requise sur l’abonnement</p>
+        <p className="font-medium text-foreground">Action requise sur votre abonnement</p>
         <p className="mt-0.5 text-muted-foreground">{message}</p>
       </div>
       <Link
         href="/dashboard/organization"
         className="inline-flex min-h-9 shrink-0 items-center rounded-md border border-border bg-background px-3 text-xs font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label="Gérer l’abonnement de l’organisation"
       >
-        Voir l’abonnement
+        Gérer l’abonnement
       </Link>
     </div>
   )
@@ -199,15 +203,17 @@ function MaintenanceBannerContent({ message }: { message: string | null }) {
   return (
     <div
       role="status"
-      className="rounded-lg border border-amber-500/30 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100"
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-amber-500/30 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100"
     >
-      <span className="font-medium">Maintenance en cours.</span>{' '}
-      {message || 'Le service peut être momentanément indisponible.'}{' '}
+      <p className="min-w-0 flex-1">
+        <span className="font-medium">Maintenance en cours.</span>{' '}
+        <span>{message || 'Certaines fonctionnalités peuvent être momentanément indisponibles.'}</span>
+      </p>
       <Link
         href="/status"
-        className="font-medium underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+        className="shrink-0 font-medium underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
       >
-        Voir le statut des services
+        Consulter l’état des services
       </Link>
     </div>
   )
@@ -234,13 +240,16 @@ function AnnouncementBannerContent({
           : 'flex flex-wrap items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm text-foreground'
       }
     >
-      <span className="min-w-0 flex-1">{message}</span>
+      <p className="min-w-0 flex-1">
+        <span className="font-medium">{warning ? 'Annonce importante : ' : 'Annonce : '}</span>
+        <span>{message}</span>
+      </p>
       {dismissible && (
         <button
           type="button"
           onClick={onDismiss}
           className="inline-flex min-h-9 shrink-0 items-center rounded-md border border-current/20 px-3 text-xs font-medium hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:hover:bg-white/10"
-          aria-label="Fermer l’annonce"
+          aria-label="Fermer cette annonce"
         >
           Fermer
         </button>

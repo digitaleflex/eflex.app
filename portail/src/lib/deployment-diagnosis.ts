@@ -127,13 +127,78 @@ const RULES: Rule[] = [
     action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
   },
   {
+    id: 'nixpacks-build-detect',
+    test: (t) =>
+      /could not determine how to build/i.test(t) ||
+      (/nixpacks/i.test(t) &&
+        /\b(Error|failed|unable)\b/i.test(t) &&
+        /\b(detect|detected|determine|plan|provider|generate a build plan)\b/i.test(t) &&
+        !/start command/i.test(t)),
+    cause: "Le système de build (Nixpacks/buildpack) n'a pas pu déterminer comment construire l'application.",
+    action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
     id: 'start-command-missing',
     test: (t) =>
-      /No start command (could be found|was found)|could not determine how to start|Missing start command|Procfile declares types\s*->\s*\(none\)/i.test(
+      /No start command (could be found|was found)|could not determine how to start|Missing start command|Procfile declares types\s*->\s*\(none\)|Error: Please specify a start command/i.test(
         t,
       ),
     cause: "Aucune commande de démarrage n'a été détectée pour l'application.",
     action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
+    id: 'missing-tooling',
+    test: (t) =>
+      /\b(bundler|bundle|composer|php): command not found\b/i.test(t) ||
+      /\bsh: \d+: (bundler|bundle|composer|php): not found\b/i.test(t),
+    cause: "Un outil requis pour la construction ou le démarrage est introuvable dans l'environnement.",
+    action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
+    id: 'go-module-missing',
+    test: (t) => /go: cannot find main module/i.test(t),
+    cause: "Le module Go principal est introuvable (fichier go.mod manquant ou contexte de build incorrect).",
+    action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
+    id: 'python-module-missing',
+    test: (t) =>
+      /\bModuleNotFoundError: No module named ['"][^'"]+['"]/i.test(t) ||
+      /\bImportError: No module named ['"]?[^\s'"]+['"]?/i.test(t),
+    cause: "Un module Python requis est introuvable au démarrage ou à l'exécution.",
+    action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
+    id: 'java-class-missing',
+    test: (t) =>
+      /\bjava\.lang\.ClassNotFoundException\b/i.test(t) ||
+      /\bError: Could not find or load main class\b/i.test(t),
+    cause: "Une classe Java requise est introuvable au démarrage.",
+    action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
+    id: 'docker-socket-permission',
+    test: (t) =>
+      /permission denied while trying to connect to the Docker daemon socket/i.test(t) ||
+      /Got permission denied while trying to connect to the Docker daemon socket/i.test(t) ||
+      /Cannot connect to the Docker daemon .* permission denied/i.test(t),
+    cause: "L'accès au démon Docker a été refusé (socket ou permissions insuffisantes).",
+    action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
+    id: 'exec-format-error',
+    test: (t) => /\bexec format error\b/i.test(t),
+    cause: "Le binaire exécuté est incompatible avec l'architecture du serveur (exec format error).",
+    action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
+    id: 'port-in-use',
+    test: (t) =>
+      /\bEADDRINUSE\b/i.test(t) ||
+      /\baddress already in use\b/i.test(t) ||
+      /listen EADDRINUSE/i.test(t),
+    cause: "Le port demandé est déjà utilisé au démarrage de l'application.",
+    action: (id) => ({ label: 'Corriger le port', href: `/dashboard/projects/${id}/settings` }),
   },
   {
     id: 'permission-build',

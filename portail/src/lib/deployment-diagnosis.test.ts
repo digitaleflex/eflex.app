@@ -219,6 +219,141 @@ npm ERR! network request to https://registry.npmjs.org/react/-/react-18.3.1.tgz 
     })
   })
 
+  it('détecte une commande de démarrage manquante (Nixpacks "Please specify a start command")', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: '╔══════════════════════ Nixpacks v1.21.2 ══════════════════════╗\n║ setup      │ nodejs_20                                       ║\n║ build      │ npm run build                                   ║\n╚══════════════════════════════════════════════════════════════╝\nError: Please specify a start command',
+      projectId: 'p1',
+    })
+    expect(d).toEqual({
+      cause: "Aucune commande de démarrage n'a été détectée pour l'application.",
+      action: { label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' },
+    })
+  })
+
+  it("détecte un build Nixpacks/buildpack qui ne peut pas déterminer comment construire", () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'Nixpacks build failed\nError: could not determine how to build the app',
+      projectId: 'p1',
+    })
+    expect(d).toEqual({
+      cause: "Le système de build (Nixpacks/buildpack) n'a pas pu déterminer comment construire l'application.",
+      action: { label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' },
+    })
+  })
+
+  it('ne confond pas des phases Nixpacks informatives avec un échec de détection', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'Nixpacks v1.21.2\nsetup      │ nodejs_20\nbuild      │ npm run build\nstart      │ npm start\nDone in 12s',
+      projectId: 'p1',
+    })
+    expect(d).toBeNull()
+  })
+
+  it('détecte un outil manquant (composer: command not found)', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: '/bin/sh: 1: composer: command not found\nThe command "composer install --no-dev" returned a non-zero code: 127',
+      projectId: 'p1',
+    })
+    expect(d).toEqual({
+      cause: "Un outil requis pour la construction ou le démarrage est introuvable dans l'environnement.",
+      action: { label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' },
+    })
+  })
+
+  it('détecte un outil manquant (bundler: command not found)', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'sh: 1: bundler: command not found',
+      projectId: 'p1',
+    })
+    expect(d?.cause).toContain('outil requis')
+  })
+
+  it('détecte un outil manquant (php: command not found)', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'bash: php: command not found',
+      projectId: 'p1',
+    })
+    expect(d?.cause).toContain('outil requis')
+  })
+
+  it('détecte un module Go principal introuvable', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'go: cannot find main module, but found .git/config in /app\n\tto create a module there, run:\n\tcd .. && go mod init',
+      projectId: 'p1',
+    })
+    expect(d).toEqual({
+      cause: "Le module Go principal est introuvable (fichier go.mod manquant ou contexte de build incorrect).",
+      action: { label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' },
+    })
+  })
+
+  it('détecte un module Python manquant (ModuleNotFoundError)', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'Traceback (most recent call last):\n  File "/app/main.py", line 1, in <module>\n    import fastapi\nModuleNotFoundError: No module named \'fastapi\'',
+      projectId: 'p1',
+    })
+    expect(d).toEqual({
+      cause: "Un module Python requis est introuvable au démarrage ou à l'exécution.",
+      action: { label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' },
+    })
+  })
+
+  it('détecte une classe Java introuvable au démarrage', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'Error: Could not find or load main class com.example.Application\nCaused by: java.lang.ClassNotFoundException: com.example.Application',
+      projectId: 'p1',
+    })
+    expect(d).toEqual({
+      cause: "Une classe Java requise est introuvable au démarrage.",
+      action: { label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' },
+    })
+  })
+
+  it('détecte un refus d’accès au socket Docker', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'Got permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock: Post "http://%2Fvar%2Frun%2Fdocker.sock/v1.24/build": dial unix /var/run/docker.sock: connect: permission denied',
+      projectId: 'p1',
+    })
+    expect(d).toEqual({
+      cause: "L'accès au démon Docker a été refusé (socket ou permissions insuffisantes).",
+      action: { label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' },
+    })
+  })
+
+  it("détecte une erreur d'architecture (exec format error)", () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'standard_init_linux.go:228: exec user process caused: exec format error',
+      projectId: 'p1',
+    })
+    expect(d).toEqual({
+      cause: "Le binaire exécuté est incompatible avec l'architecture du serveur (exec format error).",
+      action: { label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' },
+    })
+  })
+
+  it('détecte un port déjà utilisé au démarrage (EADDRINUSE)', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'Error: listen EADDRINUSE: address already in use 0.0.0.0:3000\n    at Server.setupListenHandle [as _listen2] (node:net:1904:16)',
+      projectId: 'p1',
+    })
+    expect(d).toEqual({
+      cause: "Le port demandé est déjà utilisé au démarrage de l'application.",
+      action: { label: 'Corriger le port', href: '/dashboard/projects/p1/settings' },
+    })
+  })
+
   it('détecte un refus de permission pendant la construction', () => {
     const d = diagnoseFailure({
       status: 'failed',
