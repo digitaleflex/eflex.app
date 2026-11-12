@@ -160,7 +160,14 @@ function ImpersonationBannerContent({ userName }: { userName: string }) {
           {error}
         </p>
       )}
-      <Button type="button" variant="outline" size="sm" loading={busy} onClick={() => void stop()}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        loading={busy}
+        onClick={() => void stop()}
+        aria-label={`Quitter le compte de ${userName}`}
+      >
         Quitter ce compte
       </Button>
     </div>
@@ -196,7 +203,10 @@ function MaintenanceBannerContent({ message }: { message: string | null }) {
     >
       <span className="font-medium">Maintenance en cours.</span>{' '}
       {message || 'Le service peut être momentanément indisponible.'}{' '}
-      <Link href="/status" className="font-medium underline underline-offset-2 hover:no-underline">
+      <Link
+        href="/status"
+        className="font-medium underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+      >
         Voir le statut des services
       </Link>
     </div>

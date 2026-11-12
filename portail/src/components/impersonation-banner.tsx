@@ -48,7 +48,14 @@ export function ImpersonationBanner({ userName }: { userName: string }) {
         </p>
         {error && <p role="alert" className="mt-1 text-xs text-destructive">{error}</p>}
       </div>
-      <Button type="button" variant="outline" size="sm" loading={busy} onClick={() => void stop()}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        loading={busy}
+        onClick={() => void stop()}
+        aria-label={`Quitter le compte de ${userName}`}
+      >
         Quitter ce compte
       </Button>
     </div>
