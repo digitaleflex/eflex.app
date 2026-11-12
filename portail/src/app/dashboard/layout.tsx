@@ -1,13 +1,17 @@
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { resolveOrganization } from '@/lib/organizations'
+import { canManageBilling, resolveOrganization } from '@/lib/organizations'
 import { EventsProvider } from '@/hooks/events-provider'
 import { ToastProvider } from '@/components/ui/toast'
 import { NotificationToaster } from '@/components/notification-toaster'
 import { MembershipWatcher } from '@/components/membership-watcher'
-import { ImpersonationBanner } from '@/components/impersonation-banner'
 import { DashboardShell } from '@/components/dashboard-shell'
+import { billingSummary, loadBillingState } from '@/lib/billing'
+import { DashboardBanner } from '@/components/dashboard/dashboard-banner'
+
+const SIDEBAR_COOKIE = 'eflex-sidebar'
 
 // Protection côté serveur : aucune page du tableau de bord n'est rendue sans session.
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -21,6 +25,26 @@ export default async function DashboardLayout({ children }: { children: React.Re
     await prisma.session.update({ where: { id: session.session.id }, data: { activeOrganizationId: org.organizationId } })
   }
 
+  let billing: Awaited<ReturnType<typeof billingSummary>> | null = null
+  let billingBlock: { kind: 'suspension' | 'past_due'; message: string } | null = null
+  if (org) {
+    const [billingResult, billingState] = await Promise.all([
+      canManageBilling(org.role) ? billingSummary(org.organizationId).catch(() => null) : Promise.resolve(null),
+      loadBillingState(org.organizationId).catch(() => null),
+    ])
+    billing = billingResult
+    if (billingState?.blocked && billingState.message) {
+      billingBlock = {
+        kind: billingState.blockCode === 'organization_suspended' ? 'suspension' : 'past_due',
+        message: billingState.message,
+      }
+    }
+  }
+
+  const sidebarCookie = (await cookies()).get(SIDEBAR_COOKIE)?.value
+  const initialSidebarCollapsed =
+    sidebarCookie === 'collapsed' ? true : sidebarCookie === 'expanded' ? false : undefined
+
   return (
     // Le thème est porté par <html> (cookie ou système), commun à tout le site.
     <div className="min-h-screen bg-background text-foreground">
@@ -28,8 +52,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <ToastProvider>
         <MembershipWatcher />
         <NotificationToaster />
-        <DashboardShell user={{ name: session.user.name, email: session.user.email }}>
-          {session.session.impersonatedBy && <ImpersonationBanner userName={session.user.name} />}
+        <DashboardShell
+          user={{ name: session.user.name, email: session.user.email }}
+          billing={billing}
+          banner={
+            <DashboardBanner
+              impersonatedUserName={session.session.impersonatedBy ? session.user.name : null}
+              billingBlock={billingBlock}
+            />
+          }
+          initialSidebarCollapsed={initialSidebarCollapsed}
+        >
           {children}
         </DashboardShell>
       </ToastProvider>

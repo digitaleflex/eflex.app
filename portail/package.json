@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test:a11y": "playwright test"
+    "test:a11y": "playwright test e2e/a11y.spec.ts",
+    "test:screenshots": "playwright test e2e/screenshots.spec.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.7.19",

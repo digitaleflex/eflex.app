@@ -511,6 +511,7 @@ export async function GET() {
   })
 
   return NextResponse.json({
+    canManage: canManageProjects(org.role),
     projects: projects.map(({ apps, ...project }) => {
       const primary = getPrimaryApp(apps)
       return {

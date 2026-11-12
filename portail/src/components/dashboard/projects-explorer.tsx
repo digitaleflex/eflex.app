@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useId, useMemo, useState } from 'react'
 import { FolderKanban, LayoutGrid, List, Plus, Search, SearchX } from 'lucide-react'
-import { ProjectCard, ProjectRow } from '@/components/dashboard/project-card'
+import { ProjectCard } from '@/components/dashboard/project-card'
+import { ProjectsTable } from '@/components/dashboard/projects-table'
 import { EmptyPanel } from '@/components/dashboard/section'
 import {
   PROJECT_FILTERS,
@@ -37,7 +38,7 @@ export function ProjectsExplorer({
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<ProjectFilter>('all')
   const [sort, setSort] = useState<ProjectSort>(initialSort)
-  const [view, setView] = useState<View>('grid')
+  const [view, setView] = useState<View>('list')
   const searchId = useId()
   const sortId = useId()
 
@@ -118,7 +119,7 @@ export function ProjectsExplorer({
             </select>
 
             <div role="group" aria-label="Affichage" className="flex rounded-lg border border-border bg-card p-0.5">
-              {([['grid', LayoutGrid, 'Grille'], ['list', List, 'Liste']] as const).map(([value, Icon, label]) => (
+              {([['grid', LayoutGrid, 'Grille'], ['list', List, 'Tableau']] as const).map(([value, Icon, label]) => (
                 <button
                   key={value}
                   type="button"
@@ -194,9 +195,7 @@ export function ProjectsExplorer({
           {visible.map((project) => <ProjectCard key={project.id} project={project} />)}
         </div>
       ) : (
-        <ul aria-label="Projets" className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
-          {visible.map((project) => <ProjectRow key={project.id} project={project} />)}
-        </ul>
+        <ProjectsTable projects={visible} />
       )}
     </section>
   )

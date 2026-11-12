@@ -48,10 +48,24 @@ describe('attentionItems', () => {
       project('cassé', dep('failed', 1), dep('live', 5)),
       project('en-cours', dep('building', 0)),
       project('vide'),
-    ])
-    expect(items.map((i) => [i.name, i.kind])).toEqual([['cassé', 'failed'], ['en-cours', 'in-progress']])
+    ], { now })
+    expect(items.map((i) => [i.kind === 'failed' || i.kind === 'in-progress' ? i.name : i.kind, i.kind])).toEqual([['cassé', 'failed'], ['en-cours', 'in-progress']])
   })
+
+  it('ajoute une alerte certificat quand il expire sous 14 jours', () => {
+    const p: ProjectLite = { id: 's', name: 'Site', framework: null, domain: 's.test', deployments: [dep('live', 0)], tlsExpiresAt: new Date(now.getTime() + 5 * 86_400_000) }
+    const items = attentionItems([p], { now })
+    expect(items.some((i) => i.kind === 'certificate' && i.projectId === 's')).toBe(true)
+  })
+
+  it('ajoute une alerte de quota à partir de 80 %', () => {
+    const items = attentionItems([project('a', dep('live', 0))], { now, quota: { used: 8, limit: 10 } })
+    expect(items.some((i) => i.kind === 'quota')).toBe(true)
+    const none = attentionItems([project('a', dep('live', 0))], { now, quota: { used: 7, limit: 10 } })
+    expect(none.some((i) => i.kind === 'quota')).toBe(false)
+  })
+
   it('résume le parc', () => {
-    expect(summarize([project('a', dep('live')), project('b', dep('failed')), project('c')])).toEqual({ total: 3, live: 1, needsAttention: 1 })
+    expect(summarize([project('a', dep('live')), project('b', dep('failed')), project('c')], { now })).toEqual({ total: 3, live: 1, needsAttention: 1 })
   })
 })

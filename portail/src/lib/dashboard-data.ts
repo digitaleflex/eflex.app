@@ -35,23 +35,106 @@ export type DashboardProject = {
   apps: DashboardProjectApp[]
 }
 
-export type DashboardActivity = {
-  id: string
-  status: string
-  commitSha: string
-  createdAt: string
-  projectId: string
-  projectName: string
-  framework: string | null
+export type DashboardActivity =
+  | {
+      kind: 'deployment'
+      id: string
+      status: string
+      commitSha: string
+      createdAt: string
+      projectId: string
+      projectName: string
+      framework: string | null
+    }
+  | {
+      kind: 'domain_verified'
+      id: string
+      createdAt: string
+      projectId: string
+      projectName: string
+      hostname: string
+    }
+  | {
+      kind: 'member_added'
+      id: string
+      createdAt: string
+      memberName: string
+    }
+
+export type OrgRecentEvent = Extract<DashboardActivity, { kind: 'domain_verified' | 'member_added' }>
+
+/**
+ * Événements fiables récents de l'organisation hors déploiements (domaines vérifiés, membres ajoutés),
+ * dédupliqués par identifiant source et triés du plus récent au plus ancien.
+ */
+export async function loadRecentOrgEvents(organizationId: string, take = 15): Promise<OrgRecentEvent[]> {
+  const [domainVerifications, memberEvents] = await Promise.all([
+    prisma.auditLog.findMany({
+      where: { organizationId, action: 'project.domain.verify' },
+      orderBy: { createdAt: 'desc' },
+      take,
+      select: { id: true, createdAt: true, details: true },
+    }),
+    prisma.member.findMany({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+      take,
+      select: { id: true, createdAt: true, user: { select: { name: true } } },
+    }),
+  ])
+
+  const projectIds = Array.from(
+    new Set(
+      domainVerifications
+        .map((entry) => (entry.details as { projectId?: unknown } | null)?.projectId)
+        .filter((id): id is string => typeof id === 'string'),
+    ),
+  )
+  const projects = projectIds.length
+    ? await prisma.project.findMany({
+        where: { organizationId, id: { in: projectIds } },
+        select: { id: true, name: true },
+      })
+    : []
+  const projectNameById = new Map(projects.map((p) => [p.id, p.name]))
+
+  const domainActivity: OrgRecentEvent[] = domainVerifications.flatMap((entry) => {
+    const details = entry.details as { projectId?: unknown; hostname?: unknown } | null
+    const projectId = typeof details?.projectId === 'string' ? details.projectId : null
+    const hostname = typeof details?.hostname === 'string' ? details.hostname : null
+    const projectName = projectId ? projectNameById.get(projectId) : null
+    if (!projectId || !hostname || !projectName) return []
+    return [
+      {
+        kind: 'domain_verified' as const,
+        id: `domain-verify:${entry.id}`,
+        createdAt: entry.createdAt.toISOString(),
+        projectId,
+        projectName,
+        hostname,
+      },
+    ]
+  })
+
+  const memberActivity: OrgRecentEvent[] = memberEvents.map((m) => ({
+    kind: 'member_added',
+    id: `member-added:${m.id}`,
+    createdAt: m.createdAt.toISOString(),
+    memberName: m.user.name,
+  }))
+
+  return [...domainActivity, ...memberActivity]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, take)
 }
 
 /**
  * Tout ce qu'il faut pour la page d'accueil, calculé côté serveur pour l'organisation donnée
  * (jamais pour un autre locataire) et sérialisé en types simples (dates en ISO).
  */
-export async function loadDashboard(organizationId: string, now = new Date()) {
+export async function loadDashboard(organizationId: string, now = new Date(), options?: { quota?: { used: number; limit: number } | null }) {
   const since = new Date(now.getTime() - DAYS * 86_400_000)
-  const [projects, recent, activity] = await Promise.all([
+  const [projects, recent, deployments, domainVerifications, memberEvents] = await Promise.all([
     prisma.project.findMany({
       where: { organizationId },
       orderBy: { updatedAt: 'desc' },
@@ -66,7 +149,7 @@ export async function loadDashboard(organizationId: string, now = new Date()) {
         updatedAt: true,
         tlsValid: true,
         tlsExpiresAt: true,
-        deployments: { orderBy: { createdAt: 'desc' }, take: 8, select: { id: true, status: true, commitSha: true, createdAt: true } },
+        deployments: { orderBy: { createdAt: 'desc' }, take: 8, select: { id: true, status: true, commitSha: true, createdAt: true, logsSummary: true } },
         apps: {
           orderBy: [{ position: 'asc' }, { name: 'asc' }],
           select: { id: true, name: true, position: true, framework: true, runtime: true, domain: true, tlsValid: true, tlsExpiresAt: true },
@@ -102,6 +185,18 @@ export async function loadDashboard(organizationId: string, now = new Date()) {
         },
       },
     }),
+    prisma.auditLog.findMany({
+      where: { organizationId, action: 'project.domain.verify' },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+      select: { id: true, createdAt: true, details: true, targetId: true },
+    }),
+    prisma.member.findMany({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+      select: { id: true, createdAt: true, user: { select: { name: true } } },
+    }),
   ])
 
   const derived = projects.map((p) => {
@@ -121,7 +216,8 @@ export async function loadDashboard(organizationId: string, now = new Date()) {
     name: p.name,
     framework: p._framework,
     domain: p._domain,
-    deployments: p.deployments,
+    tlsExpiresAt: p._tlsExpiresAt,
+    deployments: p.deployments.map((d) => ({ id: d.id, status: d.status, createdAt: d.createdAt, commitSha: d.commitSha, logsSummary: d.logsSummary })),
     apps: p.apps.map((app) => ({ framework: app.framework, domain: app.domain, position: app.position, name: app.name })),
   }))
   const cards: DashboardProject[] = derived.map((p) => {
@@ -146,22 +242,59 @@ export async function loadDashboard(organizationId: string, now = new Date()) {
     }
   })
 
+  const deploymentActivity: DashboardActivity[] = deployments.map((d) => ({
+    kind: 'deployment',
+    id: d.id,
+    status: d.status,
+    commitSha: d.commitSha === 'pending' ? '' : d.commitSha.slice(0, 7),
+    createdAt: d.createdAt.toISOString(),
+    projectId: d.project.id,
+    projectName: d.project.name,
+    framework: d.project.apps[0]?.framework ?? d.project.framework,
+  }))
+
+  const projectNameById = new Map(projects.map((p) => [p.id, p.name]))
+  const domainActivity: DashboardActivity[] = domainVerifications.flatMap((entry) => {
+    const details = entry.details as { projectId?: unknown; hostname?: unknown } | null
+    const projectId = typeof details?.projectId === 'string' ? details.projectId : null
+    const hostname = typeof details?.hostname === 'string' ? details.hostname : null
+    const projectName = projectId ? projectNameById.get(projectId) : null
+    if (!projectId || !hostname || !projectName) return []
+    return [
+      {
+        kind: 'domain_verified' as const,
+        id: `domain-verify:${entry.id}`,
+        createdAt: entry.createdAt.toISOString(),
+        projectId,
+        projectName,
+        hostname,
+      },
+    ]
+  })
+
+  const memberActivity: DashboardActivity[] = memberEvents.map((m) => ({
+    kind: 'member_added',
+    id: `member-added:${m.id}`,
+    createdAt: m.createdAt.toISOString(),
+    memberName: m.user.name,
+  }))
+
+  const activity = [...deploymentActivity, ...domainActivity, ...memberActivity]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 12)
+
   return {
     projects: cards,
-    summary: summarize(lite),
-    attention: attentionItems(lite).map((a) => ({ ...a, at: a.at.toISOString() })),
+    summary: summarize(lite, { now, quota: options?.quota }),
+    attention: attentionItems(lite, { now, quota: options?.quota }).map((a) => ({
+      ...a,
+      at: a.at.toISOString(),
+      ...(a.kind === 'certificate' ? { expiresAt: a.expiresAt.toISOString() } : {}),
+    })),
     series: dailySeries(recent, DAYS, now),
     deploymentsInWindow: recent.length,
     successRate: successRate(recent),
-    activity: activity.map<DashboardActivity>((d) => ({
-      id: d.id,
-      status: d.status,
-      commitSha: d.commitSha === 'pending' ? '' : d.commitSha.slice(0, 7),
-      createdAt: d.createdAt.toISOString(),
-      projectId: d.project.id,
-      projectName: d.project.name,
-      framework: d.project.apps[0]?.framework ?? d.project.framework,
-    })),
+    activity,
     windowDays: DAYS,
   }
 }

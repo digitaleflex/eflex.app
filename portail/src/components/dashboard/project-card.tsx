@@ -141,30 +141,3 @@ export function ProjectCard({ project }: { project: DashboardProject }) {
   )
 }
 
-/** Ligne de projet (vue liste) : mêmes informations, alignées en colonnes. */
-export function ProjectRow({ project }: { project: DashboardProject }) {
-  return (
-    <li className="relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 hover:bg-muted/50 sm:grid-cols-[auto_minmax(0,2fr)_minmax(0,1.5fr)_8rem_auto]">
-      <FrameworkTile framework={project.framework} name={project.name} size="sm" />
-      <div className="min-w-0">
-        <Link href={`/dashboard/projects/${project.id}`} className="flex min-w-0 items-center gap-2 truncate text-sm font-semibold after:absolute after:inset-0 focus-visible:outline-none">
-          <span className="truncate">{project.name}</span>
-          {project.appCount > 1 && (
-            <span className="shrink-0 rounded-full border border-border bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-              {project.appCount} apps
-            </span>
-          )}
-        </Link>
-        <p className="truncate text-xs text-muted-foreground">{project.domain ?? 'Pas encore de domaine'}</p>
-      </div>
-      <p className="hidden min-w-0 items-center gap-1.5 text-xs text-muted-foreground sm:flex">
-        <Github className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        <span className="truncate">{repoLabel(project.repoUrl)}</span>
-      </p>
-      <p className="hidden text-xs text-muted-foreground sm:block">
-        {project.lastAt ? <time dateTime={project.lastAt} suppressHydrationWarning>{relativeTime(project.lastAt)}</time> : '—'}
-      </p>
-      <StatusPill status={project.lastStatus} />
-    </li>
-  )
-}

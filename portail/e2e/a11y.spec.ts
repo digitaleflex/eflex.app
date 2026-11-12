@@ -2,9 +2,9 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
 /**
- * Audit automatisé WCAG 2.1 AA (issue #32).
+ * Audit automatisé WCAG 2.1 AA (issue #32, #80).
  *
- * - pages publiques : 360, 768 et 1280 px, thèmes clair et sombre ;
+ * - pages publiques : 360, 768 et 1440 px, thèmes clair et sombre ;
  * - parcours authentifié (si `PLAYWRIGHT_AUTH=1`) : tableau de bord, projet,
  *   équipe, notifications, paramètres et pages d'administration ;
  * - aucun débordement horizontal au niveau de la page ;
@@ -19,7 +19,7 @@ const THEMES = ['light', 'dark'] as const
 const WIDTHS = [
   { label: '360', width: 360 },
   { label: '768', width: 768 },
-  { label: '1280', width: 1280 },
+  { label: '1440', width: 1440 },
 ] as const
 
 const PUBLIC_PAGES = [

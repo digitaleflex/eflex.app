@@ -1,11 +1,14 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
-import { canManageProjects, resolveOrganization } from '@/lib/organizations'
+import { canManageBilling, canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { loadDashboard } from '@/lib/dashboard-data'
 import { prisma } from '@/lib/prisma'
+import { billingSummary } from '@/lib/billing'
+import { computeNextSteps } from '@/lib/next-steps'
 import { LiveRefresh } from '@/components/live-refresh'
 import { ActivityFeed, AttentionList, OverviewStrip } from '@/components/dashboard/overview'
 import { DashboardOnboarding } from '@/components/dashboard/onboarding'
+import { NextStepsCard } from '@/components/dashboard/next-steps-card'
 import { ProjectsExplorer } from '@/components/dashboard/projects-explorer'
 
 export const metadata = { title: 'Projets — Eflex' }
@@ -22,14 +25,34 @@ export default async function DashboardPage() {
   const org = await resolveOrganization(session)
   if (!org) redirect('/dashboard/organization')
 
-  const [data, organization] = await Promise.all([
-    loadDashboard(org.organizationId),
+  const canManage = canManageProjects(org.role)
+  const billing = canManageBilling(org.role)
+    ? await billingSummary(org.organizationId).catch(() => null)
+    : null
+
+  const quota = billing ? { used: billing.usage.apps, limit: billing.limits.projects } : null
+  const [data, organization, memberCount, envCount, verifiedDomainCount, liveDeployCount] = await Promise.all([
+    loadDashboard(org.organizationId, new Date(), { quota }),
     prisma.organization.findUnique({ where: { id: org.organizationId }, select: { name: true } }),
+    prisma.member.count({ where: { organizationId: org.organizationId } }),
+    prisma.envVar.count({ where: { project: { organizationId: org.organizationId } } }),
+    prisma.projectDomain.count({ where: { project: { organizationId: org.organizationId }, verifiedAt: { not: null } } }),
+    prisma.deployment.count({ where: { project: { organizationId: org.organizationId }, status: 'live' } }),
   ])
   const firstName = session.user.name.split(' ')[0]
   const organizationName = organization?.name ?? 'cette organisation'
   const hasProjects = data.summary.total > 0
-  const canManage = canManageProjects(org.role)
+
+  const hasVerifiedDomain = verifiedDomainCount > 0 || data.projects.some((p) => p.tlsValid === true && p.domain)
+  const nextSteps = hasProjects
+    ? computeNextSteps({
+        hasVerifiedDomain,
+        hasEnvVars: envCount > 0,
+        memberCount,
+        hasSuccessfulDeploy: liveDeployCount > 0,
+        canManage,
+      })
+    : []
 
   return (
     <div className="space-y-6">
@@ -44,7 +67,7 @@ export default async function DashboardPage() {
           {!hasProjects
             ? `Aucun projet dans ${organizationName} pour l’instant.`
             : data.summary.needsAttention > 0
-              ? `${data.summary.needsAttention} projet${data.summary.needsAttention > 1 ? 's demandent' : ' demande'} votre attention dans ${organizationName}.`
+              ? `${data.summary.needsAttention} élément${data.summary.needsAttention > 1 ? 's demandent' : ' demande'} votre attention dans ${organizationName}.`
               : `Tous les projets de ${organizationName} sont en ordre.`}
         </p>
       </header>
@@ -53,6 +76,7 @@ export default async function DashboardPage() {
         <>
           <OverviewStrip data={data} />
           <AttentionList items={data.attention} />
+          {nextSteps.length > 0 && <NextStepsCard steps={nextSteps} />}
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
             <ProjectsExplorer

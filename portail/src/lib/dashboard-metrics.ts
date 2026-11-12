@@ -1,6 +1,7 @@
 import { attentionRank, statusInfo } from '@/lib/project-status'
+import { diagnoseFailure, type Diagnosis } from '@/lib/deployment-diagnosis'
 
-export type DeploymentLite = { id: string; status: string; createdAt: Date; commitSha?: string }
+export type DeploymentLite = { id: string; status: string; createdAt: Date; commitSha?: string; logsSummary?: string | null }
 export type ProjectLiteApp = { framework?: string | null; domain?: string | null; position?: number; name?: string | null }
 export type ProjectLite = {
   id: string
@@ -8,6 +9,7 @@ export type ProjectLite = {
   /** Miroirs projet (compatibilité) ; l'app principale prévaut quand `apps` est fourni. */
   framework: string | null
   domain: string | null
+  tlsExpiresAt?: Date | null
   deployments: DeploymentLite[] // du plus récent au plus ancien
   /** Applications du projet : source de vérité pour domaine/framework. */
   apps?: readonly ProjectLiteApp[]
@@ -41,25 +43,61 @@ export function successRate(deployments: readonly { status: string }[]): number 
   return Math.round((finished.filter((d) => d.status === 'live').length / finished.length) * 100)
 }
 
-export type Attention = { projectId: string; name: string; kind: 'failed' | 'in-progress'; status: string; deploymentId: string; at: Date }
+export type Attention =
+  | { kind: 'failed' | 'in-progress'; projectId: string; name: string; status: string; deploymentId: string; at: Date; diagnosis?: Diagnosis | null }
+  | { kind: 'certificate'; projectId: string; name: string; at: Date; expiresAt: Date }
+  | { kind: 'quota'; at: Date; used: number; limit: number }
+
+const FOURTEEN_DAYS = 14 * 86_400_000
 
 /**
- * Ce qui demande un regard : le dernier déploiement d'un projet a échoué, ou est en cours.
- * Un échec ancien suivi d'un succès n'apparaît pas.
+ * Ce qui demande un regard : déploiement en échec/en cours (échec corrigé exclu),
+ * certificats expirant sous 14 jours, et quota proche/atteint.
  */
-export function attentionItems(projects: readonly ProjectLite[]): Attention[] {
+export function attentionItems(
+  projects: readonly ProjectLite[],
+  options?: { now?: Date; quota?: { used: number; limit: number } | null },
+): Attention[] {
+  const now = options?.now ?? new Date()
   const items: Attention[] = []
   for (const p of projects) {
     const last = p.deployments[0]
-    if (!last) continue
-    const info = statusInfo(last.status)
-    if (info.tone === 'danger') items.push({ projectId: p.id, name: p.name, kind: 'failed', status: last.status, deploymentId: last.id, at: last.createdAt })
-    else if (info.inProgress) items.push({ projectId: p.id, name: p.name, kind: 'in-progress', status: last.status, deploymentId: last.id, at: last.createdAt })
+    if (last) {
+      const info = statusInfo(last.status)
+      if (info.tone === 'danger') {
+        items.push({
+          projectId: p.id, name: p.name, kind: 'failed', status: last.status, deploymentId: last.id, at: last.createdAt,
+          diagnosis: diagnoseFailure({ status: last.status, logs: last.logsSummary, projectId: p.id }),
+        })
+      } else if (info.inProgress) {
+        items.push({ projectId: p.id, name: p.name, kind: 'in-progress', status: last.status, deploymentId: last.id, at: last.createdAt })
+      }
+    }
+    const exp = p.tlsExpiresAt ?? null
+    if (exp && exp.getTime() - now.getTime() <= FOURTEEN_DAYS) {
+      items.push({ kind: 'certificate', projectId: p.id, name: p.name, at: now, expiresAt: exp })
+    }
   }
-  return items.sort((a, b) => attentionRank(a.status) - attentionRank(b.status) || b.at.getTime() - a.at.getTime())
+  const quota = options?.quota
+  if (quota && quota.limit > 0 && quota.used / quota.limit >= 0.8) {
+    items.push({ kind: 'quota', at: now, used: quota.used, limit: quota.limit })
+  }
+  return items.sort((a, b) => {
+    const ar = xKindRank(a)
+    const br = xKindRank(b)
+    if (ar !== br) return ar - br
+    return b.at.getTime() - a.at.getTime()
+  })
 }
 
-export function summarize(projects: readonly ProjectLite[]) {
+function xKindRank(a: Attention): number {
+  if (a.kind === 'failed') return attentionRank(a.status)
+  if (a.kind === 'certificate') return 10
+  if (a.kind === 'quota') return 11
+  return attentionRank(a.status)
+}
+
+export function summarize(projects: readonly ProjectLite[], options?: { now?: Date; quota?: { used: number; limit: number } | null }) {
   const live = projects.filter((p) => p.deployments.length > 0 && p.deployments[0]!.status === 'live').length
-  return { total: projects.length, live, needsAttention: attentionItems(projects).length }
+  return { total: projects.length, live, needsAttention: attentionItems(projects, options).length }
 }

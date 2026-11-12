@@ -4,7 +4,7 @@ Issue : [#32](https://github.com/digitaleflex/eflex.app/issues/32) — « Consol
 d'accessibilité WCAG 2.1 AA et adaptation mobile ».
 
 Date de l'audit : 10 novembre 2026. Périmètre : `portail/` (console client et administration),
-thèmes clair et sombre, largeurs 360, 768 et 1280 px, zoom 200 % (approché par reflow à 360 px),
+thèmes clair et sombre, largeurs 360, 768 et 1440 px, zoom 200 % (approché par reflow à 360 px),
 navigation clavier seule.
 
 ## Méthode
@@ -55,7 +55,7 @@ Parcours couverts par la CI (`portail/e2e/a11y.spec.ts`) :
 | 15 | Contrastes des badges, boutons destructifs et jetons | — | Global | Vérifié | 49 couples ≥ seuils AA dans les deux thèmes (`contrast.test.ts`) |
 
 Aucune violation `serious` ou `critical` ne subsiste sur les parcours automatisés après
-correction (public et authentifié, 360/768/1280 px, clair/sombre).
+correction (public et authentifié, 360/768/1440 px, clair/sombre).
 
 ### Résultats mesurés après correction
 
@@ -64,7 +64,7 @@ correction (public et authentifié, 360/768/1280 px, clair/sombre).
 | Pages publiques + clavier | 60 tests Playwright validés (54 pages, 6 clavier) ; 0 violation sérieuse/critique ; 0 débordement |
 | 360 px avec pointeur grossier (cibles 44 px) | 18 tests passés (clair et sombre) |
 | Tableau de bord, projet, équipe, notifications, paramètres | 0 violation aux trois largeurs ; 0 débordement |
-| Administration (7 pages) | 0 violation à 1280 px clair et 360 px sombre ; `/admin/users` de nouveau accessible |
+| Administration (7 pages) | 0 violation à 1440 px clair et 360 px sombre ; `/admin/users` de nouveau accessible |
 | Contrastes | 49 couples ≥ 4,5:1 (textes) et ≥ 3:1 (contours/anneau), deux thèmes |
 | Dialogues bloquants | 0 `window.confirm`/`window.alert` |
 
@@ -74,7 +74,7 @@ correction (public et authentifié, 360/768/1280 px, clair/sombre).
 |---|---|
 | **Pas de barre de navigation basse** sur mobile : les onglets restent en haut et défilent horizontalement. | Choix de conception assumé : aucun contenu n'est masqué, toutes les cibles font 44 px, et le défilement horizontal est limité à la barre d'onglets (pas à la page). Une barre basse pourra être étudiée si la navigation grandit. |
 | **Pages d'administration de détail** (`/admin/projects/[id]`, `/admin/deployments/[id]`, `/admin/organizations/[id]`), `/admin/live` et `/admin/infrastructure` non couvertes par axe en CI. | Elles dépendent de données dynamiques ou d'API externes (Coolify, flux SSE). Leur source a été relue (libellés, `<dl>`, boutons, focus) mais il manque des fixtures stables. À ajouter avec le jeu de données d'administration. |
-| **Zoom 200 %** vérifié par reflow à 360 px (et 768 px), pas par un vrai zoom navigateur. | Playwright n'émule pas le zoom de page ; 360 px est plus contraignant que 1280 px à 200 % (640 px CSS). Une vérification manuelle dans Firefox/Chrome reste recommandée avant mise en production. |
+| **Zoom 200 %** vérifié par reflow à 360 px (et 768 px), pas par un vrai zoom navigateur. | Playwright n'émule pas le zoom de page ; 360 px est plus contraignant que 1440 px à 200 % (720 px CSS). Une vérification manuelle dans Firefox/Chrome reste recommandée avant mise en production. |
 | **Lecteurs d'écran réels** (NVDA, VoiceOver) non testés. | L'audit couvre les rôles/labels/annonces et axe ; un passage manuel reste nécessaire pour valider l'expérience d'annonce des flux SSE et des toasts. |
 | **Vérification d'e-mail et 2FA** : seuls les états initiaux sont audités. | Les états de succès exigent un e-mail ou un TOTP réel. Formulaires et messages statiques sont couverts. |
 | **Dialogues de confirmation** : `<dialog>` natif sans `aria-modal` explicite. | `showModal()` expose déjà la modalité aux technologies d'assistance (piège de focus, Échap, retour du focus). |
@@ -91,18 +91,22 @@ cd .. && pnpm vitest run portail/src/lib/contrast.test.ts portail/src/lib/no-blo
 # 2. Navigateur de test
 cd portail && npx playwright install --with-deps chromium
 
-# 3. Pages publiques (serveur de dev démarré automatiquement)
+# 3. Audit axe — pages publiques (360/768/1440 px, clair/sombre)
 cd portail && npm run test:a11y
 
-# 4. Parcours authentifiés (base de test migrée)
+# 4. Audit axe — parcours authentifiés (base de test migrée)
 cd portail
 DATABASE_URL=postgresql://eflex:eflex@localhost:5432/eflex?schema=public E2E_ADMIN=1 node e2e/seed-auth.mjs
 PLAYWRIGHT_AUTH=1 PLAYWRIGHT_ADMIN=1 npm run test:a11y
 
-# 5. CI : workflow « Accessibilité (axe + Playwright) »
-#    build + PostgreSQL + Chromium, puis npx playwright test
+# 5. Captures visuelles reproductibles (360/768/1440 px, clair/sombre)
+cd portail && npm run test:screenshots
+# + authentifié/admin : PLAYWRIGHT_AUTH=1 PLAYWRIGHT_ADMIN=1 npm run test:screenshots
 ```
 
-Fichiers ajoutés : `portail/playwright.config.ts`, `portail/e2e/a11y.spec.ts`,
-`portail/e2e/seed-auth.mjs`, `.github/workflows/a11y.yml`,
-`portail/src/lib/no-blocking-dialogs.test.ts`.
+Détails, prérequis et notes CI : `portail/e2e/README.md`. Les captures sont
+enregistrées dans `portail/e2e/screenshots/<thème>/<largeur>/`.
+
+Fichiers principaux : `portail/playwright.config.ts`, `portail/e2e/a11y.spec.ts`,
+`portail/e2e/screenshots.spec.ts`, `portail/e2e/seed-auth.mjs`,
+`portail/e2e/README.md`, `portail/src/lib/no-blocking-dialogs.test.ts`.
