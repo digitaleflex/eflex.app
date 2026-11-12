@@ -24,6 +24,7 @@ import { prisma } from '@/lib/prisma'
 import { resolveOrganization, canManageProjects } from '@/lib/organizations'
 import { AutoRefresh } from '@/components/auto-refresh'
 import { DeploymentLogs } from '@/components/deployment-logs'
+import { diagnoseFailure } from '@/lib/deployment-diagnosis'
 import { RuntimeLogs } from '@/components/runtime-logs'
 import { ProjectMetrics } from '@/components/project-metrics'
 import { LiveRefresh } from '@/components/live-refresh'
@@ -130,6 +131,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             status: true,
             commitSha: true,
             createdAt: true,
+            logsSummary: true,
             app: { select: { id: true, name: true } },
           },
         },
@@ -736,12 +738,22 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                           {index === 0 && <span className="rounded-full border border-border px-1.5 text-[11px] font-medium text-muted-foreground">Dernier</span>}
                           {production?.id === deployment.id && <span className="rounded-full bg-primary/10 px-1.5 text-[11px] font-semibold text-primary">Production</span>}
                         </p>
-                        {deployment.status === 'failed' && (
-                          <p className="mt-1 text-xs text-destructive">
-                            Le déploiement a échoué. Ouvrez le journal pour identifier la cause ; les
-                            valeurs connues des variables y sont masquées.
-                          </p>
-                        )}
+                        {deployment.status === 'failed' && (() => {
+                          const diagnosis = diagnoseFailure({ status: deployment.status, logs: deployment.logsSummary, projectId: project.id })
+                          return diagnosis ? (
+                            <div className="mt-2 rounded-md border border-destructive/20 bg-destructive/5 p-2.5 text-xs">
+                              <p className="font-medium text-foreground">{diagnosis.cause}</p>
+                              <Link href={diagnosis.action.href} className="mt-1 inline-flex font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+                                {diagnosis.action.label}
+                              </Link>
+                            </div>
+                          ) : (
+                            <p className="mt-1 text-xs text-destructive">
+                              Le déploiement a échoué. Ouvrez le journal pour identifier la cause ; les
+                              valeurs connues des variables y sont masquées.
+                            </p>
+                          )
+                        })()}
                       </div>
                       <time dateTime={deployment.createdAt.toISOString()} className="text-xs text-muted-foreground">
                         {dateFormat.format(deployment.createdAt)}
