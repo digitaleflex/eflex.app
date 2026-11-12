@@ -37,7 +37,7 @@ export function ProjectsExplorer({
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<ProjectFilter>('all')
   const [sort, setSort] = useState<ProjectSort>(initialSort)
-  const [view, setView] = useState<View>('grid')
+  const [view, setView] = useState<View>('list')
   const searchId = useId()
   const sortId = useId()
 
