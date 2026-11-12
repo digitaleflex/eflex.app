@@ -40,6 +40,18 @@ describe('deployment-diagnosis', () => {
     })
   })
 
+  it('détecte un quota disque dépassé', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'tar: ./node_modules/.cache: Cannot write: Disk quota exceeded\nError: EDQUOT: disk quota exceeded, write',
+      projectId: 'p1',
+    })
+    expect(d).toEqual({
+      cause: "L'espace disque du serveur de build ou d'exécution semble insuffisant.",
+      action: { label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' },
+    })
+  })
+
   it('détecte un manque de mémoire', () => {
     const d = diagnoseFailure({
       status: 'failed',
