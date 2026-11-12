@@ -2,11 +2,21 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Activity, Bell, CornerDownLeft, FolderKanban, Moon, Plus, Search, UserPlus, Users } from 'lucide-react'
+import { Activity, Bell, CornerDownLeft, FolderKanban, Globe, Moon, Plus, Rocket, ScrollText, Search, UserPlus, Users } from 'lucide-react'
 import { applyTheme, readTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 
-type Item = { id: string; label: string; hint?: string; href?: string; action?: 'theme'; group: 'Actions' | 'Projets'; icon?: React.ComponentType<{ className?: string }> }
+type Item = {
+  id: string
+  label: string
+  hint?: string
+  href?: string
+  action?: 'theme' | 'redeploy'
+  group: 'Actions' | 'Projets'
+  icon?: React.ComponentType<{ className?: string }>
+  projectId?: string
+  projectName?: string
+}
 
 const ACTIONS: Item[] = [
   { id: 'new', label: 'Nouveau projet', hint: 'Importer un dépôt GitHub', href: '/dashboard/new', group: 'Actions', icon: Plus },
@@ -26,7 +36,7 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
-  const [projects, setProjects] = useState<Item[]>([])
+  const [projectItems, setProjectItems] = useState<Item[]>([])
   const listId = useId()
   const [isMac, setIsMac] = useState(true)
 
@@ -53,16 +63,48 @@ export function CommandPalette() {
       d.showModal()
       inputRef.current?.focus()
       fetch('/api/projects')
-        .then((r) => (r.ok ? r.json() : { projects: [] }))
-        .then((data: { projects?: { id: string; name: string; domain: string | null; apps?: { id: string; name?: string; position: number; domain?: string | null }[] }[] }) =>
-          setProjects(
-            (data.projects ?? []).map((p) => {
-              const primary = p.apps?.slice().sort((a, b) => a.position - b.position || (a.name ?? '').localeCompare(b.name ?? '') || a.id.localeCompare(b.id))[0]
-              const domain = primary?.domain ?? p.domain ?? null
-              return { id: p.id, label: p.name, hint: domain ?? undefined, href: `/dashboard/projects/${p.id}`, group: 'Projets' }
-            }),
-          ),
-        )
+        .then((r) => (r.ok ? r.json() : { projects: [], canManage: false }))
+        .then((data: {
+          canManage?: boolean
+          projects?: { id: string; name: string; domain: string | null; apps?: { id: string; name?: string; position: number; domain?: string | null }[] }[]
+        }) => {
+          const canManage = data.canManage === true
+          const items: Item[] = []
+          for (const p of data.projects ?? []) {
+            const primary = p.apps?.slice().sort((a, b) => a.position - b.position || (a.name ?? '').localeCompare(b.name ?? '') || a.id.localeCompare(b.id))[0]
+            const domain = primary?.domain ?? p.domain ?? null
+            items.push({ id: `project:${p.id}`, label: p.name, hint: domain ?? undefined, href: `/dashboard/projects/${p.id}`, group: 'Projets', icon: FolderKanban })
+            if (canManage) {
+              items.push({
+                id: `project:${p.id}:redeploy`,
+                label: `Redéployer ${p.name}`,
+                hint: p.name,
+                action: 'redeploy',
+                group: 'Projets',
+                icon: Rocket,
+                projectId: p.id,
+                projectName: p.name,
+              })
+              items.push({
+                id: `project:${p.id}:logs`,
+                label: `Voir les journaux de ${p.name}`,
+                hint: p.name,
+                href: `/dashboard/projects/${p.id}?tab=deployments`,
+                group: 'Projets',
+                icon: ScrollText,
+              })
+              items.push({
+                id: `project:${p.id}:domain`,
+                label: `Ajouter un domaine à ${p.name}`,
+                hint: p.name,
+                href: `/dashboard/projects/${p.id}/settings#domaines`,
+                group: 'Projets',
+                icon: Globe,
+              })
+            }
+          }
+          setProjectItems(items)
+        })
         .catch(() => undefined)
     }
     if (!open && d.open) d.close()
@@ -70,22 +112,44 @@ export function CommandPalette() {
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const match = (i: Item) => !q || i.label.toLowerCase().includes(q) || (i.hint ?? '').toLowerCase().includes(q)
-    return [...projects.filter(match).slice(0, 8), ...ACTIONS.filter(match)]
-  }, [query, projects])
+    const match = (i: Item) => !q || i.label.toLowerCase().includes(q) || (i.hint ?? '').toLowerCase().includes(q) || (i.projectName ?? '').toLowerCase().includes(q)
+    const matchedProjects = projectItems.filter(match)
+    const matchedActions = ACTIONS.filter(match)
+    return q ? [...matchedProjects, ...matchedActions] : [...matchedProjects.slice(0, 12), ...matchedActions]
+  }, [query, projectItems])
 
   useEffect(() => setActive(0), [query])
 
-  const go = (item: Item | undefined) => {
+  const go = async (item: Item | undefined) => {
     if (!item) return
-    setOpen(false)
     if (item.action === 'theme') {
+      setOpen(false)
       const current = readTheme()
       const resolved = current === 'dark' ? 'light' : current === 'light' ? 'dark' : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark')
       applyTheme(resolved)
       return
     }
-    if (item.href) router.push(item.href)
+    if (item.action === 'redeploy' && item.projectId) {
+      const name = item.projectName ?? item.label
+      if (!window.confirm(`Relancer le déploiement de « ${name} » ?`)) return
+      setOpen(false)
+      try {
+        const res = await fetch(`/api/projects/${item.projectId}/redeploy`, { method: 'POST' })
+        if (res.status === 202 || res.ok) {
+          router.push(`/dashboard/projects/${item.projectId}?tab=deployments`)
+          return
+        }
+        const data = await res.json().catch(() => ({} as { error?: string }))
+        window.alert(data.error || 'Impossible de relancer le déploiement.')
+      } catch {
+        window.alert('Impossible de relancer le déploiement.')
+      }
+      return
+    }
+    if (item.href) {
+      setOpen(false)
+      router.push(item.href)
+    }
   }
 
   return (
