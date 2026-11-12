@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight, CircleAlert, Loader2 } from 'lucide-react'
+import { Activity, ArrowRight, CircleAlert, CircleCheck, Layers, Loader2, Rocket } from 'lucide-react'
 import { StatusDot } from '@/components/dashboard/status-pill'
 import { FrameworkTile } from '@/components/dashboard/project-card'
 import { relativeTime } from '@/lib/relative-time'
@@ -48,7 +48,7 @@ export function OverviewStrip({ data }: { data: DashboardData }) {
     <div className="space-y-2">
     <section aria-label="Aperçu" className="grid overflow-hidden rounded-xl border border-border bg-card sm:grid-cols-2 lg:grid-cols-4 [&>*]:border-border [&>*:not(:last-child)]:border-b sm:[&>*:nth-child(odd)]:border-r lg:[&>*]:border-b-0 lg:[&>*:not(:last-child)]:border-r">
       <div className="p-4">
-        <p className="text-xs font-medium text-muted-foreground">Projets en ligne</p>
+        <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Layers className="h-3.5 w-3.5" aria-hidden="true" />Projets en ligne</p>
         <p className="mt-1 font-display text-2xl font-bold tabular-nums">
           {summary.live}
           <span className="text-base font-semibold text-muted-foreground"> / {summary.total}</span>
@@ -58,22 +58,24 @@ export function OverviewStrip({ data }: { data: DashboardData }) {
         </p>
       </div>
       <div className="p-4">
-        <p className="text-xs font-medium text-muted-foreground">Déploiements · {windowDays} jours</p>
+        <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Rocket className="h-3.5 w-3.5" aria-hidden="true" />Déploiements · {windowDays} j</p>
         <p className="mt-1 font-display text-2xl font-bold tabular-nums">{deploymentsInWindow}</p>
         <DeploySparkbars series={series} />
       </div>
       <div className="p-4">
-        <p className="text-xs font-medium text-muted-foreground">Taux de réussite · {windowDays} jours</p>
+        <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><CircleCheck className="h-3.5 w-3.5" aria-hidden="true" />Réussite · {windowDays} j</p>
         <p className="mt-1 font-display text-2xl font-bold tabular-nums">{successRate === null ? '—' : `${successRate} %`}</p>
-        {successRate !== null && (
+        {successRate !== null ? (
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-destructive/20" role="img" aria-label={`${successRate} % de déploiements réussis`}>
             <div className="h-full rounded-full bg-success" style={{ width: `${successRate}%` }} />
           </div>
+        ) : (
+          <p className="mt-3 text-xs text-muted-foreground">Aucun déploiement terminé sur la période.</p>
         )}
-        <p className="mt-2 text-xs text-muted-foreground">{successRate === null ? 'Aucun déploiement terminé' : 'Parmi les déploiements terminés'}</p>
+        {successRate !== null && <p className="mt-2 text-xs text-muted-foreground">Sur les déploiements terminés.</p>}
       </div>
       <div className="min-w-0 p-4">
-        <p className="text-xs font-medium text-muted-foreground">Dernier déploiement</p>
+        <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Activity className="h-3.5 w-3.5" aria-hidden="true" />Dernier déploiement</p>
         {last ? (
           <>
             <p className="mt-1 flex min-w-0 items-center gap-2">
@@ -90,9 +92,7 @@ export function OverviewStrip({ data }: { data: DashboardData }) {
       </div>
     </section>
     <p className="text-xs text-muted-foreground">
-      Chiffres calculés sur les {windowDays} derniers jours à partir des déploiements enregistrés.
-      « Taux de réussite » : part des déploiements terminés (réussis ou en échec) qui sont en ligne ;
-      un déploiement encore en cours n’entre pas dans ce taux.
+      Sur les {windowDays} derniers jours. Le taux de réussite ne compte que les déploiements terminés (réussis ou en échec).
     </p>
     </div>
   )
