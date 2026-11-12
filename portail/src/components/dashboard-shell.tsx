@@ -300,7 +300,7 @@ export function DashboardShell({
           </ul>
         </nav>
 
-        <main id="contenu" tabIndex={-1} className="mx-auto w-full max-w-7xl flex-1 px-4 pb-28 pt-8 focus:outline-none sm:px-6 md:pb-8">
+        <main id="contenu" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-7xl flex-1 px-4 pb-28 pt-8 focus:outline-none sm:px-6 md:pb-8">
           {children}
         </main>
       </div>
