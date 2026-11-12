@@ -173,10 +173,10 @@ export function ProjectMetrics({
             Ressources et état
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Utilisation CPU/mémoire et état runtime rapportés par l’hébergement, quand disponibles.
+            Utilisation CPU/mémoire et état runtime rapportés par l’hébergement (Coolify), quand disponibles. Valeurs en échantillon instantané (non cumulé).
             {metrics?.sampledAt && metrics.available && (
               <span className="ml-1 tabular-nums">
-                Échantillon : {new Date(metrics.sampledAt).toLocaleString('fr-FR')}.
+                Dernier échantillon : {new Date(metrics.sampledAt).toLocaleString('fr-FR')}.
               </span>
             )}
           </p>
@@ -272,7 +272,7 @@ export function ProjectMetrics({
               icon={Cpu}
               label="Processeur"
               value={formatPercent(metrics.cpuPercent)}
-              detail="Utilisation instantanée du CPU (barre indicative)."
+              detail="Utilisation instantanée du CPU (source : hébergement)."
               percent={metrics.cpuPercent}
             />
             <MetricCard
@@ -281,8 +281,8 @@ export function ProjectMetrics({
               value={formatPercent(metrics.memoryPercent)}
               detail={
                 metrics.memoryUsedMb !== null || metrics.memoryLimitMb !== null
-                  ? `${formatMb(metrics.memoryUsedMb)} utilisés sur ${formatMb(metrics.memoryLimitMb)}`
-                  : 'Consommation mémoire rapportée.'
+                  ? `${formatMb(metrics.memoryUsedMb)} utilisés sur ${formatMb(metrics.memoryLimitMb)} · source hébergement`
+                  : 'Consommation mémoire rapportée par l’hébergement.'
               }
               percent={metrics.memoryPercent}
             />
