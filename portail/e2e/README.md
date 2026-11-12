@@ -51,6 +51,8 @@ clés aux largeurs **360, 768 et 1440 px** en thèmes **clair et sombre**.
 Dossier de sortie (stable) : `portail/e2e/screenshots/<thème>/<largeur>/`
 (par ex. `e2e/screenshots/light/1440/accueil.png`).
 
+Ces captures sont des artefacts locaux : elles ne sont pas versionnées (`portail/e2e/screenshots/` est ignoré par Git).
+
 ```bash
 # Captures publiques
 npm run test:screenshots
