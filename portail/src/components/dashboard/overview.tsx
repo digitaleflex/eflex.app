@@ -146,20 +146,31 @@ export function AttentionList({ items }: { items: DashboardData['attention'] }) 
             )
           }
           const failed = item.kind === 'failed'
+          const diagnosis = failed ? item.diagnosis : null
           return (
-            <li key={item.deploymentId} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+            <li key={item.deploymentId} className="flex flex-wrap items-start gap-x-3 gap-y-1 px-4 py-3">
               {failed ? (
-                <CircleAlert className="h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
+                <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
               ) : (
-                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-warning motion-reduce:animate-none" aria-hidden="true" />
+                <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-warning motion-reduce:animate-none" aria-hidden="true" />
               )}
-              <p className="min-w-0 flex-[1_1_14rem] text-sm">
-                <span className="font-semibold">{item.name}</span>
-                <span className="text-muted-foreground">
-                  {failed ? ' : le dernier déploiement a échoué' : ` : ${statusInfo(item.status).label.toLowerCase()}`} ·{' '}
-                  <time dateTime={item.at} suppressHydrationWarning>{relativeTime(item.at)}</time>
-                </span>
-              </p>
+              <div className="min-w-0 flex-[1_1_14rem]">
+                <p className="text-sm">
+                  <span className="font-semibold">{item.name}</span>
+                  <span className="text-muted-foreground">
+                    {failed ? ' : le dernier déploiement a échoué' : ` : ${statusInfo(item.status).label.toLowerCase()}`} ·{' '}
+                    <time dateTime={item.at} suppressHydrationWarning>{relativeTime(item.at)}</time>
+                  </span>
+                </p>
+                {diagnosis && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {diagnosis.cause}{' '}
+                    <Link href={diagnosis.action.href} className="font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+                      {diagnosis.action.label}
+                    </Link>
+                  </p>
+                )}
+              </div>
               <Link
                 href={`/dashboard/projects/${item.projectId}?tab=deployments`}
                 className="ml-7 inline-flex min-h-11 shrink-0 items-center gap-1 text-sm font-medium text-primary hover:underline sm:ml-0 sm:min-h-0"

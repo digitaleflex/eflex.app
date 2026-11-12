@@ -66,7 +66,7 @@ export async function loadDashboard(organizationId: string, now = new Date(), op
         updatedAt: true,
         tlsValid: true,
         tlsExpiresAt: true,
-        deployments: { orderBy: { createdAt: 'desc' }, take: 8, select: { id: true, status: true, commitSha: true, createdAt: true } },
+        deployments: { orderBy: { createdAt: 'desc' }, take: 8, select: { id: true, status: true, commitSha: true, createdAt: true, logsSummary: true } },
         apps: {
           orderBy: [{ position: 'asc' }, { name: 'asc' }],
           select: { id: true, name: true, position: true, framework: true, runtime: true, domain: true, tlsValid: true, tlsExpiresAt: true },
@@ -122,7 +122,7 @@ export async function loadDashboard(organizationId: string, now = new Date(), op
     framework: p._framework,
     domain: p._domain,
     tlsExpiresAt: p._tlsExpiresAt,
-    deployments: p.deployments,
+    deployments: p.deployments.map((d) => ({ id: d.id, status: d.status, createdAt: d.createdAt, commitSha: d.commitSha, logsSummary: d.logsSummary })),
     apps: p.apps.map((app) => ({ framework: app.framework, domain: app.domain, position: app.position, name: app.name })),
   }))
   const cards: DashboardProject[] = derived.map((p) => {

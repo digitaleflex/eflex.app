@@ -1,6 +1,7 @@
 import { attentionRank, statusInfo } from '@/lib/project-status'
+import { diagnoseFailure, type Diagnosis } from '@/lib/deployment-diagnosis'
 
-export type DeploymentLite = { id: string; status: string; createdAt: Date; commitSha?: string }
+export type DeploymentLite = { id: string; status: string; createdAt: Date; commitSha?: string; logsSummary?: string | null }
 export type ProjectLiteApp = { framework?: string | null; domain?: string | null; position?: number; name?: string | null }
 export type ProjectLite = {
   id: string
@@ -43,7 +44,7 @@ export function successRate(deployments: readonly { status: string }[]): number 
 }
 
 export type Attention =
-  | { kind: 'failed' | 'in-progress'; projectId: string; name: string; status: string; deploymentId: string; at: Date }
+  | { kind: 'failed' | 'in-progress'; projectId: string; name: string; status: string; deploymentId: string; at: Date; diagnosis?: Diagnosis | null }
   | { kind: 'certificate'; projectId: string; name: string; at: Date; expiresAt: Date }
   | { kind: 'quota'; at: Date; used: number; limit: number }
 
@@ -63,8 +64,14 @@ export function attentionItems(
     const last = p.deployments[0]
     if (last) {
       const info = statusInfo(last.status)
-      if (info.tone === 'danger') items.push({ projectId: p.id, name: p.name, kind: 'failed', status: last.status, deploymentId: last.id, at: last.createdAt })
-      else if (info.inProgress) items.push({ projectId: p.id, name: p.name, kind: 'in-progress', status: last.status, deploymentId: last.id, at: last.createdAt })
+      if (info.tone === 'danger') {
+        items.push({
+          projectId: p.id, name: p.name, kind: 'failed', status: last.status, deploymentId: last.id, at: last.createdAt,
+          diagnosis: diagnoseFailure({ status: last.status, logs: last.logsSummary, projectId: p.id }),
+        })
+      } else if (info.inProgress) {
+        items.push({ projectId: p.id, name: p.name, kind: 'in-progress', status: last.status, deploymentId: last.id, at: last.createdAt })
+      }
     }
     const exp = p.tlsExpiresAt ?? null
     if (exp && exp.getTime() - now.getTime() <= FOURTEEN_DAYS) {
@@ -76,7 +83,6 @@ export function attentionItems(
     items.push({ kind: 'quota', at: now, used: quota.used, limit: quota.limit })
   }
   return items.sort((a, b) => {
-    const rank = (x: Attention) => (x.kind === 'failed' ? 0 : x.kind === 'certificate' ? 1 : x.kind === 'quota' ? 2 : 3)
     const ar = xKindRank(a)
     const br = xKindRank(b)
     if (ar !== br) return ar - br
