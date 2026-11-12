@@ -16,7 +16,7 @@ const ACTIONS: Item[] = [
 ]
 
 /** Bouton de recherche + palette de commandes (⌘K / Ctrl+K). Motif combobox accessible. */
-export function CommandPalette() {
+export function CommandPalette({ className }: { className?: string } = {}) {
   const router = useRouter()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -84,7 +84,7 @@ export function CommandPalette() {
       <button
         type="button"
         onClick={show}
-        className="flex h-11 min-w-11 items-center gap-2 rounded-lg border border-input bg-background px-3 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-56"
+        className={cn('flex h-11 min-w-11 items-center gap-2 rounded-lg border border-input bg-background px-3 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', className ?? 'sm:w-56')}
       >
         <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span className="hidden sm:inline">Rechercher…</span>
