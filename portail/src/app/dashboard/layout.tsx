@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
@@ -9,6 +10,8 @@ import { MembershipWatcher } from '@/components/membership-watcher'
 import { DashboardShell } from '@/components/dashboard-shell'
 import { billingSummary, loadBillingState } from '@/lib/billing'
 import { DashboardBanner } from '@/components/dashboard/dashboard-banner'
+
+const SIDEBAR_COOKIE = 'eflex-sidebar'
 
 // Protection côté serveur : aucune page du tableau de bord n'est rendue sans session.
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -38,6 +41,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     }
   }
 
+  const sidebarCookie = (await cookies()).get(SIDEBAR_COOKIE)?.value
+  const initialSidebarCollapsed =
+    sidebarCookie === 'collapsed' ? true : sidebarCookie === 'expanded' ? false : undefined
+
   return (
     // Le thème est porté par <html> (cookie ou système), commun à tout le site.
     <div className="min-h-screen bg-background text-foreground">
@@ -54,6 +61,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               billingBlock={billingBlock}
             />
           }
+          initialSidebarCollapsed={initialSidebarCollapsed}
         >
           {children}
         </DashboardShell>
