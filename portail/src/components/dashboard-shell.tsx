@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, Bell, ChevronsLeft, ChevronsRight, FolderKanban, LifeBuoy, Settings, Users, type LucideIcon } from 'lucide-react'
+import { Activity, Bell, ChevronsLeft, ChevronsRight, FolderKanban, Gauge, LifeBuoy, Settings, Users, type LucideIcon } from 'lucide-react'
 import { OrgSwitcher } from '@/components/org-switcher'
 import { NotificationBell } from '@/components/notification-bell'
 import { CommandPalette } from '@/components/command-palette'
@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 const TAB_ICONS: Record<DashboardTabKey, LucideIcon> = {
   projects: FolderKanban,
   activity: Activity,
+  usage: Gauge,
   team: Users,
   notifications: Bell,
   settings: Settings,

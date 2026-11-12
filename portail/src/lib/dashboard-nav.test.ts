@@ -5,6 +5,7 @@ describe('activeDashboardTab', () => {
   it('reconnaît chaque destination principale', () => {
     expect(activeDashboardTab('/dashboard')).toBe('projects')
     expect(activeDashboardTab('/dashboard/activity')).toBe('activity')
+    expect(activeDashboardTab('/dashboard/usage')).toBe('usage')
     expect(activeDashboardTab('/dashboard/organization')).toBe('team')
     expect(activeDashboardTab('/dashboard/notifications')).toBe('notifications')
     expect(activeDashboardTab('/dashboard/settings')).toBe('settings')
@@ -42,6 +43,7 @@ describe('DASHBOARD_TABS', () => {
     expect(DASHBOARD_TABS.map((tab) => tab.key)).toEqual([
       'projects',
       'activity',
+      'usage',
       'team',
       'settings',
     ])

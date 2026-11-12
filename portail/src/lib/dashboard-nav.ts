@@ -3,7 +3,7 @@
  * Module pur (aucun import React) pour rester testable sans DOM.
  */
 
-export type DashboardTabKey = 'projects' | 'activity' | 'team' | 'notifications' | 'settings'
+export type DashboardTabKey = 'projects' | 'activity' | 'usage' | 'team' | 'notifications' | 'settings'
 
 export interface DashboardTab {
   key: DashboardTabKey
@@ -15,6 +15,7 @@ export interface DashboardTab {
 export const DASHBOARD_TABS: readonly DashboardTab[] = [
   { key: 'projects', label: 'Projets', href: '/dashboard' },
   { key: 'activity', label: 'Activité', href: '/dashboard/activity' },
+  { key: 'usage', label: 'Utilisation', href: '/dashboard/usage' },
   { key: 'team', label: 'Équipe', href: '/dashboard/organization' },
   { key: 'settings', label: 'Paramètres', href: '/dashboard/settings' },
 ]
@@ -41,6 +42,7 @@ export function activeDashboardTab(pathname: string): DashboardTabKey | null {
   if (path === '/dashboard' || path === '/dashboard/new') return 'projects'
   if (inSection(path, '/dashboard/projects')) return 'projects'
   if (inSection(path, '/dashboard/activity')) return 'activity'
+  if (inSection(path, '/dashboard/usage')) return 'usage'
   if (inSection(path, '/dashboard/organization')) return 'team'
   if (inSection(path, '/dashboard/notifications')) return 'notifications'
   if (inSection(path, '/dashboard/settings')) return 'settings'
