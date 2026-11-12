@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { resolveOrganization } from '@/lib/organizations'
+import { canManageBilling, resolveOrganization } from '@/lib/organizations'
 import { EventsProvider } from '@/hooks/events-provider'
 import { ToastProvider } from '@/components/ui/toast'
 import { NotificationToaster } from '@/components/notification-toaster'
@@ -23,7 +23,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   let billing: Awaited<ReturnType<typeof billingSummary>> | null = null
-  if (org) {
+  if (org && canManageBilling(org.role)) {
     try {
       billing = await billingSummary(org.organizationId)
     } catch {
