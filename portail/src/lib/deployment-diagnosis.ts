@@ -46,6 +46,15 @@ const RULES: Rule[] = [
     action: (id) => ({ label: 'Corriger le port', href: `/dashboard/projects/${id}/settings` }),
   },
   {
+    id: 'disk-space',
+    test: (t) =>
+      /no space left on device|\bENOSPC\b|insufficient (disk )?space|write .*no space left|not enough (disk )?space/i.test(
+        t,
+      ),
+    cause: "L'espace disque du serveur de build ou d'exécution semble insuffisant.",
+    action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
     id: 'oom',
     test: (t) =>
       /out of memory|oom|killed process|exit code 137|javascript heap out of memory|Cannot allocate memory/i.test(
@@ -67,15 +76,13 @@ const RULES: Rule[] = [
     action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
   },
   {
-    id: 'network-deps',
+    id: 'deps-resolution',
     test: (t) =>
-      /npm ERR!.*network|ERR_PNPM_FETCH|YARN_NETWORK_ERROR/i.test(t) ||
-      /\b(ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN)\b/i.test(t) &&
-        /(registry|fetch|download|resolve|getaddrinfo|Could not resolve host|network)/i.test(t) ||
-      /Could not resolve host|Temporary failure in (resolving|name resolution)|Failed to fetch .*packages?/i.test(
-        t,
-      ),
-    cause: 'Le téléchargement des dépendances a échoué (erreur réseau).',
+      /Could not find a version that satisfies the requirement|No matching distribution found for/i.test(t) ||
+      /Your requirements could not be resolved to an installable set of packages/i.test(t) ||
+      ((/because these conflicting requirements exist|SolverProblemError/i.test(t)) && /poetry|pyproject/i.test(t)) ||
+      /Could not find gem '[^']+' in|Bundler::GemNotFound/i.test(t),
+    cause: 'La résolution des dépendances a échoué (version introuvable ou contraintes incompatibles).',
     action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
   },
   {
@@ -100,8 +107,23 @@ const RULES: Rule[] = [
     id: 'base-image-missing',
     test: (t) =>
       /manifest unknown|failed to resolve source metadata|pull access denied.*repository does not exist/i.test(t) ||
-      /not found: manifest unknown|repository .* not found/i.test(t),
+      /not found: manifest unknown|repository .* not found/i.test(t) ||
+      /ERROR \[internal\] load metadata for/i.test(t),
     cause: "L'image de base du conteneur est introuvable ou inaccessible.",
+    action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
+    id: 'network-deps',
+    test: (t) =>
+      /npm ERR!.*network|ERR_PNPM_FETCH|YARN_NETWORK_ERROR/i.test(t) ||
+      (/\b(ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN)\b/i.test(t) &&
+        /(registry|fetch|download|resolve|getaddrinfo|Could not resolve host|network)/i.test(t)) ||
+      /Could not resolve host|Temporary failure in (resolving|name resolution)|Failed to fetch .*packages?/i.test(
+        t,
+      ) ||
+      (/\b(i\/o timeout|timed out)\b/i.test(t) &&
+        /(registry|fetch|download|resolve|getaddrinfo|dial tcp|Could not resolve host|packages?)/i.test(t)),
+    cause: 'Le téléchargement des dépendances a échoué (erreur réseau).',
     action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
   },
   {

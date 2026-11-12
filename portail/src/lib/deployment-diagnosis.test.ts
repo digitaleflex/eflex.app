@@ -28,6 +28,18 @@ describe('deployment-diagnosis', () => {
     })
   })
 
+  it("détecte un manque d'espace disque", () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'Error response from daemon: write /var/lib/docker/tmp/docker-builder123: no space left on device',
+      projectId: 'p1',
+    })
+    expect(d).toEqual({
+      cause: "L'espace disque du serveur de build ou d'exécution semble insuffisant.",
+      action: { label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' },
+    })
+  })
+
   it('détecte un manque de mémoire', () => {
     const d = diagnoseFailure({
       status: 'failed',
@@ -83,6 +95,41 @@ npm error \`npm ci\` can only install packages when your package.json and packag
     expect(d?.cause).toContain('verrouillage')
   })
 
+  it('détecte une dépendance pip introuvable', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: `ERROR: Could not find a version that satisfies the requirement django==9.9.9 (from versions: 4.2, 5.0)
+ERROR: No matching distribution found for django==9.9.9`,
+      projectId: 'p1',
+    })
+    expect(d).toEqual({
+      cause: 'La résolution des dépendances a échoué (version introuvable ou contraintes incompatibles).',
+      action: { label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' },
+    })
+  })
+
+  it('détecte des contraintes Composer impossibles à résoudre', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: `Loading composer repositories with package information
+Your requirements could not be resolved to an installable set of packages.
+
+  Problem 1
+    - Root composer.json requires laravel/framework ^12.0, found laravel/framework[11.0.0]`,
+      projectId: 'p1',
+    })
+    expect(d?.cause).toContain('résolution des dépendances')
+  })
+
+  it('détecte une gem Bundler introuvable', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: "Could not find gem 'rails (= 9.0.0)' in rubygems repository https://rubygems.org/ or installed locally.",
+      projectId: 'p1',
+    })
+    expect(d?.cause).toContain('résolution des dépendances')
+  })
+
   it('détecte une erreur réseau lors du téléchargement des dépendances', () => {
     const d = diagnoseFailure({
       status: 'failed',
@@ -101,6 +148,15 @@ npm ERR! network request to https://registry.npmjs.org/react/-/react-18.3.1.tgz 
     const d = diagnoseFailure({
       status: 'failed',
       logs: 'error An unexpected error occurred: "https://registry.yarnpkg.com/react: getaddrinfo EAI_AGAIN registry.yarnpkg.com".',
+      projectId: 'p1',
+    })
+    expect(d?.cause).toContain('réseau')
+  })
+
+  it("détecte un délai d'attente réseau explicite lors d'un téléchargement", () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'dial tcp 104.16.0.35:443: i/o timeout while fetching https://registry.npmjs.org/express',
       projectId: 'p1',
     })
     expect(d?.cause).toContain('réseau')
@@ -140,6 +196,15 @@ npm ERR! network request to https://registry.npmjs.org/react/-/react-18.3.1.tgz 
       cause: "L'image de base du conteneur est introuvable ou inaccessible.",
       action: { label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' },
     })
+  })
+
+  it('détecte un échec de chargement des métadonnées d’image (BuildKit)', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'ERROR [internal] load metadata for docker.io/library/node:22-alpine: failed to do request: Head "https://registry-1.docker.io/v2/library/node/manifests/22-alpine": dial tcp: lookup registry-1.docker.io: i/o timeout',
+      projectId: 'p1',
+    })
+    expect(d?.cause).toContain("image de base")
   })
 
   it('détecte une commande de démarrage manquante', () => {
