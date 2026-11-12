@@ -26,7 +26,6 @@ export function PlanWidget({ billing, className }: { billing: BillingLite; class
         billing.blocked && 'border-destructive/40',
         className,
       )}
-      aria-label={`Votre plan ${billing.plan.label}, ${used} applications sur ${limit}. ${usageLabel(level)}.`}
     >
       <div className="flex items-center justify-between gap-2">
         <span className="truncate text-xs font-semibold text-foreground">Votre plan · {billing.plan.label}</span>

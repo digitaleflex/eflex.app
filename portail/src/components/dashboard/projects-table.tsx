@@ -11,8 +11,8 @@ import type { DashboardProject } from '@/lib/dashboard-data'
 
 export function ProjectsTable({ projects }: { projects: DashboardProject[] }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
-      <table className="w-full border-collapse text-left text-sm">
+    <div className="overflow-x-auto rounded-xl border border-border bg-card">
+      <table className="min-w-full border-collapse text-left text-sm">
         <caption className="sr-only">Projets de l’organisation</caption>
         <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
