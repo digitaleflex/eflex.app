@@ -6,7 +6,7 @@ const run = process.env.EFLEX_TEST_DB === '1' ? describe : describe.skip
 
 let currentSession: unknown = null
 vi.mock('@/lib/session', () => ({ getSession: async () => currentSession }))
-vi.mock('@/lib/rate-limit', () => ({ allow: async () => true }))
+vi.mock('@/lib/rate-limit', () => ({ allow: async () => true, allowOrg: async () => true }))
 vi.mock('@/lib/git-credentials', () => ({ resolveUserRepoToken: async () => null }))
 
 const queueMock = vi.hoisted(() => ({ calls: [] as string[], fail: false }))

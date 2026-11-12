@@ -1,8 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fakeGitHub } from '@/lib/test-support/fake-github'
 
-vi.mock('@/lib/session', () => ({ getSession: async () => ({ user: { id: 'test-user' } }) }))
-vi.mock('@/lib/rate-limit', () => ({ allow: async () => true }))
+vi.mock('@/lib/session', () => ({
+  getSession: async () => ({
+    user: { id: 'test-user' },
+    session: { activeOrganizationId: 'org-test' },
+  }),
+}))
+vi.mock('@/lib/rate-limit', () => ({ allow: async () => true, allowOrg: async () => true }))
+vi.mock('@/lib/organizations', () => ({
+  resolveOrganization: async () => ({ organizationId: 'org-test', role: 'owner' }),
+}))
 vi.mock('@/lib/git-credentials', () => ({ resolveUserRepoToken: async () => null }))
 
 const json = (value: unknown) => JSON.stringify(value)

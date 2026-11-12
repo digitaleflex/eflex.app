@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/session'
-import { prisma } from '@/lib/prisma'
 import { canManageProjects } from '@/lib/organizations'
 import { applicationAction, getApplicationRuntime, type ApplicationAction } from '@/lib/coolify'
 import { getPrimaryApp } from '@/lib/project-primary'

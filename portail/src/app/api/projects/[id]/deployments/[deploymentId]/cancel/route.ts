@@ -66,7 +66,16 @@ export async function POST(
     project: { select: { id: true, name: true, organizationId: true } },
   })
   if ('response' in deploymentResult) return deploymentResult.response
-  const deployment = deploymentResult.deployment as any
+  const deployment = deploymentResult.deployment as {
+    id: string
+    status: string
+    coolifyBuildId: string | null
+    groupId: string | null
+    appId: string | null
+    app: { name: string } | null
+    project: { id: string; name: string; organizationId: string }
+    logsSummary: string | null
+  }
 
   const result = await cancelDeployment(deployment, {
     removeQueuedJob: removeQueuedDeployment,

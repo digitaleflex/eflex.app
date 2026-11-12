@@ -30,7 +30,6 @@ export function DeploymentItem({
   inProgress,
   isLast,
   isProduction,
-  multiApp,
   defaultOpen,
 }: {
   projectId: string

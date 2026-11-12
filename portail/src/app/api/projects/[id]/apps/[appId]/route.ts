@@ -11,6 +11,37 @@ import { requireOrg, requireProject, requireProjectApp, tenantNotFound } from '@
 
 export const dynamic = 'force-dynamic'
 
+/** Retourne le détail d'une application du projet (lecture isolée par organisation). */
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string; appId: string }> }) {
+  const session = await getSession()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  }
+
+  const { id, appId } = await params
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
+
+  const projectResult = await requireProject(org, id, { id: true })
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project
+
+  const appResult = await requireProjectApp(org, project.id, appId, {
+    id: true,
+    name: true,
+    root: true,
+    framework: true,
+    runtime: true,
+    port: true,
+    domain: true,
+    coolifyAppId: true,
+    position: true,
+  })
+  if ('response' in appResult) return appResult.response
+
+  return NextResponse.json({ app: appResult.app })
+}
+
 /**
  * Renomme une application du projet. Le dossier, la stack, la position et le
  * statut principal ne changent pas ici.
