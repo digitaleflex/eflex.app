@@ -4,7 +4,7 @@ import type { BuildPlan } from '@eflex/detector'
 import type { Prisma } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { allow } from '@/lib/rate-limit'
+import { allow, allowOrg } from '@/lib/rate-limit'
 import { analyzeGitHubRepo, type RepoAnalysis } from '@/lib/repo-analysis'
 import { errorResponse, normalizeRoot, repoFields, resolveRepo } from '@/lib/analysis-request'
 import { resolveUserRepoToken } from '@/lib/git-credentials'
@@ -154,6 +154,9 @@ export async function POST(request: NextRequest) {
 
   if (!(await allow(`create:${userId}`, 10, 60_000))) {
     return NextResponse.json({ error: 'Trop de créations en peu de temps. Patientez une minute.' }, { status: 429 })
+  }
+  if (!(await allowOrg(org.organizationId, 'create', 20, 60_000))) {
+    return NextResponse.json({ error: 'Trop de créations pour cette organisation en peu de temps. Patientez une minute.' }, { status: 429 })
   }
 
   let body: unknown

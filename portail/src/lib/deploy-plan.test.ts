@@ -137,6 +137,19 @@ describe('coolifyApplicationSettings', () => {
     expect(settings.startCommand).toBe("cd 'apps/web' && next start")
   })
 
+  it('construit un monorepo Bun avec filtre et dépendances internes', () => {
+    const settings = coolifyApplicationSettings({
+      ...monorepoPlan,
+      install: 'bun install --frozen-lockfile',
+      workspace: { manager: 'bun', name: '@acme/web', buildScript: 'build' },
+    })
+
+    expect(settings.baseDirectory).toBe('/')
+    expect(settings.installCommand).toBe('bun install --frozen-lockfile')
+    expect(settings.buildCommand).toBe("bun --filter '@acme/web'... run 'build'")
+    expect(settings.startCommand).toBe("cd 'apps/web' && next start")
+  })
+
   it('publie la sortie statique relativement au dossier de travail', () => {
     const settings = coolifyApplicationSettings(monorepoStaticPlan)
     expect(settings.publishDirectory).toBe('/apps/site/dist')

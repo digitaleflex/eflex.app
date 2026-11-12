@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import type { Prisma } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { publish } from '@/lib/event-bus'
 import { audit } from '@/lib/audit'
 import { deleteApplication, deletePrivateKey, deleteManagedDatabase } from '@/lib/coolify'
@@ -11,6 +10,7 @@ import { deleteDeployKey } from '@/lib/github-app'
 import { parseGitHubUrl } from '@/lib/github-url'
 import { getPrimaryApp } from '@/lib/project-apps'
 import { firstIssue, projectUpdateSchema } from '@/lib/project-settings'
+import { assertProjectManager, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
@@ -20,67 +20,62 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params
 
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
 
   // Le filtre sur l'organisation garantit qu'on ne lit que les projets de son organisation.
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      repoUrl: true,
-      branch: true,
-      createdAt: true,
-      updatedAt: true,
-      // Repli de transition (Lot G) : inclus sans être exposé directement.
-      coolifyAppId: true,
-      // Seulement les noms des variables : les valeurs ne quittent jamais le serveur.
-      envVars: { select: { key: true, updatedAt: true }, orderBy: { key: 'asc' } },
-      // Applications du projet (D2) : nom, dossier, domaine, TLS et dernier déploiement.
-      apps: {
-        orderBy: [{ position: 'asc' }, { name: 'asc' }],
-        select: {
-          id: true,
-          name: true,
-          root: true,
-          position: true,
-          plan: true,
-          framework: true,
-          runtime: true,
-          port: true,
-          domain: true,
-          coolifyAppId: true,
-          tlsValid: true,
-          tlsExpiresAt: true,
-          tlsCheckedAt: true,
-          deployments: {
-            take: 1,
-            orderBy: { createdAt: 'desc' },
-            select: { id: true, status: true, commitSha: true, createdAt: true },
-          },
+  const projectResult = await requireProject(org, id, {
+    id: true,
+    name: true,
+    slug: true,
+    repoUrl: true,
+    branch: true,
+    createdAt: true,
+    updatedAt: true,
+    // Repli de transition (Lot G) : inclus sans être exposé directement.
+    coolifyAppId: true,
+    // Seulement les noms des variables : les valeurs ne quittent jamais le serveur.
+    envVars: { select: { key: true, updatedAt: true }, orderBy: { key: 'asc' } },
+    // Applications du projet (D2) : nom, dossier, domaine, TLS et dernier déploiement.
+    apps: {
+      orderBy: [{ position: 'asc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        root: true,
+        position: true,
+        plan: true,
+        framework: true,
+        runtime: true,
+        port: true,
+        domain: true,
+        coolifyAppId: true,
+        tlsValid: true,
+        tlsExpiresAt: true,
+        tlsCheckedAt: true,
+        deployments: {
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, status: true, commitSha: true, createdAt: true },
         },
-      },
-      deployments: {
-        select: {
-          id: true,
-          appId: true,
-          status: true,
-          commitSha: true,
-          logsSummary: true,
-          createdAt: true,
-          app: { select: { id: true, name: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 10,
       },
     },
+    deployments: {
+      select: {
+        id: true,
+        appId: true,
+        status: true,
+        commitSha: true,
+        logsSummary: true,
+        createdAt: true,
+        app: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    },
   })
-
-  if (!project) {
-    return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
-  }
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project
 
   const { apps, coolifyAppId: legacyCoolifyAppId, ...rest } = project
   const primary = getPrimaryApp(apps)
@@ -119,9 +114,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { id } = await params
 
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
-  if (!canManageProjects(org.role)) {
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
+  const denied = assertProjectManager(org)
+  if (denied) {
     return NextResponse.json(
       { error: 'Votre rôle dans cette organisation ne permet pas de modifier ce projet.' },
       { status: 403 },
@@ -140,13 +136,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: firstIssue(parsed.error) }, { status: 400 })
   }
 
-  const existing = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: { id: true },
-  })
-  if (!existing) {
-    return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
-  }
+  const existingResult = await requireProject(org, id, { id: true })
+  if ('response' in existingResult) return existingResult.response
+  const existing = existingResult.project
 
   const data: Prisma.ProjectUpdateInput = {}
   if (parsed.data.name !== undefined) data.name = parsed.data.name
@@ -186,34 +178,31 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   const { id } = await params
 
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
-  if (!canManageProjects(org.role)) {
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
+  const denied = assertProjectManager(org)
+  if (denied) {
     return NextResponse.json(
       { error: 'Votre rôle dans cette organisation ne permet pas de supprimer ce projet.' },
       { status: 403 },
     )
   }
 
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: {
-      id: true,
-      name: true,
-      userId: true,
-      coolifyAppId: true,
-      apps: { select: { name: true, coolifyAppId: true } },
-      installationId: true,
-      repoUrl: true,
-      repoFullName: true,
-      githubDeployKeyId: true,
-      coolifyPrivateKeyUuid: true,
-      databases: { select: { coolifyId: true, kind: true } },
-    },
+  const projectResult = await requireProject(org, id, {
+    id: true,
+    name: true,
+    userId: true,
+    coolifyAppId: true,
+    apps: { select: { name: true, coolifyAppId: true } },
+    installationId: true,
+    repoUrl: true,
+    repoFullName: true,
+    githubDeployKeyId: true,
+    coolifyPrivateKeyUuid: true,
+    databases: { select: { coolifyId: true, kind: true } },
   })
-  if (!project) {
-    return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
-  }
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project
 
   // Applications Coolify du projet (D2) : une par `ProjectApp`, avec repli sur
   // le miroir `Project.coolifyAppId` pendant la transition. Un échec annule la

@@ -203,7 +203,7 @@ func Dockerfile(f Facts, buildCommand, startCommand string, port int) (string, e
 	}))
 	b.WriteString("\n")
 	b.WriteString("RUN ")
-	b.WriteString(printfLine("/etc/supervisor/conf.d/axiom.conf", supervisorConfig()))
+	b.WriteString(printfLine("/etc/supervisor/conf.d/axiom.conf", supervisorConfig(f.Laravel)))
 	b.WriteString("\n")
 	entry := []string{
 		"#!/bin/sh",
@@ -222,9 +222,9 @@ func Dockerfile(f Facts, buildCommand, startCommand string, port int) (string, e
 	return b.String(), nil
 }
 
-func supervisorConfig() []string {
-	program := func(name, command string) []string {
-		return []string{
+func supervisorConfig(laravel bool) []string {
+	program := func(name, command, user string) []string {
+		p := []string{
 			"[program:" + name + "]",
 			"command=" + command,
 			"autorestart=true",
@@ -233,6 +233,10 @@ func supervisorConfig() []string {
 			"stderr_logfile=/dev/stderr",
 			"stderr_logfile_maxbytes=0",
 		}
+		if user != "" {
+			p = append(p, "user="+user)
+		}
+		return p
 	}
 	lines := []string{
 		"[supervisord]",
@@ -243,9 +247,15 @@ func supervisorConfig() []string {
 		"logfile_maxbytes=0",
 		"",
 	}
-	lines = append(lines, program("php-fpm", "/usr/local/sbin/php-fpm -F")...)
+	lines = append(lines, program("php-fpm", "/usr/local/sbin/php-fpm -F", "")...)
 	lines = append(lines, "")
-	lines = append(lines, program("nginx", "/usr/sbin/nginx -g 'daemon off;'")...)
+	lines = append(lines, program("nginx", "/usr/sbin/nginx -g 'daemon off;'", "")...)
+	if laravel {
+		lines = append(lines, "")
+		lines = append(lines, program("queue", "php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600", "www-data")...)
+		lines = append(lines, "")
+		lines = append(lines, program("scheduler", "php /var/www/html/artisan schedule:work", "www-data")...)
+	}
 	return lines
 }
 

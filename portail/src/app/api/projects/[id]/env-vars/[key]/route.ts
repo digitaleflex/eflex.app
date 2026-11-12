@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { publish } from '@/lib/event-bus'
 import { ENV_KEY_MAX, ENV_KEY_PATTERN } from '@/lib/project-settings'
+import { assertProjectManager, requireOrg, requireProject, requireProjectApp, tenantNotFound } from '@/lib/tenant'
 
 /**
  * Supprime une variable d'environnement d'un projet.
@@ -24,32 +24,26 @@ export async function DELETE(
     return NextResponse.json({ error: 'Nom de variable invalide.' }, { status: 400 })
   }
 
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
-  if (!canManageProjects(org.role)) {
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
+  const denied = assertProjectManager(org)
+  if (denied) {
     return NextResponse.json(
       { error: 'Votre rôle dans cette organisation ne permet pas de modifier les variables.' },
       { status: 403 },
     )
   }
 
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: { id: true },
-  })
-  if (!project) {
-    return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
-  }
+  const projectResult = await requireProject(org, id, { id: true })
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project
 
   const rawAppId = new URL(request.url).searchParams.get('appId')
   const appId = rawAppId && rawAppId.trim() ? rawAppId.trim() : null
 
   if (appId) {
-    const app = await prisma.projectApp.findFirst({
-      where: { id: appId, projectId: project.id },
-      select: { id: true },
-    })
-    if (!app) {
+    const appResult = await requireProjectApp(org, project.id, appId, { id: true })
+    if ('response' in appResult) {
       return NextResponse.json({ error: 'Application introuvable.' }, { status: 404 })
     }
   }

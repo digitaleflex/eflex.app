@@ -143,6 +143,10 @@ func TestDockerfileConstructs(t *testing.T) {
 		"root /var/www/html/public;",
 		"listen 8080;",
 		"EXPOSE 8080",
+		"php /var/www/html/artisan queue:work",
+		"php /var/www/html/artisan schedule:work",
+		"[program:queue]",
+		"[program:scheduler]",
 	} {
 		if !strings.Contains(df, want) {
 			t.Fatalf("dockerfile must contain %q:\n%s", want, df)

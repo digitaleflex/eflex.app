@@ -1,9 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { RefreshCw, TerminalSquare } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { useMemo, useState } from 'react'
+import { TerminalSquare } from 'lucide-react'
+import { Terminal } from '@/components/terminal'
 
 export type RuntimeLogApp = {
   id: string
@@ -13,10 +12,9 @@ export type RuntimeLogApp = {
 }
 
 /**
- * Journaux d'exécution du conteneur (Coolify), rafraîchis automatiquement.
- * Pour un compose, un sélecteur permet de lire les logs d'un service précis.
- * En multi-app, un sélecteur d'application cible l'instance à consulter.
- * Les valeurs des variables d'environnement connues sont masquées côté serveur.
+ * Journaux d'exécution du conteneur en direct (flux SSE, sondage Coolify côté serveur).
+ * Sélection de l'application (multi-app) et du service compose, secrets connus masqués.
+ * Recherche, suivi/pause et téléchargement sont fournis par le terminal.
  */
 export function RuntimeLogs({
   projectId,
@@ -30,14 +28,7 @@ export function RuntimeLogs({
   apps?: readonly RuntimeLogApp[]
 }) {
   const [selectedAppId, setSelectedAppId] = useState<string>(apps[0]?.id ?? '')
-  const [logs, setLogs] = useState('')
-  const [updatedAt, setUpdatedAt] = useState<string | null>(null)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [autoRefresh, setAutoRefresh] = useState(true)
-  const [copied, setCopied] = useState(false)
   const [service, setService] = useState('')
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const activeServices = useMemo(() => {
     if (apps.length > 1) {
@@ -47,62 +38,27 @@ export function RuntimeLogs({
     return services
   }, [apps, selectedAppId, services])
 
-  useEffect(() => {
+  // Réinitialise le service quand l'application change (la liste peut différer).
+  const onAppChange = (appId: string) => {
+    setSelectedAppId(appId)
     setService('')
-  }, [selectedAppId])
+  }
 
-  const load = useCallback(async () => {
-    try {
-      const query = new URLSearchParams({ lines: '200' })
-      if (service !== '') query.set('service', service)
-      if (apps.length > 1 && selectedAppId) query.set('appId', selectedAppId)
-      const response = await fetch(`/api/projects/${projectId}/logs?${query.toString()}`, {
-        cache: 'no-store',
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        setError(data.error ?? 'Journaux indisponibles.')
-        return
-      }
-      setLogs(typeof data.logs === 'string' ? data.logs : '')
-      setUpdatedAt(typeof data.updatedAt === 'string' ? data.updatedAt : null)
-      setError('')
-    } catch {
-      setError('Impossible de contacter le serveur.')
-    } finally {
-      setLoading(false)
-    }
+  const streamUrl = useMemo(() => {
+    const query = new URLSearchParams()
+    if (service !== '') query.set('service', service)
+    if (apps.length > 1 && selectedAppId) query.set('appId', selectedAppId)
+    const suffix = query.toString() ? `?${query.toString()}` : ''
+    return `/api/projects/${projectId}/logs/stream${suffix}`
   }, [projectId, service, apps.length, selectedAppId])
 
-  useEffect(() => {
-    setLoading(true)
-    void load()
-  }, [load])
-
-  useEffect(() => {
-    if (!autoRefresh) {
-      if (timer.current) clearInterval(timer.current)
-      timer.current = null
-      return
+  const label = useMemo(() => {
+    if (apps.length > 1) {
+      const name = (apps.find((app) => app.id === selectedAppId) ?? apps[0])?.name ?? 'application'
+      return service ? `Journaux · ${name} · ${service}` : `Journaux · ${name}`
     }
-    timer.current = setInterval(() => {
-      if (document.visibilityState === 'visible') void load()
-    }, 5_000)
-    return () => {
-      if (timer.current) clearInterval(timer.current)
-      timer.current = null
-    }
-  }, [autoRefresh, load])
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(logs)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2_000)
-    } catch {
-      setError('Copie impossible dans ce navigateur.')
-    }
-  }
+    return service ? `Journaux · ${service}` : 'Journaux d’exécution'
+  }, [apps, selectedAppId, service])
 
   return (
     <section aria-labelledby="runtime-logs-title" className="space-y-3">
@@ -113,8 +69,8 @@ export function RuntimeLogs({
             Journaux d’exécution
           </h2>
           <p className="text-sm text-muted-foreground">
-            Dernières lignes du conteneur, secrets connus masqués.
-            {updatedAt && <span className="ml-1 tabular-nums">Mis à jour à {new Date(updatedAt).toLocaleTimeString('fr-FR')}.</span>}
+            Flux en direct du conteneur, secrets connus masqués. La fenêtre récente est
+            affichée ; utilisez Télécharger pour conserver ce qui est visible.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -123,7 +79,7 @@ export function RuntimeLogs({
               <span className="text-muted-foreground">Application</span>
               <select
                 value={selectedAppId}
-                onChange={(e) => setSelectedAppId(e.target.value)}
+                onChange={(e) => onAppChange(e.target.value)}
                 className="min-h-7 bg-transparent text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {apps.map((app) => (
@@ -151,40 +107,11 @@ export function RuntimeLogs({
               </select>
             </label>
           )}
-          <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm [@media(pointer:coarse)]:min-h-11">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="accent-primary"
-            />
-            Rafraîchir automatiquement
-          </label>
-          <Button type="button" variant="outline" size="sm" onClick={() => void load()} loading={loading}>
-            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-            Actualiser
-          </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => void copy()} disabled={logs === ''}>
-            {copied ? 'Copié' : 'Copier'}
-          </Button>
         </div>
       </div>
 
-      {error && (
-        <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
-        </p>
-      )}
-
-      <pre
-        aria-label="Journaux d’exécution du conteneur"
-        className={cn(
-          'max-h-[32rem] min-h-48 overflow-auto rounded-xl border border-border bg-eflexnavy p-4 font-mono text-xs leading-relaxed text-white/90',
-          loading && logs === '' && 'flex items-center justify-center',
-        )}
-      >
-        {loading && logs === '' ? 'Chargement des journaux…' : logs || 'Aucun journal pour le moment.'}
-      </pre>
+      <Terminal url={streamUrl} label={label} />
     </section>
   )
 }
+

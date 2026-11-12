@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
-import { resolveOrganization } from '@/lib/organizations'
 import { firstIssue } from '@/lib/project-settings'
 import { transferProject, transferProjectSchema } from '@/lib/project-transfer'
+import { requireOrg, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,8 +17,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
 
   const { id } = await params
 

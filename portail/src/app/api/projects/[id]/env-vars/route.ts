@@ -3,9 +3,9 @@ import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { allow } from '@/lib/rate-limit'
 import { assertCryptoConfig, encrypt } from '@/lib/crypto'
-import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { publish } from '@/lib/event-bus'
 import { envVarSchema, firstIssue } from '@/lib/project-settings'
+import { assertProjectManager, requireOrg, requireProject, requireProjectApp, tenantNotFound } from '@/lib/tenant'
 
 /**
  * Ajoute ou met à jour une variable d'environnement.
@@ -36,9 +36,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     )
   }
 
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
-  if (!canManageProjects(org.role)) {
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
+  const denied = assertProjectManager(org)
+  if (denied) {
     return NextResponse.json(
       { error: 'Votre rôle dans cette organisation ne permet pas de modifier les variables.' },
       { status: 403 },
@@ -57,21 +58,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: firstIssue(parsed.error) }, { status: 400 })
   }
 
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: { id: true },
-  })
-  if (!project) {
-    return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
-  }
+  const projectResult = await requireProject(org, id, { id: true })
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project
 
   const { key, value, appId } = parsed.data
   if (appId) {
-    const app = await prisma.projectApp.findFirst({
-      where: { id: appId, projectId: project.id },
-      select: { id: true },
-    })
-    if (!app) {
+    const appResult = await requireProjectApp(org, project.id, appId, { id: true })
+    if ('response' in appResult) {
       return NextResponse.json({ error: 'Application introuvable.' }, { status: 404 })
     }
   }

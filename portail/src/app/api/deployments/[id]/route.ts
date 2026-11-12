@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
-import { prisma } from '@/lib/prisma'
 import { STATUS_LABELS, isDeploymentStatus } from '@/lib/deployment-state'
-import { resolveOrganization } from '@/lib/organizations'
+import { requireDeploymentById, requireOrg, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,25 +13,19 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params
-  // Le filtre relationnel garantit qu'on ne lit que les déploiements de son organisation,
-  // sans avoir à sélectionner (puis jeter) le projet.
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Déploiement introuvable' }, { status: 404 })
-  const deployment = await prisma.deployment.findFirst({
-    where: { id, project: { organizationId: org.organizationId } },
-    select: {
-      id: true,
-      status: true,
-      commitSha: true,
-      coolifyBuildId: true,
-      logsSummary: true,
-      createdAt: true,
-    },
+  // Le filtre relationnel garantit qu'on ne lit que les déploiements de son organisation.
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Déploiement introuvable')
+  const result = await requireDeploymentById(org, id, {
+    id: true,
+    status: true,
+    commitSha: true,
+    coolifyBuildId: true,
+    logsSummary: true,
+    createdAt: true,
   })
-
-  if (!deployment) {
-    return NextResponse.json({ error: 'Déploiement introuvable' }, { status: 404 })
-  }
+  if ('response' in result) return result.response
+  const deployment = result.deployment
 
   const rest = deployment
   return NextResponse.json(

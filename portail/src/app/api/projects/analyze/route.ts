@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/session'
-import { allow } from '@/lib/rate-limit'
+import { allow, allowOrg } from '@/lib/rate-limit'
 import { analyzeGitHubRepo } from '@/lib/repo-analysis'
 import { errorResponse, repoFields, resolveRepo } from '@/lib/analysis-request'
 import { resolveUserRepoToken } from '@/lib/git-credentials'
+import { resolveOrganization } from '@/lib/organizations'
 
 const schema = z.object(repoFields)
 
@@ -14,10 +15,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
-  // Chaque analyse consomme des requêtes GitHub : on limite par utilisateur.
+  // Analyse rattachée à l'organisation active pour limiter l'usage abusif à
+  // l'échelle du locataire (#22), tout en conservant la limite par utilisateur.
+  const org = await resolveOrganization(session)
+  if (!org) {
+    return NextResponse.json({ error: 'Aucune organisation active.' }, { status: 403 })
+  }
+
+  // Chaque analyse consomme des requêtes GitHub : on limite par utilisateur et par organisation.
   if (!(await allow(`analyze:${session.user.id}`, 10, 60_000))) {
     return NextResponse.json(
       { error: "Trop d'analyses en peu de temps. Patientez une minute avant de réessayer." },
+      { status: 429 },
+    )
+  }
+  if (!(await allowOrg(org.organizationId, 'analyze', 30, 60_000))) {
+    return NextResponse.json(
+      { error: "Trop d'analyses pour cette organisation en peu de temps. Patientez une minute." },
       { status: 429 },
     )
   }

@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server'
 import type { Prisma } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { resolveOrganization } from '@/lib/organizations'
 import { STATUS_LABELS, isDeploymentStatus } from '@/lib/deployment-state'
+import { requireOrg, requireProject, requireProjectApp, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,14 +24,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const { id } = await params
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
 
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: { id: true },
-  })
-  if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const projectResult = await requireProject(org, id, { id: true })
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project
 
   const url = new URL(request.url)
   const requestedLimit = Number.parseInt(url.searchParams.get('limit') ?? '', 10)
@@ -45,11 +43,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const before = url.searchParams.get('before')
   const appIdParam = url.searchParams.get('appId')
   if (appIdParam) {
-    const app = await prisma.projectApp.findFirst({
-      where: { id: appIdParam, projectId: project.id },
-      select: { id: true },
-    })
-    if (!app) {
+    const appResult = await requireProjectApp(org, project.id, appIdParam, { id: true })
+    if ('response' in appResult) {
       return NextResponse.json(
         { error: 'Application introuvable dans ce projet.', code: 'app_not_found' },
         { status: 404 },

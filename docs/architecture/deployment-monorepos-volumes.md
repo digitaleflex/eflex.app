@@ -52,14 +52,15 @@ Coolify 4.7.3). Le portail applique donc les règles suivantes
 | Cas | `base_directory` | `install` | `build` | `start` |
 | --- | --- | --- | --- | --- |
 | `root === ""` | non envoyé (défaut `/`) | inchangé | inchangé | inchangé |
-| `root` dans un workspace | `/` (racine du dépôt) | inchangé (depuis la racine) | `pnpm --filter '<nom>'... run '<script>'` | `cd '<root>' && <start>` |
+| `root` dans un workspace | `/` (racine du dépôt) | inchangé (depuis la racine) | `<gestionnaire> --filter '<nom>'... run '<script>'` (pnpm, bun) ou `cd '<root>' && <build>` (yarn, npm) | `cd '<root>' && <start>` |
 | `root` autonome (hors workspace) | `/<root>` | inchangé | inchangé | inchangé |
 | framework `docker` | `/<root>` ou `/` | ignoré | ignoré | ignoré |
 
-Pour pnpm, le filtre construit l'application **et ses dépendances internes**
-dans l'ordre topologique. Les autres gestionnaires (yarn, npm, bun) utilisent
-`cd '<root>' && <build>` : ils bénéficient du `node_modules` installé à la
-racine, mais pas de l'ordonnancement des dépendances du workspace.
+Pour pnpm et bun, le filtre construit l'application **et ses dépendances internes**
+dans l'ordre topologique (`--filter '<nom>'...`). Les autres gestionnaires
+(yarn, npm) utilisent `cd '<root>' && <build>` : ils bénéficient du
+`node_modules` installé à la racine, mais pas d'un ordonnancement automatique
+des dépendances internes du workspace.
 
 ### `publish_directory`
 

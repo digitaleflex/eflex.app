@@ -40,7 +40,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { isCommitSha } from '@/lib/deployment-rollback'
 import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 import { statusInfo } from '@/lib/project-status'
-import { applicationHealth, tlsHealth } from '@/lib/project-health'
+import { runtimeHealth, tlsHealth } from '@/lib/project-health'
 import { nextProjectAction, projectSituation, type NextProjectAction } from '@/lib/project-actions'
 import { getApplicationRuntime } from '@/lib/coolify'
 import { getPrimaryApp } from '@/lib/project-apps'
@@ -184,8 +184,16 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const runtime = primaryCoolifyAppId ? await getApplicationRuntime(primaryCoolifyAppId, 3_000) : null
   const runtimeStatus = primaryCoolifyAppId ? (runtime && !('error' in runtime) ? runtime.status : null) : null
   const runtimeError = runtime && 'error' in runtime ? runtime.error : null
+  const runtimeInfo = runtime && !('error' in runtime) ? runtime : null
   const appHealth = primaryCoolifyAppId
-    ? applicationHealth(runtimeStatus)
+    ? runtimeHealth({
+        status: runtimeStatus,
+        healthCheckEnabled: runtimeInfo?.healthCheckEnabled,
+        healthCheckPath: runtimeInfo?.healthCheckPath,
+        restartCount: runtimeInfo?.restartCount ?? null,
+        lastRestartAt: runtimeInfo?.lastRestartAt ?? null,
+        restartReason: runtimeInfo?.restartReason ?? null,
+      })
     : { label: 'Pas encore déployé', detail: 'Le statut sera disponible après le premier déploiement.', tone: 'muted' as const }
   const certificateHealth = tlsHealth(primaryTlsValid, primaryTlsExpiresAt, primaryTlsCheckedAt)
 

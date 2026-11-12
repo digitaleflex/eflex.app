@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
-import { prisma } from '@/lib/prisma'
-import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
 import { multiAppEnabled } from '@/lib/multi-app'
-import { allow } from '@/lib/rate-limit'
+import { allow, allowOrg } from '@/lib/rate-limit'
 import { getPrimaryApp } from '@/lib/project-primary'
+import { assertProjectManager, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,26 +32,29 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const url = new URL(request.url)
   const appId = url.searchParams.get('appId')
   // Le projet doit appartenir à l'organisation active, et le rôle doit permettre de déployer.
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
-  if (!canManageProjects(org.role)) {
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
+  const denied = assertProjectManager(org)
+  if (denied) {
     return NextResponse.json({ error: 'Votre rôle dans cette organisation ne permet pas de relancer un déploiement.' }, { status: 403 })
   }
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: {
-      id: true,
-      name: true,
-      organizationId: true,
-      apps: {
-        orderBy: [{ position: 'asc' }, { name: 'asc' }],
-        select: { id: true, name: true, position: true, coolifyAppId: true },
-      },
+  if (!(await allowOrg(org.organizationId, 'redeploy', 30, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop de redéploiements pour cette organisation en peu de temps. Patientez une minute.' },
+      { status: 429 },
+    )
+  }
+  const projectResult = await requireProject(org, id, {
+    id: true,
+    name: true,
+    organizationId: true,
+    apps: {
+      orderBy: [{ position: 'asc' }, { name: 'asc' }],
+      select: { id: true, name: true, position: true, coolifyAppId: true },
     },
   })
-  if (!project) {
-    return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
-  }
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project
 
   const multi = multiAppEnabled()
   let apps = project.apps

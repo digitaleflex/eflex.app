@@ -6,6 +6,15 @@ export interface HealthView {
   tone: HealthTone
 }
 
+export interface RuntimeHealthInput {
+  status: string | null | undefined
+  healthCheckEnabled?: boolean
+  healthCheckPath?: string | null
+  restartCount?: number | null
+  lastRestartAt?: string | null
+  restartReason?: string | null
+}
+
 /** Statut du conteneur Coolify, traduit en libellé utilisateur. */
 export function applicationHealth(status: string | null | undefined): HealthView {
   if (!status) return { label: 'Statut indisponible', detail: null, tone: 'muted' }
@@ -20,6 +29,31 @@ export function applicationHealth(status: string | null | undefined): HealthView
     return { label: 'Arrêtée', detail: 'Le conteneur est arrêté.', tone: 'muted' }
   }
   return { label: 'Inconnu', detail: status, tone: 'muted' }
+}
+
+const dt = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
+
+/** Enrichit l'état santé avec les détails runtime connus (sonde, redémarrages). */
+export function runtimeHealth(input: RuntimeHealthInput): HealthView {
+  const base = applicationHealth(input.status)
+  const details: string[] = []
+  if (base.detail) details.push(base.detail)
+  if (input.healthCheckEnabled && input.healthCheckPath) {
+    details.push(`Sonde : ${input.healthCheckPath}`)
+  } else if (input.healthCheckEnabled) {
+    details.push('Sonde de santé activée.')
+  }
+  if (typeof input.restartCount === 'number' && Number.isFinite(input.restartCount)) {
+    details.push(`Redémarrages : ${input.restartCount}`)
+  }
+  if (input.lastRestartAt) {
+    const d = new Date(input.lastRestartAt)
+    const when = Number.isNaN(d.getTime()) ? input.lastRestartAt : dt.format(d)
+    details.push(`Dernier redémarrage : ${when}${input.restartReason ? ` (${input.restartReason})` : ''}`)
+  } else if (input.restartReason) {
+    details.push(`Dernier redémarrage : ${input.restartReason}`)
+  }
+  return { ...base, detail: details.length > 0 ? details.join(' · ') : null }
 }
 
 const DAY_MS = 86_400_000

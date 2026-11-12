@@ -220,15 +220,15 @@ Limits — do not report these as supported:
 
 ### PHP / Laravel preset (V1)
 
-Added on 2026-11-10.
+Added on 2026-11-10 (hardened for #11).
 
 - **Analysis.** `composer.json` now produces `language: PHP` and `package_manager: composer`; `require.php` gives the interpreter minor (a constraint other than 8.3 produces a warning, never a different image); `laravel/framework` produces `framework: Laravel`. `artisan`, `public/index.php`, `ext-*` requirements, Composer scripts and npm/Vite assets are recorded as tokens in the new multi-valued `php` finding (`analyzer/evidence/php.go`). A new `adapters` finding records `@sveltejs/adapter-node`/`adapter-static` and `@astrojs/node`. The analyzer version is now `evidence/1.1.0`.
 - **Contract impact (additive).** The profile `preset` enum (`schemas/artifact.schema.json`) and the `axiom.yaml` strategy/language/packageManager enums (`schemas/axiom.schema.json`, `internal/manifest`) gain the new values. `RepositoryAnalysis` gains two finding kinds (`adapters`, `php`). No existing value, field or state changed; consumers that ignore unknown presets/kinds keep working.
 - **Presets.** `php` requires a `composer.json` and either `public/index.php` or an explicit `start.command`; `laravel` is chosen when `laravel/framework` is detected. Both are source builds on port 8080 and use `StartCommand = sh /usr/local/bin/axiom-start`.
 - **Build command.** `composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts`. `--no-scripts` is mandatory: Composer scripts such as Laravel's `post-autoload-dump` call `artisan`, which is not copied yet at dependency-install time. Laravel rediscovers its packages at runtime (the `bootstrap/cache` directory is writable).
-- **Image.** One container: `php:8.3-fpm-bookworm` + nginx + Supervisor (`internal/runtime/presets/php`). Extensions `bcmath`, `pdo_mysql`, `pdo_pgsql`, `zip`, `opcache` are compiled in; nginx forwards `*.php` to `127.0.0.1:9000`; Supervisor runs `php-fpm -F` and `nginx -g 'daemon off;'`. The entrypoint runs `php artisan config:cache` then `php artisan migrate --force` for Laravel, and exits non-zero if either fails, so migrations can fail a deployment. `storage` and `bootstrap/cache` are owned by `www-data`. When a `public/index.php` document root and an npm build script exist, a `node:20-alpine` stage runs `npm ci`/`npm install` then `npm run build`, and the built `public/` directory is copied (Laravel's `public/build` included).
+- **Image.** One container: `php:8.3-fpm-bookworm` + nginx + Supervisor (`internal/runtime/presets/php`). Extensions `bcmath`, `pdo_mysql`, `pdo_pgsql`, `zip`, `opcache` are compiled in; nginx forwards `*.php` to `127.0.0.1:9000`; Supervisor runs `php-fpm -F` and `nginx -g 'daemon off;'`. For Laravel, Supervisor also runs in-container workers `php artisan queue:work --sleep=3 --tries=3 --max-time=3600` and `php artisan schedule:work` (as `www-data`), because the planner has no multi-service model; they stop with the container on redeploy. The entrypoint runs `php artisan config:cache` then `php artisan migrate --force` for Laravel, and exits non-zero if either fails, so migrations can fail a deployment. `storage` and `bootstrap/cache` are owned by `www-data`. When a `public/index.php` document root and an npm build script exist, a `node:20-alpine` stage runs `npm ci`/`npm install` then `npm run build`, and the built `public/` directory is copied (Laravel's `public/build` included).
 - **Limits — do not report these as done:**
-  - **No `queue` or `scheduler` worker.** `php artisan queue:work` and `schedule:work` are not started: the planner has no multi-service model (`planner.Plan` has one runtime).
+  - **No separate `queue`/`scheduler` services.** The planner has no multi-service model (`planner.Plan` has one runtime), so workers run inside the app container under Supervisor rather than as distinct services with independent scaling/health.
   - **No persistent `storage` volume.** The planner has no volume model; `storage/` lives in the container and is lost on redeploy. There is no `VOLUME` instruction pretending otherwise.
   - No nginx sidecar, no PHP-FPM pool tuning, no OPcache preload configuration.
   - Frontend assets are built only with **npm**, and only when `public/index.php` exists. pnpm/yarn/bun lockfiles skip the asset stage instead of downloading a package manager inside the build.
@@ -236,7 +236,7 @@ Added on 2026-11-10.
   - The php-fpm and nginx masters run as root; FPM workers drop to `www-data`. The Composer binary stays in the image.
   - No database provisioning: `DATABASE_URL`/`DB_*` must be configured; a Laravel app whose migrations fail at start does not reach LIVE.
   - A `start.command` override replaces the generated entrypoint entirely: Laravel migrations and the nginx/php-fpm pair are then not started unless the override does it.
-  - No `TestLaravelToLive` e2e: building the image needs apt, Composer and Docker Hub, and was not added to the Docker-gated CI job. Coverage is analysis, profile goldens and Dockerfile goldens.
+  - No `TestLaravelToLive` e2e: building a real Laravel image needs apt, Composer, network access and a database/runtime configuration not provided by the in-process e2e harness; Docker-gated coverage is not added. Coverage is analysis, profile goldens and Dockerfile goldens.
   - A repository that ships its own Dockerfile still uses it (Dockerfile precedence).
 
 Two packages are delivered and tested but **not adopted by production code**:

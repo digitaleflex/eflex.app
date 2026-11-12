@@ -833,6 +833,11 @@ export interface ApplicationRuntime {
   status: string
   healthCheckEnabled: boolean
   healthCheckPath: string | null
+  /** Nombre de redémarrages, si exposé par Coolify. */
+  restartCount?: number | null
+  /** Date/raison du dernier redémarrage, si exposées. */
+  lastRestartAt?: string | null
+  restartReason?: string | null
 }
 
 /** Statut courant et configuration de healthcheck d'une application. */
@@ -840,19 +845,38 @@ export async function getApplicationRuntime(
   appId: string,
   timeoutMs = 5_000,
 ): Promise<ApplicationRuntime | { error: string }> {
-  const res = await coolifyFetch<{
-    status?: unknown
-    health_check_enabled?: unknown
-    health_check_path?: unknown
-  }>(`/applications/${encodeURIComponent(appId)}`, {
+  const res = await coolifyFetch<Record<string, unknown>>(`/applications/${encodeURIComponent(appId)}`, {
     signal: AbortSignal.timeout(timeoutMs),
   })
   if (res.error) return { error: res.error }
   const data = res.data ?? {}
+  const restartCount =
+    typeof data.restart_count === 'number'
+      ? data.restart_count
+      : typeof data.restartCount === 'number'
+        ? data.restartCount
+        : null
+  const lastRestartAt =
+    typeof data.last_restart_at === 'string'
+      ? data.last_restart_at
+      : typeof data.lastRestartAt === 'string'
+        ? data.lastRestartAt
+        : null
+  const restartReason =
+    typeof data.restart_reason === 'string'
+      ? data.restart_reason
+      : typeof data.restartReason === 'string'
+        ? data.restartReason
+        : typeof data.last_restart_reason === 'string'
+          ? data.last_restart_reason
+          : null
   return {
     status: typeof data.status === 'string' ? data.status : 'unknown',
     healthCheckEnabled: data.health_check_enabled === true,
     healthCheckPath: typeof data.health_check_path === 'string' ? data.health_check_path : null,
+    restartCount,
+    lastRestartAt,
+    restartReason,
   }
 }
 

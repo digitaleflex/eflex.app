@@ -58,3 +58,17 @@ export async function allow(key: string, limit: number, windowMs: number): Promi
   }
   return allowMemory(key, limit, windowMs)
 }
+
+/**
+ * Limite par organisation (clé `org:<organizationId>:<action>`), en plus des
+ * limites par utilisateur. Permet de contenir un usage abusif réparti entre
+ * plusieurs comptes d'une même organisation.
+ */
+export async function allowOrg(
+  organizationId: string,
+  action: string,
+  limit: number,
+  windowMs: number,
+): Promise<boolean> {
+  return allow(`org:${organizationId}:${action}`, limit, windowMs)
+}
