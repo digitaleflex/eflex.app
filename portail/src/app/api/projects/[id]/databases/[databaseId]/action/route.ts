@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/session'
-import { prisma } from '@/lib/prisma'
 import { audit } from '@/lib/audit'
 import { canManageProjects } from '@/lib/organizations'
 import { projectDatabaseAction } from '@/lib/project-databases'

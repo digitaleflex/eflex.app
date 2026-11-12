@@ -37,18 +37,41 @@ export function CommandPalette({ className, hotkey = true }: { className?: strin
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const [projectItems, setProjectItems] = useState<Item[]>([])
+  const [pendingRedeploy, setPendingRedeploy] = useState<{ id: string; name: string } | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [redeploying, setRedeploying] = useState(false)
   const listId = useId()
   const [isMac, setIsMac] = useState(true)
 
   useEffect(() => setIsMac(/Mac|iPhone|iPad/.test(navigator.platform)), [])
 
-  const show = useCallback(() => setOpen(true), [])
+  const show = useCallback(() => {
+    setOpen(true)
+    setQuery('')
+    setPendingRedeploy(null)
+    setActionError(null)
+  }, [])
+  const hide = useCallback(() => {
+    setOpen(false)
+    setPendingRedeploy(null)
+    setActionError(null)
+  }, [])
+
   useEffect(() => {
     if (!hotkey) return
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        setOpen((o) => !o)
+        setOpen((o) => {
+          const next = !o
+          if (!next) {
+            setPendingRedeploy(null)
+            setActionError(null)
+          } else {
+            setQuery('')
+          }
+          return next
+        })
       }
     }
     window.addEventListener('keydown', onKey)
@@ -61,6 +84,8 @@ export function CommandPalette({ className, hotkey = true }: { className?: strin
     if (open && !d.open) {
       setQuery('')
       setActive(0)
+      setPendingRedeploy(null)
+      setActionError(null)
       d.showModal()
       inputRef.current?.focus()
       fetch('/api/projects')
@@ -121,34 +146,50 @@ export function CommandPalette({ className, hotkey = true }: { className?: strin
 
   useEffect(() => setActive(0), [query])
 
+  const confirmRedeploy = async () => {
+    if (!pendingRedeploy) return
+    setActionError(null)
+    setRedeploying(true)
+    try {
+      const res = await fetch(`/api/projects/${pendingRedeploy.id}/redeploy`, { method: 'POST' })
+      if (res.status === 202 || res.ok) {
+        hide()
+        router.push(`/dashboard/projects/${pendingRedeploy.id}?tab=deployments`)
+        return
+      }
+      const data = await res.json().catch(() => ({} as { error?: string }))
+      setActionError(data.error || 'Impossible de relancer le déploiement.')
+    } catch {
+      setActionError('Impossible de relancer le déploiement.')
+    } finally {
+      setRedeploying(false)
+    }
+  }
+
   const go = async (item: Item | undefined) => {
     if (!item) return
     if (item.action === 'theme') {
-      setOpen(false)
+      hide()
       const current = readTheme()
-      const resolved = current === 'dark' ? 'light' : current === 'light' ? 'dark' : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark')
+      const resolved =
+        current === 'dark'
+          ? 'light'
+          : current === 'light'
+            ? 'dark'
+            : window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'light'
+              : 'dark'
       applyTheme(resolved)
       return
     }
     if (item.action === 'redeploy' && item.projectId) {
       const name = item.projectName ?? item.label
-      if (!window.confirm(`Relancer le déploiement de « ${name} » ?`)) return
-      setOpen(false)
-      try {
-        const res = await fetch(`/api/projects/${item.projectId}/redeploy`, { method: 'POST' })
-        if (res.status === 202 || res.ok) {
-          router.push(`/dashboard/projects/${item.projectId}?tab=deployments`)
-          return
-        }
-        const data = await res.json().catch(() => ({} as { error?: string }))
-        window.alert(data.error || 'Impossible de relancer le déploiement.')
-      } catch {
-        window.alert('Impossible de relancer le déploiement.')
-      }
+      setPendingRedeploy({ id: item.projectId, name })
+      setActionError(null)
       return
     }
     if (item.href) {
-      setOpen(false)
+      hide()
       router.push(item.href)
     }
   }
@@ -172,8 +213,8 @@ export function CommandPalette({ className, hotkey = true }: { className?: strin
       <dialog
         ref={dialogRef}
         aria-label="Palette de commandes"
-        onCancel={(e) => { e.preventDefault(); setOpen(false) }}
-        onClick={(e) => { if (e.target === dialogRef.current) setOpen(false) }}
+        onCancel={(e) => { e.preventDefault(); hide() }}
+        onClick={(e) => { if (e.target === dialogRef.current) hide() }}
         className="m-auto mt-[12vh] w-[calc(100%-2rem)] max-w-xl overflow-hidden rounded-xl border border-border bg-card p-0 text-card-foreground shadow-2xl backdrop:bg-black/40"
       >
         <div className="flex items-center gap-2 border-b border-border px-4">
@@ -186,16 +227,47 @@ export function CommandPalette({ className, hotkey = true }: { className?: strin
             aria-activedescendant={results[active] ? `${listId}-${results[active]!.id}` : undefined}
             aria-label="Rechercher un projet ou une action"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setPendingRedeploy(null); setActionError(null) }}
             onKeyDown={(e) => {
               if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(a + 1, results.length - 1)) }
               if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)) }
-              if (e.key === 'Enter') { e.preventDefault(); go(results[active]) }
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                if (pendingRedeploy) void confirmRedeploy()
+                else void go(results[active])
+              }
             }}
             placeholder="Rechercher un projet ou une action…"
             className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           />
         </div>
+        {pendingRedeploy && (
+          <div className="border-b border-border bg-muted/40 px-4 py-3">
+            <p className="text-sm font-medium">Relancer le déploiement de « {pendingRedeploy.name} » ?</p>
+            <p className="mt-1 text-xs text-muted-foreground">Cette action crée un nouveau déploiement pour le projet.</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void confirmRedeploy()}
+                disabled={redeploying}
+                className="inline-flex h-9 items-center rounded-lg bg-foreground px-3 text-sm font-semibold text-background hover:bg-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 [@media(pointer:coarse)]:h-11"
+              >
+                {redeploying ? 'Redéploiement…' : 'Confirmer'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPendingRedeploy(null); setActionError(null); inputRef.current?.focus() }}
+                disabled={redeploying}
+                className="inline-flex h-9 items-center rounded-lg border border-border bg-card px-3 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 [@media(pointer:coarse)]:h-11"
+              >
+                Annuler
+              </button>
+            </div>
+            {actionError && (
+              <p role="alert" className="mt-2 text-sm text-destructive">{actionError}</p>
+            )}
+          </div>
+        )}
         <ul id={listId} role="listbox" aria-label="Résultats" className="max-h-80 overflow-auto p-2">
           {results.length === 0 && <li className="px-3 py-6 text-center text-sm text-muted-foreground">Aucun résultat pour « {query} »</li>}
           {results.map((item, i) => {
@@ -209,7 +281,7 @@ export function CommandPalette({ className, hotkey = true }: { className?: strin
                   role="option"
                   aria-selected={i === active}
                   onMouseMove={() => setActive(i)}
-                  onClick={() => go(item)}
+                  onClick={() => void go(item)}
                   className={cn('flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm', i === active ? 'bg-muted text-foreground' : 'text-foreground/90')}
                 >
                   <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />

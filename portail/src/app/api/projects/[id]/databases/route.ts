@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import type { ProjectDatabase } from '@prisma/client'
 import { getSession } from '@/lib/session'
-import { prisma } from '@/lib/prisma'
 import { audit } from '@/lib/audit'
 import { canManageProjects } from '@/lib/organizations'
 import { DATABASE_KINDS, createProjectDatabase, isDatabaseKind, refreshProjectDatabase } from '@/lib/project-databases'
@@ -27,7 +27,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     databases: { orderBy: { createdAt: 'asc' } },
   })
   if ('response' in projectResult) return projectResult.response
-  const project = projectResult.project as unknown as { id: string; databases: Array<any> }
+  const project = projectResult.project as unknown as { id: string; databases: ProjectDatabase[] }
 
   const databases = await Promise.all(
     project.databases.map(async (database) => {

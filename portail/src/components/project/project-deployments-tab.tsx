@@ -21,8 +21,6 @@ export function ProjectDeploymentsTab({
   multiApp: boolean
   productionId?: string | null
 }) {
-  const last = deployments[0]
-
   return (
     <SectionCard
       id="deployments"

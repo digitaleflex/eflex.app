@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Bell, LifeBuoy, LogOut, Settings, Users } from 'lucide-react'
+import { LifeBuoy, LogOut, Settings, Users } from 'lucide-react'
 import { signOut } from '@/lib/auth-client'
 import { ThemeIcons } from '@/components/theme-switcher'
 import { useConnectionState } from '@/hooks/events-provider'

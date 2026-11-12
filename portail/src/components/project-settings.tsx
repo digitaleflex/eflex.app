@@ -215,7 +215,6 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
   const [renameDrafts, setRenameDrafts] = useState<Record<string, string>>({})
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [confirmAppDelete, setConfirmAppDelete] = useState<SettingsApp | null>(null)
-  const [deletingAppId, setDeletingAppId] = useState<string | null>(null)
   const [appFeedback, setAppFeedback] = useState<Feedback>(null)
   const [newAppRoot, setNewAppRoot] = useState('')
   const [addingApp, setAddingApp] = useState(false)
@@ -432,7 +431,6 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
 
   async function removeApp(app: SettingsApp) {
     setAppFeedback(null)
-    setDeletingAppId(app.id)
     try {
       const response = await fetch(`/api/projects/${project.id}/apps/${app.id}`, { method: 'DELETE' })
       const data = await response.json().catch(() => ({}))
@@ -447,8 +445,6 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
       router.refresh()
     } catch {
       setAppFeedback({ tone: 'error', message: NETWORK_ERROR })
-    } finally {
-      setDeletingAppId(null)
     }
   }
 
