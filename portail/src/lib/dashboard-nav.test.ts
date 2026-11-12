@@ -43,7 +43,6 @@ describe('DASHBOARD_TABS', () => {
       'projects',
       'activity',
       'team',
-      'notifications',
       'settings',
     ])
     expect(new Set(DASHBOARD_TABS.map((tab) => tab.href)).size).toBe(DASHBOARD_TABS.length)

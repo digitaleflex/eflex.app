@@ -56,7 +56,6 @@ export function UserMenu({ name, email }: { name: string; email: string }) {
             )}
           </div>
           <div className="my-1 h-px bg-border" />
-          <Link href="/dashboard/notifications" onClick={() => setOpen(false)} className={item}><Bell className="h-4 w-4 text-muted-foreground" aria-hidden="true" />Notifications</Link>
           <Link href="/dashboard/organization" onClick={() => setOpen(false)} className={item}><Users className="h-4 w-4 text-muted-foreground" aria-hidden="true" />Équipe</Link>
           <Link href="/dashboard/support" onClick={() => setOpen(false)} className={item}><LifeBuoy className="h-4 w-4 text-muted-foreground" aria-hidden="true" />Aide & support</Link>
           <Link href="/dashboard/settings" onClick={() => setOpen(false)} className={item}><Settings className="h-4 w-4 text-muted-foreground" aria-hidden="true" />Paramètres</Link>
