@@ -1,10 +1,12 @@
 import Link from 'next/link'
-import { Activity, ArrowRight, CircleAlert, CircleCheck, Gauge, Globe, Layers, Loader2, Rocket, ShieldAlert, UserPlus } from 'lucide-react'
+import { Activity, ArrowRight, CircleAlert, CircleCheck, Gauge, Layers, Loader2, Rocket, ShieldAlert } from 'lucide-react'
 import { StatusDot } from '@/components/dashboard/status-pill'
-import { FrameworkTile } from '@/components/dashboard/project-card'
 import { relativeTime } from '@/lib/relative-time'
 import { statusInfo } from '@/lib/project-status'
 import type { DashboardData } from '@/lib/dashboard-data'
+import { ActivityFeed } from '@/components/dashboard/activity-feed'
+
+export { ActivityFeed }
 
 const dayFormat = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
 
@@ -187,68 +189,4 @@ export function AttentionList({ items }: { items: DashboardData['attention'] }) 
   )
 }
 
-/** Fil d'activité : derniers événements utiles de l'organisation (déploiements, domaines, équipe), mis à jour en direct. */
-export function ActivityFeed({ items }: { items: DashboardData['activity'] }) {
-  return (
-    <section aria-labelledby="activity-title" className="rounded-xl border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-        <h2 id="activity-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Activité récente</h2>
-        <Link href="/dashboard/activity" className="text-xs font-medium text-primary hover:underline">Tout voir</Link>
-      </div>
-      {items.length === 0 ? (
-        <p className="px-4 py-8 text-center text-sm text-muted-foreground">L’activité récente de vos projets apparaîtra ici.</p>
-      ) : (
-        <ol className="px-4 py-2">
-          {items.map((item, i) => (
-            <li key={item.id} className="relative flex gap-3 py-2.5">
-              {i < items.length - 1 && <span aria-hidden="true" className="absolute left-4 top-11 h-[calc(100%-2rem)] w-px bg-border" />}
-              {item.kind === 'deployment' ? (
-                <>
-                  <FrameworkTile framework={item.framework} name={item.projectName} size="sm" />
-                  <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-1.5 text-sm">
-                      <Link href={`/dashboard/projects/${item.projectId}`} className="truncate font-medium hover:underline">{item.projectName}</Link>
-                      <StatusDot status={item.status} className="shrink-0" />
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {statusInfo(item.status).label}
-                      {item.commitSha && <> · <span className="font-mono">{item.commitSha}</span></>} · <time dateTime={item.createdAt} suppressHydrationWarning>{relativeTime(item.createdAt)}</time>
-                    </p>
-                  </div>
-                </>
-              ) : item.kind === 'domain_verified' ? (
-                <>
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success" aria-hidden="true">
-                    <Globe className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-1.5 text-sm">
-                      <Link href={`/dashboard/projects/${item.projectId}`} className="truncate font-medium hover:underline">{item.projectName}</Link>
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      Domaine vérifié · <span className="font-mono">{item.hostname}</span> · <time dateTime={item.createdAt} suppressHydrationWarning>{relativeTime(item.createdAt)}</time>
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground" aria-hidden="true">
-                    <UserPlus className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-1.5 text-sm">
-                      <Link href="/dashboard/organization" className="truncate font-medium hover:underline">{item.memberName}</Link>
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      A rejoint l’équipe · <time dateTime={item.createdAt} suppressHydrationWarning>{relativeTime(item.createdAt)}</time>
-                    </p>
-                  </div>
-                </>
-              )}
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
-  )
-}
+/** Fil d'activité réutilisé (rendu extrait dans `components/dashboard/activity-feed.tsx`). */

@@ -14,6 +14,8 @@ import { PageHeader } from '@/components/page-header'
 import { LinkButton } from '@/components/link-button'
 import { formatInteger } from '@/lib/table'
 import { getPrimaryApp } from '@/lib/project-apps'
+import { loadRecentOrgEvents } from '@/lib/dashboard-data'
+import { ActivityFeed } from '@/components/dashboard/activity-feed'
 import {
   ACTIVITY_FILTERS,
   ACTIVITY_FILTER_LABEL,
@@ -77,10 +79,11 @@ export default async function ActivityPage({
   })
 
   const empty = activityEmptyState(filter)
+  const otherEvents = filter === 'all' ? await loadRecentOrgEvents(org.organizationId, 15) : []
 
   return (
     <div className="space-y-6">
-      <LiveRefresh types={['deployment.created', 'deployment.status']} />
+      <LiveRefresh types={['deployment.created', 'deployment.status', 'member.added']} />
 
       <PageHeader
         title="Activité"
@@ -190,6 +193,22 @@ export default async function ActivityPage({
         hrefTemplate={activityHrefTemplate(filter)}
         label="Pagination de l’activité"
       />
+
+      {filter === 'all' && otherEvents.length > 0 ? (
+        <section aria-label="Autres événements récents" className="space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold">Équipe et domaines</h2>
+            <p className="text-xs text-muted-foreground">
+              Derniers domaines vérifiés et membres ajoutés à l’organisation.
+            </p>
+          </div>
+          <ActivityFeed
+            items={otherEvents}
+            emptyText="Aucun événement d’équipe ou de domaine pour le moment."
+            showAllLink={false}
+          />
+        </section>
+      ) : null}
     </div>
   )
 }

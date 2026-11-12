@@ -61,6 +61,73 @@ export type DashboardActivity =
       memberName: string
     }
 
+export type OrgRecentEvent = Extract<DashboardActivity, { kind: 'domain_verified' | 'member_added' }>
+
+/**
+ * Événements fiables récents de l'organisation hors déploiements (domaines vérifiés, membres ajoutés),
+ * dédupliqués par identifiant source et triés du plus récent au plus ancien.
+ */
+export async function loadRecentOrgEvents(organizationId: string, take = 15): Promise<OrgRecentEvent[]> {
+  const [domainVerifications, memberEvents] = await Promise.all([
+    prisma.auditLog.findMany({
+      where: { organizationId, action: 'project.domain.verify' },
+      orderBy: { createdAt: 'desc' },
+      take,
+      select: { id: true, createdAt: true, details: true },
+    }),
+    prisma.member.findMany({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+      take,
+      select: { id: true, createdAt: true, user: { select: { name: true } } },
+    }),
+  ])
+
+  const projectIds = Array.from(
+    new Set(
+      domainVerifications
+        .map((entry) => (entry.details as { projectId?: unknown } | null)?.projectId)
+        .filter((id): id is string => typeof id === 'string'),
+    ),
+  )
+  const projects = projectIds.length
+    ? await prisma.project.findMany({
+        where: { organizationId, id: { in: projectIds } },
+        select: { id: true, name: true },
+      })
+    : []
+  const projectNameById = new Map(projects.map((p) => [p.id, p.name]))
+
+  const domainActivity: OrgRecentEvent[] = domainVerifications.flatMap((entry) => {
+    const details = entry.details as { projectId?: unknown; hostname?: unknown } | null
+    const projectId = typeof details?.projectId === 'string' ? details.projectId : null
+    const hostname = typeof details?.hostname === 'string' ? details.hostname : null
+    const projectName = projectId ? projectNameById.get(projectId) : null
+    if (!projectId || !hostname || !projectName) return []
+    return [
+      {
+        kind: 'domain_verified' as const,
+        id: `domain-verify:${entry.id}`,
+        createdAt: entry.createdAt.toISOString(),
+        projectId,
+        projectName,
+        hostname,
+      },
+    ]
+  })
+
+  const memberActivity: OrgRecentEvent[] = memberEvents.map((m) => ({
+    kind: 'member_added',
+    id: `member-added:${m.id}`,
+    createdAt: m.createdAt.toISOString(),
+    memberName: m.user.name,
+  }))
+
+  return [...domainActivity, ...memberActivity]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, take)
+}
+
 /**
  * Tout ce qu'il faut pour la page d'accueil, calculé côté serveur pour l'organisation donnée
  * (jamais pour un autre locataire) et sérialisé en types simples (dates en ISO).

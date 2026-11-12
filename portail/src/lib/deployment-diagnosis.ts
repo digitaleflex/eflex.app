@@ -28,7 +28,7 @@ const RULES: Rule[] = [
     id: 'port',
     test: (t) => /no (open )?ports? detected|port .*not (found|listening)|exposed port|health ?check.*(fail|timeout)/i.test(t),
     cause: "Le port d'écoute de l'application n'a pas été détecté.",
-    action: (id) => ({ label: 'Corriger le port', href: `/dashboard/projects/${id}?tab=settings` }),
+    action: (id) => ({ label: 'Corriger le port', href: `/dashboard/projects/${id}/settings` }),
   },
   {
     id: 'oom',
@@ -46,7 +46,7 @@ const RULES: Rule[] = [
     id: 'repo-private',
     test: (t) => /repository not found|authentication failed|permission denied \(publickey\)|could not read from remote repository|fatal: could not read/i.test(t),
     cause: "Le dépôt semble inaccessible (privé ou droits insuffisants).",
-    action: (id) => ({ label: 'Vérifier la connexion Git', href: `/dashboard/projects/${id}?tab=settings` }),
+    action: (id) => ({ label: 'Vérifier la connexion Git', href: `/dashboard/projects/${id}/settings` }),
   },
 ]
 
