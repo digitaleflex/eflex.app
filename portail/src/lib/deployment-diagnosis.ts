@@ -48,7 +48,7 @@ const RULES: Rule[] = [
   {
     id: 'disk-space',
     test: (t) =>
-      /no space left on device|\bENOSPC\b|insufficient (disk )?space|write .*no space left|not enough (disk )?space/i.test(
+      /no space left on device|\bENOSPC\b|\bEDQUOT\b|disk quota exceeded|insufficient (disk )?space|write .*no space left|not enough (disk )?space/i.test(
         t,
       ),
     cause: "L'espace disque du serveur de build ou d'exécution semble insuffisant.",
