@@ -6,11 +6,9 @@ import { EventsProvider } from '@/hooks/events-provider'
 import { ToastProvider } from '@/components/ui/toast'
 import { NotificationToaster } from '@/components/notification-toaster'
 import { MembershipWatcher } from '@/components/membership-watcher'
-import { ImpersonationBanner } from '@/components/impersonation-banner'
 import { DashboardShell } from '@/components/dashboard-shell'
 import { billingSummary, loadBillingState } from '@/lib/billing'
-import { BillingBlockBanner } from '@/components/dashboard/billing-banner'
-import { selectBanner } from '@/lib/banner-priority'
+import { DashboardBanner } from '@/components/dashboard/dashboard-banner'
 
 // Protection côté serveur : aucune page du tableau de bord n'est rendue sans session.
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -50,20 +48,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <DashboardShell
           user={{ name: session.user.name, email: session.user.email }}
           billing={billing}
+          banner={
+            <DashboardBanner
+              impersonatedUserName={session.session.impersonatedBy ? session.user.name : null}
+              billingBlock={billingBlock}
+            />
+          }
         >
-          {(() => {
-            const candidates: Array<'impersonation' | 'suspension' | 'past_due'> = []
-            if (session.session.impersonatedBy) candidates.push('impersonation')
-            if (billingBlock) candidates.push(billingBlock.kind)
-            const chosen = selectBanner(candidates)
-            if (chosen === 'impersonation' && session.session.impersonatedBy) {
-              return <ImpersonationBanner userName={session.user.name} />
-            }
-            if ((chosen === 'suspension' || chosen === 'past_due') && billingBlock) {
-              return <BillingBlockBanner message={billingBlock.message} />
-            }
-            return null
-          })()}
           {children}
         </DashboardShell>
       </ToastProvider>

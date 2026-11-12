@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
 interface MaintenanceState {
   enabled: boolean
@@ -17,11 +18,17 @@ interface MaintenanceState {
  *
  * En maintenance, le bandeau de maintenance remplace l'annonce ; hors
  * maintenance, l'annonce configurée dans `/admin/infrastructure` s'affiche.
+ *
+ * Masquée sur les routes `/dashboard` : le tableau de bord possède son propre
+ * emplacement unique priorisé (impersonation/suspension/past_due/maintenance/annonce).
  */
 export function MaintenanceBanner() {
+  const pathname = usePathname()
+  const inDashboard = pathname?.startsWith('/dashboard') ?? false
   const [state, setState] = useState<MaintenanceState | null>(null)
 
   useEffect(() => {
+    if (inDashboard) return
     let cancelled = false
     fetch('/api/maintenance', { cache: 'no-store' })
       .then((res) => res.json())
@@ -34,9 +41,9 @@ export function MaintenanceBanner() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [inDashboard])
 
-  if (!state) return null
+  if (inDashboard || !state) return null
 
   if (state.enabled) {
     return (

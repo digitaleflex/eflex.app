@@ -30,7 +30,18 @@ const TAB_ICONS: Record<DashboardTabKey, LucideIcon> = {
  * Les deux navigations partagent la même liste (`DASHBOARD_TABS`) et le même calcul de section
  * active (`activeDashboardTab`) : aucune destination ne disparaît d'un format à l'autre.
  */
-export function DashboardShell({ children, user, billing }: { children: React.ReactNode; user: { name?: string | null; email?: string | null }; billing?: Awaited<ReturnType<typeof billingSummary>> | null }) {
+export function DashboardShell({
+  children,
+  user,
+  billing,
+  banner,
+}: {
+  children: React.ReactNode
+  user: { name?: string | null; email?: string | null }
+  billing?: Awaited<ReturnType<typeof billingSummary>> | null
+  /** Emplacement unique des bandeaux, affiché sous la barre du haut. */
+  banner?: React.ReactNode
+}) {
   const pathname = usePathname()
   const activeTab = activeDashboardTab(pathname)
 
@@ -81,6 +92,12 @@ export function DashboardShell({ children, user, billing }: { children: React.Re
           </div>
         </nav>
       </header>
+
+      {banner ? (
+        <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6">
+          {banner}
+        </div>
+      ) : null}
 
       {/* Barre inférieure : la navigation reste visible sans défilement horizontal.
           Elle précède le contenu dans le DOM pour que l'ordre clavier reste cohérent. */}
