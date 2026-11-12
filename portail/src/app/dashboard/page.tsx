@@ -9,6 +9,7 @@ import { LiveRefresh } from '@/components/live-refresh'
 import { ActivityFeed, AttentionList, OverviewStrip } from '@/components/dashboard/overview'
 import { DashboardOnboarding } from '@/components/dashboard/onboarding'
 import { NextStepsCard } from '@/components/dashboard/next-steps-card'
+import { UsageTile } from '@/components/dashboard/usage-tile'
 import { ProjectsExplorer } from '@/components/dashboard/projects-explorer'
 
 export const metadata = { title: 'Projets — Eflex' }
@@ -77,6 +78,7 @@ export default async function DashboardPage() {
           <OverviewStrip data={data} />
           <AttentionList items={data.attention} />
           {nextSteps.length > 0 && <NextStepsCard steps={nextSteps} />}
+          <UsageTile />
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
             <ProjectsExplorer
