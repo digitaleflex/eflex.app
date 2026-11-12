@@ -60,7 +60,9 @@ Pour pnpm et bun, le filtre construit l'application **et ses dépendances intern
 dans l'ordre topologique (`--filter '<nom>'...`). Les autres gestionnaires
 (yarn, npm) utilisent `cd '<root>' && <build>` : ils bénéficient du
 `node_modules` installé à la racine, mais pas d'un ordonnancement automatique
-des dépendances internes du workspace.
+des dépendances internes du workspace. `coolifyApplicationSettings` n'applique
+le filtre pnpm/bun que lorsque le nom du paquet et le script de build sont
+connus ; sinon la commande de build reste préfixée par `cd '<root>' && ...`.
 
 ### `publish_directory`
 

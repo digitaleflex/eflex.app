@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Activity, Cpu, MemoryStick, RefreshCw } from 'lucide-react'
+import { Activity, Cpu, HeartPulse, MemoryStick, RefreshCw, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export type MetricsApp = {
@@ -19,6 +19,17 @@ type MetricsPayload = {
   message?: string
 }
 
+type RuntimePayload = {
+  available: boolean
+  status: string | null
+  healthCheckEnabled: boolean
+  healthCheckPath: string | null
+  restartCount: number | null
+  lastRestartAt: string | null
+  restartReason: string | null
+  error?: string
+}
+
 function formatPercent(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return '—'
   return `${value.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`
@@ -32,16 +43,53 @@ function formatMb(value: number | null): string {
   return `${value.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} Mo`
 }
 
+function clampPercent(value: number | null): number {
+  if (value === null || !Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(100, value))
+}
+
+function statusLabel(status: string | null): string {
+  if (!status) return 'Statut indisponible'
+  if (status.startsWith('running')) return status.includes('unhealthy') ? 'En ligne (sonde en échec)' : 'En ligne'
+  if (status.startsWith('restarting')) return 'Redémarrage en cours'
+  if (status.startsWith('starting')) return 'Démarrage'
+  if (status.startsWith('exited') || status.startsWith('stopped')) return 'Arrêtée'
+  return status
+}
+
+function UsageBar({ value, label }: { value: number | null; label: string }) {
+  const pct = clampPercent(value)
+  const known = value !== null && Number.isFinite(value)
+  return (
+    <div
+      className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted"
+      role="meter"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={known ? Math.round(pct) : undefined}
+      aria-valuetext={known ? formatPercent(value) : 'Indisponible'}
+    >
+      <div
+        className={`h-full rounded-full transition-[width] duration-300 ${known ? 'bg-primary' : 'bg-muted-foreground/20'}`}
+        style={{ width: known ? `${pct}%` : '100%' }}
+      />
+    </div>
+  )
+}
+
 function MetricCard({
   icon: Icon,
   label,
   value,
   detail,
+  percent,
 }: {
   icon: typeof Cpu
   label: string
   value: string
   detail?: string
+  percent: number | null
 }) {
   return (
     <div className="rounded-lg border border-border bg-background p-4">
@@ -51,12 +99,13 @@ function MetricCard({
       </dt>
       <dd className="mt-2 font-mono text-lg font-semibold tabular-nums">{value}</dd>
       {detail && <p className="mt-1 text-xs text-muted-foreground">{detail}</p>}
+      <UsageBar value={percent} label={label} />
     </div>
   )
 }
 
 /**
- * Métriques CPU/RAM d'une application (Coolify), en mode dégradé si non exposées.
+ * Métriques CPU/RAM et état runtime (Coolify), en mode dégradé si non exposés.
  * Rafraîchissement manuel uniquement pour éviter un polling agressif.
  */
 export function ProjectMetrics({
@@ -68,6 +117,7 @@ export function ProjectMetrics({
 }) {
   const [selectedAppId, setSelectedAppId] = useState<string>(apps[0]?.id ?? '')
   const [metrics, setMetrics] = useState<MetricsPayload | null>(null)
+  const [runtime, setRuntime] = useState<RuntimePayload | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -87,12 +137,15 @@ export function ProjectMetrics({
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
         setMetrics(null)
+        setRuntime(null)
         setError(data.error ?? 'Métriques indisponibles.')
         return
       }
       setMetrics((data.metrics ?? null) as MetricsPayload | null)
+      setRuntime((data.runtime ?? null) as RuntimePayload | null)
     } catch {
       setMetrics(null)
+      setRuntime(null)
       setError('Impossible de contacter le serveur.')
     } finally {
       setLoading(false)
@@ -117,10 +170,10 @@ export function ProjectMetrics({
         <div>
           <h2 id="project-metrics-title" className="flex items-center gap-2 text-base font-semibold">
             <Activity className="h-4 w-4 text-primary" aria-hidden="true" />
-            Ressources
+            Ressources et état
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Utilisation CPU et mémoire rapportée par l’hébergement, quand disponible.
+            Utilisation CPU/mémoire et état runtime rapportés par l’hébergement, quand disponibles.
             {metrics?.sampledAt && metrics.available && (
               <span className="ml-1 tabular-nums">
                 Échantillon : {new Date(metrics.sampledAt).toLocaleString('fr-FR')}.
@@ -152,7 +205,7 @@ export function ProjectMetrics({
         </div>
       </div>
 
-      <div className="p-4 sm:p-5">
+      <div className="space-y-4 p-4 sm:p-5">
         {error && (
           <p
             role="alert"
@@ -160,6 +213,53 @@ export function ProjectMetrics({
           >
             {error}
           </p>
+        )}
+
+        {!error && runtime && (
+          <div className="rounded-lg border border-border bg-background p-4">
+            <h3 className="flex items-center gap-2 text-sm font-medium">
+              <HeartPulse className="h-4 w-4 text-primary" aria-hidden="true" />
+              État du conteneur
+            </h3>
+            {runtime.available ? (
+              <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <dt className="text-xs text-muted-foreground">Statut détaillé</dt>
+                  <dd className="font-medium">
+                    {statusLabel(runtime.status)}{' '}
+                    {runtime.status && (
+                      <span className="ml-1 font-mono text-xs text-muted-foreground">({runtime.status})</span>
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">Sonde de santé</dt>
+                  <dd>{runtime.healthCheckEnabled ? runtime.healthCheckPath || 'Activée' : 'Non configurée'}</dd>
+                </div>
+                <div>
+                  <dt className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Redémarrages
+                  </dt>
+                  <dd className="tabular-nums">
+                    {runtime.restartCount !== null ? runtime.restartCount : 'Non communiqué'}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <dt className="text-xs text-muted-foreground">Dernier redémarrage</dt>
+                  <dd>
+                    {runtime.lastRestartAt
+                      ? `${new Date(runtime.lastRestartAt).toLocaleString('fr-FR')}${runtime.restartReason ? ` · ${runtime.restartReason}` : ''}`
+                      : runtime.restartReason || 'Aucune information fournie par l’hébergement.'}
+                  </dd>
+                </div>
+              </dl>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">
+                État runtime indisponible pour le moment.{' '}
+                {runtime.error ? <span className="text-warning">({runtime.error})</span> : null}
+              </p>
+            )}
+          </div>
         )}
 
         {!error && loading && !metrics && (
@@ -172,7 +272,8 @@ export function ProjectMetrics({
               icon={Cpu}
               label="Processeur"
               value={formatPercent(metrics.cpuPercent)}
-              detail="Utilisation instantanée du CPU."
+              detail="Utilisation instantanée du CPU (barre indicative)."
+              percent={metrics.cpuPercent}
             />
             <MetricCard
               icon={MemoryStick}
@@ -183,6 +284,7 @@ export function ProjectMetrics({
                   ? `${formatMb(metrics.memoryUsedMb)} utilisés sur ${formatMb(metrics.memoryLimitMb)}`
                   : 'Consommation mémoire rapportée.'
               }
+              percent={metrics.memoryPercent}
             />
           </dl>
         )}
@@ -190,6 +292,12 @@ export function ProjectMetrics({
         {!error && metrics && !metrics.available && (
           <p className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
             {unavailableMessage}
+          </p>
+        )}
+
+        {!error && metrics?.available && (metrics.cpuPercent === null || metrics.memoryPercent === null) && (
+          <p className="text-xs text-muted-foreground">
+            Certaines valeurs ne sont pas exposées par l’hébergement : l’affichage se dégrade sans bloquer les autres informations.
           </p>
         )}
       </div>

@@ -90,15 +90,25 @@ Measured with PostgreSQL 16 and a real Docker daemon (`AXIOM_TEST_DATABASE_URL`,
 - The source is a fixture: the GitHub connection (OAuth application, archive download) was never run end to end.
 - The agent CI job sets no `AXIOM_TEST_DOCKER`, so the agent's Docker integration tests never run in CI. That is how `TestIntegrationLifecycle` went stale.
 - V0.1 stack coverage: Node (Next.js, Nuxt, Remix, SolidStart, RedwoodJS, Astro, SvelteKit, Vite, generic), Go, Python (FastAPI, Flask, Django with a `requirements.txt`), PHP and Laravel (Composer, single php-fpm+nginx container), Dockerfile, compose. Rails (Ruby) and Spring Boot (Java) are detected but rejected (`analyzer/evidence/decide.go`); queue/scheduler workers and persistent volumes are not modelled by the planner.
+- **Issue #12 (Traefik/DNS/certificats réels)** : aucune URL HTTPS publique servie par Axiom avec certificat valide n'a été observée ; redéploiement sans interruption perceptible, rollback sur échec de santé réel et renouvellement de certificat ne sont pas prouvés. Des runbooks/scripts gabarits ont été préparés côté dépôt (voir `docs/operations/axiom-traefik-dns-tls-proof.md`, `scripts/axiom-proof/`) mais **aucune exécution réelle n'a été réalisée**.
+- **Issue #13 (agent distant réel)** : aucun enrôlement, heartbeat/poll, déploiement complet, coupure réseau 60 s, rotation ni révocation n'ont été observés entre un moteur et un agent sur machines distinctes (NAT/réseau réel). Des runbooks/scripts gabarits ont été préparés (`docs/operations/axiom-agent-remote-proof.md`, `scripts/axiom-proof/`) mais **aucune exécution réelle n'a été réalisée**.
+
+### Livrables code-side préparés pour #12/#13 (2026-11-12, non exécutés sur infra réelle)
+
+- Runbooks : `docs/operations/axiom-traefik-dns-tls-proof.md`, `docs/operations/axiom-agent-remote-proof.md`.
+- Gabarits opérateur : `scripts/axiom-proof/` (pré-vol, provisionnement, vérification TLS, déploiement Node/Python, sondes redéploiement/rollback, enrôlement agent, drills de coupure 60 s, collecte de preuves, exemples systemd/env agent).
+- Mises à jour documentaires : `docs/security/threat-model.md` et `docs/architecture/agent-failure-matrix.md` complétés avec des sections « À valider sur infrastructure réelle » sans résultats observés.
+
+Ces éléments facilitent la clôture mais **ne remplacent pas** les preuves demandées par #12/#13.
 
 ### What that means for the roadmap
 
-- Wave 5 is no longer blocked by wiring. What blocks `#109` (reference dry run) and `#110` (end-to-end gate on a real server) is the real-server run described above.
-- Nothing should be reported as "deployments go LIVE on a real server" on the basis of the in-process e2e test alone.
+- Wave 5 is no longer blocked by wiring. What blocks `#109` (reference dry run), `#110` (end-to-end gate on a real server), et la clôture de **#12/#13** est l'exécution réelle sur serveur(s), domaine/DNS, certificats et réseau distant, avec collecte de preuves.
+- Nothing should be reported as "deployments go LIVE on a real server" on the basis of the in-process e2e test alone. Nothing should be reported as "agent distant prouvé" on the basis of tests in-process/fakes alone.
 
 ## Human-gated (cannot be delegated)
 
-VPS provisioning (#108/#109), GitHub OAuth App credentials (real connect test), production `AXIOM_API_TOKEN`/`AXIOM_SECRET_KEY`, release tag (#113), closing design epic #130 (needs visual validation).
+VPS provisioning (#108/#109, #12, #13), domaine/DNS/certificats réels (#12), exécution d'un agent distant réel et scénarios de panne réseau (#13), GitHub OAuth App credentials (real connect test), production `AXIOM_API_TOKEN`/`AXIOM_SECRET_KEY`, release tag (#113), closing design epic #130 (needs visual validation).
 
 ## Launch protocol per lane
 

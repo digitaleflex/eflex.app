@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
-import { prisma } from '@/lib/prisma'
-import { resolveOrganization } from '@/lib/organizations'
-import { getApplicationMetrics } from '@/lib/coolify'
-import { allow } from '@/lib/rate-limit'
+import { getApplicationMetrics, getApplicationRuntime } from '@/lib/coolify'
+import { allow, allowOrg } from '@/lib/rate-limit'
 import { getPrimaryApp } from '@/lib/project-apps'
+import { requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -21,36 +20,41 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     )
   }
 
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
+  if (!(await allowOrg(org.organizationId, 'runtime-metrics', 120, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop de lectures de métriques pour cette organisation en peu de temps. Patientez une minute.' },
+      { status: 429 },
+    )
+  }
 
   const { id } = await params
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: {
-      id: true,
-      coolifyAppId: true,
-      apps: {
-        orderBy: [{ position: 'asc' }, { name: 'asc' }],
-        select: { id: true, name: true, position: true, coolifyAppId: true },
-      },
+  const projectResult = await requireProject(org, id, {
+    id: true,
+    coolifyAppId: true,
+    apps: {
+      orderBy: [{ position: 'asc' }, { name: 'asc' }],
+      select: { id: true, name: true, position: true, coolifyAppId: true },
     },
   })
-  if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project as any
 
   const requestedAppId = new URL(request.url).searchParams.get('appId')?.trim() || null
 
   let targetApp: { id: string; coolifyAppId: string | null } | null = null
+  const apps = project.apps as Array<{ id: string; name: string; position: number; coolifyAppId: string | null }>
   if (requestedAppId) {
-    targetApp = project.apps.find((app) => app.id === requestedAppId) ?? null
+    targetApp = apps.find((app) => app.id === requestedAppId) ?? null
     if (!targetApp) {
       return NextResponse.json({ error: 'Application introuvable.' }, { status: 404 })
     }
-  } else if (project.apps.length > 0) {
+  } else if (apps.length > 0) {
     targetApp =
-      project.apps.find((app) => app.coolifyAppId) ??
-      getPrimaryApp(project.apps) ??
-      project.apps[0] ??
+      apps.find((app) => app.coolifyAppId) ??
+      (getPrimaryApp(apps as any) as { id: string; coolifyAppId: string | null } | null) ??
+      apps[0] ??
       null
   }
 
@@ -62,10 +66,35 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     )
   }
 
-  const metrics = await getApplicationMetrics(coolifyAppId)
+  const [metrics, runtime] = await Promise.all([
+    getApplicationMetrics(coolifyAppId),
+    getApplicationRuntime(coolifyAppId, 5_000),
+  ])
+
+  const runtimeInfo =
+    'error' in runtime
+      ? {
+          available: false as const,
+          status: null,
+          healthCheckEnabled: false,
+          healthCheckPath: null,
+          restartCount: null,
+          lastRestartAt: null,
+          restartReason: null,
+          error: runtime.error,
+        }
+      : {
+          available: true as const,
+          status: runtime.status,
+          healthCheckEnabled: runtime.healthCheckEnabled,
+          healthCheckPath: runtime.healthCheckPath,
+          restartCount: runtime.restartCount ?? null,
+          lastRestartAt: runtime.lastRestartAt ?? null,
+          restartReason: runtime.restartReason ?? null,
+        }
 
   return NextResponse.json(
-    { metrics, appId: targetApp?.id ?? null },
+    { metrics, runtime: runtimeInfo, appId: targetApp?.id ?? null },
     { headers: { 'Cache-Control': 'no-store, max-age=0' } },
   )
 }

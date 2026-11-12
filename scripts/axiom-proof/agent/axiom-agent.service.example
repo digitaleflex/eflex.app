@@ -1,0 +1,24 @@
+# Exemple d'unité systemd pour l'agent Axiom (issue #13). À adapter et valider.
+# Installer par exemple dans /etc/systemd/system/axiom-agent.service
+
+[Unit]
+Description=Axiom Runtime Agent
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+# Adapter l'utilisateur/groupe et le chemin du binaire.
+User=axiom
+Group=axiom
+EnvironmentFile=/etc/axiom-agent/axiom-agent.env
+ExecStart=/usr/local/bin/axiom-agent
+Restart=always
+RestartSec=5
+# Durcissement à compléter selon la politique de l'hôte.
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -150,6 +150,23 @@ describe('coolifyApplicationSettings', () => {
     expect(settings.startCommand).toBe("cd 'apps/web' && next start")
   })
 
+  it('construit un monorepo yarn/npm depuis la racine mais sans filtre automatique', () => {
+    for (const manager of ['yarn', 'npm'] as const) {
+      const settings = coolifyApplicationSettings({
+        ...monorepoPlan,
+        install: manager === 'yarn' ? 'yarn install --frozen-lockfile' : 'npm ci',
+        workspace: { manager, name: '@acme/web', buildScript: 'build' },
+      })
+
+      expect(settings.baseDirectory).toBe('/')
+      expect(settings.installCommand).toBe(
+        manager === 'yarn' ? 'yarn install --frozen-lockfile' : 'npm ci',
+      )
+      expect(settings.buildCommand).toBe("cd 'apps/web' && next build")
+      expect(settings.startCommand).toBe("cd 'apps/web' && next start")
+    }
+  })
+
   it('publie la sortie statique relativement au dossier de travail', () => {
     const settings = coolifyApplicationSettings(monorepoStaticPlan)
     expect(settings.publishDirectory).toBe('/apps/site/dist')

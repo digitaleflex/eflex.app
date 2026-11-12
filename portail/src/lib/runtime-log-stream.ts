@@ -1,8 +1,17 @@
-import { hasPossibleSecret, maskSecrets, parseLogs, type LogLine } from '@/lib/log-lines'
+import { DEFAULT_MAX_LINE_LENGTH, parseLogs, sanitizeLogText, type LogLine } from '@/lib/log-lines'
 import { sleep, type SseSend } from '@/lib/sse'
 
 export type RuntimeLogClient = {
   getLogs(lines: number, serviceName?: string): Promise<{ logs: string } | { error: string }>
+}
+
+export type RuntimeStreamStats = {
+  emitted: number
+  dropped: number
+  truncatedLines: number
+  suspiciousLines: number
+  windowStart: number | null
+  windowEnd: number | null
 }
 
 export type RuntimeStreamInput = {
@@ -17,12 +26,28 @@ export type RuntimeStreamInput = {
   maxFailures?: number
   /** Nombre maximal de lignes émises par sondage (contre-pression). */
   maxLinesPerPoll?: number
+  /** Longueur maximale d'une ligne diffusée (les lignes plus longues sont tronquées). */
+  maxLineLength?: number
   send: SseSend
   signal: AbortSignal
 }
 
-const toPayload = (lines: LogLine[], secrets: readonly string[]) =>
-  lines.map((l) => ({ n: l.n, text: maskSecrets(l.text, secrets), ...(l.ts ? { ts: l.ts } : {}) }))
+type Prepared = { n: number; text: string; ts?: string; suspicious: boolean; truncated: boolean }
+
+const prepare = (lines: LogLine[], secrets: readonly string[], maxLineLength: number): Prepared[] =>
+  lines.map((line) => {
+    const sanitized = sanitizeLogText(line.text, secrets, maxLineLength)
+    return {
+      n: line.n,
+      text: sanitized.text,
+      suspicious: sanitized.suspicious,
+      truncated: sanitized.truncated,
+      ...(line.ts ? { ts: line.ts } : {}),
+    }
+  })
+
+const toPayload = (lines: Prepared[]) =>
+  lines.map((l) => ({ n: l.n, text: l.text, ...(l.ts ? { ts: l.ts } : {}) }))
 
 /**
  * Aligne un instantané (fenêtre des N dernières lignes) sur le flux déjà émis.
@@ -67,9 +92,9 @@ export function diffRuntimeSnapshot(
 
 /**
  * Diffuse les journaux d'exécution d'un conteneur par sondage de l'API Coolify.
- * Événements : `log`, `warn`, `end`. Le flux reste ouvert tant que le client est
- * connecté ; `sseResponse` borne la durée et le navigateur se reconnecte avec
- * `Last-Event-ID` (le curseur est le rang de la dernière ligne émise).
+ * Événements : `log`, `warn`, `stats`, `end`. Le flux reste ouvert tant que le
+ * client est connecté ; `sseResponse` borne la durée et le navigateur se
+ * reconnecte avec `Last-Event-ID` (curseur = rang de la dernière ligne émise).
  */
 export async function streamRuntimeLogs(input: RuntimeStreamInput): Promise<void> {
   const {
@@ -82,6 +107,7 @@ export async function streamRuntimeLogs(input: RuntimeStreamInput): Promise<void
     intervalMs = 2_000,
     maxFailures = 5,
     maxLinesPerPoll = 500,
+    maxLineLength = DEFAULT_MAX_LINE_LENGTH,
   } = input
 
   let cursor = Math.max(0, input.from ?? 0)
@@ -89,8 +115,23 @@ export async function streamRuntimeLogs(input: RuntimeStreamInput): Promise<void
   let previous: LogLine[] = []
   let failures = 0
   let warned = false
-  let truncatedWarned = false
+  let truncatedWindowWarned = false
   let secretWarned = false
+  let droppedTotal = 0
+  let truncatedLinesTotal = 0
+  let suspiciousTotal = 0
+
+  const emitStats = (globalBase: number, snapshotEnd: number) => {
+    const stats: RuntimeStreamStats = {
+      emitted: Math.max(0, cursor),
+      dropped: droppedTotal,
+      truncatedLines: truncatedLinesTotal,
+      suspiciousLines: suspiciousTotal,
+      windowStart: snapshotEnd > globalBase ? globalBase : null,
+      windowEnd: snapshotEnd > globalBase ? snapshotEnd - 1 : null,
+    }
+    send('stats', stats)
+  }
 
   while (!signal.aborted) {
     try {
@@ -104,43 +145,62 @@ export async function streamRuntimeLogs(input: RuntimeStreamInput): Promise<void
       previous = snapshot
       const snapshotEnd = globalBase + snapshot.length
 
-      // Si le curseur demandé est plus ancien que la fenêtre disponible, on
-      // reprend au début de la fenêtre et on le signale (pas d'historique).
+      // Curseur plus ancien que la fenêtre disponible : reprise au début de la
+      // fenêtre (pas d'historique complet côté Coolify) avec avertissement explicite.
       let toSend = fresh.filter((line) => line.n >= cursor)
-      if (cursor < globalBase && snapshot.length > 0 && !truncatedWarned) {
-        truncatedWarned = true
-        send('warn', {
-          message:
-            'Les lignes antérieures ne sont plus disponibles dans la fenêtre actuelle. Le flux reprend aux journaux récents.',
-        })
+      if (snapshot.length > 0 && cursor < globalBase) {
+        if (!truncatedWindowWarned) {
+          truncatedWindowWarned = true
+          send('warn', {
+            message:
+              'Les lignes antérieures ne sont plus disponibles dans la fenêtre actuelle. Le flux reprend aux journaux récents.',
+          })
+        }
         cursor = globalBase
         toSend = snapshot.map((line, i) => ({ ...line, n: globalBase + i }))
       }
 
-      if (!secretWarned && toSend.some((line) => hasPossibleSecret(line.text))) {
+      let droppedThisPoll = 0
+      if (toSend.length > maxLinesPerPoll) {
+        droppedThisPoll = toSend.length - maxLinesPerPoll
+        droppedTotal += droppedThisPoll
+        // On garde la fin (les lignes les plus récentes) et on avance le curseur
+        // pour éviter de retraiter indéfiniment les mêmes lignes omises.
+        toSend = toSend.slice(-maxLinesPerPoll)
+        send('warn', {
+          message: `Débit élevé : ${droppedThisPoll} ligne(s) omise(s) ce cycle (${droppedTotal} au total) pour préserver la fluidité. Téléchargez la fenêtre récente pour l’intégralité disponible.`,
+        })
+      }
+
+      const prepared = prepare(toSend, secrets, maxLineLength)
+      const suspiciousNow = prepared.filter((line) => line.suspicious).length
+      const truncatedNow = prepared.filter((line) => line.truncated).length
+      suspiciousTotal += suspiciousNow
+      truncatedLinesTotal += truncatedNow
+
+      if (!secretWarned && suspiciousNow > 0) {
         secretWarned = true
         send('warn', {
           message:
             'Certaines lignes ressemblent à des secrets (clés, jetons). Les valeurs connues sont masquées ; évitez d’écrire des secrets dans les journaux.',
         })
       }
-
-      if (toSend.length > maxLinesPerPoll) {
-        const dropped = toSend.length - maxLinesPerPoll
-        toSend = toSend.slice(-maxLinesPerPoll)
+      if (truncatedNow > 0) {
         send('warn', {
-          message: `Débit élevé : ${dropped} ligne(s) omise(s) pour préserver la fluidité. Utilisez le téléchargement pour l’intégralité récente.`,
+          message: `${truncatedNow} ligne(s) très longue(s) ont été tronquées pour l’affichage. Le téléchargement fournit la fenêtre récente masquée.`,
         })
       }
 
-      if (toSend.length > 0) {
-        cursor = toSend[toSend.length - 1]!.n + 1
-        send('log', { lines: toPayload(toSend, secrets) }, cursor - 1)
-      } else if (snapshotEnd > nextGlobalBase) {
-        // Rien de nouveau à envoyer (ex. reprise au-delà du snapshot) mais la base avance.
-        cursor = Math.max(cursor, snapshotEnd)
+      if (prepared.length > 0) {
+        cursor = prepared[prepared.length - 1]!.n + 1
+        send('log', { lines: toPayload(prepared) }, cursor - 1)
+      } else if (snapshotEnd > cursor) {
+        // Fenêtre avancée sans émission (ex. reprise au-delà) : on rattrape le curseur.
+        cursor = snapshotEnd
       }
+
       nextGlobalBase = snapshotEnd
+      emitStats(globalBase, snapshotEnd)
     } catch {
       failures += 1
       if (!warned) {

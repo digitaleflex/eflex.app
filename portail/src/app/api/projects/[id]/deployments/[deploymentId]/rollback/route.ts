@@ -1,16 +1,17 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { canManageProjects, resolveOrganization } from '@/lib/organizations'
+import { canManageProjects } from '@/lib/organizations'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
 import { multiAppEnabled } from '@/lib/multi-app'
-import { allow } from '@/lib/rate-limit'
+import { allow, allowOrg } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 import {
   ROLLBACK_REFUSAL_MESSAGES,
   isCommitSha,
   rollbackRefusal,
 } from '@/lib/deployment-rollback'
+import { requireDeployment, requireOrg, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -40,19 +41,25 @@ export async function POST(
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
+  if (!canManageProjects(org.role)) {
+    return NextResponse.json(
+      { error: 'Votre rôle dans cette organisation ne permet pas de revenir à une version précédente.' },
+      { status: 403 },
+    )
+  }
+
   if (!(await allow(`rollback-deployment:${session.user.id}`, 10, 60_000))) {
     return NextResponse.json(
       { error: 'Trop de retours arrière en peu de temps. Patientez une minute.' },
       { status: 429 },
     )
   }
-
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
-  if (!canManageProjects(org.role)) {
+  if (!(await allowOrg(org.organizationId, 'deployment-rollback', 20, 60_000))) {
     return NextResponse.json(
-      { error: 'Votre rôle dans cette organisation ne permet pas de revenir à une version précédente.' },
-      { status: 403 },
+      { error: 'Trop de retours arrière pour cette organisation en peu de temps. Patientez une minute.' },
+      { status: 429 },
     )
   }
 
@@ -71,24 +78,18 @@ export async function POST(
 
   // Le déploiement cible doit appartenir au projet **et** à l'organisation
   // active : un identifiant deviné d'un autre locataire répond 404.
-  const target = await prisma.deployment.findFirst({
-    where: {
-      id: deploymentId,
-      projectId: id,
-      project: { organizationId: org.organizationId },
-    },
-    select: {
-      id: true,
-      status: true,
-      commitSha: true,
-      createdAt: true,
-      appId: true,
-      groupId: true,
-      app: { select: { id: true, name: true } },
-      project: { select: { id: true, name: true, organizationId: true } },
-    },
+  const targetResult = await requireDeployment(org, id, deploymentId, {
+    id: true,
+    status: true,
+    commitSha: true,
+    createdAt: true,
+    appId: true,
+    groupId: true,
+    app: { select: { id: true, name: true } },
+    project: { select: { id: true, name: true, organizationId: true } },
   })
-  if (!target) return NextResponse.json({ error: 'Déploiement introuvable' }, { status: 404 })
+  if ('response' in targetResult) return targetResult.response
+  const target = targetResult.deployment as any
 
   const refusal = rollbackRefusal(target)
   if (refusal === 'invalid_commit') {

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { collectProjectSecretValues, hasPossibleSecret, maskSecrets, parseLogs } from '@/lib/log-lines'
+import {
+  collectProjectSecretValues,
+  countSuspiciousLines,
+  hasPossibleSecret,
+  maskSecrets,
+  parseLogs,
+  sanitizeLogText,
+  truncateLogLine,
+} from '@/lib/log-lines'
 
 describe('log-lines', () => {
   it('parseLogs numérote les lignes et ignore les entrées cachées', () => {
@@ -22,7 +30,33 @@ describe('log-lines', () => {
   it('hasPossibleSecret détecte des motifs courants sans fuite', () => {
     expect(hasPossibleSecret('Bearer abcdefghijklmnopqrstuvwxyz123456')).toBe(true)
     expect(hasPossibleSecret('password=supersecretvalue')).toBe(true)
+    expect(hasPossibleSecret('-----BEGIN PRIVATE KEY-----')).toBe(true)
     expect(hasPossibleSecret('hello world')).toBe(false)
+  })
+
+  it('truncateLogLine tronque sans conserver le contenu supprimé en clair au-delà du marqueur', () => {
+    const out = truncateLogLine('abcdefghij', 8)
+    expect(out.truncated).toBe(true)
+    expect(out.text).toContain('[ligne tronquée, 10 caractères]')
+  })
+
+  it('sanitizeLogText masque puis tronque et signale les motifs sensibles', () => {
+    const out = sanitizeLogText(`token=abcd1234 ${'x'.repeat(300)}`, ['abcd1234'], 80)
+    expect(out.text).not.toContain('abcd1234')
+    expect(out.text).toContain('***')
+    expect(out.truncated).toBe(true)
+  })
+
+  it('countSuspiciousLines compte après masquage des secrets connus', () => {
+    const count = countSuspiciousLines(
+      [
+        { n: 0, text: 'api_key=abcd1234' },
+        { n: 1, text: 'api_key=supersecretvalue' },
+        { n: 2, text: 'ok' },
+      ],
+      ['supersecretvalue'],
+    )
+    expect(count).toBe(1)
   })
 
   it('collectProjectSecretValues filtre par application et déchiffre', () => {

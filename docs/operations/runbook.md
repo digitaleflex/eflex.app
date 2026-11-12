@@ -663,4 +663,13 @@
 - `docs/architecture/agent-protocol.md` — Agent ↔ Engine protocol, operation types, error codes
 - `docs/adr/0005-traefik-reverse-proxy.md` — Traefik as reverse proxy with ACME
 - `services/engine/migrations/README.md` — Database migration discipline and state ownership
-- `docs/security/threat-model.md` — Security threat model (DRAFT)
+- `docs/security/threat-model.md` — Security threat model
+
+## 15. Validation réelle en attente (issues #12/#13)
+
+Les procédures ci-dessus décrivent l'exploitation connue du moteur. Elles ne remplacent pas les preuves demandées par les issues ouvertes :
+
+- **#12 Traefik/DNS/certificats sur vrai serveur** : suivre `docs/operations/axiom-traefik-dns-tls-proof.md` et les gabarits `scripts/axiom-proof/` (`00`, `10`, `20`, `30`, `40`, `collect-evidence.sh`). Aucune preuve HTTPS publique réelle n'est consignée dans le dépôt à ce stade.
+- **#13 Agent distant réel** : suivre `docs/operations/axiom-agent-remote-proof.md` et les gabarits `scripts/axiom-proof/` (`00`, `50`, `60`, `collect-evidence.sh`, `agent/*.example`). Aucun enrôlement/déploiement distant réel, coupure 60 s observée, rotation/révocation observée n'est consigné dans le dépôt à ce stade.
+
+Après chaque exécution réelle, mettre à jour ce runbook uniquement avec les comportements observés et les écarts constatés, puis compléter `docs/roadmap/parallel-plan.md`, `docs/architecture/agent-failure-matrix.md` et `docs/security/threat-model.md` selon les preuves.

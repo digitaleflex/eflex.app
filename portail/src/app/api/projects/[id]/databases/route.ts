@@ -3,8 +3,10 @@ import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { audit } from '@/lib/audit'
-import { canManageProjects, resolveOrganization } from '@/lib/organizations'
+import { canManageProjects } from '@/lib/organizations'
 import { DATABASE_KINDS, createProjectDatabase, isDatabaseKind, refreshProjectDatabase } from '@/lib/project-databases'
+import { allowOrg } from '@/lib/rate-limit'
+import { requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -16,18 +18,16 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
 
   const { id } = await params
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: {
-      id: true,
-      databases: { orderBy: { createdAt: 'asc' } },
-    },
+  const projectResult = await requireProject(org, id, {
+    id: true,
+    databases: { orderBy: { createdAt: 'asc' } },
   })
-  if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project as unknown as { id: string; databases: Array<any> }
 
   const databases = await Promise.all(
     project.databases.map(async (database) => {
@@ -68,25 +68,37 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
   if (!canManageProjects(org.role)) {
     return NextResponse.json({ error: 'Votre rôle ne permet pas de créer une base.' }, { status: 403 })
   }
 
+  if (!(await allowOrg(org.organizationId, 'database-mutate', 20, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop de modifications de bases pour cette organisation en peu de temps. Patientez une minute.' },
+      { status: 429 },
+    )
+  }
+
   const { id } = await params
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      organizationId: true,
-      coolifyAppId: true,
-      apps: { select: { coolifyAppId: true } },
-    },
+  const projectResult = await requireProject(org, id, {
+    id: true,
+    slug: true,
+    name: true,
+    organizationId: true,
+    coolifyAppId: true,
+    apps: { select: { coolifyAppId: true } },
   })
-  if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project as unknown as {
+    id: string
+    slug: string
+    name: string
+    organizationId: string
+    coolifyAppId: string | null
+    apps: Array<{ coolifyAppId: string | null }>
+  }
 
   let body: unknown
   try {

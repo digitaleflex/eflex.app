@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { canManageProjects, resolveOrganization } from '@/lib/organizations'
+import { canManageProjects } from '@/lib/organizations'
 import { applicationAction, getApplicationRuntime, type ApplicationAction } from '@/lib/coolify'
 import { getPrimaryApp } from '@/lib/project-primary'
+import { allowOrg } from '@/lib/rate-limit'
+import { requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -15,35 +17,49 @@ const actionSchema = z.object({
   appId: z.string().trim().min(1).optional(),
 })
 
-async function findProject(id: string, organizationId: string) {
-  return prisma.project.findFirst({
-    where: { id, organizationId },
+const PROJECT_RUNTIME_SELECT = {
+  id: true,
+  coolifyAppId: true,
+  domain: true,
+  tlsValid: true,
+  tlsExpiresAt: true,
+  tlsCheckedAt: true,
+  apps: {
+    orderBy: [{ position: 'asc' as const }, { name: 'asc' as const }],
     select: {
       id: true,
+      name: true,
+      position: true,
       coolifyAppId: true,
       domain: true,
       tlsValid: true,
       tlsExpiresAt: true,
       tlsCheckedAt: true,
-      apps: {
-        orderBy: [{ position: 'asc' }, { name: 'asc' }],
-        select: {
-          id: true,
-          name: true,
-          position: true,
-          coolifyAppId: true,
-          domain: true,
-          tlsValid: true,
-          tlsExpiresAt: true,
-          tlsCheckedAt: true,
-        },
-      },
     },
-  })
+  },
+}
+
+type RuntimeProject = {
+  id: string
+  coolifyAppId: string | null
+  domain: string | null
+  tlsValid: boolean | null
+  tlsExpiresAt: Date | null
+  tlsCheckedAt: Date | null
+  apps: Array<{
+    id: string
+    name: string
+    position: number
+    coolifyAppId: string | null
+    domain: string | null
+    tlsValid: boolean | null
+    tlsExpiresAt: Date | null
+    tlsCheckedAt: Date | null
+  }>
 }
 
 function resolveTarget(
-  project: NonNullable<Awaited<ReturnType<typeof findProject>>>,
+  project: RuntimeProject,
   requestedAppId: string | null,
 ): { target: { id: string | null; coolifyAppId: string | null; tlsValid: boolean | null; tlsExpiresAt: Date | null; tlsCheckedAt: Date | null }; notFound: boolean } {
   if (requestedAppId) {
@@ -79,12 +95,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
 
   const { id } = await params
-  const project = await findProject(id, org.organizationId)
-  if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const projectResult = await requireProject(org, id, PROJECT_RUNTIME_SELECT)
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project as unknown as RuntimeProject
 
   const requestedAppId = new URL(request.url).searchParams.get('appId')?.trim() || null
   const { target, notFound } = resolveTarget(project, requestedAppId)
@@ -108,15 +125,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
   if (!canManageProjects(org.role)) {
     return NextResponse.json({ error: 'Votre rôle ne permet pas cette action.' }, { status: 403 })
   }
 
+  if (!(await allowOrg(org.organizationId, 'runtime-action', 30, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop d’actions d’exécution pour cette organisation en peu de temps. Patientez une minute.' },
+      { status: 429 },
+    )
+  }
+
   const { id } = await params
-  const project = await findProject(id, org.organizationId)
-  if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const projectResult = await requireProject(org, id, PROJECT_RUNTIME_SELECT)
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project as unknown as RuntimeProject
 
   let body: unknown
   try {

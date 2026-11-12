@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { canManageProjects, resolveOrganization } from '@/lib/organizations'
-import { allow } from '@/lib/rate-limit'
+import { canManageProjects } from '@/lib/organizations'
+import { allow, allowOrg } from '@/lib/rate-limit'
 import { cancelDeployment as cancelCoolifyDeployment } from '@/lib/coolify'
 import { removeQueuedDeployment } from '@/lib/queue'
 import { isTerminal } from '@/lib/deployment-state'
 import { cancelDeployment } from '@/lib/deployment-cancel'
 import { announceDeploymentStatus } from '@/lib/deployment-events'
+import { requireDeployment, requireOrg, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -32,15 +33,8 @@ export async function POST(
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
-  if (!(await allow(`cancel-deployment:${session.user.id}`, 10, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop d’annulations en peu de temps. Patientez une minute.' },
-      { status: 429 },
-    )
-  }
-
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
   if (!canManageProjects(org.role)) {
     return NextResponse.json(
       { error: 'Votre rôle dans cette organisation ne permet pas d’annuler un déploiement.' },
@@ -48,24 +42,31 @@ export async function POST(
     )
   }
 
+  if (!(await allow(`cancel-deployment:${session.user.id}`, 10, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop d’annulations en peu de temps. Patientez une minute.' },
+      { status: 429 },
+    )
+  }
+  if (!(await allowOrg(org.organizationId, 'deployment-cancel', 30, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop d’annulations pour cette organisation en peu de temps. Patientez une minute.' },
+      { status: 429 },
+    )
+  }
+
   const { id, deploymentId } = await params
-  const deployment = await prisma.deployment.findFirst({
-    where: {
-      id: deploymentId,
-      projectId: id,
-      project: { organizationId: org.organizationId },
-    },
-    select: {
-      id: true,
-      status: true,
-      coolifyBuildId: true,
-      groupId: true,
-      appId: true,
-      app: { select: { name: true } },
-      project: { select: { id: true, name: true, organizationId: true } },
-    },
+  const deploymentResult = await requireDeployment(org, id, deploymentId, {
+    id: true,
+    status: true,
+    coolifyBuildId: true,
+    groupId: true,
+    appId: true,
+    app: { select: { name: true } },
+    project: { select: { id: true, name: true, organizationId: true } },
   })
-  if (!deployment) return NextResponse.json({ error: 'Déploiement introuvable' }, { status: 404 })
+  if ('response' in deploymentResult) return deploymentResult.response
+  const deployment = deploymentResult.deployment as any
 
   const result = await cancelDeployment(deployment, {
     removeQueuedJob: removeQueuedDeployment,

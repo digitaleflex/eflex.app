@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server'
 import type { Prisma } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { canManageProjects, resolveOrganization } from '@/lib/organizations'
+import { canManageProjects } from '@/lib/organizations'
 import { publish } from '@/lib/event-bus'
 import { deleteApplication } from '@/lib/coolify'
 import { ACTIVE_DEPLOYMENT_STATUSES } from '@/lib/deployment-state'
+import { allowOrg } from '@/lib/rate-limit'
+import { requireOrg, requireProject, requireProjectApp, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,12 +22,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const { id, appId } = await params
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
   if (!canManageProjects(org.role)) {
     return NextResponse.json(
       { error: 'Votre rôle dans cette organisation ne permet pas de modifier ce projet.' },
       { status: 403 },
+    )
+  }
+
+  if (!(await allowOrg(org.organizationId, 'app-mutate', 30, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop de modifications d’applications pour cette organisation en peu de temps. Patientez une minute.' },
+      { status: 429 },
     )
   }
 
@@ -52,17 +61,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     )
   }
 
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: { id: true, name: true },
-  })
-  if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const projectResult = await requireProject(org, id, { id: true, name: true })
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project
 
-  const app = await prisma.projectApp.findFirst({
-    where: { id: appId, projectId: project.id },
-    select: { id: true },
-  })
-  if (!app) return NextResponse.json({ error: 'Application introuvable' }, { status: 404 })
+  const appResult = await requireProjectApp(org, project.id, appId, { id: true })
+  if ('response' in appResult) return appResult.response
+  const app = appResult.app
 
   const conflict = await prisma.projectApp.findFirst({
     where: { projectId: project.id, name, id: { not: appId } },
@@ -111,8 +116,8 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
 
   const { id, appId } = await params
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
   if (!canManageProjects(org.role)) {
     return NextResponse.json(
       { error: 'Votre rôle dans cette organisation ne permet pas de supprimer cette application.' },
@@ -120,11 +125,16 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     )
   }
 
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: { id: true, name: true },
-  })
-  if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  if (!(await allowOrg(org.organizationId, 'app-mutate', 30, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop de modifications d’applications pour cette organisation en peu de temps. Patientez une minute.' },
+      { status: 429 },
+    )
+  }
+
+  const projectResult = await requireProject(org, id, { id: true, name: true })
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project
 
   const apps = await prisma.projectApp.findMany({
     where: { projectId: project.id },

@@ -3,10 +3,12 @@ import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { audit } from '@/lib/audit'
-import { canManageProjects, resolveOrganization } from '@/lib/organizations'
+import { canManageProjects } from '@/lib/organizations'
 import { platformDomain, validateCustomDomain } from '@/lib/custom-domain'
 import { effectivePlan } from '@/lib/billing'
 import { getPrimaryApp, resolveEffectiveApp } from '@/lib/project-primary'
+import { allowOrg } from '@/lib/rate-limit'
+import { requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -44,24 +46,30 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
 
   const { id } = await params
   const requestedAppId = new URL(request.url).searchParams.get('appId')?.trim() || null
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: {
-      id: true,
-      domain: true,
-      apps: {
-        orderBy: [{ position: 'asc' }, { name: 'asc' }],
-        select: { id: true, name: true, position: true, domain: true, coolifyAppId: true },
-      },
-      domains: { orderBy: { createdAt: 'asc' } },
+  const projectResult = await requireProject(org, id, {
+    id: true,
+    domain: true,
+    apps: {
+      orderBy: [{ position: 'asc' }, { name: 'asc' }],
+      select: { id: true, name: true, position: true, domain: true, coolifyAppId: true },
     },
+    domains: { orderBy: { createdAt: 'asc' } },
   })
-  if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project as unknown as {
+    id: string
+    domain: string | null
+    apps: Array<{ id: string; name: string; position: number; domain: string | null; coolifyAppId: string | null }>
+    domains: Array<{
+      id: string; hostname: string; appId: string | null; verifiedAt: Date | null;
+      tlsValid: boolean | null; tlsExpiresAt: Date | null; tlsCheckedAt: Date | null; createdAt: Date
+    }>
+  }
   if (requestedAppId && !project.apps.some((app) => app.id === requestedAppId)) {
     return NextResponse.json({ error: 'Application introuvable.' }, { status: 404 })
   }
@@ -94,26 +102,36 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
   if (!canManageProjects(org.role)) {
     return NextResponse.json({ error: 'Votre rôle ne permet pas de modifier les domaines.' }, { status: 403 })
   }
 
+  if (!(await allowOrg(org.organizationId, 'domain-mutate', 20, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop de modifications de domaines pour cette organisation en peu de temps. Patientez une minute.' },
+      { status: 429 },
+    )
+  }
+
   const { id } = await params
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: {
-      id: true,
-      domain: true,
-      apps: {
-        orderBy: [{ position: 'asc' }, { name: 'asc' }],
-        select: { id: true, name: true, position: true, domain: true, coolifyAppId: true },
-      },
-      _count: { select: { domains: true } },
+  const projectResult = await requireProject(org, id, {
+    id: true,
+    domain: true,
+    apps: {
+      orderBy: [{ position: 'asc' }, { name: 'asc' }],
+      select: { id: true, name: true, position: true, domain: true, coolifyAppId: true },
     },
+    _count: { select: { domains: true } },
   })
-  if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project as unknown as {
+    id: string
+    domain: string | null
+    apps: Array<{ id: string; name: string; position: number; domain: string | null; coolifyAppId: string | null }>
+    _count: { domains: number }
+  }
 
   let body: unknown
   try {

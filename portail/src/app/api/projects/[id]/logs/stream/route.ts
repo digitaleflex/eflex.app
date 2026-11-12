@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { resolveOrganization } from '@/lib/organizations'
 import { getApplicationLogs } from '@/lib/coolify'
 import { decrypt } from '@/lib/crypto'
+import { collectProjectSecretValues } from '@/lib/log-lines'
 import { getPrimaryApp } from '@/lib/project-primary'
 import { sseResponse } from '@/lib/sse'
 import { streamRuntimeLogs } from '@/lib/runtime-log-stream'
@@ -81,20 +82,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: 'Service inconnu pour cette application.' }, { status: 400 })
   }
 
-  const secrets: string[] = []
-  for (const variable of project.envVars) {
-    if (variable.appId && targetApp && variable.appId !== targetApp.id) continue
-    try {
-      secrets.push(decrypt(variable.value, `${project.id}:${variable.key}`))
-    } catch {
-      /* variable illisible : impossible à masquer */
-    }
-  }
+  const secrets = collectProjectSecretValues(project.envVars, project.id, targetApp?.id ?? null, decrypt)
 
   const lastEventId = Number.parseInt(request.headers.get('last-event-id') ?? search.get('from') ?? '', 10)
   const from = Number.isFinite(lastEventId)
     ? lastEventId + (request.headers.has('last-event-id') ? 1 : 0)
     : 0
+
+  const linesParam = Number.parseInt(search.get('lines') ?? '', 10)
+  const windowLines = Number.isFinite(linesParam) ? Math.min(2000, Math.max(100, linesParam)) : 400
 
   open.set(userId, (open.get(userId) ?? 0) + 1)
   const release = () => open.set(userId, Math.max(0, (open.get(userId) ?? 1) - 1))
@@ -110,12 +106,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           send('end', { reason: 'unavailable' })
           return
         }
+        send('stats', {
+          emitted: 0,
+          dropped: 0,
+          truncatedLines: 0,
+          suspiciousLines: 0,
+          windowStart: null,
+          windowEnd: null,
+          windowLines,
+        })
         await streamRuntimeLogs({
           client: {
             getLogs: (lines, serviceName) => getApplicationLogs(coolifyAppId, lines, serviceName),
           },
           secrets,
-          lines: 300,
+          lines: windowLines,
           serviceName: requestedService === '' ? undefined : requestedService,
           from,
           send,

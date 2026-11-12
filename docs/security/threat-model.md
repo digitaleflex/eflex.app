@@ -970,3 +970,89 @@ This section closes the gap between the threat-model title ("Abuse Controls") an
 | Command denylist bypassable | T13 / G8 | PARTIEL | Blocklist only; `eval`, `python -c`, `apt-get` not blocked. |
 | Container isolation is Docker-default | T27 / G10 | PARTIEL | No seccomp/AppArmor/`--cap-drop`/read-only rootfs. |
 | Reconciliation never runs | T28 / G11 | NON CABLE | `Reconcile` constructed (`bootstrap.go:182-189`), never called at boot (`189-196`) or elsewhere. |
+
+## 15. À valider sur infrastructure réelle (#12/#13)
+
+> **Aucun élément de cette section n'a été observé sur infrastructure réelle au moment de la rédaction.** Les points ci-dessous décrivent ce qui doit être prouvé, contrôlé ou infirmé lors des exécutions humaines décrites dans `docs/operations/axiom-traefik-dns-tls-proof.md`, `docs/operations/axiom-agent-remote-proof.md` et `scripts/axiom-proof/`. Les conclusions ne doivent être intégrées aux sections « EN PLACE » / « observé » qu'après collecte de preuves datées.
+
+### 15.1 Transport et exposition réseau (G6, G7, T29, ADR-0008)
+
+| Sujet | État code-side connu | À valider en réel |
+|---|---|---|
+| Listener direct agent (`/api/v1/agent/operations`) | Loopback par défaut, refus non-loopback sans opt-in (`services/agent/internal/config/config.go`), pas de TLS, authentification inbound fail-closed selon état (`refuseInbound`/HMAC). | Confirmer qu'aucun transport distant n'expose ce listener sans contrôle compensatoire ; ne pas l'utiliser comme canal distant public. |
+| Mode NAT (long-poll agent→moteur) | Routes `POST /api/v1/agent/poll` et `POST /api/v1/agent/result` présentes (`services/engine/internal/api/agent_poll_result.go`), file `agentpoll`, client `services/agent/internal/security/transport/longpoll/*`, transport `agentclient` NAT (`services/engine/internal/agentclient/nat.go`). | Prouver le fonctionnement de bout en bout sur WAN/NAT : authentification agent, signature d'opération, forme canonique, corrélation ack/result, comportement en absence d'opération (204/timeout), et absence de fuite de secrets dans les journaux. |
+| G7 (credential Engine→Agent / signature d'opération) | Résolu en code selon `Verified status`/G7 (per-agent HMAC, `agentkey`) mais non exercé sur réseau réel en e2e complet. | Vérifier qu'une opération légitime est acceptée et qu'une opération altérée, mal signée, hors fenêtre temporelle, rejouée ou destinée à un autre agent/serveur est refusée sur le transport réellement utilisé. |
+
+### 15.2 Enrôlement, identité et cycle de vie des clés (#13)
+
+| Sujet | État code-side connu | À valider en réel |
+|---|---|---|
+| Jeton bootstrap à usage unique | `POST /api/v1/servers/{serverId}/bootstrap` (user-auth), `Issue/Redeem` dans `agentauth` (TTL 15 min, hashé, lié au serveur, consommation unique). | Observer émission, transmission sûre, consommation unique, refus à la réutilisation/expiration/mauvais serveur, et absence de token en clair dans les journaux d'audit attendus. |
+| Enregistrement agent | `POST /api/v1/agent/register` échange bootstrap → identité/credential + `operationSigningKey` (retournés une fois), persistance 0600 côté agent (`identity`, `credential`, `operation-key`). | Vérifier installation distante, premier démarrage, persistance, redémarrage sans `AXIOM_AGENT_TOKEN`, et continuité d'identité. |
+| Rotation | `POST /api/v1/agent/rotate` réémet credential/clé ; grâce credential documentée (5 min, `agentauth`) ; révocation contrôlée côté moteur. | Observer rotation réussie en conditions réelles, acceptation/rejet des anciens matériels pendant/après la fenêtre, et absence d'interruption non prévue. |
+| Révocation | `agentauth`/états serveur contrôlent l'acceptation ; échecs d'auth attendus (`revoked`, etc.). | Confirmer rejet effectif des heartbeats, polls, résultats et opérations après révocation, sur les deux sens pertinents. |
+
+### 15.3 Résilience, idempotence et coupure réseau (#13)
+
+| Sujet | État code-side connu | À valider en réel |
+|---|---|---|
+| Heartbeat et liveness | Heartbeat signé, `StaleAfter`/statut dérivé côté moteur ; absence de heartbeat = timeout côté moteur. | Observer comportement sur lien distant (latence, perte temporaire, reconnexion), et cohérence des statuts serveur. |
+| Idempotence des opérations | IDs déterministes `op_<deploymentID>_<STEP>_<attempt>`, dédoublonnage/état durable côté agent (`state`, dispatcher), refus de replay terminal attendu par conception/tests. | Provoquer une coupure **60 s** pendant un déploiement réel et prouver : pas de double exécution, pas de conteneurs/routes dupliqués, état final cohérent, reprise correcte. |
+| Reprise après redémarrage agent | Classification locale des opérations interrompues (`INTERRUPTED`), réconciliateur construit mais non lancé automatiquement au boot avec ensemble géré vide (G11). | Observer le comportement réel après crash/restart/coupure prolongée et documenter tout orphan ou état incohérent. |
+
+### 15.4 Routage, DNS, TLS et rollback (#12, interactions sécurité)
+
+| Sujet | État code-side connu | À valider en réel |
+|---|---|---|
+| Exposition HTTPS publique | e2e moteur sans Traefik/DNS/certificat (`https://e2e-test.local`) ; adaptateurs Traefik/ownership existent. | Prouver chaîne complète : DNS, routage Traefik, certificat valide, application joignable. |
+| Isolation/ownership en conditions réelles | G3 connu (START/STOP/REMOVE ne vérifient pas le scope complet dans Docker adapter) ; labels/ownership appliqués à la création et au réseau selon chemins. | Vérifier qu'aucune opération ou défaillance réelle ne permet une action inter-déploiement/inter-application non autorisée sur l'hôte testé. |
+| Secrets en transit/logs | Politiques de redaction/documentation existantes (T8/T9), mais déploiement réel peut exposer des vecteurs nouveaux (proxy, journaux système). | Inspecter logs moteur/agent/Traefik collectés comme preuves pour confirmer l'absence de fuite de tokens, credentials, clés ou secrets applicatifs. |
+
+### 15.5 Mise à jour après preuve
+
+Après exécution réelle, mettre à jour ce document avec : date, environnement, version/SHA, résultats observés, écarts, et statut final de chaque point (confirmé, infirmé, partiel). Ne pas marquer un point comme validé sans preuve jointe ou référencée.
+
+## 16. Portail EFLEX — isolation des locataires et quotas applicatifs (issue #22)
+
+> État documenté d'après le code du portail (`portail/`) modifié dans le cadre de #22 (révision courante de l'espace de travail). Cette section couvre la console multi-tenant (Next.js / Prisma / Better Auth) et ne remplace pas les sections moteur/agent ci-dessus. Aucun contrôle d'isolation d'infrastructure réelle (CPU/mémoire/réseau/conteneurs par locataire) n'est revendiqué ici.
+
+### 16.1 Scénario « locataire malveillant »
+
+Un utilisateur authentifié, membre d'une organisation B, tente de :
+
+- lire ou muter un projet, une application, un déploiement, un domaine, une base managée ou des variables d'environnement appartenant à l'organisation A en devinant ou rejouant un identifiant (`/api/projects/[id]/**`, `/api/deployments/[id]`) ;
+- provoquer des actions coûteuses (analyse, création/redéploiement, création d'app/domain/base, actions runtime, annulation/retour arrière) pour épuiser des ressources partagées ou contourner des limites par compte en répartissant la charge sur plusieurs utilisateurs de la même organisation ;
+- obtenir des métadonnées ou valeurs secrètes (noms, slugs, identifiants Coolify, journaux, variables chiffrées) via des réponses ou messages d'erreur.
+
+Hypothèses : session valide côté Better Auth ; l'attaquant ne dispose pas d'un accès administrateur plateforme ni d'accès direct à PostgreSQL/Redis/Coolify. Les webhooks (`/api/webhooks/*`) et routes publiques/auth/admin restent hors de ce scénario tenant-à-tenant et relèvent de leurs propres contrôles.
+
+### 16.2 Contrôles en place (code portail)
+
+| Contrôle | Implémentation (preuves) | Effet |
+|---|---|---|
+| Résolution d'organisation et portée tenant | `portail/src/lib/tenant.ts` (`requireOrg`, `requireProject`, `requireDeployment`, `requireDeploymentById`, `requireProjectApp`, `requireProjectDomain`, `requireProjectDatabase`) ; `resolveOrganization` / `canManageProjects` (`lib/organizations.ts`) ; routes refactorées sous `portail/src/app/api/projects/[id]/**` (apps, domains, databases, deployments list/cancel/logs/rollback, runtime, logs snapshot, metrics, env-vars, transfer, redeploy, projet racine) et `api/deployments/[id]` | Les lectures/mutations tenant-scopées exigent une organisation résolue et chargent la ressource avec contrainte d'appartenance (`project.organizationId`, `deployment.project.organizationId`, `projectId` + ressource fille). |
+| Non-divulgation d'existence inter-locataire | `tenantNotFound()` renvoie 404 (`lib/tenant.ts:23-25`) ; réponses 404 « Projet/Déploiement/Application/Domaine/Base introuvable » sur ressource hors organisation | Un identifiant d'un autre locataire ne doit pas être distingué d'un identifiant absent. |
+| Séparation lecture / mutation | `canManageProjects` / `assertProjectManager` sur les mutations (création, modification, suppression, déploiement, domaines, bases, runtime, annulation, retour arrière, variables) ; certaines lectures restent accessibles aux membres selon la route (ex. historique/listes) | Limite l'impact d'un compte membre compromis. |
+| Limitations par utilisateur et par organisation | `allow` (Redis, fenêtre fixe `INCR`+`PEXPIRE`, repli mémoire) et `allowOrg` (`org:<organizationId>:<action>`, `lib/rate-limit.ts`) ; appliqués aux actions coûteuses : analyse et création de projet (`api/projects/analyze`, `api/projects` POST), redéploiement (`[id]/redeploy`), création d'application (`[id]/apps` POST), mutations d'app/domaine/base (`[id]/apps/[appId]`, `[id]/domains/**`, `[id]/databases/**`), actions runtime (`[id]/runtime` POST), annulation/rollback (`[id]/deployments/[deploymentId]/cancel|rollback`), lectures runtime coûteuses (`[id]/logs`, `[id]/metrics`) ; limites utilisateur conservées là où elles existaient | Réduit l'abus réparti sur plusieurs comptes d'une même organisation, en complément des limites par utilisateur. |
+| Secrets de projet et journaux | `EnvVar.value` chiffré AES-256-GCM avec AAD `projectId:key` (`lib/crypto.ts`) ; aucune route GET ne renvoie de valeur (modèle projet) ; masquage des secrets connus dans les journaux (`log-lines.ts`, routes logs) ; accès journaux refusé au rôle facturation sur les routes couvertes | Limite l'exposition de secrets applicatifs côté API/journaux. |
+| Garde-fous fonctionnels existants | Maintenance (`isMaintenanceActive`), facturation/quota (`assertDeploymentAllowed`, `assertProjectQuota`), verrou d'un déploiement actif par projet/app selon contexte (`lib/project-deployments.ts`) | Réduit certains abus de création/exécution et respecte les limites de plan (non conçu comme contrôle de sécurité multi-tenant strict). |
+| Vérification automatisée (inventaire + cas cross-tenant) | `portail/src/lib/api-tenant-isolation.integration.test.ts` : manifeste exhaustif des routes `src/app/api/**/route.ts` (nouvelle route non classée = échec) et cas d'intégration cross-tenant (org B sur ressources de org A) attendant un refus sans fuite d'identifiants/marqueurs | Détecte les régressions de classement et les fuites évidentes sur les routes couvertes. Tests d'intégration exécutés uniquement avec `EFLEX_TEST_DB=1` et base migrée (ignorés sinon). |
+
+### 16.3 Contrôles explicitement hors périmètre de ce lot
+
+- Pas de Row-Level Security PostgreSQL, pas de migration ni de contrainte d'isolation au niveau base pour #22.
+- Pas d'isolation CPU/mémoire/réseau/conteneurs entre locataires sur l'infrastructure réelle.
+- Pas de modification de la logique fonctionnelle du streaming runtime #35 (`api/projects/[id]/logs/stream/route.ts`, `runtime-log-stream.ts`, `log-lines.ts`, `deployment-stream.ts`, composants/hooks associés).
+
+### 16.4 Risques résiduels et limites connues
+
+| Risque / limite | Détail |
+|---|---|
+| Absence de RLS | L'isolation repose sur des filtres applicatifs (`organizationId`, `projectId`) : une requête oubliée ou un chemin non couvert pourrait exposer des données. Les helpers réduisent le risque mais ne constituent pas une garantie au niveau base. |
+| Validation en base réelle non systématique | Les tests d'intégration tenant-scopés sont conditionnés par `EFLEX_TEST_DB=1` et une base migrée ; sans cette variable ils sont ignorés. La présence effective d'une validation DB dans chaque environnement d'exécution CI doit être confirmée (et ne doit pas être supposée). |
+| Rate limiting multi-instance | `allowOrg`/`allow` utilisent Redis si `REDIS_URL` est disponible, sinon un compteur mémoire par processus. En repli mémoire, les limites ne sont pas partagées entre instances et sont perdues au redémarrage (atténuation partielle seulement). |
+| Couverture inégale des routes « coûteuses » | Les actions de mutation/lecture runtime identifiées ont reçu `allowOrg` ; d'autres chemins authentifiés (hors `projects/[id]/**` ou moins coûteux) peuvent ne pas avoir de limite par organisation. Le manifeste impose le classement, pas une politique uniforme de débit. |
+| Détection d'abus | Pas d'alerte, scoring, blocage adaptatif ni corrélation d'événements au-delà des réponses 429 et des journaux applicatifs existants. |
+| Routes hors périmètre tenant projet | `api/projects` POST, `api/projects/analyze`, routes GitHub/utilisateur, admin, billing, webhooks, auth : contrôles propres, non unifiés par `tenant.ts` sauf mention contraire ; une revue dédiée reste nécessaire. |
+| Streaming runtime (`logs/stream`) | Conserve ses contrôles existants (scoping org/projet, exclusion rôle facturation, borne de flux par utilisateur) sans ajout de quota org dans ce lot pour éviter toute régression fonctionnelle #35. |
+| Quotas « ressources » infra | Les quotas traités ici sont des garde-fous applicatifs (débit, plan). Ils ne prouvent aucune isolation de ressources d'exécution entre conteneurs/locataires. |

@@ -17,6 +17,10 @@ export interface ApplicationMetrics {
   sampledAt: string | null
   /** Message explicite quand les métriques ne sont pas disponibles. */
   message?: string
+  /** Détails facultatifs si exposés par la même source que les métriques. */
+  restartCount?: number | null
+  restartReason?: string | null
+  status?: string | null
 }
 
 export function unavailableMetrics(message = 'Métriques indisponibles.'): ApplicationMetrics {
@@ -168,8 +172,20 @@ export function normalizeApplicationMetrics(
   const sampledAt =
     typeof sampledAtValue === 'string' && sampledAtValue.trim() !== '' ? sampledAtValue : fetchedAt
 
+  const restartCount = pickNumber(sample, ['restart_count', 'restartCount'])
+  const restartReasonValue = sample.restart_reason ?? sample.restartReason ?? sample.last_restart_reason
+  const restartReason = typeof restartReasonValue === 'string' && restartReasonValue.trim() ? restartReasonValue : null
+  const statusValue = sample.status ?? sample.state
+  const status = typeof statusValue === 'string' && statusValue.trim() ? statusValue : null
+
   const hasAny =
-    cpuPercent !== null || memoryUsedMb !== null || memoryLimitMb !== null || memoryPercent !== null
+    cpuPercent !== null ||
+    memoryUsedMb !== null ||
+    memoryLimitMb !== null ||
+    memoryPercent !== null ||
+    restartCount !== null ||
+    restartReason !== null ||
+    status !== null
   if (!hasAny) return unavailableMetrics()
 
   return {
@@ -179,5 +195,8 @@ export function normalizeApplicationMetrics(
     memoryLimitMb: roundMetric(memoryLimitMb),
     memoryPercent: roundMetric(memoryPercent),
     sampledAt,
+    restartCount: restartCount === null ? null : Math.max(0, Math.round(restartCount)),
+    restartReason,
+    status,
   }
 }

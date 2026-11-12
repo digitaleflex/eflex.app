@@ -110,3 +110,24 @@ go test -race -count=1 ./...
 interval to force overflow deterministically; all other tests are
 sleep-free apart from 1 ms polling used to observe asynchronous heartbeats and
 the streaming producer.
+
+## À valider sur infrastructure réelle (#13) — non réalisé
+
+> **Aucun scénario ci-dessous n'a été observé sur un moteur et un agent distants réels.** Cette section complète la matrice de tests locale/fakes : elle liste ce qui doit être prouvé lors d'une exécution humaine sur infrastructure réelle (deux machines, réseau réel/NAT, Docker réel sur l'hôte agent), en s'appuyant sur `docs/operations/axiom-agent-remote-proof.md` et `scripts/axiom-proof/`.
+
+| Scénario / exigence #13 | Ce que les tests actuels prouvent | À valider sur infra réelle | Preuves attendues |
+|---|---|---|---|
+| Enrôlement (token bootstrap à usage unique, installation, enregistrement clé publique/signature) | Échanges et persistance couverts en tests unitaires/intégration API/agent (fakes) ; pas d'installation système réelle. | Création serveur `pending`, émission token, transfert sûr, premier démarrage agent distant, persistance `identity/credential/operation-key`, refus de réutilisation du token, redémarrage sans token. | Réponses API masquées, logs d'enregistrement, statut agent, métadonnées de fichiers (sans contenu secret), horodatages. |
+| Déploiement complet commandé par le moteur à un agent distant | Suite `tests/` et e2e moteur exercent la logique avec fakes/in-process ; aucun dispatch réseau réel. | Agent derrière NAT/routeur recevant des opérations via le transport réel retenu (long-poll ADR-0008 ou mode supporté), exécution jusqu'à l'état final attendu, résultats remontés au moteur. | IDs corrélés, transitions déploiement/étapes, logs moteur/agent, état Docker/Traefik sur l'hôte agent. |
+| Rejet d'une commande signée avec une clé révoquée/invalide | Validation/signature/auth couvertes en code/tests ; `ErrRevoked`/rejets testés dans les scénarios pertinents. | Révocation effective puis refus observé sur heartbeat, poll, result et/ou opérations en conditions réelles ; rejet de signatures altérées/hors fenêtre/rejouées sur le transport réel. | Requêtes/réponses, codes/raisons, journaux horodatés des deux côtés. |
+| Coupure réseau 60 s sans doublon ni incohérence | Idempotence par `operationId`, état durable, reprise/reconciliation modélisés et testés localement. | Coupure mesurée de 60 s pendant un déploiement, reconnexion, reprise, **aucune double exécution**, aucun conteneur/route dupliqué, état cohérent. | Commande de coupure, fenêtre exacte, journaux avant/pendant/après, inventaire Docker, opérations et résultats. |
+| Rotation de credential/clé de signature | Rotation et persistance couvertes par code/tests ; fenêtre de grâce credential documentée. | Rotation déclenchée sur agent distant actif, continuité de service, comportement des anciens matériels pendant/après grâce selon implémentation réelle. | Requêtes API, versions/horodatages, preuve de fonctionnement post-rotation. |
+| Scénarios de la matrice (succès, doublon, invalide, pannes runtime/réseau/santé, recovery, logs, autorisation) | Couverts par fakes dans `services/agent/tests` (voir tableau principal). | Rejouer les cas pertinents sur hôte réel : Docker réel, Traefik réel si applicable, transport réel, erreurs réelles (image absente, health KO, refus ownership/binding). | Pour chaque cas : préconditions, action, résultat observé, comparaison au comportement attendu, écarts. |
+
+### Points spécifiques à confirmer ou corriger pendant la preuve réelle
+
+1. **Câblage production et gaps connus** : les gaps listés dans « Gaps found » restent à confronter au comportement réel (bridge adapter, codes d'erreur stables Docker/Traefik/health, identité de déploiement dans le bridge, transport NAT end-to-end).
+2. **Mode NAT** : vérifier que les routes poll/result, la signature canonique, le nonce/timestamp et la corrélation ack/result fonctionnent comme attendu entre machines distinctes ; consigner tout écart avant clôture de #13.
+3. **Réconciliation** : `Reconcile` n'est pas exécuté automatiquement au boot (voir code/gap) ; observer le comportement réel face aux opérations interrompues/orphelins.
+
+Après exécution réelle, ajouter une sous-section datée « Résultats observés sur infra réelle » avec environnement, versions, résultats par scénario et liens vers les preuves. Ne pas marquer un scénario comme validé sans observation.

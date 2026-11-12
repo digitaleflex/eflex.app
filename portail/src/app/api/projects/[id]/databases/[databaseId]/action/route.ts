@@ -3,8 +3,10 @@ import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { audit } from '@/lib/audit'
-import { canManageProjects, resolveOrganization } from '@/lib/organizations'
+import { canManageProjects } from '@/lib/organizations'
 import { projectDatabaseAction } from '@/lib/project-databases'
+import { allowOrg } from '@/lib/rate-limit'
+import { requireOrg, requireProjectDatabase, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -19,18 +21,27 @@ export async function POST(
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
   if (!canManageProjects(org.role)) {
     return NextResponse.json({ error: 'Votre rôle ne permet pas cette action.' }, { status: 403 })
   }
 
+  if (!(await allowOrg(org.organizationId, 'database-mutate', 20, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop de modifications de bases pour cette organisation en peu de temps. Patientez une minute.' },
+      { status: 429 },
+    )
+  }
+
   const { id, databaseId } = await params
-  const database = await prisma.projectDatabase.findFirst({
-    where: { id: databaseId, projectId: id, project: { organizationId: org.organizationId } },
-    select: { id: true, kind: true, coolifyId: true },
+  const databaseResult = await requireProjectDatabase(org, id, databaseId, {
+    id: true,
+    kind: true,
+    coolifyId: true,
   })
-  if (!database) return NextResponse.json({ error: 'Base introuvable.' }, { status: 404 })
+  if ('response' in databaseResult) return databaseResult.response
+  const database = databaseResult.database as { id: string; kind: string; coolifyId: string }
 
   let body: unknown
   try {

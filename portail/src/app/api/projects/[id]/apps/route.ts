@@ -3,7 +3,7 @@ import type { BuildPlan } from '@eflex/detector'
 import type { Prisma } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { canManageProjects, resolveOrganization } from '@/lib/organizations'
+import { canManageProjects } from '@/lib/organizations'
 import { analyzeGitHubRepo } from '@/lib/repo-analysis'
 import { errorResponse, normalizeRoot } from '@/lib/analysis-request'
 import { parseGitHubUrl } from '@/lib/github-url'
@@ -16,6 +16,8 @@ import { MAINTENANCE_DEPLOYMENT_MESSAGE, isMaintenanceActive } from '@/lib/platf
 import { assertDeploymentAllowed, assertProjectQuota } from '@/lib/billing'
 import { resolveProjectToken } from '@/lib/git-credentials'
 import { appDomain, appNameFromRoot, normalizeAppRoot, uniqueAppName } from '@/lib/project-apps'
+import { allowOrg } from '@/lib/rate-limit'
+import { requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,14 +61,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
 
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: { id: true },
-  })
-  if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const projectResult = await requireProject(org, id, { id: true })
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project
 
   const apps = await prisma.projectApp.findMany({
     where: { projectId: project.id },
@@ -110,12 +110,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
   if (!canManageProjects(org.role)) {
     return NextResponse.json(
       { error: 'Votre rôle dans cette organisation ne permet pas de modifier ce projet.' },
       { status: 403 },
+    )
+  }
+
+  if (!(await allowOrg(org.organizationId, 'app-create', 20, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop de créations d’applications pour cette organisation en peu de temps. Patientez une minute.' },
+      { status: 429 },
     )
   }
 
@@ -156,22 +163,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   const framework = typeof input.framework === 'string' && input.framework.trim() ? input.framework.trim() : undefined
 
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: org.organizationId },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      userId: true,
-      organizationId: true,
-      repoUrl: true,
-      repoFullName: true,
-      installationId: true,
-      branch: true,
-      apps: { select: { id: true, name: true, root: true, position: true } },
-    },
+  const projectResult = await requireProject(org, id, {
+    id: true,
+    name: true,
+    slug: true,
+    userId: true,
+    organizationId: true,
+    repoUrl: true,
+    repoFullName: true,
+    installationId: true,
+    branch: true,
+    apps: { select: { id: true, name: true, root: true, position: true } },
   })
-  if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project
 
   if (project.apps.some((app) => app.root === root)) {
     return NextResponse.json(

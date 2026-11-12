@@ -81,6 +81,28 @@ func TestDetect(t *testing.T) {
 			t.Fatalf("pnpm assets must be skipped: %+v", got)
 		}
 	})
+
+	t.Run("yarn and bun assets are not supported", func(t *testing.T) {
+		for lock, content := range map[string]string{
+			"yarn.lock": "x",
+			"bun.lockb": "\x00",
+			"bun.lock":  "{}",
+		} {
+			t.Run(lock, func(t *testing.T) {
+				dir := t.TempDir()
+				write(t, dir, map[string]string{
+					"composer.json":    `{}`,
+					"artisan":          "php",
+					"public/index.php": "<?php",
+					"package.json":     `{"scripts":{"build":"vite build"}}`,
+					lock:               content,
+				})
+				if got := Detect(dir); got.AssetInstallCommand != "" {
+					t.Fatalf("%s assets must be skipped: %+v", lock, got)
+				}
+			})
+		}
+	})
 }
 
 func laravelFacts() Facts {
@@ -154,6 +176,35 @@ func TestDockerfileConstructs(t *testing.T) {
 	}
 	if strings.Contains(df, "HEALTHCHECK") {
 		t.Fatal("health is probed by Axiom, not baked into the image")
+	}
+}
+
+func TestGenericDockerfileDoesNotStartLaravelWorkers(t *testing.T) {
+	df, err := Dockerfile(Facts{PublicIndex: true}, "composer install --no-dev", "sh /usr/local/bin/axiom-start", 8080)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, unwanted := range []string{
+		"[program:queue]",
+		"[program:scheduler]",
+		"queue:work",
+		"schedule:work",
+		"FROM " + NodeImage + " AS assets",
+		"COPY composer.lock ./",
+	} {
+		if strings.Contains(df, unwanted) {
+			t.Fatalf("generic dockerfile must not contain %q:\n%s", unwanted, df)
+		}
+	}
+	for _, want := range []string{
+		"php artisan migrate --force",
+		"php artisan config:cache",
+		"[program:php-fpm]",
+		"[program:nginx]",
+	} {
+		if !strings.Contains(df, want) {
+			t.Fatalf("generic dockerfile must contain %q:\n%s", want, df)
+		}
 	}
 }
 

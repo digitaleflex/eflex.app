@@ -56,7 +56,7 @@ function script(steps: Array<{ logs: string } | { error: string } | Error>) {
 }
 
 describe('streamRuntimeLogs', () => {
-  it('diffuse les lignes nouvelles et masque les secrets', async () => {
+  it('diffuse les lignes nouvelles, masque les secrets et publie des stats', async () => {
     const client = script([
       { logs: logsJson('hello token=s3cret', 'world') },
       { logs: logsJson('world', 'next') },
@@ -80,6 +80,7 @@ describe('streamRuntimeLogs', () => {
     const lines = events.filter((e) => e.event === 'log').flatMap((e) => e.data.lines.map((l: any) => l.text))
     expect(lines).toEqual(['hello token=***', 'world', 'next'])
     expect(JSON.stringify(events)).not.toContain('s3cret')
+    expect(events.some((e) => e.event === 'stats')).toBe(true)
   })
 
   it('borne le débit et avertit en cas de rafale', async () => {
@@ -104,8 +105,34 @@ describe('streamRuntimeLogs', () => {
     })
     const warn = events.find((e) => e.event === 'warn' && String(e.data.message).includes('Débit élevé'))
     expect(warn).toBeTruthy()
+    expect(String(warn?.data.message)).toContain('au total')
     const emitted = events.filter((e) => e.event === 'log').flatMap((e) => e.data.lines)
     expect(emitted.length).toBe(5)
+  })
+
+  it('tronque les lignes très longues et avertit', async () => {
+    const longLine = 'x'.repeat(500)
+    const client = script([{ logs: logsJson(longLine) }])
+    const events: Evt[] = []
+    const ctrl = new AbortController()
+    let polls = 0
+    const original = client.getLogs.bind(client)
+    client.getLogs = async (n, s) => {
+      polls++
+      if (polls >= 2) ctrl.abort()
+      return original(n, s)
+    }
+    await streamRuntimeLogs({
+      client,
+      secrets: [],
+      intervalMs: 1,
+      maxLineLength: 120,
+      send: (event, data, id) => events.push({ event, data, id }),
+      signal: ctrl.signal,
+    })
+    const emitted = events.filter((e) => e.event === 'log').flatMap((e) => e.data.lines.map((l: any) => l.text))
+    expect(emitted[0]).toContain('[ligne tronquée')
+    expect(events.some((e) => e.event === 'warn' && String(e.data.message).includes('tronquées'))).toBe(true)
   })
 
   it('émet un avertissement prudent si une ligne ressemble à un secret', async () => {

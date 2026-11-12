@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { audit } from '@/lib/audit'
-import { canManageProjects, resolveOrganization } from '@/lib/organizations'
+import { canManageProjects } from '@/lib/organizations'
 import { checkDomainDns } from '@/lib/custom-domain'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
 import { isAppDeployed } from '@/lib/project-primary'
+import { allowOrg } from '@/lib/rate-limit'
+import { requireOrg, requireProjectDomain, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -18,32 +20,49 @@ export async function POST(
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const org = await resolveOrganization(session)
-  if (!org) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
   if (!canManageProjects(org.role)) {
     return NextResponse.json({ error: 'Votre rôle ne permet pas de vérifier ce domaine.' }, { status: 403 })
   }
 
+  if (!(await allowOrg(org.organizationId, 'domain-mutate', 20, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop de modifications de domaines pour cette organisation en peu de temps. Patientez une minute.' },
+      { status: 429 },
+    )
+  }
+
   const { id, domainId } = await params
-  const domain = await prisma.projectDomain.findFirst({
-    where: { id: domainId, projectId: id, project: { organizationId: org.organizationId } },
-    select: {
-      id: true,
-      hostname: true,
-      appId: true,
-      app: { select: { id: true, name: true, coolifyAppId: true } },
-      project: {
-        select: {
-          id: true,
-          name: true,
-          organizationId: true,
-          coolifyAppId: true,
-          apps: { select: { id: true, name: true, coolifyAppId: true } },
-        },
+  const domainResult = await requireProjectDomain(org, id, domainId, {
+    id: true,
+    hostname: true,
+    appId: true,
+    app: { select: { id: true, name: true, coolifyAppId: true } },
+    project: {
+      select: {
+        id: true,
+        name: true,
+        organizationId: true,
+        coolifyAppId: true,
+        apps: { select: { id: true, name: true, coolifyAppId: true } },
       },
     },
   })
-  if (!domain) return NextResponse.json({ error: 'Domaine introuvable.' }, { status: 404 })
+  if ('response' in domainResult) return domainResult.response
+  const domain = domainResult.domain as unknown as {
+    id: string
+    hostname: string
+    appId: string | null
+    app: { id: string; name: string; coolifyAppId: string | null } | null
+    project: {
+      id: string
+      name: string
+      organizationId: string
+      coolifyAppId: string | null
+      apps: Array<{ id: string; name: string; coolifyAppId: string | null }>
+    }
+  }
 
   const dns = await checkDomainDns(domain.hostname)
   if (!dns.ok) {

@@ -30,13 +30,14 @@ export function RuntimeLogs({
   const [selectedAppId, setSelectedAppId] = useState<string>(apps[0]?.id ?? '')
   const [service, setService] = useState('')
 
-  const activeServices = useMemo(() => {
-    if (apps.length > 1) {
-      const current = apps.find((app) => app.id === selectedAppId) ?? apps[0]
-      return current?.services ?? []
-    }
-    return services
-  }, [apps, selectedAppId, services])
+  const activeApp = useMemo(
+    () => (apps.length > 1 ? apps.find((app) => app.id === selectedAppId) ?? apps[0] ?? null : null),
+    [apps, selectedAppId],
+  )
+  const activeServices = useMemo(
+    () => (apps.length > 1 ? activeApp?.services ?? [] : services),
+    [apps, services, activeApp],
+  )
 
   // Réinitialise le service quand l'application change (la liste peut différer).
   const onAppChange = (appId: string) => {
@@ -44,21 +45,27 @@ export function RuntimeLogs({
     setService('')
   }
 
-  const streamUrl = useMemo(() => {
-    const query = new URLSearchParams()
-    if (service !== '') query.set('service', service)
-    if (apps.length > 1 && selectedAppId) query.set('appId', selectedAppId)
-    const suffix = query.toString() ? `?${query.toString()}` : ''
-    return `/api/projects/${projectId}/logs/stream${suffix}`
-  }, [projectId, service, apps.length, selectedAppId])
+  const query = useMemo(() => {
+    const params = new URLSearchParams()
+    if (service !== '') params.set('service', service)
+    if (apps.length > 1 && selectedAppId) params.set('appId', selectedAppId)
+    return params.toString()
+  }, [service, apps.length, selectedAppId])
+
+  const streamUrl = `/api/projects/${projectId}/logs/stream${query ? `?${query}` : ''}`
+  const downloadUrl = `/api/projects/${projectId}/logs?${new URLSearchParams({
+    ...(query ? Object.fromEntries(new URLSearchParams(query)) : {}),
+    format: 'text',
+    lines: '2000',
+  }).toString()}`
 
   const label = useMemo(() => {
     if (apps.length > 1) {
-      const name = (apps.find((app) => app.id === selectedAppId) ?? apps[0])?.name ?? 'application'
+      const name = activeApp?.name ?? 'application'
       return service ? `Journaux · ${name} · ${service}` : `Journaux · ${name}`
     }
     return service ? `Journaux · ${service}` : 'Journaux d’exécution'
-  }, [apps, selectedAppId, service])
+  }, [apps.length, activeApp, service])
 
   return (
     <section aria-labelledby="runtime-logs-title" className="space-y-3">
@@ -69,8 +76,8 @@ export function RuntimeLogs({
             Journaux d’exécution
           </h2>
           <p className="text-sm text-muted-foreground">
-            Flux en direct du conteneur, secrets connus masqués. La fenêtre récente est
-            affichée ; utilisez Télécharger pour conserver ce qui est visible.
+            Flux en direct du conteneur (fenêtre récente), secrets connus masqués. Le
+            bouton « Fenêtre » télécharge les lignes récentes masquées côté serveur.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -81,6 +88,7 @@ export function RuntimeLogs({
                 value={selectedAppId}
                 onChange={(e) => onAppChange(e.target.value)}
                 className="min-h-7 bg-transparent text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Application dont afficher les journaux"
               >
                 {apps.map((app) => (
                   <option key={app.id} value={app.id}>
@@ -97,8 +105,9 @@ export function RuntimeLogs({
                 value={service}
                 onChange={(e) => setService(e.target.value)}
                 className="min-h-7 bg-transparent font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Service compose"
               >
-                <option value="">tous</option>
+                <option value="">Tous les services</option>
                 {activeServices.map((name) => (
                   <option key={name} value={name}>
                     {name}
@@ -110,7 +119,12 @@ export function RuntimeLogs({
         </div>
       </div>
 
-      <Terminal url={streamUrl} label={label} />
+      <Terminal
+        url={streamUrl}
+        label={label}
+        downloadUrl={downloadUrl}
+        hint="Les motifs ressemblant à des secrets sont signalés prudemment ; les valeurs connues sont masquées. L’historique complet n’est pas conservé."
+      />
     </section>
   )
 }

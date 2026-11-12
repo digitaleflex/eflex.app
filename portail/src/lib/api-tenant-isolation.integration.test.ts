@@ -291,6 +291,7 @@ run('isolation cross-tenant des routes projet/déploiement (#22)', () => {
     { name: 'GET /api/projects/[id]/apps', method: 'GET', path: '/api/projects/:id/apps', importPath: '@/app/api/projects/[id]/apps/route', params: { id: 'PROJECT' } },
     { name: 'POST /api/projects/[id]/apps', method: 'POST', path: '/api/projects/:id/apps', importPath: '@/app/api/projects/[id]/apps/route', params: { id: 'PROJECT' }, body: { name: 'web2', root: '' } },
     { name: 'GET /api/projects/[id]/apps/[appId]', method: 'GET', path: '/api/projects/:id/apps/:appId', importPath: '@/app/api/projects/[id]/apps/[appId]/route', params: { id: 'PROJECT', appId: 'APP' } },
+    { name: 'PATCH /api/projects/[id]/apps/[appId]', method: 'PATCH', path: '/api/projects/:id/apps/:appId', importPath: '@/app/api/projects/[id]/apps/[appId]/route', params: { id: 'PROJECT', appId: 'APP' }, body: { name: 'webx' } },
     { name: 'DELETE /api/projects/[id]/apps/[appId]', method: 'DELETE', path: '/api/projects/:id/apps/:appId', importPath: '@/app/api/projects/[id]/apps/[appId]/route', params: { id: 'PROJECT', appId: 'APP' } },
     { name: 'GET /api/projects/[id]/deployments', method: 'GET', path: '/api/projects/:id/deployments', importPath: '@/app/api/projects/[id]/deployments/route', params: { id: 'PROJECT' } },
     { name: 'POST /api/projects/[id]/deployments/[deploymentId]/cancel', method: 'POST', path: '...', importPath: '@/app/api/projects/[id]/deployments/[deploymentId]/cancel/route', params: { id: 'PROJECT', deploymentId: 'DEPLOYMENT' } },

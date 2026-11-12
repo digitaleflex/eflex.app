@@ -4,6 +4,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 export type StreamLine = { n: number; text: string; ts?: string }
 export type StreamState = 'connecting' | 'live' | 'reconnecting' | 'done' | 'error'
+export type StreamStats = {
+  emitted?: number
+  dropped?: number
+  truncatedLines?: number
+  suspiciousLines?: number
+  windowStart?: number | null
+  windowEnd?: number | null
+  windowLines?: number
+}
 
 const MAX_LINES = 5_000
 
@@ -18,6 +27,7 @@ export function useLogStream(url: string | null) {
   const [status, setStatus] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [dropped, setDropped] = useState(0)
+  const [stats, setStats] = useState<StreamStats | null>(null)
   const lastN = useRef(-1)
 
   const reset = useCallback(() => {
@@ -25,6 +35,7 @@ export function useLogStream(url: string | null) {
     setDropped(0)
     setStatus(null)
     setNotice(null)
+    setStats(null)
     lastN.current = -1
   }, [])
 
@@ -50,8 +61,15 @@ export function useLogStream(url: string | null) {
         return next.slice(next.length - MAX_LINES)
       })
     })
-    source.addEventListener('status', (e) => setStatus((JSON.parse((e as MessageEvent<string>).data) as { status: string }).status))
-    source.addEventListener('warn', (e) => setNotice((JSON.parse((e as MessageEvent<string>).data) as { message: string }).message))
+    source.addEventListener('status', (e) =>
+      setStatus((JSON.parse((e as MessageEvent<string>).data) as { status: string }).status),
+    )
+    source.addEventListener('warn', (e) =>
+      setNotice((JSON.parse((e as MessageEvent<string>).data) as { message: string }).message),
+    )
+    source.addEventListener('stats', (e) =>
+      setStats((JSON.parse((e as MessageEvent<string>).data) as StreamStats) ?? null),
+    )
     source.addEventListener('end', () => {
       source.close()
       setState('done')
@@ -63,5 +81,5 @@ export function useLogStream(url: string | null) {
     return () => source.close()
   }, [url, reset])
 
-  return { lines, state, status, notice, dropped }
+  return { lines, state, status, notice, dropped, stats }
 }
