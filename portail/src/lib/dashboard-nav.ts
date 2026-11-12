@@ -16,7 +16,6 @@ export const DASHBOARD_TABS: readonly DashboardTab[] = [
   { key: 'projects', label: 'Projets', href: '/dashboard' },
   { key: 'activity', label: 'Activité', href: '/dashboard/activity' },
   { key: 'team', label: 'Équipe', href: '/dashboard/organization' },
-  { key: 'notifications', label: 'Notifications', href: '/dashboard/notifications' },
   { key: 'settings', label: 'Paramètres', href: '/dashboard/settings' },
 ]
 
