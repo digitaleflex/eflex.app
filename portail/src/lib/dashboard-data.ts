@@ -49,7 +49,7 @@ export type DashboardActivity = {
  * Tout ce qu'il faut pour la page d'accueil, calculé côté serveur pour l'organisation donnée
  * (jamais pour un autre locataire) et sérialisé en types simples (dates en ISO).
  */
-export async function loadDashboard(organizationId: string, now = new Date()) {
+export async function loadDashboard(organizationId: string, now = new Date(), options?: { quota?: { used: number; limit: number } | null }) {
   const since = new Date(now.getTime() - DAYS * 86_400_000)
   const [projects, recent, activity] = await Promise.all([
     prisma.project.findMany({
@@ -121,6 +121,7 @@ export async function loadDashboard(organizationId: string, now = new Date()) {
     name: p.name,
     framework: p._framework,
     domain: p._domain,
+    tlsExpiresAt: p._tlsExpiresAt,
     deployments: p.deployments,
     apps: p.apps.map((app) => ({ framework: app.framework, domain: app.domain, position: app.position, name: app.name })),
   }))
@@ -148,8 +149,12 @@ export async function loadDashboard(organizationId: string, now = new Date()) {
 
   return {
     projects: cards,
-    summary: summarize(lite),
-    attention: attentionItems(lite).map((a) => ({ ...a, at: a.at.toISOString() })),
+    summary: summarize(lite, { now, quota: options?.quota }),
+    attention: attentionItems(lite, { now, quota: options?.quota }).map((a) => ({
+      ...a,
+      at: a.at.toISOString(),
+      ...(a.kind === 'certificate' ? { expiresAt: a.expiresAt.toISOString() } : {}),
+    })),
     series: dailySeries(recent, DAYS, now),
     deploymentsInWindow: recent.length,
     successRate: successRate(recent),
