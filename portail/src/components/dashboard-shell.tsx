@@ -11,6 +11,7 @@ import { ThemeToggle } from '@/components/theme-switcher'
 import { UserMenu } from '@/components/user-menu'
 import { activeDashboardTab, DASHBOARD_TABS, type DashboardTabKey } from '@/lib/dashboard-nav'
 import { PlanWidget } from '@/components/dashboard/plan-widget'
+import { PlatformStatusIndicator } from '@/components/platform-status-indicator'
 import type { billingSummary } from '@/lib/billing'
 import { cn } from '@/lib/utils'
 
@@ -53,7 +54,7 @@ export function DashboardShell({ children, user, billing }: { children: React.Re
           </div>
         </div>
 
-        <nav aria-label="Navigation principale" className="mx-auto hidden max-w-7xl overflow-x-auto px-2 sm:block sm:px-4">
+        <nav aria-label="Navigation principale" className="mx-auto hidden max-w-7xl items-center overflow-x-auto px-2 sm:flex sm:px-4">
           <ul className="flex gap-1">
             {DASHBOARD_TABS.map((tab) => {
               const active = tab.key === activeTab
@@ -75,6 +76,9 @@ export function DashboardShell({ children, user, billing }: { children: React.Re
               )
             })}
           </ul>
+          <div className="ml-auto hidden pl-3 md:block">
+            <PlatformStatusIndicator />
+          </div>
         </nav>
       </header>
 

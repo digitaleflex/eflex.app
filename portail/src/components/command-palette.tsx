@@ -2,17 +2,20 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Activity, Bell, CornerDownLeft, FolderKanban, Plus, Search, Users } from 'lucide-react'
+import { Activity, Bell, CornerDownLeft, FolderKanban, Moon, Plus, Search, UserPlus, Users } from 'lucide-react'
+import { applyTheme, readTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 
-type Item = { id: string; label: string; hint?: string; href: string; group: 'Actions' | 'Projets'; icon?: React.ComponentType<{ className?: string }> }
+type Item = { id: string; label: string; hint?: string; href?: string; action?: 'theme'; group: 'Actions' | 'Projets'; icon?: React.ComponentType<{ className?: string }> }
 
 const ACTIONS: Item[] = [
   { id: 'new', label: 'Nouveau projet', hint: 'Importer un dépôt GitHub', href: '/dashboard/new', group: 'Actions', icon: Plus },
   { id: 'projects', label: 'Projets', href: '/dashboard', group: 'Actions', icon: FolderKanban },
   { id: 'activity', label: 'Activité', hint: 'Tous les déploiements', href: '/dashboard/activity', group: 'Actions', icon: Activity },
   { id: 'team', label: 'Équipe', hint: 'Membres et invitations', href: '/dashboard/organization', group: 'Actions', icon: Users },
+  { id: 'invite', label: 'Inviter un membre', hint: 'Depuis la page Équipe', href: '/dashboard/organization', group: 'Actions', icon: UserPlus },
   { id: 'notifications', label: 'Notifications', hint: 'Et préférences', href: '/dashboard/notifications', group: 'Actions', icon: Bell },
+  { id: 'theme', label: 'Changer de thème', hint: 'Clair / sombre', action: 'theme', group: 'Actions', icon: Moon },
 ]
 
 /** Bouton de recherche + palette de commandes (⌘K / Ctrl+K). Motif combobox accessible. */
@@ -76,7 +79,13 @@ export function CommandPalette() {
   const go = (item: Item | undefined) => {
     if (!item) return
     setOpen(false)
-    router.push(item.href)
+    if (item.action === 'theme') {
+      const current = readTheme()
+      const resolved = current === 'dark' ? 'light' : current === 'light' ? 'dark' : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark')
+      applyTheme(resolved)
+      return
+    }
+    if (item.href) router.push(item.href)
   }
 
   return (
