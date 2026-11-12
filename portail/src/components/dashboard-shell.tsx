@@ -10,6 +10,8 @@ import { CommandPalette } from '@/components/command-palette'
 import { ThemeToggle } from '@/components/theme-switcher'
 import { UserMenu } from '@/components/user-menu'
 import { activeDashboardTab, DASHBOARD_TABS, type DashboardTabKey } from '@/lib/dashboard-nav'
+import { PlanWidget } from '@/components/dashboard/plan-widget'
+import type { billingSummary } from '@/lib/billing'
 import { cn } from '@/lib/utils'
 
 const TAB_ICONS: Record<DashboardTabKey, LucideIcon> = {
@@ -27,7 +29,7 @@ const TAB_ICONS: Record<DashboardTabKey, LucideIcon> = {
  * Les deux navigations partagent la même liste (`DASHBOARD_TABS`) et le même calcul de section
  * active (`activeDashboardTab`) : aucune destination ne disparaît d'un format à l'autre.
  */
-export function DashboardShell({ children, user }: { children: React.ReactNode; user: { name?: string | null; email?: string | null } }) {
+export function DashboardShell({ children, user, billing }: { children: React.ReactNode; user: { name?: string | null; email?: string | null }; billing?: Awaited<ReturnType<typeof billingSummary>> | null }) {
   const pathname = usePathname()
   const activeTab = activeDashboardTab(pathname)
 
@@ -40,6 +42,7 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
           </Link>
           <span aria-hidden="true" className="hidden select-none text-xl font-light text-border sm:inline">/</span>
           <OrgSwitcher className="min-w-0 max-w-[45vw] sm:max-w-xs" />
+          {billing && <PlanWidget billing={billing} className="hidden w-44 lg:flex" />}
           <div className="ml-auto flex items-center gap-2">
             {/* Sur téléphone, le thème reste accessible depuis le menu du compte :
                 cela libère la place nécessaire au nom de l'organisation. */}

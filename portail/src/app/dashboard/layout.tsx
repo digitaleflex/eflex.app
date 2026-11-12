@@ -8,6 +8,7 @@ import { NotificationToaster } from '@/components/notification-toaster'
 import { MembershipWatcher } from '@/components/membership-watcher'
 import { ImpersonationBanner } from '@/components/impersonation-banner'
 import { DashboardShell } from '@/components/dashboard-shell'
+import { billingSummary } from '@/lib/billing'
 
 // Protection côté serveur : aucune page du tableau de bord n'est rendue sans session.
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -21,6 +22,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
     await prisma.session.update({ where: { id: session.session.id }, data: { activeOrganizationId: org.organizationId } })
   }
 
+  let billing: Awaited<ReturnType<typeof billingSummary>> | null = null
+  if (org) {
+    try {
+      billing = await billingSummary(org.organizationId)
+    } catch {
+      billing = null
+    }
+  }
+
   return (
     // Le thème est porté par <html> (cookie ou système), commun à tout le site.
     <div className="min-h-screen bg-background text-foreground">
@@ -28,7 +38,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <ToastProvider>
         <MembershipWatcher />
         <NotificationToaster />
-        <DashboardShell user={{ name: session.user.name, email: session.user.email }}>
+        <DashboardShell
+          user={{ name: session.user.name, email: session.user.email }}
+          billing={billing}
+        >
           {session.session.impersonatedBy && <ImpersonationBanner userName={session.user.name} />}
           {children}
         </DashboardShell>
