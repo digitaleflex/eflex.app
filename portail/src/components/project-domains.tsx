@@ -136,11 +136,24 @@ function DnsGuide({
       </div>
 
       <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+        <li>Les sous-domaines (ex. <code className="font-mono">app.exemple.com</code>) et domaines racine sont pris en charge, dans la limite de votre abonnement.</li>
         <li>Si vous ajoutez à la fois le domaine racine (<code className="font-mono">exemple.com</code>) et sa variante <code className="font-mono">www</code>, Eflex redirige automatiquement <code className="font-mono">www</code> vers le domaine racine pour les applications gérées par la plateforme.</li>
-        <li>Désactivez le proxy/CDN (ex. « nuage orange ») sur l’enregistrement pendant la vérification si elle échoue.</li>
+        <li>Désactivez le proxy/CDN (ex. « nuage orange » Cloudflare) sur l’enregistrement pendant la vérification si elle échoue.</li>
         <li>Vérifiez qu’il n’existe pas d’enregistrement contradictoire (ancien A/CNAME) pour le même hôte.</li>
-        <li>La propagation DNS et l’émission du certificat peuvent prendre un peu de temps après validation.</li>
+        <li>La propagation DNS et l’émission du certificat peuvent prendre un peu de temps après validation (selon le TTL).</li>
       </ul>
+
+      <details className="rounded-md border border-border/70 bg-background/60 p-2">
+        <summary className="cursor-pointer list-none text-xs font-medium text-foreground [&::-webkit-details-marker]:hidden">
+          Aide selon l’hébergeur DNS (indications générales)
+        </summary>
+        <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
+          <li><span className="font-medium text-foreground">Cloudflare</span> : DNS → Ajouter un enregistrement. Choisissez CNAME (ou A/AAAA à l’apex). Mettez le statut proxy sur « DNS uniquement » (gris) pendant la vérification.</li>
+          <li><span className="font-medium text-foreground">OVHcloud</span> : Zone DNS → Ajouter une entrée. Type CNAME pour un sous-domaine, ou A/AAAA pour le domaine racine. Laissez le champ « Sous-domaine » cohérent avec l’hôte (ex. <code className="font-mono">app</code>).</li>
+          <li><span className="font-medium text-foreground">Gandi / IONOS / Namecheap / autre</span> : Gestion DNS/Zone DNS → Ajouter un enregistrement. Renseignez type, nom/hôte et valeur/cible comme indiqué ci-dessus. Les libellés varient selon l’interface.</li>
+        </ul>
+        <p className="mt-2 text-xs text-muted-foreground">En cas de doute, consultez la documentation de votre fournisseur DNS : les champs « Nom/Hôte » et « Cible/Valeur » peuvent avoir des noms différents.</p>
+      </details>
 
       {failure && (
         <div className="rounded-md border border-destructive/20 bg-destructive/10 p-2 text-xs text-destructive" role="alert">
@@ -498,7 +511,7 @@ export function ProjectDomains({
                 Ajouter le domaine
               </Button>
               <span className="text-xs text-muted-foreground">
-                {(data?.domains.length ?? 0)} / {data?.max ?? 5} domaines personnalisés
+                {(data?.domains.length ?? 0)} / {data?.max ?? 5} domaines personnalisés utilisés (selon votre abonnement)
               </span>
             </div>
           </form>
