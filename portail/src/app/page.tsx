@@ -39,48 +39,48 @@ const steps = [
   {
     icon: GitBranch,
     title: 'Connectez votre dépôt',
-    text: "Collez l'URL de votre dépôt GitHub et choisissez la branche à publier.",
+    text: 'Collez l’URL de votre dépôt GitHub et choisissez la branche à publier.',
   },
   {
     icon: SearchCheck,
-    title: "Vérifiez ce qu'Eflex a compris",
-    text: 'Framework, version, commandes de build, port : chaque choix est expliqué. Vous corrigez si besoin.',
+    title: 'Vérifiez ce qu’Eflex a compris',
+    text: 'Framework, version, commandes de build, port : chaque choix est expliqué. Vous corrigez si besoin.',
   },
   {
     icon: Rocket,
     title: 'Mettez en ligne',
-    text: "Eflex construit l'application, la démarre et active HTTPS. Vous recevez l'adresse de votre site.",
+    text: 'Eflex construit l’application, la démarre et active HTTPS. Vous recevez l’adresse de votre site.',
   },
 ]
 
 const faqs = [
   {
-    q: 'Quelles technologies sont prises en charge ?',
-    a: "Next.js, Nuxt, Astro, Vite, SvelteKit, Remix, SolidStart, RedwoodJS, Node.js (Express, Fastify, NestJS…), PHP, Python (Django, FastAPI, Flask) et les sites HTML statiques. Laravel est détecté ; si son plan nécessite plusieurs services, ajoutez un `docker-compose.yml` (ou `compose.yaml`) au dépôt pour un déploiement via compose fourni (D1). Sans ce fichier, le plan multi-services généré est refusé avec un message explicite. Pour tout le reste, un Dockerfile suffit.",
+    q: 'Quelles technologies sont prises en charge ?',
+    a: 'Next.js, Nuxt, Astro, Vite, SvelteKit, Remix, SolidStart, RedwoodJS, Node.js (Express, Fastify, NestJS…), PHP, Python (Django, FastAPI, Flask) et les sites HTML statiques. Laravel est aussi reconnu. Pour tout le reste, un Dockerfile ou un fichier docker-compose.yml dans votre dépôt suffit.',
   },
   {
-    q: 'Dois-je écrire un Dockerfile ?',
-    a: "Non. Eflex déduit la configuration de votre dépôt. Si vous en avez déjà un, il est utilisé tel quel : c'est vous qui gardez la main.",
+    q: 'Dois-je écrire un Dockerfile ?',
+    a: 'Non. Eflex déduit la configuration de votre dépôt. Si vous en avez déjà un, il est utilisé tel quel : vous gardez la main.',
   },
   {
-    q: "Que se passe-t-il si Eflex se trompe de stack ?",
-    a: "Vous pouvez choisir une autre stack parmi celles qu'Eflex a détectées à la création du projet, ou ajouter un fichier eflex.json à la racine du dépôt. Ce fichier a toujours priorité sur la détection automatique.",
+    q: 'Que se passe-t-il si Eflex se trompe de stack ?',
+    a: 'À la création du projet, vous pouvez choisir une autre stack parmi celles qu’Eflex a détectées. Vous pouvez aussi ajouter un fichier eflex.json à la racine du dépôt : il a toujours priorité sur la détection automatique.',
   },
   {
-    q: "Où sont stockées mes variables d'environnement ?",
-    a: "Dans Eflex, jamais dans votre dépôt. Elles sont chiffrées en base (AES-256-GCM), transmises à l'application au démarrage et ne s'affichent plus une fois enregistrées.",
+    q: 'Où sont stockées mes variables d’environnement ?',
+    a: 'Dans Eflex, jamais dans votre dépôt. Elles sont chiffrées (AES-256-GCM), transmises à l’application au démarrage et ne s’affichent plus une fois enregistrées.',
   },
   {
-    q: 'Mes dépôts privés sont-ils compatibles ?',
-    a: "Oui. Connectez la GitHub App (recommandée) ou ajoutez un jeton personnel dans Paramètres → Connexion GitHub. Eflex lit le dépôt avec un accès à durée limitée et crée une deploy key en lecture seule pour le déploiement.",
+    q: 'Mes dépôts privés sont-ils compatibles ?',
+    a: 'Oui. Connectez la GitHub App (recommandée) ou ajoutez un jeton personnel dans Paramètres → Connexions. Pour publier un dépôt privé, Eflex lui ajoute une clé de déploiement en lecture seule, retirée à la suppression du projet.',
   },
   {
-    q: 'Mon dépôt contient plusieurs applications. Ça marche ?',
-    a: "Oui, pour en publier une. Eflex reconnaît les monorepos (pnpm, Turborepo, Nx, Lerna…) et vous demande laquelle déployer. Aujourd'hui, un seul service est publié par projet : les dépendances de workspace partagées et les applications annexes ne sont pas déployées automatiquement.",
+    q: 'Mon dépôt contient plusieurs applications. Ça marche ?',
+    a: 'Oui. Eflex reconnaît les monorepos (pnpm, Turborepo, Nx, Lerna…), liste les applications trouvées et vous demande laquelle publier.',
   },
   {
-    q: "Qu'est-ce qui n'est pas encore pris en charge ?",
-    a: "Les plans multi-services générés sans compose fourni dans le dépôt sont refusés : pour Laravel (services annexes, files d'attente, planificateur, etc.) ou plusieurs applications d'un même monorepo, ajoutez un `docker-compose.yml`/`compose.yaml` à la racine de l'application. Les volumes sont traduits mais leur création Coolify n'est activée que si `EFLEX_PERSISTENT_VOLUMES` est activé (désactivé par défaut) ; sauvegardes et quotas de stockage ne sont pas implémentés. Les métriques CPU/RAM ne sont pas disponibles.",
+    q: 'Qu’est-ce qui n’est pas encore pris en charge ?',
+    a: 'Eflex ne prépare pas encore seul une application à plusieurs services, comme Laravel avec son serveur web, sa file d’attente et son planificateur. Dans ce cas, ajoutez un fichier docker-compose.yml à votre dépôt : Eflex le déploie tel quel. Un projet publie une seule application d’un monorepo. Le stockage persistant des fichiers, les sauvegardes et les quotas de stockage ne sont pas encore disponibles.',
   },
 ]
 
@@ -145,7 +145,7 @@ export default function HomePage() {
                   <span className="text-eflexblue">Eflex le met en ligne.</span>
                 </h1>
                 <p className="max-w-xl text-lead-lg text-white/80 text-pretty">
-                  Indiquez votre dépôt GitHub : Eflex reconnaît la stack, construit l&apos;application et la publie
+                  Indiquez votre dépôt GitHub : Eflex reconnaît la stack, construit l’application et la publie
                   en HTTPS. Pas de serveur à configurer, pas de Dockerfile à écrire.
                 </p>
               </div>
@@ -207,10 +207,8 @@ export default function HomePage() {
               ))}
             </ul>
             <p className="mx-auto mt-7 max-w-2xl text-center text-xs text-muted-foreground text-pretty">
-              Laravel est reconnu. Les plans multi-services générés sans compose fourni sont refusés : ajoutez un
-              fichier <code className="font-mono">docker-compose.yml</code>/
-              <code className="font-mono">compose.yaml</code> au dépôt pour déployer ces services via compose fourni
-              (D1).
+              Plusieurs services à lancer ensemble ? Ajoutez un fichier{' '}
+              <code className="font-mono">docker-compose.yml</code> à votre dépôt : Eflex le déploie tel quel.
             </p>
           </div>
         </section>
@@ -223,8 +221,8 @@ export default function HomePage() {
         >
           <SectionHeading
             id="fonctionnement-titre"
-            title="Du dépôt à l'URL, en trois étapes"
-            lead="Vous connectez le dépôt, vous validez ce qu'Eflex a compris, puis l'application est mise en ligne."
+            title="Du dépôt à l’URL, en trois étapes"
+            lead="Vous connectez le dépôt, vous validez ce qu’Eflex a compris, puis l’application est mise en ligne."
           />
           <ol className="grid gap-6 md:grid-cols-3">
             {steps.map((step, i) => {
@@ -265,7 +263,7 @@ export default function HomePage() {
             <SectionHeading
               id="fonctionnalites-titre"
               title="Pensé pour les vrais projets, pas seulement pour les démos"
-              lead="Détection expliquée, dépôts privés, HTTPS automatique, variables chiffrées : ce que Eflex automatise pour vous."
+              lead="Détection expliquée, dépôts privés, HTTPS automatique, variables chiffrées : ce qu’Eflex automatise pour vous."
             />
 
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -274,7 +272,7 @@ export default function HomePage() {
                 icon={SearchCheck}
                 title="Des choix expliqués, pas une boîte noire"
                 description={
-                  "Eflex vous montre ce qu'il a trouvé dans votre dépôt et pourquoi. En cas de doute, il vous pose la question au lieu de deviner."
+                  'Eflex vous montre ce qu’il a trouvé dans votre dépôt et pourquoi. En cas de doute, il vous pose la question au lieu de deviner.'
                 }
                 className="sm:col-span-2 lg:row-span-2"
               >
@@ -285,13 +283,13 @@ export default function HomePage() {
                       Next.js · node@22
                     </span>
                     <span className="rounded-full bg-success/10 px-2.5 py-0.5 font-sans text-xs font-medium text-success tabular-nums">
-                      Confiance 95 %
+                      Confiance 95 %
                     </span>
                   </div>
                   <ul className="mt-4 space-y-2 text-muted-foreground">
                     {[
                       'Dépendance `next` trouvée dans `package.json`.',
-                      'Gestionnaire de paquets détecté : pnpm.',
+                      'Gestionnaire de paquets détecté : pnpm.',
                       'Fichier de configuration Next.js détecté.',
                     ].map((r) => (
                       <li key={r} className="flex gap-2">
@@ -301,7 +299,7 @@ export default function HomePage() {
                     ))}
                   </ul>
                   <p className="mt-4 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 font-sans text-xs text-warning">
-                    Conseil : activez <code className="font-mono">output: &apos;standalone&apos;</code> dans
+                    Conseil : activez <code className="font-mono">output: &apos;standalone&apos;</code> dans
                     next.config pour un démarrage plus rapide.
                   </p>
                 </div>
@@ -309,12 +307,10 @@ export default function HomePage() {
 
               <FeatureCard
                 icon={Layers}
-                title="Laravel détecté, PHP déployé"
+                title="Plusieurs services, un seul fichier"
                 description={
-                  "Laravel et PHP sont reconnus. Un plan Laravel multi-services généré sans compose fourni est refusé : " +
-                  "ajoutez un fichier `docker-compose.yml`/`compose.yaml` au dépôt pour déployer vos services (files " +
-                  "d'attente, planificateur, etc.) via compose fourni (D1). Les applications PHP simples passent en ligne " +
-                  "dès aujourd'hui."
+                  'Serveur web, file d’attente, planificateur : décrivez vos services dans un fichier ' +
+                  'docker-compose.yml à la racine du dépôt. Eflex le déploie tel quel.'
                 }
               />
 
@@ -322,8 +318,8 @@ export default function HomePage() {
                 icon={Lock}
                 title="HTTPS sans y penser"
                 description={
-                  "Certificats Let's Encrypt émis automatiquement et vérifiés après chaque déploiement, sur " +
-                  "l'adresse fournie par Eflex comme sur votre domaine après vérification DNS."
+                  'Certificats Let’s Encrypt émis automatiquement et vérifiés après chaque déploiement, sur ' +
+                  'l’adresse fournie par Eflex comme sur votre propre domaine.'
                 }
               />
 
@@ -331,24 +327,23 @@ export default function HomePage() {
                 icon={KeyRound}
                 title="Vos secrets restent hors de Git"
                 description={
-                  "Déclarez vos variables d'environnement dans Eflex : elles sont chiffrées (AES-256-GCM) et " +
+                  'Déclarez vos variables d’environnement dans Eflex : elles sont chiffrées (AES-256-GCM) et ' +
                   'injectées au démarrage, jamais écrites dans le dépôt.'
                 }
               />
 
               <FeatureCard
                 icon={Boxes}
-                title="Monorepos : une application à la fois"
+                title="Monorepos reconnus"
                 description={
-                  'pnpm, Turborepo, Nx, Lerna : Eflex repère vos applications et vous demande laquelle publier. ' +
-                  "Seule celle-ci est déployée : les dépendances de workspace partagées et les services annexes " +
-                  'ne sont pas encore publiés.'
+                  'pnpm, Turborepo, Nx, Lerna : Eflex repère les applications de votre dépôt et vous demande ' +
+                  'laquelle publier.'
                 }
               />
 
               <FeatureCard icon={FileCode2} title="Vous gardez la main" className="sm:col-span-2 lg:col-span-1">
                 <p className="mt-2 text-muted-foreground">
-                  Un Dockerfile est utilisé tel quel. Un besoin particulier ? Décrivez-le dans{' '}
+                  Un Dockerfile est utilisé tel quel. Un besoin particulier ? Décrivez-le dans{' '}
                   <code className="font-mono text-sm text-foreground">eflex.json</code>.
                 </p>
               </FeatureCard>
@@ -362,7 +357,7 @@ export default function HomePage() {
             <SectionHeading
               id="questions-titre"
               title="Questions fréquentes"
-              lead="Tout ce qu'il faut savoir avant de déployer votre premier projet."
+              lead="Tout ce qu’il faut savoir avant de déployer votre premier projet."
             />
             <div className="divide-y divide-border rounded-2xl border border-border bg-card">
               {faqs.map((item) => (
@@ -391,7 +386,7 @@ export default function HomePage() {
                 Publiez votre premier projet.
               </h2>
               <p className="text-lg text-white/90 text-pretty">
-                Créez un compte, branchez votre dépôt GitHub : Eflex analyse la stack et vous montre le plan avant la
+                Créez un compte, branchez votre dépôt GitHub : Eflex analyse la stack et vous montre le plan avant la
                 publication.
               </p>
               <div className="flex flex-col items-center gap-4 pt-2 sm:flex-row sm:justify-center">

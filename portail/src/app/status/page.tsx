@@ -25,7 +25,7 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: 'Statut des services — Eflex',
   description:
-    'État observé des services Eflex : portail, base de données, cache, déploiement et moteur Axiom, avec l’historique des relevés et des incidents déclarés.',
+    'État observé des services Eflex : portail, base de données, cache, déploiement et moteur Axiom, avec l’historique des relevés et des incidents déclarés.',
 }
 
 type BadgeVariant = 'success' | 'warning' | 'destructive' | 'outline'
@@ -90,7 +90,7 @@ function IncidentItem({ incident }: { incident: Incident }) {
         <p className="mt-1.5 text-sm text-muted-foreground">{incident.description}</p>
       )}
       <p className="mt-1.5 text-xs text-muted-foreground">
-        Début : <time dateTime={incident.startedAt}>{formatStatusDate(incident.startedAt)}</time>
+        Début : <time dateTime={incident.startedAt}>{formatStatusDate(incident.startedAt)}</time>
         {incident.resolvedAt && (
           <> · Résolu le <time dateTime={incident.resolvedAt}>{formatStatusDate(incident.resolvedAt)}</time></>
         )}
@@ -117,12 +117,12 @@ export default async function StatusPage() {
             <Badge variant="outline">État instantané</Badge>
           </div>
           <p className="max-w-3xl text-muted-foreground">
-            Cette page décrit l’état constaté par les sondages du serveur à l’ouverture de la page. Elle
-            ne constitue ni une garantie de disponibilité ni un engagement de service.
+            Chaque ouverture de cette page vérifie en direct les services d’Eflex. Vous y trouvez aussi
+            l’historique de disponibilité et les incidents signalés par l’équipe.
           </p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
             <p>
-              Dernière vérification :{' '}
+              Dernière vérification :{' '}
               <time dateTime={snapshot.checkedAt} className="font-medium text-foreground">
                 {formatStatusDate(snapshot.checkedAt)}
               </time>{' '}
@@ -169,7 +169,7 @@ export default async function StatusPage() {
                   ` · ${unknownCount} non surveillé${unknownCount > 1 ? 's' : ''}`}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Relevé {age}. Une panne d’un service périphérique dégrade l’ensemble ; une panne du
+                Relevé {age}. Une panne d’un service périphérique dégrade l’ensemble ; une panne du
                 portail ou de la base le rend indisponible.
               </p>
             </div>
@@ -187,8 +187,8 @@ export default async function StatusPage() {
             <p className="text-sm text-muted-foreground">Relevé {age}</p>
           </div>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            Chaque composant est interrogé avec un délai maximal de 3 secondes. Un composant
-            « non surveillé » n’est pas configuré : il n’est pas testé et n’entre pas dans l’état global.
+            Chaque composant doit répondre en moins de 3 secondes. Un composant « non surveillé » n’est
+            pas configuré : il n’entre pas dans l’état global.
           </p>
           <Card>
             <ul className="divide-y divide-border">
@@ -245,9 +245,7 @@ export default async function StatusPage() {
             <Badge variant="outline">Historique</Badge>
           </div>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            Part des relevés de composants marqués « opérationnels » sur chaque fenêtre. La collecte
-            démarre à la première ouverture de cette page (ou au premier appel de l’API) et se poursuit
-            au plus une fois par minute.
+            Part des relevés où les composants répondaient normalement, sur chaque période.
           </p>
           <div className="grid gap-4 sm:grid-cols-3">
             {snapshot.uptime.map((entry) => (
@@ -284,26 +282,14 @@ export default async function StatusPage() {
 
         <section aria-labelledby="limites" className="space-y-4">
           <h2 id="limites" className="text-xl font-semibold">
-            Ce que ces indicateurs ne mesurent pas
+            À propos de ces mesures
           </h2>
           <Card className="p-5 sm:p-6">
-            <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-              <li>
-                La collecte n’est pas continue : un relevé au plus par minute, déclenché par la
-                consultation de cette page ou par un appel à <code className="font-mono text-xs">/api/status</code>.
-              </li>
-              <li>
-                Les services non configurés restent « non surveillés » et sont exclus des pourcentages.
-              </li>
-              <li>
-                Les incidents sont déclarés manuellement par l’équipe ; seuls les 20 plus récents sont
-                conservés.
-              </li>
-              <li>
-                Les sondages vérifient la réponse des services de la plateforme, pas le rendu de chaque
-                application déployée.
-              </li>
-            </ul>
+            <p className="text-sm text-muted-foreground">
+              Un relevé est fait au plus une fois par minute, à la consultation de cette page ou de{' '}
+              <code className="font-mono text-xs">/api/status</code> ; il vérifie les services de la plateforme,
+              pas chaque application déployée.
+            </p>
           </Card>
         </section>
 
@@ -313,17 +299,13 @@ export default async function StatusPage() {
               Incidents déclarés
             </h2>
             <p className="text-sm text-muted-foreground">
-              Déclarés manuellement, du plus récent au plus ancien. Les 20 derniers sont conservés.
+              Signalés par l’équipe, du plus récent au plus ancien. Les 20 derniers sont affichés.
             </p>
           </div>
           <Card className="px-5">
             {snapshot.incidents.length === 0 ? (
               <div className="py-8 text-center">
-                <p className="text-sm font-medium">Aucun incident déclaré dans l’historique conservé.</p>
-                <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
-                  Cette absence ne prouve pas l’absence de panne : seuls les incidents consignés par
-                  l’équipe apparaissent ici.
-                </p>
+                <p className="text-sm font-medium">Aucun incident signalé pour le moment.</p>
               </div>
             ) : (
               <ul>
