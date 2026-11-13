@@ -5,28 +5,29 @@ import { useRouter } from 'next/navigation'
 import { Activity, Bell, CornerDownLeft, FolderKanban, Globe, Moon, Plus, Rocket, ScrollText, Search, UserPlus, Users } from 'lucide-react'
 import { applyTheme, readTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
+import {
+  buildProjectItems,
+  filterPaletteItems,
+  type PaletteIcon,
+  type PaletteItem,
+  type PaletteProject,
+} from '@/lib/command-palette-items'
 
-type Item = {
-  id: string
-  label: string
-  hint?: string
-  href?: string
-  action?: 'theme' | 'redeploy'
-  group: 'Actions' | 'Projets'
-  icon?: React.ComponentType<{ className?: string }>
-  projectId?: string
-  projectName?: string
+type Item = PaletteItem
+
+const ICONS: Record<PaletteIcon, React.ComponentType<{ className?: string }>> = {
+  plus: Plus,
+  projects: FolderKanban,
+  activity: Activity,
+  team: Users,
+  invite: UserPlus,
+  notifications: Bell,
+  theme: Moon,
+  project: FolderKanban,
+  redeploy: Rocket,
+  logs: ScrollText,
+  domain: Globe,
 }
-
-const ACTIONS: Item[] = [
-  { id: 'new', label: 'Nouveau projet', hint: 'Importer un dépôt GitHub', href: '/dashboard/new', group: 'Actions', icon: Plus },
-  { id: 'projects', label: 'Projets', href: '/dashboard', group: 'Actions', icon: FolderKanban },
-  { id: 'activity', label: 'Activité', hint: 'Tous les déploiements', href: '/dashboard/activity', group: 'Actions', icon: Activity },
-  { id: 'team', label: 'Équipe', hint: 'Membres et invitations', href: '/dashboard/organization', group: 'Actions', icon: Users },
-  { id: 'invite', label: 'Inviter un membre', hint: 'Depuis la page Équipe', href: '/dashboard/organization', group: 'Actions', icon: UserPlus },
-  { id: 'notifications', label: 'Notifications', hint: 'Et préférences', href: '/dashboard/notifications', group: 'Actions', icon: Bell },
-  { id: 'theme', label: 'Changer de thème', hint: 'Clair / sombre', action: 'theme', group: 'Actions', icon: Moon },
-]
 
 /** Bouton de recherche + palette de commandes (⌘K / Ctrl+K). Motif combobox accessible. */
 export function CommandPalette({ className, hotkey = true }: { className?: string; hotkey?: boolean }) {
@@ -90,45 +91,8 @@ export function CommandPalette({ className, hotkey = true }: { className?: strin
       inputRef.current?.focus()
       fetch('/api/projects')
         .then((r) => (r.ok ? r.json() : { projects: [], canManage: false }))
-        .then((data: {
-          canManage?: boolean
-          projects?: { id: string; name: string; domain: string | null; apps?: { id: string; name?: string; position: number; domain?: string | null }[] }[]
-        }) => {
-          const canManage = data.canManage === true
-          const items: Item[] = []
-          for (const p of data.projects ?? []) {
-            const primary = p.apps?.slice().sort((a, b) => a.position - b.position || (a.name ?? '').localeCompare(b.name ?? '') || a.id.localeCompare(b.id))[0]
-            const domain = primary?.domain ?? p.domain ?? null
-            items.push({ id: `project:${p.id}`, label: p.name, hint: domain ?? undefined, href: `/dashboard/projects/${p.id}`, group: 'Projets', icon: FolderKanban })
-            if (canManage) {
-              items.push({
-                id: `project:${p.id}:redeploy`,
-                label: `Redéployer ${p.name}`,
-                hint: p.name,
-                action: 'redeploy',
-                group: 'Projets',
-                icon: Rocket,
-                projectId: p.id,
-                projectName: p.name,
-              })
-              items.push({
-                id: `project:${p.id}:logs`,
-                label: `Voir les journaux de ${p.name}`,
-                hint: p.name,
-                href: `/dashboard/projects/${p.id}?tab=deployments`,
-                group: 'Projets',
-                icon: ScrollText,
-              })
-              items.push({
-                id: `project:${p.id}:domain`,
-                label: `Ajouter un domaine à ${p.name}`,
-                hint: p.name,
-                href: `/dashboard/projects/${p.id}/settings#domaines`,
-                group: 'Projets',
-                icon: Globe,
-              })
-            }
-          }
+        .then((data: { canManage?: boolean; projects?: PaletteProject[] }) => {
+          const items = buildProjectItems(data.projects ?? [], data.canManage === true)
           setProjectItems(items)
         })
         .catch(() => undefined)
@@ -137,11 +101,7 @@ export function CommandPalette({ className, hotkey = true }: { className?: strin
   }, [open])
 
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    const match = (i: Item) => !q || i.label.toLowerCase().includes(q) || (i.hint ?? '').toLowerCase().includes(q) || (i.projectName ?? '').toLowerCase().includes(q)
-    const matchedProjects = projectItems.filter(match)
-    const matchedActions = ACTIONS.filter(match)
-    return q ? [...matchedProjects, ...matchedActions] : [...matchedProjects.slice(0, 12), ...matchedActions]
+    return filterPaletteItems(query, projectItems)
   }, [query, projectItems])
 
   useEffect(() => setActive(0), [query])
@@ -271,7 +231,7 @@ export function CommandPalette({ className, hotkey = true }: { className?: strin
         <ul id={listId} role="listbox" aria-label="Résultats" className="max-h-80 overflow-auto p-2">
           {results.length === 0 && <li className="px-3 py-6 text-center text-sm text-muted-foreground">Aucun résultat pour « {query} »</li>}
           {results.map((item, i) => {
-            const Icon = item.icon ?? FolderKanban
+            const Icon = ICONS[item.icon] ?? FolderKanban
             const header = i === 0 || results[i - 1]!.group !== item.group
             return (
               <li key={`${item.group}-${item.id}`} role="presentation">
