@@ -136,6 +136,7 @@ function DnsGuide({
       </div>
 
       <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+        <li>Si vous ajoutez à la fois le domaine racine (<code className="font-mono">exemple.com</code>) et sa variante <code className="font-mono">www</code>, Eflex redirige automatiquement <code className="font-mono">www</code> vers le domaine racine pour les applications gérées par la plateforme.</li>
         <li>Désactivez le proxy/CDN (ex. « nuage orange ») sur l’enregistrement pendant la vérification si elle échoue.</li>
         <li>Vérifiez qu’il n’existe pas d’enregistrement contradictoire (ancien A/CNAME) pour le même hôte.</li>
         <li>La propagation DNS et l’émission du certificat peuvent prendre un peu de temps après validation.</li>

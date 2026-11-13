@@ -28,4 +28,19 @@ describe('traefikLabels', () => {
     expect(labels).toContain('traefik.http.routers.app-app.rule=Host(`app.eflex.app`) || Host(`client.example.com`)')
     expect(labels).toContain('traefik.http.routers.app-app.tls.certresolver=letsencrypt')
   })
+
+  it('ajoute une redirection www → apex quand les deux variantes sont servies', () => {
+    const labels = traefikLabels('site', 'app', ['example.com', 'www.example.com'], 3000, 'proxy')
+    expect(labels).toContain('traefik.http.routers.site-app.rule=Host(`example.com`) || Host(`www.example.com`)')
+    expect(labels).toContain('traefik.http.routers.site-app.middlewares=site-app-redir-example-com')
+    expect(labels).toContain('traefik.http.middlewares.site-app-redir-example-com.redirectregex.regex=^https?://www\\.example\\.com/(.*)')
+    expect(labels).toContain('traefik.http.middlewares.site-app-redir-example-com.redirectregex.replacement=https://example.com/${1}')
+    expect(labels).toContain('traefik.http.middlewares.site-app-redir-example-com.redirectregex.permanent=true')
+  })
+
+  it("n'ajoute pas de redirection si seule la variante www est présente", () => {
+    const labels = traefikLabels('site', 'app', ['www.example.com'], 3000, 'proxy')
+    expect(labels.some((l) => l.includes('redirectregex'))).toBe(false)
+    expect(labels.some((l) => l.includes('.middlewares='))).toBe(false)
+  })
 })
