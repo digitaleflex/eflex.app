@@ -51,7 +51,10 @@ clés aux largeurs **360, 768 et 1440 px** en thèmes **clair et sombre**.
 Dossier de sortie (stable) : `portail/e2e/screenshots/<thème>/<largeur>/`
 (par ex. `e2e/screenshots/light/1440/accueil.png`).
 
-Ces captures sont des artefacts locaux : elles ne sont pas versionnées (`portail/e2e/screenshots/` est ignoré par Git).
+- **Pages publiques** : accueil et pages clés (`/`, auth, statut, maintenance, 404, etc.).
+- **Console (authentifié)** : pages du tableau de bord et de projet ; l’**accueil du tableau de bord** (`/dashboard`) est capturé avec la **barre latérale dépliée** et **repliée** aux largeurs ≥ 768 px (`dashboard_sidebar-depliee.png`, `dashboard_sidebar-repliee.png`, issue #80).
+
+Ces captures sont des artefacts locaux : `portail/e2e/screenshots/` est ignoré par Git.
 
 ```bash
 # Captures publiques
@@ -65,27 +68,35 @@ Les parcours authentifiés reprennent les mêmes pages clés que l'audit
 (tableau de bord, nouveau projet, équipe, notifications, paramètres, activité,
 pages projet et, avec `PLAYWRIGHT_ADMIN=1`, administration).
 
+## Captures de référence et procédure de mise à jour (#80)
+
+Les captures générées dans `e2e/screenshots/` servent de base de comparaison visuelle. Pour les **versionner comme références** :
+
+1. Générer les captures sur une base de test connue : `npm run test:screenshots` (et, si besoin, `PLAYWRIGHT_AUTH=1 PLAYWRIGHT_ADMIN=1 npm run test:screenshots`).
+2. Vérifier visuellement les différences (thème, viewport, état de la barre latérale).
+3. Copier/valider les images de référence à versionner dans le dépôt (par ex. un dossier dédié de références suivi par Git, ou en retirant temporairement l’ignore pour les fichiers retenus), puis committer avec une note décrivant le changement visuel attendu.
+4. En cas d’évolution UI intentionnelle, régénérer les captures, mettre à jour les références versionnées dans la même PR et documenter la raison dans la description de la PR.
+
+> Remarque : le dossier de sortie brut reste ignoré pour éviter de committer des artefacts volumineux/non validés. Le workflow `.github/workflows/a11y.yml` exécute `test:a11y` (axe) en CI ; l’intégration de `test:screenshots` / comparaison de références peut être ajoutée dans un job dédié si le temps d’exécution reste raisonnable.
+
 ## Intégration CI
 
-L'exécution complète nécessite un build, un serveur, les navigateurs Playwright
-et, pour les parcours authentifiés, une base de données initialisée. Elle n'est
-pas branchée dans le workflow principal `ts.yml` afin de ne pas alourdir chaque
-exécution.
+Le workflow **`.github/workflows/a11y.yml`** exécute déjà les audits axe (`npm run test:a11y`) sur PR/push (portail/détecteur) avec base de test, seed et Playwright/Chromium, et publie les rapports en artefacts en cas d’échec.
 
-Pour l'intégrer de façon raisonnable, prévoir un job dédié (éventuellement non
-bloquant ou manuel) qui :
+Pour étendre à la comparaison visuelle (captures de référence), prévoir un job dédié (éventuellement non bloquant ou manuel) qui :
 
 1. installe les dépendances du portail et exécute `npx playwright install --with-deps chromium` ;
 2. construit le portail (`npm run build`) et le sert (`PLAYWRIGHT_WEB_SERVER="npm run start -- --port 3000"`) ;
 3. provisionne une base de test, applique les migrations, lance `node e2e/seed-auth.mjs` ;
-4. exécute `PLAYWRIGHT_AUTH=1 PLAYWRIGHT_ADMIN=1 npm run test:a11y` (et, au besoin, `npm run test:screenshots`) ;
-5. publie le rapport HTML et les captures en artefacts.
+4. exécute `PLAYWRIGHT_AUTH=1 PLAYWRIGHT_ADMIN=1 npm run test:screenshots` (et/ou compare aux références versionnées) ;
+5. publie les captures/rapports en artefacts.
 
 ## Limitations
 
 - Les captures et les audits dépendent d'un rendu navigateur réel ; ils ne sont
   pas exécutés par `pnpm test` à la racine.
 - Le zoom 200 % et les lecteurs d'écran réels ne sont pas couverts
-  automatiquement (voir `docs/accessibility/audit-wcag.md`).
+  automatiquement (à compléter par des vérifications manuelles/assistées).
+- Les références visuelles versionnées doivent être mises à jour lors des changements UI intentionnels (voir procédure ci-dessus).
 - Si `next dev` échoue à cause de l'instrumentation/worker en local, préférer un
   build puis `npm run start` avec `REDIS_URL` vide.

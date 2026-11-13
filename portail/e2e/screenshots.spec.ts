@@ -7,6 +7,8 @@ import path from 'node:path'
  *
  * Largeurs : 360, 768 et 1440 px. Thèmes : clair et sombre.
  * Les fichiers sont enregistrés dans `e2e/screenshots/<thème>/<largeur>/`.
+ * Pour la console (tableau de bord), l’accueil est capturé avec la barre latérale
+ * dépliée et repliée aux largeurs ≥ 768 px (issue #80).
  *
  * Parcours public toujours exécuté ; parcours authentifié si `PLAYWRIGHT_AUTH=1`
  * (mêmes prérequis que `a11y.spec.ts`, voir `e2e/seed-auth.mjs`).
@@ -66,6 +68,13 @@ function safeName(route: string) {
 async function setTheme(context: import('@playwright/test').BrowserContext, theme: string, baseURL: string) {
   await context.clearCookies({ name: 'eflex-theme' })
   await context.addCookies([{ name: 'eflex-theme', value: theme, domain: new URL(baseURL).hostname, path: '/' }])
+}
+
+async function setSidebar(context: import('@playwright/test').BrowserContext, collapsed: boolean, baseURL: string) {
+  await context.clearCookies({ name: 'eflex-sidebar' })
+  await context.addCookies([
+    { name: 'eflex-sidebar', value: collapsed ? 'collapsed' : 'expanded', domain: new URL(baseURL).hostname, path: '/' },
+  ])
 }
 
 async function capture(page: Page, route: string, theme: string, width: string, name?: string) {
@@ -142,7 +151,14 @@ if (!AUTH) {
           ]
 
           for (const route of DASHBOARD_PAGES) {
-            await capture(page, route, theme, viewport.label)
+            if (route === '/dashboard' && viewport.width >= 768) {
+              await setSidebar(context, false, baseURL!)
+              await capture(page, route, theme, viewport.label, 'dashboard_sidebar-depliee')
+              await setSidebar(context, true, baseURL!)
+              await capture(page, route, theme, viewport.label, 'dashboard_sidebar-repliee')
+            } else {
+              await capture(page, route, theme, viewport.label)
+            }
           }
           for (const [route, name] of projectPages) {
             await capture(page, route, theme, viewport.label, name)
