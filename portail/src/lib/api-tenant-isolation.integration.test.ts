@@ -173,6 +173,15 @@ vi.mock('@/lib/project-deployments', async (importOriginal) => {
     })),
   }
 })
+vi.mock('@/lib/project-transfer', () => ({
+  transferProjectSchema: { safeParse: (v: unknown) => ({ success: true, data: v }) },
+  transferProject: vi.fn(async () => ({
+    ok: false as const,
+    status: 404,
+    error: 'Projet introuvable.',
+    code: 'not_found',
+  })),
+}))
 vi.mock('@/lib/custom-domain', () => ({
   normalizeHostname: (v: string) => v.trim().toLowerCase(),
   validateCustomHostname: () => ({ ok: true }),
@@ -304,10 +313,12 @@ run('isolation cross-tenant des routes projet/déploiement (#22)', () => {
     { name: 'POST /api/projects/[id]/env-vars', method: 'POST', path: '...', importPath: '@/app/api/projects/[id]/env-vars/route', params: { id: 'PROJECT' }, body: { key: 'X', value: 'y' } },
     { name: 'DELETE /api/projects/[id]/env-vars/[key]', method: 'DELETE', path: '...', importPath: '@/app/api/projects/[id]/env-vars/[key]/route', params: { id: 'PROJECT', key: 'SECRET_TOKEN' } },
     { name: 'GET /api/projects/[id]/logs', method: 'GET', path: '...', importPath: '@/app/api/projects/[id]/logs/route', params: { id: 'PROJECT' } },
+    { name: 'GET /api/projects/[id]/logs/stream', method: 'GET', path: '...', importPath: '@/app/api/projects/[id]/logs/stream/route', params: { id: 'PROJECT' } },
     { name: 'GET /api/projects/[id]/metrics', method: 'GET', path: '...', importPath: '@/app/api/projects/[id]/metrics/route', params: { id: 'PROJECT' } },
     { name: 'POST /api/projects/[id]/redeploy', method: 'POST', path: '...', importPath: '@/app/api/projects/[id]/redeploy/route', params: { id: 'PROJECT' } },
     { name: 'GET /api/projects/[id]/runtime', method: 'GET', path: '...', importPath: '@/app/api/projects/[id]/runtime/route', params: { id: 'PROJECT' } },
     { name: 'POST /api/projects/[id]/runtime', method: 'POST', path: '...', importPath: '@/app/api/projects/[id]/runtime/route', params: { id: 'PROJECT' }, body: { action: 'restart' } },
+    { name: 'POST /api/projects/[id]/transfer', method: 'POST', path: '...', importPath: '@/app/api/projects/[id]/transfer/route', params: { id: 'PROJECT' }, body: { organizationId: 'org-target' } },
     { name: 'GET /api/projects/[id]/databases', method: 'GET', path: '...', importPath: '@/app/api/projects/[id]/databases/route', params: { id: 'PROJECT' } },
     { name: 'POST /api/projects/[id]/databases', method: 'POST', path: '...', importPath: '@/app/api/projects/[id]/databases/route', params: { id: 'PROJECT' }, body: { kind: 'postgresql' } },
     { name: 'DELETE /api/projects/[id]/databases/[databaseId]', method: 'DELETE', path: '...', importPath: '@/app/api/projects/[id]/databases/[databaseId]/route', params: { id: 'PROJECT', databaseId: 'DATABASE' } },
