@@ -24,6 +24,7 @@ import { HeroConsolePreview } from '@/components/marketing/hero-console-preview'
 import { StackShowcase } from '@/components/marketing/stack-showcase'
 import { MigrationTeaser } from '@/components/marketing/migration-teaser'
 import { GithubMark } from '@/components/icons/github-mark'
+import { getLegalCompanyInfo } from '@/lib/legal-info'
 
 const steps = [
   {
@@ -157,6 +158,8 @@ function FeatureCard({
 }
 
 export default function HomePage() {
+  // Même source que le pied de page : une seule adresse de contact à maintenir.
+  const { email: contactEmail } = getLegalCompanyInfo()
   return (
     <div className="homepage-light flex min-h-screen flex-col">
       <SiteHeader />
@@ -164,7 +167,7 @@ export default function HomePage() {
       <main id="contenu" tabIndex={-1} className="flex-1">
         {/* ─── Hero : surface pleine largeur navy, preuve produit intégrée ─── */}
         <section className="relative overflow-hidden bg-eflexnavy text-white">
-          <div className="container relative grid items-center gap-12 py-16 md:py-20 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:py-24">
+          <div className="container relative grid grid-cols-1 items-center gap-12 py-16 md:py-20 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:py-24">
             <div className="space-y-8 animate-reveal">
               <div className="space-y-5">
                 <h1 className="text-display font-bold text-balance text-white">
@@ -193,7 +196,7 @@ export default function HomePage() {
                 </Link>
               </div>
 
-              <ul className="grid gap-x-6 gap-y-3 text-sm text-white/80 sm:grid-cols-2">
+              <ul className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm text-white/80 sm:grid-cols-2">
                 {[
                   { label: 'HTTPS automatique', icon: ShieldCheck },
                   { label: 'Sans Dockerfile à écrire', icon: Layers },
@@ -234,7 +237,7 @@ export default function HomePage() {
             }
             lead="Vous connectez le dépôt, vous validez ce qu'Eflex a compris, puis l'application est mise en ligne."
           />
-          <ol className="grid gap-6 md:grid-cols-3">
+          <ol className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {steps.map((step, i) => {
               const Icon = step.icon
               return (
@@ -263,7 +266,7 @@ export default function HomePage() {
             })}
           </ol>
 
-          <ul className="grid gap-6 border-t border-border pt-8 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="grid grid-cols-1 gap-6 border-t border-border pt-8 sm:grid-cols-2 lg:grid-cols-4">
             {benefits.map((item) => (
               <li key={item.title} className="flex items-start gap-3">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -293,7 +296,7 @@ export default function HomePage() {
 
             <StackShowcase />
 
-            <ul className="mx-auto grid max-w-5xl gap-6 border-t border-white/10 pt-8 md:grid-cols-3">
+            <ul className="mx-auto grid grid-cols-1 max-w-5xl gap-6 border-t border-white/10 pt-8 md:grid-cols-3">
               {[
                 {
                   icon: Zap,
@@ -347,7 +350,7 @@ export default function HomePage() {
 
             <StackShowcase />
 
-            <ul className="mx-auto grid max-w-5xl gap-6 border-t border-white/10 pt-8 md:grid-cols-3">
+            <ul className="mx-auto grid grid-cols-1 max-w-5xl gap-6 border-t border-white/10 pt-8 md:grid-cols-3">
               {[
                 {
                   icon: Zap,
@@ -399,7 +402,7 @@ export default function HomePage() {
               lead="Détection expliquée, dépôts privés, HTTPS automatique, variables chiffrées : ce que Eflex automatise pour vous."
             />
 
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {/* Carte principale : détection expliquée */}
               <FeatureCard
                 icon={SearchCheck}
@@ -487,11 +490,11 @@ export default function HomePage() {
         </section>
 
         {/* ─── Migration Center : annonce « Bientôt » (MIG-0, #148) ─── */}
-        <MigrationTeaser />
+        <MigrationTeaser contactEmail={contactEmail} />
 
         {/* ─── FAQ ─── */}
         <section id="questions" aria-labelledby="questions-titre" className="scroll-mt-20 container py-20 md:py-28">
-          <div className="grid gap-12 lg:grid-cols-[1fr_1.6fr]">
+          <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1fr_1.6fr]">
             <div className="space-y-8">
               <SectionHeading
                 id="questions-titre"
@@ -502,7 +505,7 @@ export default function HomePage() {
                 <h3 className="text-lg font-semibold">Vous ne trouvez pas votre réponse ?</h3>
                 <p className="text-sm text-muted-foreground">Écrivez-nous : nous vous aidons.</p>
                 <a
-                  href="mailto:admin@eflex.app?subject=Question%20sur%20Eflex"
+                  href={`mailto:${contactEmail}?subject=Question%20sur%20Eflex`}
                   className="inline-flex min-h-11 items-center justify-center rounded-xl border border-input bg-background px-4 text-sm font-semibold transition-colors hover:bg-secondary hover:text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   Contacter le support
@@ -530,7 +533,7 @@ export default function HomePage() {
 
         {/* ─── Appel final : bande bleu royal, distinct du hero navy ─── */}
         <section aria-labelledby="appel-titre" className="container pb-20 md:pb-28">
-          <div className="grid items-center gap-10 rounded-3xl bg-primary px-6 py-12 text-white sm:px-12 md:py-16 lg:grid-cols-[1.2fr_1fr]">
+          <div className="grid grid-cols-1 items-center gap-10 rounded-3xl bg-primary px-6 py-12 text-white sm:px-12 md:py-16 lg:grid-cols-[1.2fr_1fr]">
             <div className="space-y-6">
               <h2 id="appel-titre" className="text-3xl font-bold tracking-tight text-balance text-white sm:text-4xl">
                 Publiez votre premier projet avec Eflex.

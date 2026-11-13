@@ -72,7 +72,7 @@ const journey = [
   { icon: Rocket, label: 'Migrez vers Eflex' },
 ]
 
-export function MigrationTeaser() {
+export function MigrationTeaser({ contactEmail }: { contactEmail: string }) {
   return (
     <section id="migration" aria-labelledby="migration-titre" className="scroll-mt-20 bg-eflexnavy text-white">
       <div className="container space-y-12 py-16 md:py-24">
@@ -89,7 +89,7 @@ export function MigrationTeaser() {
           </p>
         </div>
 
-        <div className="grid items-start gap-8 lg:grid-cols-[1fr_1.1fr]">
+        <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[1fr_1.1fr]">
           {/* Maquette du futur parcours : décorative, non disponible. */}
           <figure className="min-w-0">
             <div
@@ -147,7 +147,7 @@ export function MigrationTeaser() {
             </figcaption>
           </figure>
 
-          <ul className="grid gap-3 sm:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {capabilities.map((item) => (
               <li key={item.title} className="flex gap-3 rounded-2xl bg-white/[0.05] p-4 ring-1 ring-white/10">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/25 ring-1 ring-primary/40">
@@ -167,7 +167,7 @@ export function MigrationTeaser() {
           </ul>
         </div>
 
-        <ol className="grid gap-4 border-t border-white/10 pt-8 sm:grid-cols-2 lg:grid-cols-5">
+        <ol className="grid grid-cols-1 gap-4 border-t border-white/10 pt-8 sm:grid-cols-2 lg:grid-cols-5">
           {journey.map((step, i) => (
             <li key={step.label} className="flex items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/15">
@@ -189,7 +189,7 @@ export function MigrationTeaser() {
             </p>
           </div>
           <a
-            href="mailto:admin@eflex.app?subject=Migration%20Center%20%3A%20me%20pr%C3%A9venir%20du%20lancement"
+            href={`mailto:${contactEmail}?subject=Migration%20Center%20%3A%20me%20pr%C3%A9venir%20du%20lancement`}
             className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
             Être prévenu du lancement
