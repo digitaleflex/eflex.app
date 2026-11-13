@@ -399,6 +399,54 @@ npm ERR! network request to https://registry.npmjs.org/react/-/react-18.3.1.tgz 
     })
   })
 
+  it('détecte une connexion base de données refusée', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: "Error: P1001: Can't reach database server at `postgres:5432`",
+      projectId: 'p1',
+    })
+    expect(d).toEqual({
+      cause: "La connexion à une base de données ou un service dépendant a échoué.",
+      action: { label: 'Vérifier les variables', href: '/dashboard/projects/p1?tab=variables' },
+    })
+  })
+
+  it('détecte une erreur de certificat TLS', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'x509: certificate signed by unknown authority',
+      projectId: 'p1',
+    })
+    expect(d?.cause).toContain('certificat TLS')
+  })
+
+  it('détecte une limite de téléchargement d’image (rate limit)', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'toomanyrequests: You have reached your pull rate limit. You may increase the limit by authenticating and upgrading',
+      projectId: 'p1',
+    })
+    expect(d?.cause).toContain('limit')
+  })
+
+  it('détecte un dépassement du temps de construction', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'context deadline exceeded',
+      projectId: 'p1',
+    })
+    expect(d?.cause).toContain('temps imparti')
+  })
+
+  it('détecte un échec de healthcheck', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'container for service "app" is unhealthy, health check failed',
+      projectId: 'p1',
+    })
+    expect(d?.cause).toContain('santé')
+  })
+
   it('ne diagnostique pas un journal sans motif connu', () => {
     expect(
       diagnoseFailure({ status: 'failed', logs: 'quelque chose de totalement différent', projectId: 'p1' }),

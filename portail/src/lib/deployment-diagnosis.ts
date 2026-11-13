@@ -37,6 +37,15 @@ const RULES: Rule[] = [
     action: (id) => ({ label: 'Ouvrir les variables', href: `/dashboard/projects/${id}?tab=variables` }),
   },
   {
+    id: 'healthcheck-failed',
+    test: (t) =>
+      /health ?check.*(fail|unhealthy|timeout)|container .* unhealthy|Readiness probe failed|Liveness probe failed/i.test(
+        t,
+      ),
+    cause: "Le contrôle de santé de l'application a échoué après le démarrage.",
+    action: (id) => ({ label: 'Vérifier le port et les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
     id: 'port',
     test: (t) =>
       /no (open )?ports? detected|port .*not (found|listening)|exposed port|health ?check.*(fail|timeout)/i.test(
@@ -57,7 +66,7 @@ const RULES: Rule[] = [
   {
     id: 'oom',
     test: (t) =>
-      /out of memory|oom|killed process|exit code 137|javascript heap out of memory|Cannot allocate memory/i.test(
+      /out of memory|\boom\b|killed process|exit code 137|javascript heap out of memory|Cannot allocate memory/i.test(
         t,
       ),
     cause: "La construction ou l'exécution semble avoir manqué de mémoire.",
@@ -199,6 +208,42 @@ const RULES: Rule[] = [
       /listen EADDRINUSE/i.test(t),
     cause: "Le port demandé est déjà utilisé au démarrage de l'application.",
     action: (id) => ({ label: 'Corriger le port', href: `/dashboard/projects/${id}/settings` }),
+  },
+  {
+    id: 'db-connection',
+    test: (t) =>
+      (/ECONNREFUSED|connection refused|could not connect to server/i.test(t) &&
+        /\b(postgres|postgresql|mysql|mariadb|redis|mongo|database|db|5432|3306|6379|27017)\b/i.test(t)) ||
+      /P1001|Can't reach database server|Connection refused \(os error 111\)/i.test(t),
+    cause: "La connexion à une base de données ou un service dépendant a échoué.",
+    action: (id) => ({ label: 'Vérifier les variables', href: `/dashboard/projects/${id}?tab=variables` }),
+  },
+  {
+    id: 'tls-certificate',
+    test: (t) =>
+      /x509: certificate|certificate (verify|validation) failed|self[- ]signed certificate in certificate chain|unable to get local issuer certificate|tls: failed to verify certificate/i.test(
+        t,
+      ),
+    cause: "La validation d'un certificat TLS a échoué (registre, dépendance ou service distant).",
+    action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
+    id: 'image-pull-rate-limit',
+    test: (t) =>
+      /toomanyrequests|You have reached your pull rate limit|rate limit.*(pull|docker|registry)|429 Too Many Requests/i.test(
+        t,
+      ),
+    cause: "Le téléchargement d'une image a été limité (quota du registre atteint).",
+    action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
+    id: 'build-timeout',
+    test: (t) =>
+      /build (timed out|timeout)|context deadline exceeded|deadline exceeded|execution expired|Job exceeded/i.test(
+        t,
+      ),
+    cause: 'La construction a dépassé le temps imparti.',
+    action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
   },
   {
     id: 'permission-build',
