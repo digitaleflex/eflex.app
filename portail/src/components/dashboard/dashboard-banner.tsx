@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactElement } from 'react'
 import Link from 'next/link'
 import { AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -84,31 +84,43 @@ export function DashboardBanner({ impersonatedUserName, billingBlock }: Dashboar
     currentAnnouncementHash && dismissedHash === currentAnnouncementHash,
   )
 
-  const chosen = useMemo(() => {
+  const { chosen, hiddenCount } = useMemo(() => {
     const candidates: BannerKind[] = []
     if (impersonatedUserName) candidates.push('impersonation')
     if (billingBlock) candidates.push(billingBlock.kind)
     if (maintenance?.enabled) candidates.push('maintenance')
     if (announcement && !announcementDismissed) candidates.push('announcement')
-    return selectBanner(candidates)
+    const selected = selectBanner(candidates)
+    return { chosen: selected, hiddenCount: selected ? Math.max(0, candidates.length - 1) : 0 }
   }, [impersonatedUserName, billingBlock, maintenance, announcement, announcementDismissed])
 
   if (!chosen) return null
 
+  const withHidden = (content: ReactElement) => (
+    <div className="space-y-1">
+      {content}
+      {hiddenCount > 0 && (
+        <p className="text-xs text-muted-foreground">
+          +{hiddenCount} autre{hiddenCount > 1 ? 's' : ''} information{hiddenCount > 1 ? 's' : ''} masquée{hiddenCount > 1 ? 's' : ''} (priorité plus basse).
+        </p>
+      )}
+    </div>
+  )
+
   if (chosen === 'impersonation' && impersonatedUserName) {
-    return <ImpersonationBannerContent userName={impersonatedUserName} />
+    return withHidden(<ImpersonationBannerContent userName={impersonatedUserName} />)
   }
 
   if ((chosen === 'suspension' || chosen === 'past_due') && billingBlock) {
-    return <BillingBannerContent message={billingBlock.message} />
+    return withHidden(<BillingBannerContent message={billingBlock.message} />)
   }
 
   if (chosen === 'maintenance' && maintenance?.enabled) {
-    return <MaintenanceBannerContent message={maintenance.message} />
+    return withHidden(<MaintenanceBannerContent message={maintenance.message} />)
   }
 
   if (chosen === 'announcement' && announcement && currentAnnouncementHash) {
-    return (
+    return withHidden(
       <AnnouncementBannerContent
         message={announcement}
         level={announcementLevel}
