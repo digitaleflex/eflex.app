@@ -17,6 +17,12 @@ const FRAMEWORK_LOGOS: Record<string, string> = {
   docker: '/logos/docker.svg',
   compose: '/logos/docker.svg',
   'eflex-config': '/logo-mark.png',
+  react: '/logos/react.svg',
+  go: '/logos/go.svg',
+  tailwind: '/logos/tailwindcss.svg',
+  github: '/logos/github.svg',
+  gitlab: '/logos/gitlab.svg',
+  bitbucket: '/logos/bitbucket.svg',
 }
 
 /** Composantes RGB de la couleur de marque : sert à teinter la plaque de fond. */
@@ -37,6 +43,12 @@ const FRAMEWORK_COLORS: Record<string, string> = {
   docker: '36 150 237',
   compose: '36 150 237',
   'eflex-config': '37 99 235',
+  react: '97 218 251',
+  go: '0 173 216',
+  tailwind: '6 182 212',
+  github: '24 23 23',
+  gitlab: '252 109 38',
+  bitbucket: '0 82 204',
 }
 
 export function FrameworkIcon({
