@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Activity, Cpu, HardDrive, Info, MemoryStick, RefreshCw, Wifi } from 'lucide-react'
+import { Activity, Cpu, Gauge, HardDrive, Info, MemoryStick, RefreshCw, Users, Wifi } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -10,6 +10,14 @@ export type UsageProject = {
   id: string
   name: string
   apps: Array<{ id: string; name: string; deployed: boolean }>
+}
+
+export type UsageQuotaSummary = {
+  planLabel: string
+  phase: string
+  apps: { used: number; limit: number }
+  members: { used: number; limit: number }
+  customDomains: { used: number; maxPerProject: number; limitPerProject: number }
 }
 
 type MetricsPayload = {
@@ -84,7 +92,50 @@ function UnavailableResource({ icon: Icon, label, reason }: { icon: typeof HardD
   )
 }
 
-export function UsageView({ projects }: { projects: UsageProject[] }) {
+function phaseLabel(phase: string): string {
+  switch (phase) {
+    case 'trialing':
+      return 'Essai'
+    case 'active':
+      return 'Actif'
+    case 'past_due':
+      return 'Paiement en retard'
+    case 'expired':
+      return 'Expiré'
+    case 'pending':
+      return 'En attente'
+    case 'cancelled':
+      return 'Résilié'
+    case 'free':
+    default:
+      return 'Gratuit'
+  }
+}
+
+function QuotaBar({ used, limit, label }: { used: number; limit: number; label: string }) {
+  const ratio = limit > 0 ? Math.max(0, Math.min(1, used / limit)) : 0
+  return (
+    <div
+      className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
+      role="meter"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={limit}
+      aria-valuenow={used}
+      aria-valuetext={`${used} sur ${limit}`}
+    >
+      <div
+        className={cn(
+          'h-full rounded-full transition-[width] duration-300',
+          ratio >= 1 ? 'bg-destructive' : ratio >= 0.8 ? 'bg-amber-500' : 'bg-primary',
+        )}
+        style={{ width: `${Math.min(100, ratio * 100)}%` }}
+      />
+    </div>
+  )
+}
+
+export function UsageView({ projects, quota }: { projects: UsageProject[]; quota?: UsageQuotaSummary }) {
   const targets = useMemo(
     () =>
       projects.flatMap((project) =>
@@ -125,7 +176,6 @@ export function UsageView({ projects }: { projects: UsageProject[] }) {
 
   const refresh = useCallback(async () => {
     setSamples(targets.map((t) => ({ ...t, loading: true, error: null, metrics: null })))
-    // Concurrence bornée pour éviter de surcharger l'hébergement.
     const queue = [...targets]
     const run = async () => {
       for (;;) {
@@ -161,6 +211,63 @@ export function UsageView({ projects }: { projects: UsageProject[] }) {
           Actualiser
         </Button>
       </header>
+
+      {quota && (
+        <section aria-labelledby="usage-quota-title" className="rounded-xl border border-border bg-card p-4 sm:p-5">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <h2 id="usage-quota-title" className="flex items-center gap-2 text-sm font-semibold">
+              <Gauge className="h-4 w-4 text-primary" aria-hidden="true" />
+              Plan et consommation connue
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Plan <span className="font-medium text-foreground">{quota.planLabel}</span> · {phaseLabel(quota.phase)}
+            </p>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Comparaison entre les quotas de votre abonnement et la consommation <strong className="font-medium text-foreground">comptabilisée</strong> dans Eflex.
+            Source : base de données de l’organisation (abonnement et compteurs). Unités et périodes sont précisées ci-dessous ; aucune valeur estimée n’est affichée.
+          </p>
+          <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-border bg-background p-3">
+              <dt className="text-xs font-medium text-muted-foreground">Applications déployables</dt>
+              <dd className="mt-1 font-mono text-base font-semibold tabular-nums">
+                {quota.apps.used.toLocaleString('fr-FR')} / {quota.apps.limit.toLocaleString('fr-FR')}
+              </dd>
+              <QuotaBar used={quota.apps.used} limit={quota.apps.limit} label="Quota d’applications" />
+              <p className="mt-2 text-xs text-muted-foreground">Unité : applications (compte organisation). Source : compteur de projets/applications.</p>
+            </div>
+            <div className="rounded-lg border border-border bg-background p-3">
+              <dt className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Users className="h-4 w-4 shrink-0" aria-hidden="true" />
+                Membres
+              </dt>
+              <dd className="mt-1 font-mono text-base font-semibold tabular-nums">
+                {quota.members.used.toLocaleString('fr-FR')} / {quota.members.limit.toLocaleString('fr-FR')}
+              </dd>
+              <QuotaBar used={quota.members.used} limit={quota.members.limit} label="Quota de membres" />
+              <p className="mt-2 text-xs text-muted-foreground">Unité : membres de l’organisation. Source : compteur de membres.</p>
+            </div>
+            <div className="rounded-lg border border-border bg-background p-3">
+              <dt className="text-xs font-medium text-muted-foreground">Domaines personnalisés</dt>
+              <dd className="mt-1 font-mono text-base font-semibold tabular-nums">
+                {quota.customDomains.used.toLocaleString('fr-FR')} au total
+              </dd>
+              <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+                Limite : {quota.customDomains.limitPerProject.toLocaleString('fr-FR')} par projet · utilisation max observée sur un projet : {quota.customDomains.maxPerProject.toLocaleString('fr-FR')}
+              </p>
+              <QuotaBar
+                used={quota.customDomains.maxPerProject}
+                limit={quota.customDomains.limitPerProject}
+                label="Utilisation maximale de domaines par projet"
+              />
+              <p className="mt-2 text-xs text-muted-foreground">Unités : domaines personnalisés (total organisation) et limite par projet. Source : compteur de domaines.</p>
+            </div>
+          </dl>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Quotas non mesurés ici : stockage, bande passante, CPU/mémoire cumulés — aucune source documentée disponible (aucune valeur affichée).
+          </p>
+        </section>
+      )}
 
       <section aria-labelledby="usage-source-title" className="rounded-xl border border-border bg-card p-4 sm:p-5">
         <h2 id="usage-source-title" className="flex items-center gap-2 text-sm font-semibold">
