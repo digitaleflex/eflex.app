@@ -39,7 +39,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     },
   })
   if ('response' in projectResult) return projectResult.response
-  const project = projectResult.project as any
+  const project = projectResult.project
 
   const requestedAppId = new URL(request.url).searchParams.get('appId')?.trim() || null
 
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   } else if (apps.length > 0) {
     targetApp =
       apps.find((app) => app.coolifyAppId) ??
-      (getPrimaryApp(apps as any) as { id: string; coolifyAppId: string | null } | null) ??
+      (getPrimaryApp(apps) as { id: string; coolifyAppId: string | null } | null) ??
       apps[0] ??
       null
   }

@@ -40,7 +40,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     project: { select: { id: true, envVars: { select: { key: true, value: true } } } },
   })
   if ('response' in deploymentResult) return deploymentResult.response
-  const deployment = deploymentResult.deployment as any
+  const deployment = deploymentResult.deployment
 
   if ((open.get(userId) ?? 0) >= MAX_STREAMS_PER_USER) {
     return NextResponse.json({ error: 'Trop de flux ouverts. Fermez un onglet de journaux puis réessayez.' }, { status: 429 })

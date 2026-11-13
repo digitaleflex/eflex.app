@@ -41,7 +41,9 @@ describe('diffRuntimeSnapshot', () => {
   })
 })
 
-type Evt = { event: string; data: any; id?: string | number }
+// Forme des événements émis par `streamRuntimeLogs` (`log` porte `lines`, `warn` porte `message`).
+type EvtData = { lines: Array<{ text: string }>; message?: unknown }
+type Evt = { event: string; data: EvtData; id?: string | number }
 
 function script(steps: Array<{ logs: string } | { error: string } | Error>) {
   let i = 0
@@ -74,10 +76,10 @@ describe('streamRuntimeLogs', () => {
       client,
       secrets: ['s3cret'],
       intervalMs: 1,
-      send: (event, data, id) => events.push({ event, data, id }),
+      send: (event, data, id) => events.push({ event, data: data as EvtData, id }),
       signal: ctrl.signal,
     })
-    const lines = events.filter((e) => e.event === 'log').flatMap((e) => e.data.lines.map((l: any) => l.text))
+    const lines = events.filter((e) => e.event === 'log').flatMap((e) => e.data.lines.map((l) => l.text))
     expect(lines).toEqual(['hello token=***', 'world', 'next'])
     expect(JSON.stringify(events)).not.toContain('s3cret')
     expect(events.some((e) => e.event === 'stats')).toBe(true)
@@ -100,7 +102,7 @@ describe('streamRuntimeLogs', () => {
       secrets: [],
       intervalMs: 1,
       maxLinesPerPoll: 5,
-      send: (event, data, id) => events.push({ event, data, id }),
+      send: (event, data, id) => events.push({ event, data: data as EvtData, id }),
       signal: ctrl.signal,
     })
     const warn = events.find((e) => e.event === 'warn' && String(e.data.message).includes('Débit élevé'))
@@ -127,10 +129,10 @@ describe('streamRuntimeLogs', () => {
       secrets: [],
       intervalMs: 1,
       maxLineLength: 120,
-      send: (event, data, id) => events.push({ event, data, id }),
+      send: (event, data, id) => events.push({ event, data: data as EvtData, id }),
       signal: ctrl.signal,
     })
-    const emitted = events.filter((e) => e.event === 'log').flatMap((e) => e.data.lines.map((l: any) => l.text))
+    const emitted = events.filter((e) => e.event === 'log').flatMap((e) => e.data.lines.map((l) => l.text))
     expect(emitted[0]).toContain('[ligne tronquée')
     expect(events.some((e) => e.event === 'warn' && String(e.data.message).includes('tronquées'))).toBe(true)
   })
@@ -150,7 +152,7 @@ describe('streamRuntimeLogs', () => {
       client,
       secrets: [],
       intervalMs: 1,
-      send: (event, data, id) => events.push({ event, data, id }),
+      send: (event, data, id) => events.push({ event, data: data as EvtData, id }),
       signal: ctrl.signal,
     })
     expect(events.some((e) => e.event === 'warn' && String(e.data.message).includes('ressemblent à des secrets'))).toBe(

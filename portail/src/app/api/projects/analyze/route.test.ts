@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fakeGitHub } from '@/lib/test-support/fake-github'
 
-vi.mock('@/lib/session', () => ({ getSession: async () => ({ user: { id: 'test-user' } }) }))
-vi.mock('@/lib/rate-limit', () => ({ allow: async () => true }))
+vi.mock('@/lib/session', () => ({
+  getSession: async () => ({ user: { id: 'test-user' }, session: { activeOrganizationId: 'test-org' } }),
+}))
+// La route rattache l'analyse à l'organisation active (#22) : on simule un membre sans toucher à la base.
+vi.mock('@/lib/organizations', () => ({
+  resolveOrganization: async () => ({ organizationId: 'test-org', role: 'owner' }),
+}))
+vi.mock('@/lib/rate-limit', () => ({ allow: async () => true, allowOrg: async () => true }))
 vi.mock('@/lib/git-credentials', () => ({ resolveUserRepoToken: async () => null }))
 
 const json = (value: unknown) => JSON.stringify(value)

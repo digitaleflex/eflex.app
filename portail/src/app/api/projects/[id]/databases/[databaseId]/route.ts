@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
-import { prisma } from '@/lib/prisma'
 import { audit } from '@/lib/audit'
 import { canManageProjects } from '@/lib/organizations'
 import { deleteProjectDatabase } from '@/lib/project-databases'

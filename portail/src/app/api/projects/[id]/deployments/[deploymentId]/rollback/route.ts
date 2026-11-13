@@ -89,7 +89,7 @@ export async function POST(
     project: { select: { id: true, name: true, organizationId: true } },
   })
   if ('response' in targetResult) return targetResult.response
-  const target = targetResult.deployment as any
+  const target = targetResult.deployment
 
   const refusal = rollbackRefusal(target)
   if (refusal === 'invalid_commit') {

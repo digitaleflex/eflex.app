@@ -66,7 +66,7 @@ export async function POST(
     project: { select: { id: true, name: true, organizationId: true } },
   })
   if ('response' in deploymentResult) return deploymentResult.response
-  const deployment = deploymentResult.deployment as any
+  const deployment = deploymentResult.deployment
 
   const result = await cancelDeployment(deployment, {
     removeQueuedJob: removeQueuedDeployment,
