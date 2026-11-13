@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { allowIp } from '@/lib/rate-limit'
 import { verifyResendWebhook } from '@/lib/resend-webhook'
 
 export const dynamic = 'force-dynamic'
@@ -16,6 +17,9 @@ interface ResendEvent {
  */
 export async function POST(request: NextRequest) {
   const body = await request.text()
+  if (!(await allowIp(request, 'webhook:resend', 120, 60_000))) {
+    return NextResponse.json({ error: 'Trop de demandes.' }, { status: 429 })
+  }
   const valid = verifyResendWebhook(
     body,
     {

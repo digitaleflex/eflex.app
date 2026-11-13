@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { allowIp } from '@/lib/rate-limit'
 import {
   activatePayment,
   findPayment,
@@ -24,6 +25,9 @@ export async function POST(request: NextRequest) {
   if (!secret) return NextResponse.json({ error: 'Webhook Kkiapay non configuré.' }, { status: 503 })
 
   const raw = await request.text()
+  if (!(await allowIp(request, 'webhook:kkiapay', 120, 60_000))) {
+    return NextResponse.json({ error: 'Trop de demandes.' }, { status: 429 })
+  }
   const header = request.headers.get('x-kiapay-secret') ?? request.headers.get('x-kkiapay-secret')
   if (!verifyKkiapaySecret(header, secret)) {
     return NextResponse.json({ error: 'Signature invalide.' }, { status: 401 })

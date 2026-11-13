@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { allowIp } from '@/lib/rate-limit'
 import { getWebhookSecret, verifyGitHubWebhook } from '@/lib/github-app'
 import { prisma } from '@/lib/prisma'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
@@ -82,6 +83,9 @@ function pathTouchesRoot(path: string, root: string): boolean {
  */
 export async function POST(request: NextRequest) {
   const body = await request.text()
+  if (!(await allowIp(request, 'webhook:github', 120, 60_000))) {
+    return NextResponse.json({ error: 'Trop de demandes.' }, { status: 429 })
+  }
   const secret = await getWebhookSecret()
   if (!verifyGitHubWebhook(body, request.headers.get('x-hub-signature-256'), secret)) {
     return NextResponse.json({ error: 'Signature invalide.' }, { status: 401 })

@@ -72,3 +72,23 @@ export async function allowOrg(
 ): Promise<boolean> {
   return allow(`org:${organizationId}:${action}`, limit, windowMs)
 }
+
+
+/** Extrait la meilleure IP cliente disponible (proxy de confiance en tête). */
+export function getClientIp(request: Request): string {
+  const forwarded = request.headers.get('x-forwarded-for')
+  if (forwarded) {
+    const first = forwarded.split(',')[0]?.trim()
+    if (first) return first
+  }
+  const realIp = request.headers.get('x-real-ip')?.trim()
+  if (realIp) return realIp
+  const cf = request.headers.get('cf-connecting-ip')?.trim()
+  if (cf) return cf
+  return 'unknown'
+}
+
+/** Limite par adresse IP (utile pour les points d'entrée non authentifiés). */
+export async function allowIp(request: Request, action: string, limit: number, windowMs: number): Promise<boolean> {
+  return allow(`ip:${getClientIp(request)}:${action}`, limit, windowMs)
+}
