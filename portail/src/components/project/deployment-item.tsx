@@ -7,20 +7,14 @@ import { StatusPill } from '@/components/dashboard/status-pill'
 import { DeploymentLogs } from '@/components/deployment-logs'
 import { CancelDeploymentButton } from '@/components/cancel-deployment-button'
 import { RollbackDeploymentButton } from '@/components/rollback-deployment-button'
-import { diagnoseFailure } from '@/lib/deployment-diagnosis'
+import type { DeploymentItemData } from '@/lib/deployment-item-data'
 import { isCommitSha } from '@/lib/deployment-rollback'
 import { statusInfo } from '@/lib/project-status'
 
 const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
 
-export type DeploymentItemData = {
-  id: string
-  status: string
-  commitSha: string
-  createdAt: Date
-  logsSummary: string | null
-  app: { id: string; name: string } | null
-}
+// Le diagnostic est calculé côté serveur : ce composant client ne reçoit jamais le journal brut.
+export type { DeploymentItemData }
 
 export function DeploymentItem({
   projectId,
@@ -45,10 +39,7 @@ export function DeploymentItem({
 }) {
   const [open, setOpen] = useState(defaultOpen)
   const detailsId = useId()
-  const diagnosis =
-    deployment.status === 'failed'
-      ? diagnoseFailure({ status: deployment.status, logs: deployment.logsSummary, projectId })
-      : null
+  const diagnosis = deployment.diagnosis
   const showRollback = canManage && !inProgress && deployment.status === 'live' && isCommitSha(deployment.commitSha)
   const showCancel = canManage && statusInfo(deployment.status).inProgress
   const commitLabel = deployment.commitSha === 'pending' ? 'commit en attente' : deployment.commitSha.slice(0, 7)
