@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 // Intégration : actif avec EFLEX_TEST_DB=1 et une base PostgreSQL migrée (DATABASE_URL).
@@ -7,7 +8,7 @@ const run = process.env.EFLEX_TEST_DB === '1' ? describe : describe.skip
 run('réinitialisation de mot de passe', () => {
   process.env.BETTER_AUTH_SECRET ??= 'test-secret-test-secret-test-secret-0123'
   process.env.BETTER_AUTH_URL ??= 'http://localhost:3000'
-  const email = `reset-${Date.now()}@exemple.fr`
+  const email = `reset-${Date.now()}-${randomUUID().slice(0, 8)}@exemple.fr`
   let userId = ''
 
   beforeAll(async () => {
