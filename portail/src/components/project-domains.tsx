@@ -564,17 +564,58 @@ export function ProjectDomains({
                             failure={dnsFailure}
                             compact
                           />
-                        ) : (
-                          certInProgress && (
-                            <p className="text-xs text-muted-foreground">
-                              DNS vérifié. Le certificat SSL est en cours de préparation ; il sera validé après le déploiement.
-                              {certificate.detail ? ` ${certificate.detail}` : ''}
-                            </p>
-                          )
-                        )}
+                        ) : null}
 
-                        {verified && certReady && certificate.detail && (
-                          <p className="text-xs text-muted-foreground">{certificate.detail}</p>
+                        {verified && (
+                          <div className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-3">
+                            <p className="text-sm font-medium text-foreground">Certificat TLS</p>
+                            <dl className="grid gap-1.5 text-xs sm:grid-cols-2">
+                              <div>
+                                <dt className="text-muted-foreground">État</dt>
+                                <dd className={cn('font-medium', certificate.tone === 'success' ? 'text-success' : certificate.tone === 'danger' ? 'text-destructive' : certificate.tone === 'warning' ? 'text-warning' : 'text-foreground')}>
+                                  {certificate.label}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="text-muted-foreground">Résultat du dernier contrôle</dt>
+                                <dd className="text-foreground">
+                                  {domain.tlsValid === true ? 'Valide' : domain.tlsValid === false ? 'Invalide / échec' : 'Non vérifié'}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="text-muted-foreground">Expiration</dt>
+                                <dd className="text-foreground tabular-nums">
+                                  {domain.tlsExpiresAt ? new Date(domain.tlsExpiresAt).toLocaleDateString('fr-FR', { dateStyle: 'long' }) : 'Non disponible'}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="text-muted-foreground">Dernier contrôle</dt>
+                                <dd className="text-foreground tabular-nums">
+                                  {domain.tlsCheckedAt ? new Date(domain.tlsCheckedAt).toLocaleString('fr-FR') : 'Aucun contrôle enregistré'}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="text-muted-foreground">Émetteur</dt>
+                                <dd className="text-muted-foreground">Non disponible (source non collectée)</dd>
+                              </div>
+                              <div>
+                                <dt className="text-muted-foreground">Date d’émission</dt>
+                                <dd className="text-muted-foreground">Non disponible (source non collectée)</dd>
+                              </div>
+                            </dl>
+                            {certificate.detail && <p className="text-xs text-muted-foreground">{certificate.detail}</p>}
+                            {(certificate.tone === 'danger' || certificate.tone === 'warning' || domain.tlsValid === false || certInProgress) && (
+                              <p className={cn('text-xs', certificate.tone === 'danger' || domain.tlsValid === false ? 'text-destructive' : 'text-warning')}>
+                                {domain.tlsValid === false
+                                  ? 'Le certificat n’est pas valide. Revérifiez le DNS, puis relancez un déploiement si nécessaire (onglet Déploiements).'
+                                  : certInProgress
+                                    ? 'Certificat en cours de préparation : la validation se fait après déploiement. Vous pouvez suivre l’état dans l’onglet Déploiements.'
+                                    : certificate.tone === 'danger'
+                                      ? 'Certificat expiré ou invalide : relancez une vérification et un déploiement pour renouveler/valider le certificat.'
+                                      : 'Expiration proche : surveillez le renouvellement et relancez un déploiement en cas de besoin.'}
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
 
