@@ -23,6 +23,11 @@ const FRAMEWORK_LOGOS: Record<string, string> = {
   github: '/logos/github.svg',
   gitlab: '/logos/gitlab.svg',
   bitbucket: '/logos/bitbucket.svg',
+  vercel: '/logos/vercel.svg',
+  railway: '/logos/railway.svg',
+  netlify: '/logos/netlify.svg',
+  render: '/logos/render.svg',
+  flyio: '/logos/flyio.svg',
 }
 
 /** Composantes RGB de la couleur de marque : sert à teinter la plaque de fond. */
@@ -49,6 +54,11 @@ const FRAMEWORK_COLORS: Record<string, string> = {
   github: '24 23 23',
   gitlab: '252 109 38',
   bitbucket: '0 82 204',
+  vercel: '0 0 0',
+  railway: '11 13 14',
+  netlify: '0 199 183',
+  render: '0 0 0',
+  flyio: '36 23 91',
 }
 
 export function FrameworkIcon({
