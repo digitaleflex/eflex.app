@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 // Intégration : actif avec EFLEX_TEST_DB=1 et une base PostgreSQL migrée (DATABASE_URL).
@@ -13,7 +14,8 @@ run('GET /api/events : bus d’événements temps réel', () => {
   process.env.BETTER_AUTH_URL ??= 'http://localhost:3000'
   process.env.EVENTS_RECHECK_MS = '200' // revérification rapide des droits pour le test
 
-  const stamp = `${Date.now()}`
+  // Suffixe aléatoire : un horodatage seul peut coïncider avec celui d'un autre fichier lancé en parallèle.
+  const stamp = `${Date.now()}-${randomUUID().slice(0, 8)}`
   type U = { id: string; orgId: string; sessionId: string; admin: boolean }
   let a: U, b: U, boss: U
 
