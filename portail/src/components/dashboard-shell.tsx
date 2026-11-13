@@ -142,6 +142,7 @@ export function DashboardShell({
     <div className="min-h-screen" data-sidebar={sidebarMode}>
       {/* Barre latérale (bureau) */}
       <aside
+        id="dashboard-sidebar"
         aria-label="Barre latérale"
         className={cn(
           'fixed inset-y-0 left-0 z-40 hidden border-r border-border bg-card md:flex md:flex-col',
@@ -225,6 +226,7 @@ export function DashboardShell({
             onClick={toggleSidebar}
             aria-label={sidebarLabel}
             aria-expanded={!collapsed}
+            aria-controls="dashboard-sidebar"
             title={sidebarLabel}
             className={cn(
               'flex h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
