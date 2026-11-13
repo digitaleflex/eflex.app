@@ -1,26 +1,15 @@
 /**
- * Validation au démarrage du serveur (issue 04) : en production, le portail
- * refuse de démarrer si la clé de chiffrement des variables est absente.
- * L'import est dynamique pour rester compatible avec les deux runtimes.
+ * Point d'entrée d'instrumentation de Next.js (`register`).
+ *
+ * Tout le code Node (validation de la clé de chiffrement, worker BullMQ/ioredis) vit dans
+ * `instrumentation-node.ts`, importé derrière une condition EN LIGNE sur `NEXT_RUNTIME` :
+ * le bundler retire alors cet import du bundle edge. Un `return` anticipé ne suffit pas —
+ * en développement, l'import dynamique serait quand même résolu pour edge (ioredis →
+ * redis-parser → `string_decoder` introuvable) et toutes les pages répondraient 500 (#101).
  */
 export async function register() {
-  if (process.env.NEXT_RUNTIME !== 'nodejs') return
-  if (process.env.NEXT_PHASE === 'phase-production-build') return
-
-  const { assertCryptoConfig } = await import('./lib/crypto')
-  assertCryptoConfig()
-
-  // Worker de déploiement (issue 06) : un seul par processus, même après HMR.
-  // Import isolé pour éviter que le bundler edge ne résolve ioredis/bullmq.
-  if (process.env.REDIS_URL) {
-    try {
-      const { ensureDeploymentWorker } = await import('./instrumentation.worker')
-      ensureDeploymentWorker()
-    } catch (error) {
-      console.error(
-        '[eflex/worker] démarrage impossible :',
-        error instanceof Error ? error.message : String(error),
-      )
-    }
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { registerNode } = await import('./instrumentation-node')
+    await registerNode()
   }
 }

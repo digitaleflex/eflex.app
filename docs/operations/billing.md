@@ -2,7 +2,7 @@
 
 > Relance de #18. Module : `portail/src/lib/billing-renewal.ts`.
 > Démarrage : `portail/src/worker.ts` (worker BullMQ, lui-même lancé par
-> `portail/src/instrumentation.ts` quand `REDIS_URL` est présent).
+> `portail/src/instrumentation-node.ts` quand `REDIS_URL` est présent).
 
 La plateforme **n'encaisse aucun paiement récurrent**. Cette maintenance ne
 facture jamais, n'appelle ni Kkiapay ni FedaPay et ne supprime aucune donnée :
