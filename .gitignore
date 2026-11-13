@@ -99,3 +99,8 @@ tmp/
 # Traefik certificates and dynamic configuration are server state, not source.
 services/engine/traefik/acme.json
 services/engine/traefik/certs/
+
+# OpenCode / tooling local
+.agents/
+.opencode/plugins/
+.opencode/skills

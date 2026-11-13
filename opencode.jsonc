@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  // Répertoires/catalogues de skills supplémentaires (chemins relatifs au cwd actif, ~/, absolus, ou URL HTTP de catalogue).
+  // Les entrées de tous les fichiers de config découverts s'additionnent.
+  "skills": [],
+  // Permissions de chargement des skills (dernière règle correspondante gagnante).
+  // Actions : allow | ask | deny. À affiner par agent via agents.<id>.permissions.
+  "permissions": [
+    { "action": "skill", "resource": "*", "effect": "allow" }
+  ]
+}
