@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
 
 // Test d'intégration : actif avec EFLEX_TEST_DB=1 et une base PostgreSQL migrée (DATABASE_URL).
@@ -9,7 +10,10 @@ run('multi-tenant (Better Auth organization + admin)', () => {
   process.env.BETTER_AUTH_URL ??= 'http://localhost:3000'
   process.env.ADMIN_EMAILS = 'boss@exemple.fr'
 
-  const email = (n: string) => `${n}-${Date.now()}@exemple.fr`
+  // Suffixe aléatoire : d'autres fichiers d'intégration créent des adresses de même forme en parallèle
+  // sur la même base (ex. `boss-<horodatage>` dans events-route.test.ts) ; un horodatage seul peut coïncider.
+  const unique = () => `${Date.now()}-${randomUUID().slice(0, 8)}`
+  const email = (n: string) => `${n}-${unique()}@exemple.fr`
 
   afterAll(async () => {
     const { prisma } = await import('@/lib/prisma')
@@ -43,7 +47,7 @@ run('multi-tenant (Better Auth organization + admin)', () => {
   it("n'accorde le rôle administrateur qu'à une adresse de ADMIN_EMAILS dont l'e-mail est vérifié", async () => {
     const { auth } = await import('@/lib/auth')
     const { prisma } = await import('@/lib/prisma')
-    const bossEmail = `boss-${Date.now()}@exemple.fr`
+    const bossEmail = `boss-${unique()}@exemple.fr`
     process.env.ADMIN_EMAILS = `${process.env.ADMIN_EMAILS ?? ''},${bossEmail}`
 
     // 1. Inscription avec l'adresse d'un administrateur, sans la posséder : aucun privilège, même après connexion.

@@ -86,6 +86,7 @@ const ROUTE_MANIFEST: Record<string, RouteClass> = {
   '/projects/[id]/deployments/[deploymentId]/cancel': 'org-project',
   '/projects/[id]/deployments/[deploymentId]/logs': 'org-project',
   '/projects/[id]/deployments/[deploymentId]/rollback': 'org-project',
+  '/projects/[id]/diagnostic': 'org-project',
   '/projects/[id]/domains': 'org-project',
   '/projects/[id]/domains/[domainId]': 'org-project',
   '/projects/[id]/domains/[domainId]/verify': 'org-project',
