@@ -104,7 +104,7 @@ async function probeDatabase(): Promise<Probe> {
 function probeRedis(): Promise<Probe> {
   const raw = process.env.REDIS_URL
   if (!raw) {
-    return Promise.resolve({ state: 'unknown', latencyMs: null, detail: 'REDIS_URL non configurée' })
+    return Promise.resolve({ state: 'unknown', latencyMs: null, detail: 'Cache non configuré' })
   }
 
   let host: string
@@ -114,7 +114,7 @@ function probeRedis(): Promise<Probe> {
     host = url.hostname
     port = Number(url.port || 6379)
   } catch {
-    return Promise.resolve({ state: 'down', latencyMs: null, detail: 'REDIS_URL invalide' })
+    return Promise.resolve({ state: 'down', latencyMs: null, detail: 'Configuration du cache invalide' })
   }
 
   const start = Date.now()

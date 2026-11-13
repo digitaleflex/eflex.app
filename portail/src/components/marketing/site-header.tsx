@@ -73,8 +73,9 @@ export function SiteHeader() {
         </ul>
 
         <div className="flex items-center gap-1 sm:gap-2">
-          {/* 44 px en pointeur grossier (convention du dépôt), 36 px en pointeur fin. */}
-          <ThemeToggle className="mr-1" />
+          {/* 44 px en pointeur grossier (convention du dépôt), 36 px en pointeur fin.
+              Masqué sur l'accueil : la page est volontairement en thème clair. */}
+          {pathname !== '/' && <ThemeToggle className="mr-1" />}
           {/* Sous 640 px, l'en-tête ne garde que l'action principale : « Connexion »
               reste accessible depuis la page d'inscription, sans débordement horizontal. */}
           <Link

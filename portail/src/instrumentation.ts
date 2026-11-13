@@ -11,14 +11,11 @@ export async function register() {
   assertCryptoConfig()
 
   // Worker de déploiement (issue 06) : un seul par processus, même après HMR.
+  // Import isolé pour éviter que le bundler edge ne résolve ioredis/bullmq.
   if (process.env.REDIS_URL) {
     try {
-      const { startDeploymentWorker } = await import('./worker')
-      const globalForWorker = globalThis as unknown as { __eflexWorker?: unknown }
-      if (!globalForWorker.__eflexWorker) {
-        globalForWorker.__eflexWorker = startDeploymentWorker()
-        console.info('[eflex/worker] file de déploiement démarrée')
-      }
+      const { ensureDeploymentWorker } = await import('./instrumentation.worker')
+      ensureDeploymentWorker()
     } catch (error) {
       console.error(
         '[eflex/worker] démarrage impossible :',
