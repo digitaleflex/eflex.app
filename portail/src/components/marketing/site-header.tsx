@@ -5,7 +5,9 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { ThemeToggle } from '@/components/theme-switcher'
 import { cn } from '@/lib/utils'
+import { MobileMenu } from './mobile-menu'
 
+/** Source unique des destinations : en-tête large (≥ 1024 px) ET menu mobile. */
 const links = [
   { href: '/#fonctionnement', label: 'Fonctionnement' },
   { href: '/#fonctionnalites', label: 'Fonctionnalités' },
@@ -23,9 +25,9 @@ const links = [
  * transparaît à 15 % seulement) comme sur les sections claires, sans style
  * propre au composant et sans toucher aux jetons globaux.
  *
- * Aucun menu n'est ajouté : sous `lg`, la navigation est masquée (`hidden` =
- * display:none, donc hors ordre de tabulation — pas de piège de focus) et
- * reste accessible depuis le pied de page.
+ * Sous `lg` (1024 px), les liens en ligne sont masqués (`hidden lg:flex`) et
+ * remplacés par `MobileMenu` (bouton « Menu » + panneau) qui reprend le même
+ * tableau `links`, plus « Connexion » et « Créer un compte ».
  */
 export function SiteHeader() {
   const pathname = usePathname()
@@ -72,11 +74,11 @@ export function SiteHeader() {
           })}
         </ul>
 
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex min-w-0 items-center gap-1 sm:gap-2">
           {/* 44 px en pointeur grossier (convention du dépôt), 36 px en pointeur fin. */}
           <ThemeToggle className="mr-1" />
           {/* Sous 640 px, l'en-tête ne garde que l'action principale : « Connexion »
-              reste accessible depuis la page d'inscription, sans débordement horizontal. */}
+              reste à un geste, dans le menu mobile, sans débordement horizontal. */}
           <Link
             href="/login"
             className="hidden h-11 items-center whitespace-nowrap rounded-lg px-2.5 text-sm font-medium text-foreground transition-colors duration-200 ease-out-expo hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:inline-flex sm:px-3"
@@ -89,6 +91,7 @@ export function SiteHeader() {
           >
             Créer un compte
           </Link>
+          <MobileMenu links={links} pathname={pathname} />
         </div>
       </nav>
     </header>

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 // En-tête marketing (`site-header.tsx`) : destinations conservées, cibles de 44 px,
-// focus visible, repli mobile hors ordre de tabulation — et lisibilité AA SUR le
+// focus visible, menu mobile accessible (`mobile-menu.tsx`) — et lisibilité AA SUR le
 // hero navy de la page d'accueil. La surface `glass` étant translucide
 // (`bg-background/85`), les jetons de texte du composant sont mesurés sur un fond
 // mélangé à `--eflex-navy`. Même méthode de calcul que `src/lib/contrast.test.ts`
@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(new URL('../../app/globals.css', import.meta.url), 'utf8')
 const header = readFileSync(new URL('./site-header.tsx', import.meta.url), 'utf8')
+const menu = readFileSync(new URL('./mobile-menu.tsx', import.meta.url), 'utf8')
 
 type Hsl = [number, number, number]
 type Rgb = [number, number, number]
@@ -130,13 +131,38 @@ describe('comportement conservé', () => {
     expect((header.match(/focus-visible:ring-2/g) ?? []).length).toBeGreaterThanOrEqual(4)
   })
 
-  it('repli mobile : navigation masquée sous lg, donc hors ordre de tabulation', () => {
-    // `hidden` = display:none : les liens ne sont pas atteignables au clavier
-    // tant qu'ils sont masqués — pas de piège de focus, pas de menu à déplier.
-    // Aucun bouton hamburger n'est déclaré dans ce composant.
+  it('sous lg, liens en ligne masqués et remplacés par le menu mobile', () => {
     expect(header).toContain('hidden lg:flex')
-    expect(header).not.toMatch(/<button/)
-    expect(header).not.toContain('aria-expanded')
+    // Un seul tableau `links` alimente l'en-tête large et le menu mobile.
+    expect(header).toContain('<MobileMenu links={links}')
+    expect((header.match(/const links\b/g) ?? []).length).toBe(1)
+    expect(menu).not.toMatch(/href: '\/#/)
+  })
+
+  it('menu mobile : bouton de divulgation nommé, Connexion et Créer un compte', () => {
+    expect(menu).toContain('aria-expanded={open}')
+    expect(menu).toContain('aria-controls={panelId}')
+    expect(menu).toContain('>Menu<')
+    expect(menu).toContain('href="/login"')
+    expect(menu).toContain('href="/register"')
+    expect(menu).toContain('lg:hidden')
+  })
+
+  it('menu mobile : Échap, piège de Tab, verrou de défilement, fermeture ≥ 1024 px', () => {
+    expect(menu).toContain("event.key === 'Escape'")
+    expect(menu).toContain("event.key !== 'Tab'")
+    expect(menu).toContain("style.overflow = 'hidden'")
+    expect(menu).toContain('(min-width: 1024px)')
+    // Chaque lien du panneau referme le menu (ancres `/#…` comprises).
+    expect((menu.match(/onClick=\{\(\) => close\(false\)\}/g) ?? []).length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('menu mobile : cibles de 44 px, focus visible, mouvement sobre', () => {
+    expect((menu.match(/h-11|min-h-11/g) ?? []).length).toBeGreaterThanOrEqual(4)
+    expect((menu.match(/focus-visible:ring-2/g) ?? []).length).toBeGreaterThanOrEqual(4)
+    expect(menu).toContain('transition-[opacity,transform,visibility]')
+    expect(menu).toContain('motion-reduce:transition-none')
+    expect(menu).not.toContain('transition-all')
   })
 
   it('reste sobre au plan des animations (pas de transition-all)', () => {
