@@ -80,16 +80,16 @@ export default async function DashboardPage() {
           {nextSteps.length > 0 && <NextStepsCard steps={nextSteps} />}
           <UsageTile />
 
-          {/* `grid-cols-1` (= minmax(0, 1fr)) sous xl : sans définition de colonne, la piste implicite est
+          {/* `grid-cols-1` (= minmax(0, 1fr)) sous 2xl : sans définition de colonne, la piste implicite est
               `auto` et les enfants prennent la largeur minimale de leur contenu, ce qui fait déborder la
               page sur téléphone et tablette (41 px à 360 px, 96 px à 768 px en CI). */}
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_20rem]">
             <ProjectsExplorer
               projects={data.projects}
               canManage={canManage}
               initialSort={data.summary.needsAttention > 0 ? 'status' : 'recent'}
             />
-            <aside className="xl:sticky xl:top-28 xl:self-start">
+            <aside className="2xl:sticky 2xl:top-28 2xl:self-start">
               <ActivityFeed items={data.activity.slice(0, 8)} />
             </aside>
           </div>
