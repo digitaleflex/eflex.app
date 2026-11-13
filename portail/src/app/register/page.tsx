@@ -215,6 +215,18 @@ export default function RegisterPage() {
 
           <PassphraseGuidance />
 
+          <p className="text-xs text-muted-foreground">
+            En créant un compte, vous reconnaissez avoir pris connaissance des{' '}
+            <Link href="/conditions" className="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+              conditions d’utilisation
+            </Link>{' '}
+            et de la{' '}
+            <Link href="/confidentialite" className="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+              politique de confidentialité
+            </Link>
+            .
+          </p>
+
           {CAPTCHA_ENABLED && <Turnstile onToken={setCaptchaToken} />}
 
           <Button type="submit" size="lg" className="w-full" loading={loading}>
