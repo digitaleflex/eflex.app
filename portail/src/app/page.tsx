@@ -56,7 +56,7 @@ const steps = [
 const faqs = [
   {
     q: 'Quelles technologies sont prises en charge ?',
-    a: "Next.js, Nuxt, Astro, Vite, SvelteKit, Remix, SolidStart, RedwoodJS, Node.js (Express, Fastify, NestJS…), PHP, Python (Django, FastAPI, Flask) et les sites HTML statiques. Laravel est détecté ; si son plan nécessite plusieurs services, ajoutez un `docker-compose.yml` (ou `compose.yaml`) au dépôt pour un déploiement via compose fourni (D1). Sans ce fichier, le plan multi-services généré est refusé avec un message explicite. Pour tout le reste, un Dockerfile suffit.",
+    a: "Next.js, Nuxt, Astro, Vite, SvelteKit, Remix, SolidStart, RedwoodJS, Node.js (Express, Fastify, NestJS…), PHP, Python (Django, FastAPI, Flask) et les sites HTML statiques. Laravel est reconnu ; si votre application nécessite plusieurs services (par exemple web, file d’attente, planificateur), ajoutez un fichier `docker-compose.yml` ou `compose.yaml` à la racine de l’application. Un Dockerfile existant est aussi utilisé tel quel.",
   },
   {
     q: 'Dois-je écrire un Dockerfile ?',
@@ -72,15 +72,15 @@ const faqs = [
   },
   {
     q: 'Mes dépôts privés sont-ils compatibles ?',
-    a: "Oui. Connectez la GitHub App (recommandée) ou ajoutez un jeton personnel dans Paramètres → Connexion GitHub. Eflex lit le dépôt avec un accès à durée limitée et crée une deploy key en lecture seule pour le déploiement.",
+    a: "Oui. Connectez la GitHub App (recommandée) ou ajoutez un jeton personnel dans Paramètres → Connexion GitHub. Eflex lit le dépôt avec un accès à durée limitée et crée une clé de déploiement en lecture seule.",
   },
   {
     q: 'Mon dépôt contient plusieurs applications. Ça marche ?',
-    a: "Oui, pour en publier une. Eflex reconnaît les monorepos (pnpm, Turborepo, Nx, Lerna…) et vous demande laquelle déployer. Aujourd'hui, un seul service est publié par projet : les dépendances de workspace partagées et les applications annexes ne sont pas déployées automatiquement.",
+    a: "Oui, pour en publier une. Eflex reconnaît les monorepos (pnpm, Turborepo, Nx, Lerna…) et vous demande laquelle déployer. Aujourd'hui, un seul service est publié par projet : les dépendances partagées et les applications annexes ne sont pas déployées automatiquement.",
   },
   {
     q: "Qu'est-ce qui n'est pas encore pris en charge ?",
-    a: "Les plans multi-services générés sans compose fourni dans le dépôt sont refusés : pour Laravel (services annexes, files d'attente, planificateur, etc.) ou plusieurs applications d'un même monorepo, ajoutez un `docker-compose.yml`/`compose.yaml` à la racine de l'application. Les volumes sont traduits mais leur création Coolify n'est activée que si `EFLEX_PERSISTENT_VOLUMES` est activé (désactivé par défaut) ; sauvegardes et quotas de stockage ne sont pas implémentés. Les métriques CPU/RAM ne sont pas disponibles.",
+    a: "Les applications qui nécessitent plusieurs services sans fichier `docker-compose.yml`/`compose.yaml` fourni ne peuvent pas encore être déployées automatiquement. La conservation garantie des données stockées sur disque entre déploiements (fichiers uploadés, certains stockages locaux) dépend de la configuration de l’infrastructure et peut ne pas être disponible. Les métriques détaillées (CPU/mémoire dans le temps, stockage, bande passante) ne sont pas toutes disponibles pour l’instant.",
   },
 ]
 
@@ -207,10 +207,9 @@ export default function HomePage() {
               ))}
             </ul>
             <p className="mx-auto mt-7 max-w-2xl text-center text-xs text-muted-foreground text-pretty">
-              Laravel est reconnu. Les plans multi-services générés sans compose fourni sont refusés : ajoutez un
-              fichier <code className="font-mono">docker-compose.yml</code>/
-              <code className="font-mono">compose.yaml</code> au dépôt pour déployer ces services via compose fourni
-              (D1).
+              Laravel est reconnu. Si votre application repose sur plusieurs services, ajoutez un fichier{' '}
+              <code className="font-mono">docker-compose.yml</code> ou{' '}
+              <code className="font-mono">compose.yaml</code> à la racine de l’application pour les déployer ensemble.
             </p>
           </div>
         </section>
