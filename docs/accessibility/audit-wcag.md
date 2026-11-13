@@ -79,7 +79,7 @@ correction (public et authentifié, 360/768/1440 px, clair/sombre).
 | **Vérification d'e-mail et 2FA** : seuls les états initiaux sont audités. | Les états de succès exigent un e-mail ou un TOTP réel. Formulaires et messages statiques sont couverts. |
 | **Dialogues de confirmation** : `<dialog>` natif sans `aria-modal` explicite. | `showModal()` expose déjà la modalité aux technologies d'assistance (piège de focus, Échap, retour du focus). |
 | **Tests authentifiés absents par défaut en local.** | Ils exigent une base de test migrée et le compte `e2e/seed-auth.mjs` ; la CI les exécute. |
-| **`next dev` et l'instrumentation** : sur certains environnements, le worker BullMQ importé par `instrumentation.ts` fait échouer la compilation de développement (`string_decoder`). | La CI utilise `npm run build` puis `npm run start` pour Playwright. En local, si `next dev` échoue, utiliser `PLAYWRIGHT_WEB_SERVER="npm run start -- --port 3000"` après un build, ou démarrer le serveur sans `REDIS_URL`. |
+| **`next dev` et l'instrumentation** : corrigé (#101) — le code Node de l'instrumentation est isolé dans `instrumentation-node.ts`, derrière une condition `NEXT_RUNTIME` en ligne. | `next dev` fonctionne en local ; la CI continue d'utiliser `npm run build` puis `npm run start` pour Playwright. |
 
 ## Commandes de vérification
 
