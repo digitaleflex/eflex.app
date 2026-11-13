@@ -80,7 +80,10 @@ export default async function DashboardPage() {
           {nextSteps.length > 0 && <NextStepsCard steps={nextSteps} />}
           <UsageTile />
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+          {/* `grid-cols-1` (= minmax(0, 1fr)) sous xl : sans définition de colonne, la piste implicite est
+              `auto` et les enfants prennent la largeur minimale de leur contenu, ce qui fait déborder la
+              page sur téléphone et tablette (41 px à 360 px, 96 px à 768 px en CI). */}
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
             <ProjectsExplorer
               projects={data.projects}
               canManage={canManage}
