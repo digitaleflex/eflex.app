@@ -4,6 +4,7 @@ import Link from 'next/link'
 const footerLinks = [
   { href: '/#fonctionnement', label: 'Fonctionnement' },
   { href: '/#fonctionnalites', label: 'Fonctionnalités' },
+  { href: '/tarifs', label: 'Tarifs' },
   { href: '/#questions', label: 'Questions' },
   { href: '/status', label: 'Statut' },
   { href: '/login', label: 'Connexion' },
