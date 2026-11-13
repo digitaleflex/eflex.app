@@ -41,6 +41,9 @@ export function DashboardOnboarding({
             Indiquez l’adresse d’un dépôt GitHub : Eflex reconnaît la stack, construit l’application
             et la publie avec son adresse et son certificat.
           </p>
+          <p className="mt-2 max-w-prose text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Avant de commencer :</span> l’URL du dépôt (public ou privé, avec accès configuré) et, si besoin, les variables d’environnement requises par l’application. Vous pourrez les ajuster avant le déploiement.
+          </p>
 
           {canManage ? (
             <div className="mt-5 flex flex-wrap items-center gap-3">
