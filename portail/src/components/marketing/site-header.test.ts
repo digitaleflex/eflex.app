@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 // En-tête marketing (`site-header.tsx`) : destinations conservées, cibles de 44 px,
-// focus visible, repli mobile hors ordre de tabulation — et lisibilité AA SUR le
+// focus visible, menu mobile accessible au clavier — et lisibilité AA SUR le
 // hero navy de la page d'accueil. La surface `glass` étant translucide
 // (`bg-background/85`), les jetons de texte du composant sont mesurés sur un fond
 // mélangé à `--eflex-navy`. Même méthode de calcul que `src/lib/contrast.test.ts`
@@ -130,13 +130,30 @@ describe('comportement conservé', () => {
     expect((header.match(/focus-visible:ring-2/g) ?? []).length).toBeGreaterThanOrEqual(4)
   })
 
-  it('repli mobile : navigation masquée sous lg, donc hors ordre de tabulation', () => {
-    // `hidden` = display:none : les liens ne sont pas atteignables au clavier
-    // tant qu'ils sont masqués — pas de piège de focus, pas de menu à déplier.
-    // Aucun bouton hamburger n'est déclaré dans ce composant.
+  it('bureau : la liste de liens reste visible dès lg et masquée en dessous', () => {
+    // `hidden` = display:none : sous lg les liens de la barre ne sont pas atteignables au clavier ;
+    // les mêmes destinations sont proposées par le menu mobile.
     expect(header).toContain('hidden lg:flex')
-    expect(header).not.toMatch(/<button/)
-    expect(header).not.toContain('aria-expanded')
+  })
+
+  it('mobile : un bouton de menu accessible, masqué dès lg, avec les mêmes destinations', () => {
+    expect(header).toMatch(/<button/)
+    expect(header).toContain('aria-expanded={open}')
+    expect(header).toContain('aria-controls={panelId}')
+    // Le bouton n'existe que sous lg ; le panneau est lui aussi masqué dès lg.
+    expect((header.match(/lg:hidden/g) ?? []).length).toBeGreaterThanOrEqual(2)
+    // Source unique : la barre de bureau et le menu mobile parcourent la même liste.
+    expect((header.match(/links\.map\(/g) ?? []).length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('menu mobile : boîte de dialogue modale, Échap, piège de focus et défilement bloqué', () => {
+    expect(header).toContain('role="dialog"')
+    expect(header).toContain('aria-modal="true"')
+    expect(header).toContain("event.key === 'Escape'")
+    expect(header).toContain("event.key === 'Tab'")
+    expect(header).toContain('buttonRef.current?.focus()')
+    expect(header).toContain("document.body.style.overflow = 'hidden'")
+    expect(header).toContain('document.body.style.overflow = previousOverflow')
   })
 
   it('reste sobre au plan des animations (pas de transition-all)', () => {
