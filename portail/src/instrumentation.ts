@@ -1,29 +1,16 @@
 /**
- * Validation au démarrage du serveur (issue 04) : en production, le portail
- * refuse de démarrer si la clé de chiffrement des variables est absente.
- * L'import est dynamique pour rester compatible avec les deux runtimes.
+ * Point d'entrée de l'instrumentation Next.js.
+ *
+ * Next compile ce fichier pour les runtimes Node.js **et** edge. Le code Node
+ * (validation de la clé de chiffrement, worker BullMQ / ioredis) vit dans
+ * `instrumentation-node.ts` et n'est importé que derrière une condition en
+ * ligne sur `NEXT_RUNTIME` : avec un `return` anticipé, webpack incluait
+ * quand même l'import dans le bundle edge et `next dev` renvoyait 500 sur
+ * toutes les pages (`Can't resolve 'string_decoder'`, PUB-13, #101).
  */
 export async function register() {
-  if (process.env.NEXT_RUNTIME !== 'nodejs') return
-  if (process.env.NEXT_PHASE === 'phase-production-build') return
-
-  const { assertCryptoConfig } = await import('./lib/crypto')
-  assertCryptoConfig()
-
-  // Worker de déploiement (issue 06) : un seul par processus, même après HMR.
-  if (process.env.REDIS_URL) {
-    try {
-      const { startDeploymentWorker } = await import('./worker')
-      const globalForWorker = globalThis as unknown as { __eflexWorker?: unknown }
-      if (!globalForWorker.__eflexWorker) {
-        globalForWorker.__eflexWorker = startDeploymentWorker()
-        console.info('[eflex/worker] file de déploiement démarrée')
-      }
-    } catch (error) {
-      console.error(
-        '[eflex/worker] démarrage impossible :',
-        error instanceof Error ? error.message : String(error),
-      )
-    }
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { registerNode } = await import('./instrumentation-node')
+    await registerNode()
   }
 }

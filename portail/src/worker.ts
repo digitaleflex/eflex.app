@@ -1,6 +1,6 @@
 /**
  * Worker de déploiement (issue 06). Tourne dans le processus du portail,
- * démarré par `src/instrumentation.ts`. BullMQ reprend automatiquement les
+ * démarré par `src/instrumentation-node.ts`. BullMQ reprend automatiquement les
  * jobs « stalled » après un redémarrage, ce qui rend le pipeline résilient
  * sans second conteneur à maintenir.
  *
