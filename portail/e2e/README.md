@@ -54,7 +54,7 @@ Dossier de sortie (stable) : `portail/e2e/screenshots/<thème>/<largeur>/`
 - **Pages publiques** : accueil et pages clés (`/`, auth, statut, maintenance, 404, etc.).
 - **Console (authentifié)** : pages du tableau de bord et de projet ; l’**accueil du tableau de bord** (`/dashboard`) est capturé avec la **barre latérale dépliée** et **repliée** aux largeurs ≥ 768 px (`dashboard_sidebar-depliee.png`, `dashboard_sidebar-repliee.png`, issue #80).
 
-Ces captures sont des artefacts locaux : `portail/e2e/screenshots/` est ignoré par Git.
+Ces captures sont des artefacts locaux : `portail/e2e/screenshots/` est ignoré par Git. Les **références validées et versionnées** sont conservées dans `portail/e2e/visual-references/` (voir section ci-dessous).
 
 ```bash
 # Captures publiques
@@ -70,14 +70,15 @@ pages projet et, avec `PLAYWRIGHT_ADMIN=1`, administration).
 
 ## Captures de référence et procédure de mise à jour (#80)
 
-Les captures générées dans `e2e/screenshots/` servent de base de comparaison visuelle. Pour les **versionner comme références** :
+Les captures générées dans `e2e/screenshots/` servent de base de comparaison visuelle. Les **références versionnées** sont stockées dans `portail/e2e/visual-references/` (voir `visual-references/README.md`).
 
+Procédure :
 1. Générer les captures sur une base de test connue : `npm run test:screenshots` (et, si besoin, `PLAYWRIGHT_AUTH=1 PLAYWRIGHT_ADMIN=1 npm run test:screenshots`).
-2. Vérifier visuellement les différences (thème, viewport, état de la barre latérale).
-3. Copier/valider les images de référence à versionner dans le dépôt (par ex. un dossier dédié de références suivi par Git, ou en retirant temporairement l’ignore pour les fichiers retenus), puis committer avec une note décrivant le changement visuel attendu.
-4. En cas d’évolution UI intentionnelle, régénérer les captures, mettre à jour les références versionnées dans la même PR et documenter la raison dans la description de la PR.
+2. Vérifier visuellement les différences (thème, viewport, état de la barre latérale repliée/dépliée).
+3. Copier les images validées dans `e2e/visual-references/` (nomenclature claire), puis committer avec une note décrivant le changement visuel.
+4. En cas d’évolution UI intentionnelle, régénérer, mettre à jour les références dans la même PR et documenter la raison.
 
-> Remarque : le dossier de sortie brut reste ignoré pour éviter de committer des artefacts volumineux/non validés. Le workflow `.github/workflows/a11y.yml` exécute `test:a11y` (axe) en CI ; l’intégration de `test:screenshots` / comparaison de références peut être ajoutée dans un job dédié si le temps d’exécution reste raisonnable.
+> Le dossier de sortie brut `e2e/screenshots/` reste ignoré pour éviter de committer des artefacts non validés. Le workflow `.github/workflows/a11y.yml` exécute `test:a11y` (axe) en CI ; l’intégration de `test:screenshots` / comparaison avec les références peut être ajoutée dans un job dédié si le temps d’exécution reste raisonnable.
 
 ## Intégration CI
 
