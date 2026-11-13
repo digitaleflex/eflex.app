@@ -9,6 +9,7 @@ import {
   ArrowRightLeft,
   ChevronDown,
   Database,
+  Download,
   FileUp,
   GitBranch,
   Globe,
@@ -510,6 +511,7 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
     { href: '#disponibilite', label: 'Disponibilité' },
     { href: '#variables', label: 'Variables' },
     ...(showApplications ? [{ href: '#applications', label: 'Applications' }] : []),
+    { href: '#support', label: 'Support' },
     { href: '#zone-dangereuse', label: 'Zone dangereuse' },
   ]
 
@@ -1039,6 +1041,35 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
           </div>
         </SettingsSection>
       )}
+
+      <section id="support" aria-labelledby="support-title" className="scroll-mt-28">
+        <Card>
+          <CardHeader>
+            <h2 id="support-title" className="flex items-center gap-2 text-base font-semibold">
+              <Download className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              Support et diagnostic
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Exportez un bundle de diagnostic à partager avec le support. Il contient uniquement des métadonnées,
+              statuts et diagnostics interprétés des déploiements récents : <strong className="font-medium text-foreground">aucune variable d’environnement, aucun jeton et aucun journal brut</strong> n’est inclus.
+            </p>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Fichier JSON (20 derniers déploiements) · accès limité aux membres de l’organisation.
+            </p>
+            <a
+              href={`/api/projects/${project.id}/diagnostic`}
+              download
+              className="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-background px-3 text-xs font-medium transition-[background-color,color,box-shadow,border-color,transform] duration-200 ease-out-expo hover:bg-secondary hover:text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background [@media(pointer:coarse)]:h-11"
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              Télécharger le bundle
+            </a>
+          </CardContent>
+        </Card>
+      </section>
+
 
       <section id="zone-dangereuse" aria-labelledby="zone-dangereuse-title" className="scroll-mt-28">
         <details className="group rounded-xl border border-destructive/30 bg-destructive/5">
