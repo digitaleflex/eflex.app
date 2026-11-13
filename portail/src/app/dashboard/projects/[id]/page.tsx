@@ -22,6 +22,7 @@ import { ProjectTabsNav } from '@/components/project/project-tabs-nav'
 import { ProjectSituationBanners } from '@/components/project/project-situation-banners'
 import { ProjectOverviewTab } from '@/components/project/project-overview-tab'
 import { ProjectDeploymentsTab } from '@/components/project/project-deployments-tab'
+import { toDeploymentItemData } from '@/lib/deployment-item-data'
 import { ProjectVariablesTab } from '@/components/project/project-variables-tab'
 import { ProjectRuntimeLogsTab } from '@/components/project/project-runtime-logs-tab'
 import { statusInfo } from '@/lib/project-status'
@@ -341,7 +342,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       {tab === 'deployments' && (
         <ProjectDeploymentsTab
           projectId={project.id}
-          deployments={deployments}
+          deployments={deployments.map((deployment) => toDeploymentItemData(deployment, project.id))}
           branch={project.branch}
           canManage={canManage}
           inProgress={inProgress}
