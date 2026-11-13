@@ -31,7 +31,7 @@ interface DomainsResponse {
 
 type Feedback = { tone: 'success' | 'error'; message: string } | null
 
-type DnsFailure = { message: string; values?: string[]; cname?: string | null }
+type DnsFailure = { message: string; values?: string[]; cname?: string | null; platformIps?: string[]; target?: string | null }
 
 type VerifyResponse = {
   error?: string
@@ -39,7 +39,7 @@ type VerifyResponse = {
   ok?: boolean
   verified?: boolean
   queued?: boolean
-  dns?: { ok?: boolean; error?: string | null; cname?: string | null; ips?: string[]; target?: string | null }
+  dns?: { ok?: boolean; error?: string | null; cname?: string | null; ips?: string[]; platformIps?: string[]; target?: string | null }
 }
 
 const AUTO_INTERVAL_MS = 9_000
@@ -49,11 +49,112 @@ const AUTO_TIMEOUT_MS = 10 * 60_000
 function describeDnsFailure(body: VerifyResponse): DnsFailure {
   const values = [...(body.dns?.cname ? [body.dns.cname] : []), ...(body.dns?.ips ?? [])].filter(Boolean)
   const parts = [body.error, body.dns?.error].filter((v): v is string => Boolean(v && v !== body.error))
+  const platformIps = (body.dns?.platformIps ?? []).filter(Boolean)
   return {
     message: parts.length > 0 ? `${body.error ?? 'Le DNS n’est pas encore prêt.'} ${parts.join(' ')}`.trim() : (body.error ?? 'Le DNS n’est pas encore prêt.'),
     values: values.length > 0 ? values : undefined,
     cname: body.dns?.cname ?? null,
+    platformIps: platformIps.length > 0 ? platformIps : undefined,
+    target: body.dns?.target ?? null,
   }
+}
+
+function DnsGuide({
+  hostname,
+  target,
+  platformIps,
+  failure,
+  compact = false,
+}: {
+  hostname: string
+  target: string
+  platformIps?: string[]
+  failure?: DnsFailure
+  compact?: boolean
+}) {
+  const host = hostname.trim() || 'votre-domaine.exemple.com'
+  const cnameTarget = failure?.target || target
+  const ips = (failure?.platformIps ?? platformIps ?? []).filter(Boolean)
+  return (
+    <div className={cn('space-y-3 rounded-md border border-border/70 bg-muted/20 p-3', compact ? 'text-xs' : 'text-sm')}>
+      <div>
+        <p className="font-medium text-foreground">Assistant DNS</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Ajoutez l’enregistrement chez votre fournisseur DNS. La propagation peut prendre quelques minutes (parfois jusqu’à 1 h selon le TTL).
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-foreground">Option recommandée · Sous-domaine (ex. <code className="font-mono">app.exemple.com</code>)</p>
+        <dl className="space-y-1.5 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <dt className="text-muted-foreground">Type</dt>
+            <dd className="rounded bg-background px-1.5 py-0.5 font-mono text-foreground">CNAME</dd>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <dt className="text-muted-foreground">Nom / hôte</dt>
+            <dd className="flex flex-wrap items-center gap-2">
+              <code className="break-all font-mono text-foreground">{host}</code>
+              {hostname.trim() && <CopyButton value={hostname.trim()} label="Copier le nom" copiedLabel="Nom copié" size="sm" />}
+            </dd>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <dt className="text-muted-foreground">Valeur / cible</dt>
+            <dd className="flex flex-wrap items-center gap-2">
+              <code className="break-all font-mono text-foreground">{cnameTarget}</code>
+              <CopyButton value={cnameTarget} label="Copier la cible" copiedLabel="Cible copiée" size="sm" />
+            </dd>
+          </div>
+        </dl>
+      </div>
+
+      <div className="space-y-2 border-t border-border/70 pt-3">
+        <p className="text-xs font-medium text-foreground">Domaine racine / apex (ex. <code className="font-mono">exemple.com</code>)</p>
+        <p className="text-xs text-muted-foreground">
+          Un CNAME n’est pas autorisé à la racine chez la plupart des fournisseurs : créez un enregistrement <strong className="font-medium text-foreground">A</strong> (IPv4) et/ou <strong className="font-medium text-foreground">AAAA</strong> (IPv6) pointant vers la plateforme.
+        </p>
+        {ips.length > 0 ? (
+          <div className="space-y-1.5 text-xs">
+            <p className="text-muted-foreground">Adresses de la plateforme (détectées) :</p>
+            <ul className="space-y-1">
+              {ips.map((ip) => (
+                <li key={ip} className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-muted-foreground">A/AAAA</span>
+                  <span className="flex items-center gap-2">
+                    <code className="break-all font-mono text-foreground">{ip}</code>
+                    <CopyButton value={ip} label="Copier l’adresse" copiedLabel="Adresse copiée" size="sm" />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Les adresses IP de la plateforme seront indiquées ici après une tentative de vérification si nécessaire. Si votre fournisseur le permet, un enregistrement <span className="font-mono">ALIAS</span>/<span className="font-mono">ANAME</span> vers <code className="break-all font-mono text-foreground">{cnameTarget}</code> peut aussi convenir.
+          </p>
+        )}
+      </div>
+
+      <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+        <li>Désactivez le proxy/CDN (ex. « nuage orange ») sur l’enregistrement pendant la vérification si elle échoue.</li>
+        <li>Vérifiez qu’il n’existe pas d’enregistrement contradictoire (ancien A/CNAME) pour le même hôte.</li>
+        <li>La propagation DNS et l’émission du certificat peuvent prendre un peu de temps après validation.</li>
+      </ul>
+
+      {failure && (
+        <div className="rounded-md border border-destructive/20 bg-destructive/10 p-2 text-xs text-destructive" role="alert">
+          <p className="font-medium text-foreground">Diagnostic de la dernière vérification</p>
+          <p className="mt-1">{failure.message}</p>
+          {failure.values && failure.values.length > 0 && (
+            <p className="mt-1">Valeurs détectées : <code className="break-all font-mono">{failure.values.join(', ')}</code></p>
+          )}
+          {ips.length > 0 && (
+            <p className="mt-1">Adresses attendues (plateforme) : <code className="break-all font-mono">{ips.join(', ')}</code></p>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 /** Assistant de configuration des domaines : enregistrement DNS, copie, vérification et auto-vérification. */
@@ -164,12 +265,18 @@ export function ProjectDomains({
           if (mode === 'manual') setFeedback({ tone: 'error', message: failure.message })
           return { verified: false }
         }
-        setDnsFailures((current) => {
-          if (!current[domainId]) return current
-          const copy = { ...current }
-          delete copy[domainId]
-          return copy
-        })
+        // Conserver les infos DNS utiles (ex. IPs plateforme) pour guider un futur recontrôle.
+        if (body.dns) {
+          const info = describeDnsFailure(body)
+          setDnsFailures((current) => ({ ...current, [domainId]: info }))
+        } else {
+          setDnsFailures((current) => {
+            if (!current[domainId]) return current
+            const copy = { ...current }
+            delete copy[domainId]
+            return copy
+          })
+        }
         if (mode === 'manual') {
           setFeedback({ tone: 'success', message: body.message ?? 'DNS vérifié. Le domaine sera actif après le déploiement.' })
         }
@@ -383,29 +490,7 @@ export function ProjectDomains({
               hint="Après l’ajout, créez l’enregistrement DNS indiqué ci-dessous. La propagation peut prendre quelques minutes."
               required
             />
-            <div className="rounded-md border border-border/70 bg-muted/30 p-3 text-xs text-muted-foreground">
-              <p className="font-medium text-foreground">Enregistrement DNS à créer</p>
-              <dl className="mt-2 space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <dt className="text-muted-foreground">Type</dt>
-                  <dd className="font-mono text-foreground">CNAME</dd>
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <dt className="text-muted-foreground">Nom / hôte</dt>
-                  <dd className="flex items-center gap-2">
-                    <code className="font-mono text-foreground">{hostname.trim() || 'votre-domaine.exemple.com'}</code>
-                    {hostname.trim() && <CopyButton value={hostname.trim()} label="Copier le nom" copiedLabel="Nom copié" size="sm" />}
-                  </dd>
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <dt className="text-muted-foreground">Valeur / cible</dt>
-                  <dd className="flex items-center gap-2">
-                    <code className="font-mono text-foreground">{target}</code>
-                    <CopyButton value={target} label="Copier la cible" copiedLabel="Cible copiée" size="sm" />
-                  </dd>
-                </div>
-              </dl>
-            </div>
+            <DnsGuide hostname={hostname} target={target} />
             <div className="flex flex-wrap items-center gap-3">
               <Button type="submit" loading={adding} disabled={(data?.domains.length ?? 0) >= (data?.max ?? 5)}>
                 <Plus className="h-4 w-4" aria-hidden="true" />
@@ -472,38 +557,13 @@ export function ProjectDomains({
                         </div>
 
                         {!verified ? (
-                          <div className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-3">
-                            <p className="text-sm font-medium text-foreground">Enregistrement DNS à créer</p>
-                            <p className="text-xs text-muted-foreground">La propagation DNS peut prendre quelques minutes.</p>
-                            <dl className="space-y-2 text-xs">
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <dt className="text-muted-foreground">Type</dt>
-                                <dd className="font-mono text-foreground">CNAME</dd>
-                              </div>
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <dt className="text-muted-foreground">Nom / hôte</dt>
-                                <dd className="flex flex-wrap items-center gap-2">
-                                  <code className="break-all font-mono text-foreground">{domain.hostname}</code>
-                                  <CopyButton value={domain.hostname} label="Copier le nom" copiedLabel="Nom copié" size="sm" />
-                                </dd>
-                              </div>
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <dt className="text-muted-foreground">Valeur / cible</dt>
-                                <dd className="flex flex-wrap items-center gap-2">
-                                  <code className="break-all font-mono text-foreground">{target}</code>
-                                  <CopyButton value={target} label="Copier la cible" copiedLabel="Cible copiée" size="sm" />
-                                </dd>
-                              </div>
-                            </dl>
-                            {dnsFailure && (
-                              <div className="rounded-md border border-destructive/20 bg-destructive/10 p-2 text-xs text-destructive" role="alert">
-                                <p>{dnsFailure.message}</p>
-                                {dnsFailure.values && dnsFailure.values.length > 0 && (
-                                  <p className="mt-1">Valeurs détectées : <code className="break-all font-mono">{dnsFailure.values.join(', ')}</code></p>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                          <DnsGuide
+                            hostname={domain.hostname}
+                            target={target}
+                            platformIps={dnsFailure?.platformIps}
+                            failure={dnsFailure}
+                            compact
+                          />
                         ) : (
                           certInProgress && (
                             <p className="text-xs text-muted-foreground">
