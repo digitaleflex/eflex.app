@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { RefreshCw } from 'lucide-react'
 import { SiteHeader } from '@/components/marketing/site-header'
+import { SiteFooter } from '@/components/marketing/site-footer'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { collectStatus } from '@/lib/status'
@@ -335,18 +336,8 @@ export default async function StatusPage() {
           </Card>
         </section>
 
-        <footer className="flex flex-wrap items-center gap-4 border-t border-border pt-6 text-sm text-muted-foreground">
-          <Link href="/" className="hover:text-foreground hover:underline">
-            Retour à l’accueil
-          </Link>
-          <Link href="/api/status" className="font-mono text-xs hover:text-foreground hover:underline">
-            /api/status (JSON)
-          </Link>
-          <Link href="/maintenance" className="hover:text-foreground hover:underline">
-            Maintenance
-          </Link>
-        </footer>
       </main>
+      <SiteFooter />
     </div>
   )
 }
