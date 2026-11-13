@@ -245,11 +245,6 @@
     animation-delay: var(--d, 0s);
   }
 
-  .demo-step {
-    opacity: 0;
-    animation: demo-step-in 0.5s var(--ease-out-expo) forwards;
-    animation-delay: var(--d, 0s);
-  }
   .demo-ping {
     animation: demo-ping 1.6s var(--ease-out-expo) infinite;
   }
@@ -257,10 +252,6 @@
 
 @keyframes reveal {
   from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: none; }
-}
-@keyframes demo-step-in {
-  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
 @keyframes demo-ping {
@@ -274,7 +265,7 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  .demo-step, .animate-reveal { opacity: 1; }
+  .animate-reveal { opacity: 1; }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

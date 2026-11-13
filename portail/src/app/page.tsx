@@ -12,11 +12,12 @@ import {
   Lock,
   Rocket,
   SearchCheck,
+  ShieldCheck,
 } from 'lucide-react'
 import { FrameworkIcon } from '@/components/framework-icon'
 import { SiteHeader } from '@/components/marketing/site-header'
 import { SiteFooter } from '@/components/marketing/site-footer'
-import { DeployDemo } from '@/components/marketing/deploy-demo'
+import { HeroConsolePreview } from '@/components/marketing/hero-console-preview'
 
 const stacks = [
   { id: 'nextjs', name: 'Next.js' },
@@ -160,22 +161,28 @@ export default function HomePage() {
                 </Link>
               </div>
 
-              <ul className="flex flex-wrap gap-x-6 gap-y-3 text-sm text-white/80">
-                {['HTTPS automatique', 'Dépôts privés pris en charge', 'Secrets chiffrés hors de votre dépôt'].map(
-                  (item) => (
-                    <li key={item} className="flex items-center gap-2">
-                      <Check className="h-4 w-4 shrink-0 text-eflexblue" aria-hidden="true" />
-                      {item}
-                    </li>
-                  ),
-                )}
+              <ul className="grid gap-x-6 gap-y-3 text-sm text-white/80 sm:grid-cols-2">
+                {[
+                  { label: 'HTTPS automatique', icon: ShieldCheck },
+                  { label: 'Sans Dockerfile à écrire', icon: Layers },
+                  { label: 'Dépôts privés pris en charge', icon: Lock },
+                  { label: 'Secrets chiffrés hors de votre dépôt', icon: KeyRound },
+                ].map((item) => (
+                  <li key={item.label} className="flex items-center gap-2.5">
+                    <item.icon className="h-5 w-5 shrink-0 text-eflexblue" aria-hidden="true" />
+                    {item.label}
+                  </li>
+                ))}
               </ul>
+
+              <p className="text-sm text-white/80">
+                Le plan Découverte est gratuit : aucun paiement pour démarrer.
+              </p>
             </div>
 
-            {/* Preuve produit : le démonstrateur de déploiement est logé dans le
-                hero (panneau encadré), pas posé comme un widget détaché. */}
-            <div className="min-w-0 rounded-3xl bg-white/5 p-3 ring-1 ring-white/10 sm:p-4">
-              <DeployDemo />
+            {/* Aperçu illustratif de la console (données fictives, dit dans la légende). */}
+            <div className="min-w-0">
+              <HeroConsolePreview />
             </div>
           </div>
         </section>
