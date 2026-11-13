@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -13,28 +13,14 @@ import {
   Rocket,
   SearchCheck,
   ShieldCheck,
+  SlidersHorizontal,
+  Zap,
 } from 'lucide-react'
 import { FrameworkIcon } from '@/components/framework-icon'
 import { SiteHeader } from '@/components/marketing/site-header'
 import { SiteFooter } from '@/components/marketing/site-footer'
 import { HeroConsolePreview } from '@/components/marketing/hero-console-preview'
-
-const stacks = [
-  { id: 'nextjs', name: 'Next.js' },
-  { id: 'nuxt', name: 'Nuxt' },
-  { id: 'astro', name: 'Astro' },
-  { id: 'vite', name: 'Vite' },
-  { id: 'svelte', name: 'SvelteKit' },
-  { id: 'remix', name: 'Remix' },
-  { id: 'solidstart', name: 'SolidStart' },
-  { id: 'redwoodjs', name: 'RedwoodJS' },
-  { id: 'node', name: 'Node.js' },
-  { id: 'laravel', name: 'Laravel' },
-  { id: 'php', name: 'PHP' },
-  { id: 'python', name: 'Python' },
-  { id: 'static', name: 'HTML' },
-  { id: 'docker', name: 'Docker' },
-]
+import { StackShowcase } from '@/components/marketing/stack-showcase'
 
 const steps = [
   {
@@ -187,34 +173,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ─── Stacks ─── */}
-        <section aria-labelledby="stacks-titre" className="border-y border-border bg-card">
-          <div className="container py-10 md:py-12">
-            <h2 id="stacks-titre" className="text-center text-sm font-semibold text-foreground">
-              Les technologies reconnues sans configuration
-            </h2>
-            <ul className="stacks-grid mt-7 flex flex-wrap items-start justify-center gap-x-5 gap-y-6 sm:grid sm:grid-cols-7 sm:gap-x-4">
-              {stacks.map((stack, i) => (
-                <li
-                  key={stack.id}
-                  style={{ '--i': i } as CSSProperties}
-                  className="group flex flex-col items-center gap-2 text-center"
-                >
-                  <FrameworkIcon framework={stack.id} alt="" className="h-8 w-8" />
-                  <span className="text-xs text-muted-foreground transition-colors duration-200 ease-out-expo group-hover:text-foreground">
-                    {stack.name}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="mx-auto mt-7 max-w-2xl text-center text-xs text-muted-foreground text-pretty">
-              Laravel est reconnu. Si votre application repose sur plusieurs services, ajoutez un fichier{' '}
-              <code className="font-mono">docker-compose.yml</code> ou{' '}
-              <code className="font-mono">compose.yaml</code> à la racine de l’application pour les déployer ensemble.
-            </p>
-          </div>
-        </section>
-
         {/* ─── Fonctionnement ─── */}
         <section
           id="fonctionnement"
@@ -253,6 +211,60 @@ export default function HomePage() {
               )
             })}
           </ol>
+        </section>
+
+        {/* ─── Technologies : bande navy, en alternance avec les sections claires ─── */}
+        <section id="technologies" aria-labelledby="stacks-titre" className="scroll-mt-20 bg-eflexnavy text-white">
+          <div className="container space-y-10 py-16 md:py-24">
+            <div className="mx-auto max-w-3xl space-y-4 text-center">
+              <h2 id="stacks-titre" className="text-3xl font-bold tracking-tight text-balance md:text-4xl">
+                Déployez vos applications avec vos <span className="text-eflexblue">technologies préférées</span>
+              </h2>
+              <p className="text-lead-lg text-white/80 text-pretty">
+                Eflex reconnaît la stack de votre dépôt et propose la commande de build, le démarrage et le port.
+                Vous relisez et corrigez si besoin.
+              </p>
+            </div>
+
+            <StackShowcase />
+
+            <ul className="mx-auto grid max-w-5xl gap-6 border-t border-white/10 pt-8 md:grid-cols-3">
+              {[
+                {
+                  icon: Zap,
+                  title: 'Détection automatique',
+                  text: 'La stack est identifiée dès l’import du dépôt.',
+                },
+                {
+                  icon: SlidersHorizontal,
+                  title: 'Configuration proposée',
+                  text: 'Build, démarrage et port sont expliqués : vous les validez ou les corrigez.',
+                },
+                {
+                  icon: FileCode2,
+                  title: 'Une technologie manque ?',
+                  text: 'Décrivez votre application avec un Dockerfile ou un fichier eflex.json.',
+                },
+              ].map((item) => (
+                <li key={item.title} className="flex items-start gap-4">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
+                    <item.icon className="h-5 w-5 text-eflexsky" aria-hidden="true" />
+                  </span>
+                  <span>
+                    <span className="block text-base font-semibold">{item.title}</span>
+                    <span className="mt-1 block text-sm text-white/80">{item.text}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <p className="mx-auto max-w-2xl text-center text-xs text-white/75 text-pretty">
+              Les dépôts GitHub, publics ou privés, sont pris en charge aujourd’hui ; les technologies marquées «&nbsp;Bientôt&nbsp;»
+              arrivent prochainement. Si votre application repose sur plusieurs services, ajoutez un fichier{' '}
+              <code className="font-mono">docker-compose.yml</code> ou <code className="font-mono">compose.yaml</code> à
+              la racine pour les déployer ensemble.
+            </p>
+          </div>
         </section>
 
         {/* ─── Fonctionnalités ─── */}
