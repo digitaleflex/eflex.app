@@ -272,7 +272,9 @@ export function UsageView({ projects }: { projects: UsageProject[] }) {
                       </div>
                     </dl>
                   ) : (
-                    <p className="mt-4 text-sm text-muted-foreground">Aucune mesure disponible.</p>
+                    <p className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                      Mesures indisponibles pour le moment (source non exposée ou non encore collectée). Aucune valeur estimée n’est affichée.
+                    </p>
                   )}
 
                   {m?.sampledAt && (

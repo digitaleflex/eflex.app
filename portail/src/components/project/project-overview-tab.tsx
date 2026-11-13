@@ -239,7 +239,7 @@ export function ProjectOverviewTab({
           </div>
           <div className="p-4 sm:p-5">
             <p className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-              Métriques indisponibles : cette application n’a pas encore été déployée.
+              Métriques CPU/mémoire indisponibles : aucune application déployée pour le moment. Aucune valeur estimée n’est affichée.
             </p>
           </div>
         </section>
