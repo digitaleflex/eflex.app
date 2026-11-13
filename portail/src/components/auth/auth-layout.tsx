@@ -58,7 +58,7 @@ export function AuthLayout({
               Eflex le met en ligne.
             </p>
             <p className="text-sm leading-relaxed text-white/80">
-              Détection de la stack, construction et publication : votre projet passe du dépôt à une URL
+              Détection de la stack, construction et publication : votre projet passe du dépôt à une URL
               sécurisée sans serveur à configurer.
             </p>
             <ul className="space-y-3 text-sm text-white/90">

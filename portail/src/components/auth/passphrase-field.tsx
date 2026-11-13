@@ -21,9 +21,10 @@ export interface PassphraseFieldProps {
 }
 
 /**
- * Champ de phrase secrète avec affichage/masquage. On conserve le terme
- * technique « mot de passe » dans le libellé accessible pour ne pas dérouter
- * les gestionnaires de mots de passe ni les utilisateurs habitués.
+ * Champ de mot de passe avec affichage/masquage. Le libellé visible reste
+ * « Mot de passe » ; les conseils recommandent une phrase de plusieurs mots.
+ * Le bouton n'emploie pas « mot de passe » dans son nom accessible pour ne pas
+ * rendre ambigu un sélecteur par libellé (`getByLabel('Mot de passe')`).
  */
 export const PassphraseField = forwardRef<HTMLInputElement, PassphraseFieldProps>(
   function PassphraseField(
@@ -73,8 +74,8 @@ export const PassphraseField = forwardRef<HTMLInputElement, PassphraseFieldProps
             onClick={() => setVisible((current) => !current)}
             aria-pressed={visible}
             aria-controls={id}
-            aria-label={visible ? 'Masquer la phrase secrète' : 'Afficher la phrase secrète'}
-            title={visible ? 'Masquer la phrase secrète' : 'Afficher la phrase secrète'}
+            aria-label={visible ? 'Masquer les caractères' : 'Afficher les caractères'}
+            title={visible ? 'Masquer les caractères' : 'Afficher les caractères'}
             disabled={disabled}
             className="absolute right-0 top-0 z-10 inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-200 ease-out-expo hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50"
           >
@@ -91,11 +92,11 @@ export function PassphraseGuidance({ className }: { className?: string }) {
   return (
     <details className={['rounded-lg border border-border bg-muted/40 px-3 text-sm', className].filter(Boolean).join(' ')}>
       <summary className="min-h-11 cursor-pointer py-3 font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-        Comment choisir une phrase secrète ?
+        Comment choisir un bon mot de passe ?
       </summary>
       <ul className="list-disc space-y-1 pb-3 pl-5 text-muted-foreground">
         <li>4 à 5 mots sans lien entre eux, séparés par des espaces.</li>
-        <li>Au moins 12 caractères : une phrase longue est acceptée et jamais tronquée.</li>
+        <li>Au moins 12 caractères : une phrase longue est acceptée et jamais tronquée.</li>
         <li>Évitez votre nom, une date, une citation connue ou une information personnelle.</li>
         <li>N’utilisez jamais le même secret sur plusieurs sites.</li>
         <li>{PASSPHRASE_EXAMPLE_NOTE}</li>

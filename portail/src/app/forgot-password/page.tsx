@@ -72,8 +72,8 @@ export default function ForgotPasswordPage() {
 
   return (
     <AuthLayout
-      title="Phrase secrète oubliée"
-      description="Indiquez votre adresse e-mail : nous vous enverrons un lien pour choisir une nouvelle phrase secrète."
+      title="Mot de passe oublié"
+      description="Indiquez votre adresse e-mail : nous vous enverrons un lien pour choisir un nouveau mot de passe."
       footer={
         <Link suppressHydrationWarning href={withNext('/login')} className="font-medium text-primary hover:underline">
           Retour à la connexion

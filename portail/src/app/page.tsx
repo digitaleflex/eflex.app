@@ -302,12 +302,11 @@ export default function HomePage() {
 
               <FeatureCard
                 icon={Layers}
-                title="Laravel détecté, PHP déployé"
+                title="Plusieurs services, un seul fichier"
                 description={
-                  "Laravel et PHP sont reconnus. Un plan Laravel multi-services généré sans compose fourni est refusé : " +
-                  "ajoutez un fichier `docker-compose.yml`/`compose.yaml` au dépôt pour déployer vos services (files " +
-                  "d'attente, planificateur, etc.) via compose fourni (D1). Les applications PHP simples passent en ligne " +
-                  "dès aujourd'hui."
+                  'Serveur web, file d’attente, planificateur : décrivez vos services dans un fichier ' +
+                  'docker-compose.yml ou compose.yaml à la racine de l’application, Eflex les déploie ensemble. ' +
+                  'Laravel et PHP sont reconnus.'
                 }
               />
 

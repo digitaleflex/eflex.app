@@ -19,8 +19,7 @@ import { Input } from '@/components/ui/input'
 import { authClient, authErrorMessage, signIn } from '@/lib/auth-client'
 import { validateEmail, validateLoginPassword } from '@/lib/auth-validation'
 
-const LOGIN_PASSPHRASE_HINT =
-  'Les espaces sont acceptés. Collez votre phrase secrète ou utilisez votre gestionnaire de mots de passe.'
+const LOGIN_PASSPHRASE_HINT = 'Espaces acceptés. Votre gestionnaire de mots de passe peut le remplir.'
 
 function focusFirst(
   errors: (string | null)[],
@@ -109,7 +108,7 @@ export default function LoginPage() {
       )
       if (result.error) {
         setNeedsVerification(result.error.code === 'EMAIL_NOT_VERIFIED')
-        setFormError(authErrorMessage(result.error, 'Email ou phrase secrète incorrecte.'))
+        setFormError(authErrorMessage(result.error, 'Adresse e-mail ou mot de passe incorrect.'))
         focusAlert()
         return
       }
@@ -180,7 +179,7 @@ export default function LoginPage() {
       }
       finish()
     } catch {
-      setFormError('Connexion par passkey impossible sur cet appareil. Utilisez votre phrase secrète.')
+      setFormError('Connexion par passkey impossible sur cet appareil. Utilisez votre mot de passe.')
       focusAlert()
     } finally {
       setPasskeyLoading(false)
@@ -202,7 +201,7 @@ export default function LoginPage() {
       description="Retrouvez vos projets et vos déploiements."
       footer={
         <>
-          Pas encore de compte ?{' '}
+          Pas encore de compte ?{' '}
           <Link suppressHydrationWarning href={withNext('/register')} className="font-medium text-primary hover:underline">
             Créer un compte
           </Link>
@@ -321,7 +320,7 @@ export default function LoginPage() {
               <PassphraseField
                 ref={passphraseRef}
                 id="password"
-                label="Phrase secrète (mot de passe)"
+                label="Mot de passe"
                 autoComplete="current-password"
                 value={passphrase.value}
                 onChange={passphrase.change}
@@ -334,7 +333,7 @@ export default function LoginPage() {
 
               <div className="flex justify-end">
                 <Link href="/forgot-password" className="text-sm font-medium text-primary hover:underline">
-                  Phrase secrète oubliée ?
+                  Mot de passe oublié ?
                 </Link>
               </div>
 
