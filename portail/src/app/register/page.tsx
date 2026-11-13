@@ -132,7 +132,7 @@ export default function RegisterPage() {
       description="Déployez votre premier projet en quelques minutes."
       footer={
         <>
-          Déjà un compte ?{' '}
+          Déjà un compte ?{' '}
           <Link suppressHydrationWarning href={withNext('/login')} className="font-medium text-primary hover:underline">
             Se connecter
           </Link>
@@ -189,7 +189,7 @@ export default function RegisterPage() {
           <PassphraseField
             ref={passphraseRef}
             id="password"
-            label="Phrase secrète (mot de passe)"
+            label="Mot de passe"
             autoComplete="new-password"
             value={passphrase.value}
             onChange={passphrase.change}
@@ -202,13 +202,13 @@ export default function RegisterPage() {
           <PassphraseField
             ref={confirmationRef}
             id="confirm-password"
-            label="Confirmer la phrase secrète"
+            label="Confirmer le mot de passe"
             autoComplete="new-password"
             value={confirmation.value}
             onChange={confirmation.change}
             onBlur={confirmation.blur}
             error={confirmation.error}
-            hint="Saisissez à nouveau la même phrase, espaces compris."
+            hint="Saisissez-le à nouveau, espaces compris."
             disabled={loading}
             required
           />

@@ -20,8 +20,8 @@ import { withNext } from '@/lib/safe-next'
 export default function ResetPasswordPage() {
   return (
     <AuthLayout
-      title="Nouvelle phrase secrète"
-      description="Choisissez une phrase secrète de 4 à 5 mots, sans lien avec vos informations personnelles."
+      title="Nouveau mot de passe"
+      description="Idéalement 4 à 5 mots sans lien entre eux ni avec vos informations personnelles."
       footer={
         <Link suppressHydrationWarning href={withNext('/login')} className="font-medium text-primary hover:underline">
           Retour à la connexion
@@ -105,7 +105,7 @@ function ResetPasswordForm() {
     <Card className="space-y-5 p-6">
       {done ? (
         <div role="status" className="space-y-4">
-          <p className="text-sm text-foreground">Votre phrase secrète a été mise à jour. Vous pouvez vous connecter.</p>
+          <p className="text-sm text-foreground">Votre mot de passe a été mis à jour. Vous pouvez vous connecter.</p>
           <Button size="lg" className="w-full" onClick={goToLogin}>
             Se connecter
           </Button>
@@ -129,7 +129,7 @@ function ResetPasswordForm() {
             <PassphraseField
               ref={passphraseRef}
               id="new-password"
-              label="Nouvelle phrase secrète (mot de passe)"
+              label="Nouveau mot de passe"
               autoComplete="new-password"
               value={passphrase.value}
               onChange={passphrase.change}
@@ -142,13 +142,13 @@ function ResetPasswordForm() {
             <PassphraseField
               ref={confirmationRef}
               id="confirm-password"
-              label="Confirmer la phrase secrète"
+              label="Confirmer le mot de passe"
               autoComplete="new-password"
               value={confirmation.value}
               onChange={confirmation.change}
               onBlur={confirmation.blur}
               error={confirmation.error}
-              hint="Saisissez à nouveau la même phrase, espaces compris."
+              hint="Saisissez-le à nouveau, espaces compris."
               disabled={loading}
               required
             />
@@ -156,7 +156,7 @@ function ResetPasswordForm() {
             <PassphraseGuidance />
 
             <Button type="submit" size="lg" className="w-full" loading={loading}>
-              Enregistrer la phrase secrète
+              Enregistrer le mot de passe
             </Button>
           </form>
         </>
