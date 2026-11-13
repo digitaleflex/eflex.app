@@ -70,11 +70,21 @@ async function setTheme(context: import('@playwright/test').BrowserContext, them
   await context.addCookies([{ name: 'eflex-theme', value: theme, domain: new URL(baseURL).hostname, path: '/' }])
 }
 
-async function setSidebar(context: import('@playwright/test').BrowserContext, collapsed: boolean, baseURL: string) {
+/**
+ * La barre latérale lit d'abord `localStorage` (`eflex:sidebar-collapsed`), écrit dès la première
+ * visite : poser seulement le cookie laisserait donc l'état précédent. On pose les deux.
+ */
+async function setSidebar(
+  context: import('@playwright/test').BrowserContext,
+  page: Page,
+  collapsed: boolean,
+  baseURL: string,
+) {
   await context.clearCookies({ name: 'eflex-sidebar' })
   await context.addCookies([
     { name: 'eflex-sidebar', value: collapsed ? 'collapsed' : 'expanded', domain: new URL(baseURL).hostname, path: '/' },
   ])
+  await page.evaluate((value) => window.localStorage.setItem('eflex:sidebar-collapsed', value), collapsed ? '1' : '0')
 }
 
 async function capture(page: Page, route: string, theme: string, width: string, name?: string) {
@@ -152,9 +162,9 @@ if (!AUTH) {
 
           for (const route of DASHBOARD_PAGES) {
             if (route === '/dashboard' && viewport.width >= 768) {
-              await setSidebar(context, false, baseURL!)
+              await setSidebar(context, page, false, baseURL!)
               await capture(page, route, theme, viewport.label, 'dashboard_sidebar-depliee')
-              await setSidebar(context, true, baseURL!)
+              await setSidebar(context, page, true, baseURL!)
               await capture(page, route, theme, viewport.label, 'dashboard_sidebar-repliee')
             } else {
               await capture(page, route, theme, viewport.label)
