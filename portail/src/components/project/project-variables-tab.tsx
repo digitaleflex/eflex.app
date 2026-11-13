@@ -44,13 +44,13 @@ export function ProjectVariablesTab({
           title="Aucune variable définie"
           description={
             canManage
-              ? 'Ajoutez une variable (par exemple une clé d’API) : sa valeur restera masquée et chiffrée.'
+              ? 'Ajoutez des variables une par une ou importez un fichier .env depuis les paramètres. Les valeurs restent chiffrées et ne sont jamais réaffichées.'
               : 'Un propriétaire ou un administrateur peut ajouter des variables au projet.'
           }
           action={
             canManage ? (
               <Link href={`/dashboard/projects/${projectId}/settings#variables`} className={smallLinkClass}>
-                Ajouter une variable
+                Gérer les variables
               </Link>
             ) : undefined
           }
@@ -82,8 +82,7 @@ export function ProjectVariablesTab({
         </ul>
       )}
       <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground sm:px-5">
-        Une valeur ne peut pas être relue depuis l’interface : pour la remplacer, saisissez-la à
-        nouveau dans les paramètres. Les journaux masquent les valeurs connues.
+        Les valeurs ne peuvent pas être relues : pour les remplacer, saisissez-les à nouveau dans les paramètres (ajout ou import .env). Les modifications s’appliquent au prochain déploiement et les journaux masquent les valeurs connues.
       </p>
     </SectionCard>
   )

@@ -806,7 +806,7 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
                 Importer depuis un fichier .env
               </h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Collez le contenu ou importez un fichier texte. Les valeurs ne sont jamais affichées ; seules les clés sont prévisualisées.
+                Collez le contenu ou importez un fichier texte. Les valeurs ne sont jamais affichées ; seules les clés sont prévisualisées. En cas de clé en double, la dernière valeur fournie est conservée.
               </p>
             </div>
             <FeedbackMessage feedback={envImportFeedback} id="project-env-import-feedback" />
