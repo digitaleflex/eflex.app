@@ -10,6 +10,7 @@ const links = [
   { href: '/#fonctionnement', label: 'Fonctionnement' },
   { href: '/#fonctionnalites', label: 'Fonctionnalités' },
   { href: '/#questions', label: 'Questions' },
+  { href: '/tarifs', label: 'Tarifs' },
   { href: '/status', label: 'Statut' },
 ]
 
