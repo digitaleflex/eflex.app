@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ENV_BULK_MAX,
+  envBulkSchema,
   envVarSchema,
   firstIssue,
   projectUpdateSchema,
@@ -49,5 +51,37 @@ describe('envVarSchema', () => {
 
   it('refuse une valeur trop longue', () => {
     expect(envVarSchema.safeParse({ key: 'KEY', value: 'x'.repeat(5_001) }).success).toBe(false)
+  })
+})
+
+describe('envBulkSchema', () => {
+  it('accepte des variables valides et dédoublonne (dernière valeur)', () => {
+    const parsed = envBulkSchema.parse({
+      vars: [
+        { key: 'A', value: '1' },
+        { key: ' B ', value: '' },
+        { key: 'A', value: '2' },
+      ],
+    })
+    expect(parsed.vars).toEqual([
+      { key: 'B', value: '' },
+      { key: 'A', value: '2' },
+    ])
+  })
+
+  it('nomme la variable fautive', () => {
+    const result = envBulkSchema.safeParse({ vars: [{ key: 'OK', value: '1' }, { key: '1MAUVAIS', value: 'x' }] })
+    expect(result.success).toBe(false)
+    expect(result.success ? '' : firstIssue(result.error)).toMatch(/Variable 2 \(1MAUVAIS\)/)
+  })
+
+  it('refuse une liste vide ou trop longue', () => {
+    expect(envBulkSchema.safeParse({ vars: [] }).success).toBe(false)
+    const tooMany = Array.from({ length: ENV_BULK_MAX + 1 }, (_, i) => ({ key: `V${i}`, value: '' }))
+    expect(envBulkSchema.safeParse({ vars: tooMany }).success).toBe(false)
+  })
+
+  it('refuse une valeur trop longue', () => {
+    expect(envBulkSchema.safeParse({ vars: [{ key: 'A', value: 'x'.repeat(5001) }] }).success).toBe(false)
   })
 })
