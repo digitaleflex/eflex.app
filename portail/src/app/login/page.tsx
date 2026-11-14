@@ -3,12 +3,13 @@
 import { nextFromLocation, withNext } from '@/lib/safe-next'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Fingerprint } from 'lucide-react'
+import { Fingerprint, Mail } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 import { AuthDivider, AuthLayout } from '@/components/auth/auth-layout'
 import { FormAlert } from '@/components/auth/form-alert'
-import { GoogleButton } from '@/components/auth/google-button'
+import { EmailCodeForm } from '@/components/auth/email-code-form'
+import { OAuthButton } from '@/components/auth/oauth-buttons'
 import { PassphraseField } from '@/components/auth/passphrase-field'
 import { useAuthConfig, useOAuthError } from '@/components/auth/use-auth-config'
 import { useValidatedField } from '@/components/auth/use-validated-field'
@@ -37,7 +38,7 @@ function verifyEmailHref(email: string): string {
 
 export default function LoginPage() {
   const router = useRouter()
-  const { config } = useAuthConfig()
+  const { config, failed: configFailed } = useAuthConfig()
   const oauthError = useOAuthError()
 
   const email = useValidatedField('', validateEmail)
@@ -53,6 +54,9 @@ export default function LoginPage() {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [passkeyLoading, setPasskeyLoading] = useState(false)
   const [passkeySupported, setPasskeySupported] = useState(false)
+  const [mode, setMode] = useState<'code' | 'password'>('code')
+  const [codeStep, setCodeStep] = useState<'email' | 'code'>('email')
+  const [lastMethod, setLastMethod] = useState<string | null>(null)
 
   const emailRef = useRef<HTMLInputElement>(null)
   const passphraseRef = useRef<HTMLInputElement>(null)
@@ -65,11 +69,22 @@ export default function LoginPage() {
       setTwoFactor(true)
     }
     setPasskeySupported(typeof window !== 'undefined' && 'PublicKeyCredential' in window)
+    // Dernière méthode utilisée (cookie posé par le plugin `lastLoginMethod`) : simple repère visuel.
+    setLastMethod(authClient.getLastUsedLoginMethod())
   }, [])
 
   useEffect(() => {
     if (oauthError) setFormError(oauthError)
   }, [oauthError])
+
+  const configReady = config !== null || configFailed
+  const codeEnabled = config?.emailCodeEnabled === true
+  const showCode = codeEnabled && mode === 'code'
+  const anyPasswordless = Boolean(config?.githubEnabled || config?.googleEnabled || codeEnabled)
+  const providerFailed = (message: string) => {
+    setFormError(message)
+    focusAlert()
+  }
 
   const focusAlert = () => {
     requestAnimationFrame(() => alertRef.current?.focus())
@@ -197,11 +212,15 @@ export default function LoginPage() {
 
   return (
     <AuthLayout
-      title="Connexion"
-      description="Retrouvez vos projets et vos déploiements."
+      title="Bienvenue sur EFLEX"
+      description={
+        anyPasswordless
+          ? 'Connectez-vous ou créez un compte : c’est le même geste.'
+          : 'Retrouvez vos projets et vos déploiements.'
+      }
       footer={
         <>
-          Pas encore de compte ?{' '}
+          Pas encore de compte ?{' '}
           <Link suppressHydrationWarning href={withNext('/register')} className="font-medium text-primary hover:underline">
             Créer un compte
           </Link>
@@ -284,91 +303,153 @@ export default function LoginPage() {
           </form>
         ) : (
           <>
-            {config?.googleEnabled && (
-              <>
-                <GoogleButton disabled={loading} onError={(message) => {
-                  setFormError(message)
-                  focusAlert()
-                }} />
-                <AuthDivider />
-              </>
-            )}
-
-            {formError && (
-              <FormAlert ref={alertRef} id="login-error">
-                {formError}
-              </FormAlert>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-              <Input
-                ref={emailRef}
-                id="email"
-                label="Adresse e-mail"
-                type="email"
-                placeholder="vous@exemple.com"
-                autoComplete="email"
-                inputMode="email"
-                value={email.value}
-                onChange={(event) => email.change(event.target.value)}
-                onBlur={email.blur}
-                error={email.error ?? undefined}
-                disabled={loading}
-                required
-              />
-
-              <PassphraseField
-                ref={passphraseRef}
-                id="password"
-                label="Mot de passe"
-                autoComplete="current-password"
-                value={passphrase.value}
-                onChange={passphrase.change}
-                onBlur={passphrase.blur}
-                error={passphrase.error}
-                hint={LOGIN_PASSPHRASE_HINT}
-                disabled={loading}
-                required
-              />
-
-              <div className="flex justify-end">
-                <Link href="/forgot-password" className="text-sm font-medium text-primary hover:underline">
-                  Mot de passe oublié ?
-                </Link>
+            {!configReady ? (
+              <div aria-busy="true" aria-label="Chargement des méthodes de connexion" className="space-y-3">
+                <div className="h-12 animate-pulse rounded-lg bg-muted" />
+                <div className="h-12 animate-pulse rounded-lg bg-muted" />
+                <div className="h-12 animate-pulse rounded-lg bg-muted" />
               </div>
+            ) : (
+              <>
+                {!(showCode && codeStep === 'code') && (config?.githubEnabled || config?.googleEnabled || passkeySupported) && (
+                  <div className="space-y-3">
+                    {config?.githubEnabled && (
+                      <OAuthButton
+                        provider="github"
+                        primary
+                        lastUsed={lastMethod === 'github'}
+                        disabled={loading}
+                        onError={providerFailed}
+                      />
+                    )}
+                    {config?.googleEnabled && (
+                      <OAuthButton
+                        provider="google"
+                        primary={!config.githubEnabled}
+                        lastUsed={lastMethod === 'google'}
+                        disabled={loading}
+                        onError={providerFailed}
+                      />
+                    )}
+                    {passkeySupported && (
+                      <div className="relative">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="lg"
+                          className="w-full justify-center gap-3 font-medium"
+                          onClick={() => void handlePasskey()}
+                          loading={passkeyLoading}
+                          disabled={loading}
+                        >
+                          <Fingerprint className="h-5 w-5" aria-hidden="true" />
+                          Se connecter avec une passkey
+                        </Button>
+                        {lastMethod === 'passkey' && (
+                          <span className="pointer-events-none absolute -top-2.5 right-3 rounded-full border border-primary/25 bg-background px-2 py-0.5 text-xs font-semibold text-primary">
+                            Dernière utilisée
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <AuthDivider label="ou par e-mail" />
+                  </div>
+                )}
 
-              {CAPTCHA_ENABLED && <Turnstile onToken={setCaptchaToken} />}
+                {formError && (
+                  <FormAlert ref={alertRef} id="login-error">
+                    {formError}
+                  </FormAlert>
+                )}
 
-              <Button type="submit" size="lg" className="w-full" loading={loading}>
-                Se connecter
-              </Button>
-            </form>
+                {showCode ? (
+                  <EmailCodeForm
+                    initialEmail={email.value}
+                    onSuccess={finish}
+                    onStepChange={setCodeStep}
+                    onUsePassword={(address) => {
+                      email.change(address)
+                      setMode('password')
+                      requestAnimationFrame(() => (address ? passphraseRef : emailRef).current?.focus())
+                    }}
+                    disabled={loading}
+                  />
+                ) : (
+                  <>
+                    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+                      <Input
+                        ref={emailRef}
+                        id="email"
+                        label="Adresse e-mail"
+                        type="email"
+                        placeholder="vous@exemple.com"
+                        autoComplete="email"
+                        inputMode="email"
+                        value={email.value}
+                        onChange={(event) => email.change(event.target.value)}
+                        onBlur={email.blur}
+                        error={email.error ?? undefined}
+                        disabled={loading}
+                        required
+                      />
 
-            {needsVerification && (
-              <p className="text-center text-sm text-muted-foreground">
-                <Link
-                  suppressHydrationWarning
-                  href={verifyEmailHref(email.value)}
-                  className="font-medium text-primary hover:underline"
-                >
-                  Renvoyer l’e-mail de vérification
-                </Link>
-              </p>
-            )}
+                      <PassphraseField
+                        ref={passphraseRef}
+                        id="password"
+                        label="Mot de passe"
+                        autoComplete="current-password"
+                        value={passphrase.value}
+                        onChange={passphrase.change}
+                        onBlur={passphrase.blur}
+                        error={passphrase.error}
+                        hint={LOGIN_PASSPHRASE_HINT}
+                        disabled={loading}
+                        required
+                      />
 
-            {passkeySupported && (
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                className="w-full justify-center gap-2"
-                onClick={() => void handlePasskey()}
-                loading={passkeyLoading}
-                disabled={loading}
-              >
-                <Fingerprint className="h-5 w-5" aria-hidden="true" />
-                Se connecter avec une passkey
-              </Button>
+                      <div className="flex justify-end">
+                        <Link href="/forgot-password" className="text-sm font-medium text-primary hover:underline">
+                          Mot de passe oublié ?
+                        </Link>
+                      </div>
+
+                      {CAPTCHA_ENABLED && <Turnstile onToken={setCaptchaToken} />}
+
+                      <Button type="submit" size="lg" className="w-full" loading={loading}>
+                        Se connecter
+                      </Button>
+                    </form>
+
+                    {needsVerification && (
+                      <p className="text-center text-sm text-muted-foreground">
+                        <Link
+                          suppressHydrationWarning
+                          href={verifyEmailHref(email.value)}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          Renvoyer l’e-mail de vérification
+                        </Link>
+                      </p>
+                    )}
+
+                    {codeEnabled && (
+                      <p className="text-center text-sm">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMode('code')
+                            setFormError('')
+                          }}
+                          className="inline-flex min-h-11 items-center gap-2 font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <Mail className="h-4 w-4" aria-hidden="true" />
+                          Recevoir un code par e-mail
+                        </button>
+                      </p>
+                    )}
+                  </>
+                )}
+              </>
             )}
           </>
         )}

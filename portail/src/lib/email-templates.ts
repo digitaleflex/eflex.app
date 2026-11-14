@@ -78,6 +78,34 @@ export function verificationEmail(url: string): EmailTemplate {
   )
 }
 
+/** Code de connexion à 6 chiffres (connexion et inscription sans mot de passe). */
+export function loginCodeEmail(code: string, expiresInMinutes: number): EmailTemplate {
+  const safeCode = escapeHtml(code)
+  const title = 'Votre code de connexion'
+  const intro = `Saisissez ce code pour vous connecter à EFLEX : ${code}`
+  const introHtml = `Saisissez ce code pour vous connecter à EFLEX :<br><span style="display:inline-block;margin-top:16px;font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:32px;font-weight:700;letter-spacing:0.3em;color:#0b1f3b">${safeCode}</span>`
+  const note = `Ce code expire dans ${expiresInMinutes} minutes et ne peut être utilisé qu’une fois. Si vous ne l’avez pas demandé, ignorez cet e-mail : personne ne peut se connecter sans lui.`
+  const html = `<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(title)}</title></head>
+<body style="margin:0;padding:0;background:#f4f7fb;font-family:Inter,Arial,Helvetica,sans-serif;color:#0b1f3b">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7fb;padding:32px 16px">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden">
+        <tr><td style="padding:28px 32px 8px"><p style="margin:0;font-size:18px;font-weight:700;letter-spacing:-0.02em;color:#0b1f3b">EFLEX</p></td></tr>
+        <tr><td style="padding:8px 32px 8px">
+          <h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;letter-spacing:-0.02em;color:#0b1f3b">${escapeHtml(title)}</h1>
+          <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#475569">${introHtml}</p>
+        </td></tr>
+        <tr><td style="padding:8px 32px 28px"><p style="margin:0;font-size:12px;line-height:1.5;color:#64748b">${escapeHtml(note)}</p></td></tr>
+        <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 32px"><p style="margin:0;font-size:12px;color:#94a3b8">Le déploiement depuis Git, sans DevOps — eflex.app</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+  return { html, text: `${title}\n\n${intro}\n\n${note}\n\nEflex — eflex.app` }
+}
+
 export function resetPasswordEmail(url: string): EmailTemplate {
   return layout(
     'Réinitialiser votre phrase secrète',

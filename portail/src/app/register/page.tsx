@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 
 import { AuthDivider, AuthLayout } from '@/components/auth/auth-layout'
 import { FormAlert } from '@/components/auth/form-alert'
-import { GoogleButton } from '@/components/auth/google-button'
+import { OAuthButton } from '@/components/auth/oauth-buttons'
 import { PassphraseField, PassphraseGuidance } from '@/components/auth/passphrase-field'
 import { useAuthConfig, useOAuthError } from '@/components/auth/use-auth-config'
 import { useValidatedField } from '@/components/auth/use-validated-field'
@@ -140,14 +140,42 @@ export default function RegisterPage() {
       }
     >
       <Card className="space-y-6 p-6">
-        {config?.googleEnabled && (
-          <>
-            <GoogleButton disabled={loading} onError={(message) => {
-              setFormError(message)
-              focusAlert()
-            }} />
-            <AuthDivider />
-          </>
+        {(config?.githubEnabled || config?.googleEnabled) && (
+          <div className="space-y-3">
+            {config.githubEnabled && (
+              <OAuthButton
+                provider="github"
+                primary
+                disabled={loading}
+                onError={(message) => {
+                  setFormError(message)
+                  focusAlert()
+                }}
+              />
+            )}
+            {config.googleEnabled && (
+              <OAuthButton
+                provider="google"
+                primary={!config.githubEnabled}
+                disabled={loading}
+                onError={(message) => {
+                  setFormError(message)
+                  focusAlert()
+                }}
+              />
+            )}
+            <AuthDivider label="ou avec un mot de passe" />
+          </div>
+        )}
+
+        {config?.emailCodeEnabled && (
+          <p className="rounded-lg bg-muted/60 px-3 py-2.5 text-sm text-muted-foreground">
+            Plus simple :{' '}
+            <Link suppressHydrationWarning href={withNext('/login')} className="font-medium text-primary hover:underline">
+              recevez un code par e-mail
+            </Link>
+            , sans mot de passe à retenir.
+          </p>
         )}
 
         {formError && (

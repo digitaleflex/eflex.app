@@ -1,7 +1,13 @@
 'use client'
 
 import { createAuthClient } from 'better-auth/react'
-import { adminClient, organizationClient, twoFactorClient } from 'better-auth/client/plugins'
+import {
+  adminClient,
+  emailOTPClient,
+  lastLoginMethodClient,
+  organizationClient,
+  twoFactorClient,
+} from 'better-auth/client/plugins'
 import { passkeyClient } from '@better-auth/passkey/client'
 
 // Sans baseURL, le client appelle /api/auth sur l'origine courante.
@@ -11,6 +17,8 @@ export const authClient = createAuthClient({
     adminClient(),
     twoFactorClient({ twoFactorPage: '/login?two-factor=1' }),
     passkeyClient(),
+    emailOTPClient(),
+    lastLoginMethodClient(),
   ],
 })
 
@@ -27,7 +35,7 @@ const MESSAGES: Record<string, string> = {
   PASSWORD_TOO_LONG: 'La phrase secrète est trop longue (256 caractères maximum).',
   INVALID_PASSWORD: 'Phrase secrète incorrecte.',
   EMAIL_NOT_VERIFIED: 'Vérifiez votre adresse e-mail avant de vous connecter.',
-  CREDENTIAL_ACCOUNT_NOT_FOUND: "Ce compte n'a pas de mot de passe (connexion Google).",
+  CREDENTIAL_ACCOUNT_NOT_FOUND: "Ce compte n'a pas de mot de passe (connexion Google ou GitHub).",
   SESSION_EXPIRED: 'Votre session a expiré. Reconnectez-vous pour continuer.',
   CHANGE_EMAIL_DISABLED: "Le changement d'adresse e-mail n'est pas disponible.",
   EMAIL_IS_THE_SAME: 'Cette adresse est déjà celle de votre compte.',
@@ -63,6 +71,13 @@ const MESSAGES: Record<string, string> = {
   UNABLE_TO_CREATE_SESSION: 'Impossible d’ouvrir une session. Réessayez.',
   PREVIOUSLY_REGISTERED: 'Cet appareil possède déjà une passkey pour votre compte.',
   ORIGIN_NOT_CONFIGURED: 'La connexion par passkey n’est pas configurée sur ce domaine.',
+  // Code de connexion par e-mail
+  INVALID_OTP: 'Code incorrect. Vérifiez-le ou demandez-en un nouveau.',
+  OTP_EXPIRED: 'Ce code a expiré. Demandez-en un nouveau.',
+  TOO_MANY_ATTEMPTS: 'Trop d’essais. Demandez un nouveau code.',
+  EMAIL_CODE_UNAVAILABLE: 'La connexion par code n’est pas disponible pour le moment.',
+  TWO_FACTOR_REQUIRES_PASSWORD:
+    'Ce compte est protégé par la double authentification : connectez-vous avec votre mot de passe.',
   // Captcha
   VERIFICATION_FAILED: 'La vérification anti-robot a échoué. Réessayez.',
   MISSING_RESPONSE: 'La vérification anti-robot est requise. Rechargez la page et réessayez.',

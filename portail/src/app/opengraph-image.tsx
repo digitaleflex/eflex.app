@@ -55,7 +55,7 @@ export default async function Image() {
           <div style={{ fontSize: 54, fontWeight: 700, letterSpacing: -1 }}>EFLEX</div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18, maxWidth: 900 }}>
-          <div style={{ fontSize: 64, fontWeight: 700, lineHeight: 1.1 }}>Poussez votre code, EFLEX le met en ligne.</div>
+          <div style={{ fontSize: 64, fontWeight: 700, lineHeight: 1.1 }}>Votre code en ligne, en quelques minutes.</div>
           <div style={{ fontSize: 32, color: 'rgba(255,255,255,0.88)', lineHeight: 1.35 }}>
             Déploiement depuis GitHub, HTTPS automatique, sans serveur à configurer.
           </div>
