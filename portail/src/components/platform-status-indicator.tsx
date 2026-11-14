@@ -32,7 +32,7 @@ export function PlatformStatusIndicator({ className }: { className?: string }) {
   return (
     <Link
       href="/status"
-      className={cn('inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded', className)}
+      className={cn('inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md', className)}
       title="État des services"
     >
       <span className={cn('h-2 w-2 rounded-full', m.dot)} aria-hidden="true" />

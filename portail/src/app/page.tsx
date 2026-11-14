@@ -166,7 +166,7 @@ export default function HomePage() {
 
       <main id="contenu" tabIndex={-1} className="flex-1">
         {/* ─── Hero : surface pleine largeur navy, preuve produit intégrée ─── */}
-        <section className="relative overflow-hidden bg-eflexnavy text-white">
+        <section className="surface-navy relative overflow-hidden bg-eflexnavy text-white">
           <div className="container relative grid grid-cols-1 items-center gap-12 py-16 md:py-20 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:py-24">
             <div className="space-y-8 animate-reveal">
               <div className="space-y-5">
@@ -282,61 +282,7 @@ export default function HomePage() {
         </section>
 
         {/* ─── Technologies : bande navy, en alternance avec les sections claires ─── */}
-        <section id="technologies" aria-labelledby="stacks-titre" className="scroll-mt-20 bg-eflexnavy text-white">
-          <div className="container space-y-10 py-16 md:py-24">
-            <div className="mx-auto max-w-3xl space-y-4 text-center">
-              <h2 id="stacks-titre" className="text-3xl font-bold tracking-tight text-balance md:text-4xl">
-                Déployez vos applications avec vos <span className="text-eflexblue">technologies préférées</span>
-              </h2>
-              <p className="text-lead-lg text-white/80 text-pretty">
-                EFLEX reconnaît la stack de votre dépôt et propose la commande de build, le démarrage et le port.
-                Vous relisez et corrigez si besoin.
-              </p>
-            </div>
-
-            <StackShowcase />
-
-            <ul className="mx-auto grid grid-cols-1 max-w-5xl gap-6 border-t border-white/10 pt-8 md:grid-cols-3">
-              {[
-                {
-                  icon: Zap,
-                  title: 'Détection automatique',
-                  text: 'La stack est identifiée dès l’import du dépôt.',
-                },
-                {
-                  icon: SlidersHorizontal,
-                  title: 'Configuration proposée',
-                  text: 'Build, démarrage et port sont expliqués : vous les validez ou les corrigez.',
-                },
-                {
-                  icon: FileCode2,
-                  title: 'Une technologie manque ?',
-                  text: 'Décrivez votre application avec un Dockerfile ou un fichier eflex.json.',
-                },
-              ].map((item) => (
-                <li key={item.title} className="flex items-start gap-4">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
-                    <item.icon className="h-5 w-5 text-eflexsky" aria-hidden="true" />
-                  </span>
-                  <span>
-                    <span className="block text-base font-semibold">{item.title}</span>
-                    <span className="mt-1 block text-sm text-white/80">{item.text}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-
-            <p className="mx-auto max-w-2xl text-center text-xs text-white/75 text-pretty">
-              Les dépôts GitHub, publics ou privés, sont pris en charge aujourd’hui ; les technologies marquées «&nbsp;Bientôt&nbsp;»
-              arrivent prochainement. Si votre application repose sur plusieurs services, ajoutez un fichier{' '}
-              <code className="font-mono">docker-compose.yml</code> ou <code className="font-mono">compose.yaml</code> à
-              la racine pour les déployer ensemble.
-            </p>
-          </div>
-        </section>
-
-        {/* ─── Technologies : bande navy, en alternance avec les sections claires ─── */}
-        <section id="technologies" aria-labelledby="stacks-titre" className="scroll-mt-20 bg-eflexnavy text-white">
+        <section id="technologies" aria-labelledby="stacks-titre" className="surface-navy scroll-mt-20 bg-eflexnavy text-white">
           <div className="container space-y-10 py-16 md:py-24">
             <div className="mx-auto max-w-3xl space-y-4 text-center">
               <h2 id="stacks-titre" className="text-3xl font-bold tracking-tight text-balance md:text-4xl">
@@ -569,7 +515,7 @@ export default function HomePage() {
 
             {/* Illustration du parcours : décorative, l'adresse est un exemple. */}
             <figure aria-hidden="true" className="mx-auto w-full max-w-sm">
-              <div className="space-y-3 rounded-2xl bg-eflexnavy p-5 shadow-2xl shadow-black/30 ring-1 ring-white/20">
+              <div className="surface-navy space-y-3 rounded-2xl bg-eflexnavy p-5 shadow-2xl shadow-black/30 ring-1 ring-white/20">
                 <div className="flex items-center gap-1.5">
                   <span className="h-2.5 w-2.5 rounded-full bg-white/25" />
                   <span className="h-2.5 w-2.5 rounded-full bg-white/25" />
@@ -578,15 +524,15 @@ export default function HomePage() {
                 <ul className="space-y-2.5 text-sm">
                   {['Dépôt connecté', 'Stack détectée', 'Application en ligne'].map((label) => (
                     <li key={label} className="flex items-center gap-2.5 rounded-lg bg-white/[0.06] px-3 py-2">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 text-emerald-300">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success/20 text-success">
                         <Check className="h-3.5 w-3.5" aria-hidden="true" />
                       </span>
                       {label}
                     </li>
                   ))}
                 </ul>
-                <div className="flex items-center gap-2 rounded-lg border border-emerald-300/30 bg-white/[0.04] px-3 py-2">
-                  <Lock className="h-4 w-4 shrink-0 text-emerald-300" aria-hidden="true" />
+                <div className="flex items-center gap-2 rounded-lg border border-success/30 bg-white/[0.04] px-3 py-2">
+                  <Lock className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />
                   <span className="truncate font-mono text-sm text-white">https://mon-app.exemple.app</span>
                 </div>
               </div>

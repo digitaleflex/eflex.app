@@ -12,7 +12,7 @@ const ANNOUNCEMENT_LEVELS = [
 
 function checkboxClass(disabled: boolean): string {
   return [
-    'h-5 w-5 shrink-0 rounded border-input text-primary accent-primary',
+    'h-5 w-5 shrink-0 rounded-md border-input text-primary accent-primary',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
     disabled ? 'cursor-not-allowed opacity-60' : '',
   ]
@@ -145,7 +145,7 @@ export function InfrastructureSettingsForm({
           Inscriptions ouvertes
         </label>
         <p id={`${ids.signups}-hint`} className="text-xs text-muted-foreground">
-          Réglage exposé publiquement sur <code className="font-mono text-[11px]">/api/maintenance</code> pour la page
+          Réglage exposé publiquement sur <code className="font-mono text-xs">/api/maintenance</code> pour la page
           d’inscription. Les comptes existants restent actifs dans tous les cas.
         </p>
       </div>
@@ -191,7 +191,7 @@ export function InfrastructureSettingsForm({
           <div
             className={
               form.announcementLevel === 'warning'
-                ? 'rounded-xl border border-amber-500/30 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100'
+                ? 'rounded-xl border border-warning/40 bg-warning-surface p-3 text-sm text-foreground'
                 : 'rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-foreground'
             }
           >

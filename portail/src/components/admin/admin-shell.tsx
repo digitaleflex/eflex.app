@@ -39,7 +39,7 @@ export function AdminShell({ children, email }: { children: React.ReactNode; ema
                   <span key={item.href} aria-disabled="true" className="flex min-h-11 shrink-0 items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground cursor-not-allowed">
                     <Icon className="h-5 w-5" aria-hidden="true" />
                     {item.label}
-                    <span className="ml-auto rounded-full border border-border px-2 py-0.5 text-[10px] uppercase">Bientôt</span>
+                    <span className="ml-auto rounded-full border border-border px-2 py-0.5 text-xs uppercase">Bientôt</span>
                   </span>
                 )
               }

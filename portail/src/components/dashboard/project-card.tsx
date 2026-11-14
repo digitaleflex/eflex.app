@@ -73,7 +73,7 @@ export function ProjectCard({ project }: { project: DashboardProject }) {
               {project.name}
             </Link>
             {project.appCount > 1 && (
-              <span className="shrink-0 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              <span className="shrink-0 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-xs font-medium text-muted-foreground">
                 {project.appCount} apps
               </span>
             )}

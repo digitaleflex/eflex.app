@@ -34,6 +34,7 @@
     --success-foreground: 0 0% 100%;
     --warning: 32 95% 30%;
     --warning-foreground: 0 0% 100%;
+    --warning-surface: 45 93% 94%; /* bandeau d'avertissement OPAQUE (collant) */
     /* Information : bleu-cyan distinct du bleu royal d'action. */
     --info: 199 89% 32%;
     --info-foreground: 0 0% 100%;
@@ -86,6 +87,7 @@
     --success-foreground: 215 69% 12%;
     --warning: 38 92% 58%;
     --warning-foreground: 215 69% 12%;
+    --warning-surface: 30 60% 13%;
     --info: 199 89% 66%;
     --info-foreground: 215 69% 12%;
     --border: 215 22% 20%;
@@ -293,6 +295,7 @@
     --success-foreground: 0 0% 100%;
     --warning: 32 95% 30%;
     --warning-foreground: 0 0% 100%;
+    --warning-surface: 45 93% 94%; /* bandeau d'avertissement OPAQUE (collant) */
     --info: 199 89% 32%;
     --info-foreground: 0 0% 100%;
     --border: 220 14% 89%;
@@ -329,3 +332,12 @@
 /* Pages forcées en clair (accueil, tarifs, pages légales) : version couleur même en thème sombre. */
 :root.dark .homepage-light .brand-logo-on-light { display: unset; }
 :root.dark .homepage-light .brand-logo-on-dark { display: none; }
+
+/* Bandes de marque navy (hero, sections de l'accueil) : la page reste forcée en clair, mais les
+   statuts doivent rester lisibles sur le navy. Mêmes valeurs que :root.dark. */
+.surface-navy {
+  --success: 142 60% 50%;
+  --warning: 38 92% 58%;
+  --info: 199 89% 66%;
+  --destructive: 0 85% 68%;
+}

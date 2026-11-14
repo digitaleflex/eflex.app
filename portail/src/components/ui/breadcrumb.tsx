@@ -21,7 +21,7 @@ export function Breadcrumb({ items, className, label = "Fil d'Ariane" }: { items
               {item.href && !last ? (
                 <Link
                   href={item.href}
-                  className="inline-flex min-h-11 items-center rounded-sm text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="inline-flex min-h-11 items-center rounded-md text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {item.label}
                 </Link>

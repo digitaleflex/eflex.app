@@ -143,7 +143,7 @@ export function Terminal({ url, label, downloadUrl, hint, onFinished, className 
       {/* Annonces pour lecteur d'écran : l'état, jamais chaque ligne. */}
       <p className="sr-only" role="status">{status && STATUS_LABEL[status] ? STATUS_LABEL[status] : STATE_LABEL[state]}</p>
       {(hint || windowRange || serverDropped > 0 || truncated > 0 || suspicious > 0) && (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 border-b border-slate-700 bg-slate-900/60 px-3 py-1.5 text-[11px] text-slate-300">
+        <div className="flex flex-wrap gap-x-3 gap-y-1 border-b border-slate-700 bg-slate-900/60 px-3 py-1.5 text-xs text-slate-300">
           {hint && <span>{hint}</span>}
           {windowRange && <span className="tabular-nums">Fenêtre serveur : lignes {windowRange}</span>}
           {serverDropped > 0 && <span className="tabular-nums text-yellow-200">Omises (débit) : {serverDropped}</span>}

@@ -192,8 +192,8 @@ export function NotificationsView() {
           <span className="sr-only">Chargement des notifications…</span>
           {[0, 1, 2].map((index) => (
             <div key={index} className="space-y-2 rounded-lg border border-border p-4">
-              <span className="block h-3 w-1/3 animate-pulse rounded bg-muted motion-reduce:animate-none" />
-              <span className="block h-3 w-2/3 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+              <span className="block h-3 w-1/3 animate-pulse rounded-md bg-muted motion-reduce:animate-none" />
+              <span className="block h-3 w-2/3 animate-pulse rounded-md bg-muted motion-reduce:animate-none" />
             </div>
           ))}
         </div>
@@ -386,7 +386,7 @@ export function NotificationsView() {
                             checked={preference.enabled}
                             onChange={(e) => void toggle(preference.type, 'app', e.target.checked)}
                             aria-describedby={descriptionId}
-                            className="h-5 w-5 shrink-0 rounded border-input accent-[hsl(var(--primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            className="h-5 w-5 shrink-0 rounded-md border-input accent-[hsl(var(--primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           />
                           Dans l’application
                         </label>
@@ -402,7 +402,7 @@ export function NotificationsView() {
                             disabled={!preference.enabled}
                             onChange={(e) => void toggle(preference.type, 'email', e.target.checked)}
                             aria-describedby={descriptionId}
-                            className="h-5 w-5 shrink-0 rounded border-input accent-[hsl(var(--primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-60"
+                            className="h-5 w-5 shrink-0 rounded-md border-input accent-[hsl(var(--primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-60"
                           />
                           Par e-mail
                         </label>

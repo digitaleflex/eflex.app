@@ -48,6 +48,7 @@ module.exports = {
         warning: {
           DEFAULT: 'hsl(var(--warning))',
           foreground: 'hsl(var(--warning-foreground))',
+          surface: 'hsl(var(--warning-surface))',
         },
         success: {
           DEFAULT: 'hsl(var(--success))',

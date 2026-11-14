@@ -108,7 +108,7 @@ export function AttentionList({ items }: { items: DashboardData['attention'] }) 
       <div className="border-b border-border px-4 py-2.5">
         <h2 id="attention-title" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           À regarder
-          <span className="rounded-full bg-muted px-1.5 text-[11px] font-medium tabular-nums text-muted-foreground">{items.length}</span>
+          <span className="rounded-full bg-muted px-1.5 text-xs font-medium tabular-nums text-muted-foreground">{items.length}</span>
         </h2>
         <p className="mt-1 text-xs text-muted-foreground">
           Déploiements, certificats et quota nécessitant une action. Un échec corrigé par un déploiement réussi plus récent n’apparaît pas.
@@ -167,7 +167,7 @@ export function AttentionList({ items }: { items: DashboardData['attention'] }) 
                 {diagnosis && (
                   <p className="mt-1 text-xs text-muted-foreground">
                     {diagnosis.cause}{' '}
-                    <Link href={diagnosis.action.href} className="font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+                    <Link href={diagnosis.action.href} className="font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
                       {diagnosis.action.label}
                     </Link>
                   </p>

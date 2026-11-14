@@ -156,7 +156,7 @@ export function ProjectAppsSection({ projectId, apps: initialApps, domains, canM
                 <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
                   {app.name}
                   {app.position === 0 && (
-                    <span className="rounded-full border border-border px-1.5 text-[11px] font-normal text-muted-foreground">
+                    <span className="rounded-full border border-border px-1.5 text-xs font-normal text-muted-foreground">
                       Principale
                     </span>
                   )}

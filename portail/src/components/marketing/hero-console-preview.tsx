@@ -104,7 +104,7 @@ export function HeroConsolePreview() {
                         <span className="block truncate font-mono text-xs text-white/75">{project.domain}</span>
                       </span>
                       <span className="hidden shrink-0 text-xs text-white/75 md:block">{project.label}</span>
-                      <span className="shrink-0 rounded-full bg-emerald-400/15 px-2 py-0.5 text-xs font-medium text-emerald-300 ring-1 ring-emerald-300/30">
+                      <span className="shrink-0 rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success ring-1 ring-success/30">
                         En ligne
                       </span>
                     </li>
@@ -140,9 +140,9 @@ export function HeroConsolePreview() {
 
         <div
           aria-hidden="true"
-          className="absolute bottom-0 right-2 hidden items-center gap-3 rounded-xl border border-emerald-300/30 bg-eflexnavy px-3.5 py-2.5 shadow-xl shadow-black/40 sm:flex lg:right-6"
+          className="absolute bottom-0 right-2 hidden items-center gap-3 rounded-xl border border-success/30 bg-eflexnavy px-3.5 py-2.5 shadow-xl shadow-black/40 sm:flex lg:right-6"
         >
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 text-emerald-300">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success/20 text-success">
             <Check className="h-4 w-4" aria-hidden="true" />
           </span>
           <span>

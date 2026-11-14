@@ -127,7 +127,7 @@ function QuotaBar({ used, limit, label }: { used: number; limit: number; label: 
       <div
         className={cn(
           'h-full rounded-full transition-[width] duration-300',
-          ratio >= 1 ? 'bg-destructive' : ratio >= 0.8 ? 'bg-amber-500' : 'bg-primary',
+          ratio >= 1 ? 'bg-destructive' : ratio >= 0.8 ? 'bg-warning' : 'bg-primary',
         )}
         style={{ width: `${Math.min(100, ratio * 100)}%` }}
       />
@@ -338,7 +338,7 @@ export function UsageView({ projects, quota }: { projects: UsageProject[]; quota
                     </div>
                     <Link
                       href={`/dashboard/projects/${sample.projectId}`}
-                      className="shrink-0 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                      className="shrink-0 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
                     >
                       Voir le projet
                     </Link>

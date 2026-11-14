@@ -11,8 +11,8 @@ export function PageSkeleton({ cards = 4, className }: { cards?: number; classNa
         Chargement de la page…
       </span>
       <div className="space-y-2">
-        <span className="block h-8 w-48 animate-pulse rounded bg-muted motion-reduce:animate-none" />
-        <span className="block h-4 w-full max-w-prose animate-pulse rounded bg-muted motion-reduce:animate-none" />
+        <span className="block h-8 w-48 animate-pulse rounded-md bg-muted motion-reduce:animate-none" />
+        <span className="block h-4 w-full max-w-prose animate-pulse rounded-md bg-muted motion-reduce:animate-none" />
       </div>
       {cards > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
