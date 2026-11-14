@@ -22,8 +22,23 @@ describe('oauthErrorMessage', () => {
     expect(message).not.toContain('secret-interne')
   })
 
+  it('nomme GitHub quand le retour vient de GitHub', () => {
+    expect(oauthErrorMessage(new URLSearchParams('oauth=error&error=access_denied&provider=github'))).toBe(
+      'Connexion avec GitHub annulée.',
+    )
+  })
+
   it('gère l’indisponibilité de la création de compte', () => {
     expect(oauthErrorMessage(new URLSearchParams('oauth=error&error=signup_disabled'))).toMatch(/désactivée/)
+  })
+})
+
+describe('oauthErrorCallbackURL', () => {
+  it('garde la destination validée et le fournisseur concerné', () => {
+    expect(oauthErrorCallbackURL('/login', '/dashboard', 'github')).toBe(
+      '/login?oauth=error&next=%2Fdashboard&provider=github',
+    )
+    expect(oauthErrorCallbackURL('/login', '/dashboard')).toBe('/login?oauth=error&next=%2Fdashboard')
   })
 })
 

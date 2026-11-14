@@ -7,8 +7,9 @@ import { sanitizeOAuthRedirect } from '@/lib/auth-oauth'
 import { PASSPHRASE_MAX_LENGTH, PASSPHRASE_MIN_LENGTH } from '@/lib/auth-validation'
 import { prisma } from '@/lib/prisma'
 import { isEmailConfigured, sendEmail } from '@/lib/email'
-import { resetPasswordEmail, verificationEmail } from '@/lib/email-templates'
-import { admin, captcha, organization, twoFactor } from 'better-auth/plugins'
+import { loginCodeEmail, resetPasswordEmail, verificationEmail } from '@/lib/email-templates'
+import { githubCredentials, googleCredentials, nameFromEmail } from '@/lib/auth-methods'
+import { admin, captcha, emailOTP, lastLoginMethod, organization, twoFactor } from 'better-auth/plugins'
 import { createAccessControl } from 'better-auth/plugins/access'
 import { passkey } from '@better-auth/passkey'
 import { personalOrganizationSlug } from '@/lib/organizations'
@@ -17,7 +18,11 @@ import { readPlatformSettings } from '@/lib/platform-settings'
 import { publish } from '@/lib/event-bus'
 import { memberIds, notify } from '@/lib/notifications'
 
-const googleConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
+const google = googleCredentials()
+const github = githubCredentials()
+
+/** Durée de validité du code de connexion envoyé par e-mail. */
+const LOGIN_CODE_TTL_SECONDS = 600
 
 /**
  * Origine et domaine des passkeys (WebAuthn). Le domaine doit correspondre à
@@ -164,18 +169,16 @@ export const auth = betterAuth({
     expiresIn: 3600,
   },
 
-  // Google n'est proposé que si les identifiants OAuth sont configurés.
-  socialProviders: googleConfigured
-    ? {
-        google: {
-          clientId: process.env.GOOGLE_CLIENT_ID as string,
-          clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-        },
-      }
-    : {},
+  // Google et GitHub ne sont proposés que si leurs identifiants OAuth sont configurés.
+  socialProviders: {
+    ...(google ? { google } : {}),
+    ...(github ? { github } : {}),
+  },
 
   // Un compte Google et un compte mot de passe qui partagent la même adresse
   // vérifiée sont liés automatiquement : une seule identité, deux méthodes.
+  // GitHub n'est volontairement PAS de confiance : Better Auth ne le lie alors qu'à une adresse
+  // que GitHub déclare vérifiée, jamais à une adresse non vérifiée.
   accountLinking: {
     enabled: true,
     trustedProviders: ['google'],
@@ -206,6 +209,9 @@ export const auth = betterAuth({
       '/passkey/verify-authentication': { window: 60, max: 10 },
       '/passkey/verify-registration': { window: 60, max: 10 },
       '/link-social': { window: 60, max: 10 },
+      // Code de connexion par e-mail : envoi limité (spam d'une boîte) et essais limités (devinette).
+      '/email-otp/send-verification-otp': { window: 60, max: 5 },
+      '/sign-in/email-otp': { window: 60, max: 10 },
     },
   },
 
@@ -218,6 +224,24 @@ export const auth = betterAuth({
       // Validation serveur des redirections OAuth : le client envoie déjà un
       // chemin validé, mais un appel direct à l'API ne doit pas transformer le
       // callback Google en redirection ouverte (issue #57).
+      // Le plugin de double authentification ne surveille pas /sign-in/email-otp : sans cette garde, le
+      // code envoyé par e-mail contournerait le TOTP d'un compte protégé. Il doit alors utiliser son mot de passe.
+      if (ctx.path === '/sign-in/email-otp') {
+        const email = (ctx.body as { email?: unknown } | undefined)?.email
+        if (typeof email === 'string') {
+          const account = await prisma.user.findUnique({
+            where: { email: email.trim().toLowerCase() },
+            select: { twoFactorEnabled: true },
+          })
+          if (account?.twoFactorEnabled) {
+            throw new APIError('FORBIDDEN', {
+              message: 'Ce compte est protégé par la double authentification : connectez-vous avec votre mot de passe.',
+              code: 'TWO_FACTOR_REQUIRES_PASSWORD',
+            })
+          }
+        }
+        return
+      }
       if (ctx.path !== '/sign-in/social' && ctx.path !== '/link-social') return
       const body = (ctx.body ?? {}) as Record<string, unknown>
       const sanitized: Record<string, string> = {}
@@ -235,7 +259,7 @@ export const auth = betterAuth({
       create: {
         // Inscriptions fermées depuis /admin/infrastructure : refuse la création
         // de compte (le message est traduit côté client).
-        before: async () => {
+        before: async (user) => {
           const { settings } = await readPlatformSettings()
           if (!settings.signupsEnabled) {
             throw new APIError('FORBIDDEN', {
@@ -243,6 +267,8 @@ export const auth = betterAuth({
               code: 'SIGNUPS_DISABLED',
             })
           }
+          // Création par code e-mail : aucun nom n'est demandé, on part de l'adresse (modifiable dans Paramètres).
+          if (!user.name?.trim()) return { data: { ...user, name: nameFromEmail(user.email) } }
         },
         // Multi-tenant : chaque compte démarre avec son organisation personnelle.
         after: async (user) => {
@@ -289,7 +315,7 @@ export const auth = betterAuth({
       provider: 'cloudflare-turnstile',
       secretKey: captchaSecret || 'captcha-desactive',
       endpoints: captchaConfigured
-        ? ['/sign-in/email', '/sign-up/email', '/request-password-reset']
+        ? ['/sign-in/email', '/sign-up/email', '/request-password-reset', '/email-otp/send-verification-otp']
         : ['/captcha-desactive'],
     }),
     // Connexion sans mot de passe (WebAuthn / FIDO2) : empreinte, visage, clé de sécurité.
@@ -298,6 +324,29 @@ export const auth = betterAuth({
       rpID: passkeyRpID,
       origin: authOrigin,
     }),
+    // Connexion et inscription sans mot de passe : code à 6 chiffres reçu par e-mail. Toujours enregistré (un
+    // plugin conditionnel ferait perdre l'inférence de types des autres), mais sans fournisseur d'e-mails l'envoi
+    // est refusé avant qu'un code existe ; `/api/auth/config` ne propose alors pas cette méthode.
+    emailOTP({
+      otpLength: 6,
+      expiresIn: LOGIN_CODE_TTL_SECONDS,
+      allowedAttempts: 5,
+      // Le code n'est jamais stocké en clair.
+      storeOTP: 'hashed',
+      async sendVerificationOTP({ email, otp, type }) {
+        if (type !== 'sign-in') return
+        if (!isEmailConfigured()) {
+          throw new APIError('SERVICE_UNAVAILABLE', {
+            message: "La connexion par code n'est pas disponible pour le moment.",
+            code: 'EMAIL_CODE_UNAVAILABLE',
+          })
+        }
+        const template = loginCodeEmail(otp, LOGIN_CODE_TTL_SECONDS / 60)
+        await sendEmail({ to: email, subject: `${otp} est votre code de connexion EFLEX`, ...template })
+      },
+    }),
+    // Mémorise la dernière méthode utilisée (cookie seul, rien en base) pour l'afficher sur la page de connexion.
+    lastLoginMethod(),
     // Organisations : membres, rôles (owner / admin / member) et invitations.
     organization({
       organizationLimit: 10,

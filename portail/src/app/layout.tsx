@@ -24,7 +24,7 @@ const siteUrl = getSiteUrl()
 export const metadata: Metadata = {
   metadataBase: siteUrl,
   title: {
-    default: 'EFLEX — Poussez votre code, EFLEX le met en ligne',
+    default: 'EFLEX — Votre code en ligne, en quelques minutes',
     template: '%s — EFLEX',
   },
   description:
@@ -34,14 +34,14 @@ export const metadata: Metadata = {
     locale: 'fr_FR',
     url: '/',
     siteName: 'EFLEX',
-    title: 'EFLEX — Poussez votre code, EFLEX le met en ligne',
+    title: 'EFLEX — Votre code en ligne, en quelques minutes',
     description:
       'Déployez vos applications depuis GitHub en HTTPS, sans serveur à configurer. EFLEX analyse votre dépôt, propose un plan et publie.',
     images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'EFLEX — Le déploiement depuis Git, sans DevOps' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'EFLEX — Poussez votre code, EFLEX le met en ligne',
+    title: 'EFLEX — Votre code en ligne, en quelques minutes',
     description:
       'Déployez vos applications depuis GitHub en HTTPS, sans serveur à configurer.',
     images: ['/opengraph-image'],

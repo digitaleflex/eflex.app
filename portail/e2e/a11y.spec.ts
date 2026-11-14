@@ -199,6 +199,9 @@ async function login(page: Page) {
   // La page de connexion doit être hydratée avant le clic : sinon le formulaire
   // part en GET natif (/login?…) au lieu d'appeler l'API Better Auth.
   await page.goto('/login', { waitUntil: 'networkidle' })
+  // Si l'instance propose le code par e-mail (Resend configuré), on choisit explicitement le mot de passe.
+  const usePassword = page.getByRole('button', { name: 'Utiliser un mot de passe' })
+  if (await usePassword.isVisible().catch(() => false)) await usePassword.click()
   await page.getByLabel('Adresse e-mail').fill(AUTH_EMAIL)
   await page.getByLabel('Mot de passe').fill(AUTH_PASSWORD)
   await page.getByRole('button', { name: 'Se connecter', exact: true }).click()

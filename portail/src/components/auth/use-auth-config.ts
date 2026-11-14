@@ -8,6 +8,8 @@ export interface AuthConfig {
   emailEnabled: boolean
   emailVerificationRequired: boolean
   googleEnabled: boolean
+  githubEnabled: boolean
+  emailCodeEnabled: boolean
 }
 
 /**
@@ -33,6 +35,8 @@ export function useAuthConfig(): { config: AuthConfig | null; failed: boolean } 
           emailEnabled: data.emailEnabled === true,
           emailVerificationRequired: data.emailVerificationRequired === true,
           googleEnabled: data.googleEnabled === true,
+          githubEnabled: data.githubEnabled === true,
+          emailCodeEnabled: data.emailCodeEnabled === true,
         })
       })
       .catch(() => {
