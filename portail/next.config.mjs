@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { cacheHeadersConfig } from './src/lib/cache-headers.mjs'
 import { securityHeadersConfig } from './src/lib/security-headers.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -20,11 +21,11 @@ const nextConfig = {
   // BullMQ / ioredis sont des modules Node natifs : on les laisse externes au
   // bundle serveur (sinon webpack tente de résoudre leurs requires dynamiques).
   serverExternalPackages: ['bullmq', 'ioredis'],
-  // En-têtes de sécurité globaux (HSTS en production, nosniff, COOP, CSP en
-  // Report-Only). Détail et procédure de passage en enforce :
-  // `src/lib/security-headers.mjs`.
+  // En-têtes de sécurité globaux et règles de cache (assets publics, API,
+  // tableau de bord, pages publiques). Détail : `src/lib/security-headers.mjs`
+  // et `src/lib/cache-headers.mjs`.
   async headers() {
-    return securityHeadersConfig()
+    return [...securityHeadersConfig(), ...cacheHeadersConfig()]
   },
   // Le build « standalone » reste à la racine de portail/ même quand le dépôt parent
   // contient un autre lockfile (sans cela, Next remonte au dossier du monorepo).
