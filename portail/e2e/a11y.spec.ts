@@ -133,7 +133,11 @@ async function assertKeyboardFocus(page: Page, stops: number) {
 
 test.describe('clavier', () => {
   test('le lien d’évitement est le premier arrêt de tabulation et mène au contenu', async ({ page }) => {
-    await page.goto('/login', { waitUntil: 'domcontentloaded' })
+    // Attendre la fin du chargement : à son initialisation, le routeur Next.js réécrit l'URL
+    // (history.replaceState) avec l'adresse relevée au chargement. Un « Entrée » pressé avant efface
+    // donc #contenu de l'URL (le focus, lui, arrive bien sur le contenu : mesuré 8/8 avec un
+    // processeur ralenti ×6). Sans cette attente, le test échouait sur une machine chargée.
+    await page.goto('/login', { waitUntil: 'networkidle' })
     await page.keyboard.press('Tab')
     const focused = await page.evaluate(() => ({
       text: (document.activeElement?.textContent ?? '').trim(),
