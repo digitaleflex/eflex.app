@@ -6,7 +6,7 @@
  * `EMAIL_FROM` doit être une adresse d'un domaine vérifié dans Resend.
  */
 const RESEND_API_URL = 'https://api.resend.com/emails'
-const DEFAULT_FROM = 'Eflex <noreply@eflex.app>'
+const DEFAULT_FROM = 'EFLEX <noreply@eflex.app>'
 
 export interface SendEmailInput {
   to: string

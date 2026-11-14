@@ -4,7 +4,7 @@
  */
 export function getLegalCompanyInfo() {
   return {
-    name: process.env.INVOICE_COMPANY_NAME?.trim() || 'Eflex',
+    name: process.env.INVOICE_COMPANY_NAME?.trim() || 'EFLEX',
     address: process.env.INVOICE_COMPANY_ADDRESS?.trim() || '',
     email: process.env.INVOICE_COMPANY_EMAIL?.trim() || 'admin@eflex.app',
     taxId: process.env.INVOICE_TAX_ID?.trim() || '',

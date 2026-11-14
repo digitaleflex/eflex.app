@@ -8,7 +8,7 @@ const STEPS = [
   },
   {
     title: 'Vérifiez la détection',
-    description: 'Eflex propose un plan de build. Vous gardez la main sur le nom, la branche et les variables.',
+    description: 'EFLEX propose un plan de build. Vous gardez la main sur le nom, la branche et les variables.',
   },
   {
     title: 'Publiez',
@@ -38,7 +38,7 @@ export function DashboardOnboarding({
             Mettez votre premier projet en ligne
           </h2>
           <p className="mt-2 max-w-prose text-sm text-muted-foreground">
-            Indiquez l’adresse d’un dépôt GitHub : Eflex reconnaît la stack, construit l’application
+            Indiquez l’adresse d’un dépôt GitHub : EFLEX reconnaît la stack, construit l’application
             et la publie avec son adresse et son certificat.
           </p>
           <p className="mt-2 max-w-prose text-xs text-muted-foreground">

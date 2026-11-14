@@ -20,7 +20,7 @@ import {
   type ProjectListFilter,
 } from '@/lib/admin-projects'
 
-export const metadata = { title: 'Projets — Administration Eflex' }
+export const metadata = { title: 'Projets — Administration EFLEX' }
 export const dynamic = 'force-dynamic'
 
 const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' })

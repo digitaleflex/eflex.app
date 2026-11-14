@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { supportCategoryLabel, supportPriorityLabel, supportStatusLabel } from '@/lib/support-tickets'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Support — Administration Eflex' }
+export const metadata = { title: 'Support — Administration EFLEX' }
 
 export default async function AdminSupportPage() {
   await requireAdminPage()

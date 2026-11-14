@@ -185,7 +185,7 @@ export function GitHubConnection({ isAdmin }: { isAdmin: boolean }) {
         setFeedback({ tone: 'error', message: 'Impossible de retirer ce compte GitHub.' })
         return
       }
-      setFeedback({ tone: 'success', message: 'Compte GitHub retiré de cette instance Eflex.' })
+      setFeedback({ tone: 'success', message: 'Compte GitHub retiré de cette instance EFLEX.' })
       await load()
     } catch {
       setFeedback({ tone: 'error', message: 'Impossible de contacter le serveur.' })
@@ -515,7 +515,7 @@ export function GitHubConnection({ isAdmin }: { isAdmin: boolean }) {
         open={confirmRemove?.kind === 'installation'}
         destructive
         title={confirmRemove?.kind === 'installation' ? `Retirer ${confirmRemove.login} ?` : 'Retirer ce compte GitHub ?'}
-        description="Eflex ne pourra plus lister ni cloner les dépôts de ce compte. Les projets déjà déployés restent en ligne. Vous pourrez reconnecter le compte plus tard."
+        description="EFLEX ne pourra plus lister ni cloner les dépôts de ce compte. Les projets déjà déployés restent en ligne. Vous pourrez reconnecter le compte plus tard."
         confirmLabel="Retirer le compte"
         onCancel={() => setConfirmRemove(null)}
         onConfirm={async () => {

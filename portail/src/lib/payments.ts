@@ -136,7 +136,7 @@ async function createFedapayTransaction(
     method: 'POST',
     headers,
     body: JSON.stringify({
-      description: `Eflex — ${plan.label}`,
+      description: `EFLEX — ${plan.label}`,
       amount: amountFcfa,
       currency: { iso: 'XOF' },
       callback_url: `${portalUrl()}/dashboard/organization?billing=fedapay`,

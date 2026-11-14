@@ -137,7 +137,7 @@ function DnsGuide({
 
       <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
         <li>Les sous-domaines (ex. <code className="font-mono">app.exemple.com</code>) et domaines racine sont pris en charge, dans la limite de votre abonnement.</li>
-        <li>Si vous ajoutez à la fois le domaine racine (<code className="font-mono">exemple.com</code>) et sa variante <code className="font-mono">www</code>, Eflex redirige automatiquement <code className="font-mono">www</code> vers le domaine racine pour les applications gérées par la plateforme.</li>
+        <li>Si vous ajoutez à la fois le domaine racine (<code className="font-mono">exemple.com</code>) et sa variante <code className="font-mono">www</code>, EFLEX redirige automatiquement <code className="font-mono">www</code> vers le domaine racine pour les applications gérées par la plateforme.</li>
         <li>Désactivez le proxy/CDN (ex. « nuage orange » Cloudflare) sur l’enregistrement pendant la vérification si elle échoue.</li>
         <li>Vérifiez qu’il n’existe pas d’enregistrement contradictoire (ancien A/CNAME) pour le même hôte.</li>
         <li>La propagation DNS et l’émission du certificat peuvent prendre un peu de temps après validation (selon le TTL).</li>
@@ -476,7 +476,7 @@ export function ProjectDomains({
           <div className="rounded-lg border border-border p-3">
             <p className="flex items-center gap-2 text-sm font-medium">
               <Globe className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              Domaine Eflex (principal)
+              Domaine EFLEX (principal)
             </p>
             {data?.primary ? (
               <a

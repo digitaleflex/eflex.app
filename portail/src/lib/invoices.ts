@@ -9,7 +9,7 @@ const ACCENT = rgb(0.15, 0.39, 0.92)
 
 export function invoiceCompany() {
   return {
-    name: process.env.INVOICE_COMPANY_NAME?.trim() || 'Eflex',
+    name: process.env.INVOICE_COMPANY_NAME?.trim() || 'EFLEX',
     address: process.env.INVOICE_COMPANY_ADDRESS?.trim() || '',
     email: process.env.INVOICE_COMPANY_EMAIL?.trim() || 'admin@eflex.app',
     taxId: process.env.INVOICE_TAX_ID?.trim() || '',
@@ -89,7 +89,7 @@ export async function generateInvoicePdf(
   write('Montant', { x: width - margin - 70, y, size: 9, font: bold, color: MUTED })
 
   y -= 32
-  write(`Abonnement Eflex — ${plan.label}`, { x: margin + 10, y, size: 11, font, color: INK })
+  write(`Abonnement EFLEX — ${plan.label}`, { x: margin + 10, y, size: 11, font, color: INK })
   const amount = `${new Intl.NumberFormat('fr-FR').format(payment.amountFcfa)} FCFA`
   write(amount, { x: width - margin - 70, y, size: 11, font: bold, color: INK })
 
@@ -114,7 +114,7 @@ export async function generateInvoicePdf(
   footer.forEach((line, index) => {
     write(line, { x: margin, y: 70 - index * 13, size: 8, font, color: MUTED })
   })
-  write('Merci d’utiliser Eflex.', { x: margin, y: 35, size: 8, font, color: MUTED })
+  write('Merci d’utiliser EFLEX.', { x: margin, y: 35, size: 8, font, color: MUTED })
 
   return doc.save()
 }

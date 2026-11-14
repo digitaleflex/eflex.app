@@ -18,7 +18,7 @@ import { getPrimaryApp } from '@/lib/project-apps'
 import { collectCoolifyAppIds } from '@/lib/project-primary'
 import { ACTIVE_DEPLOYMENT_STATUSES } from '@/lib/deployment-state'
 
-export const metadata = { title: 'Projet — Administration Eflex' }
+export const metadata = { title: 'Projet — Administration EFLEX' }
 export const dynamic = 'force-dynamic'
 
 const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })

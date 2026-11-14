@@ -345,7 +345,7 @@ export interface ApplicationRef {
   serverUuid?: string | null
 }
 
-/** Applications présentes côté Coolify mais liées à aucun projet Eflex. */
+/** Applications présentes côté Coolify mais liées à aucun projet EFLEX. */
 export function orphanApplications(
   applications: readonly ApplicationRef[],
   knownAppIds: Iterable<string>,

@@ -719,7 +719,7 @@ export async function collectInfrastructure(): Promise<InfrastructureSnapshot> {
     collectSettings(),
   ])
 
-  // Applications présentes côté Coolify mais liées à aucun projet Eflex.
+  // Applications présentes côté Coolify mais liées à aucun projet EFLEX.
   // Base injoignable : on ne peut pas savoir, donc on n'accuse aucune application.
   const projects: ProjectsSnapshot = {
     total: projectsAttempt.total,

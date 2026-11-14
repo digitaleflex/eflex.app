@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(new URL('../../app/globals.css', import.meta.url), 'utf8')
 const header = readFileSync(new URL('./site-header.tsx', import.meta.url), 'utf8')
+const brandLogo = readFileSync(new URL('../brand-logo.tsx', import.meta.url), 'utf8')
 
 type Hsl = [number, number, number]
 type Rgb = [number, number, number]
@@ -103,8 +104,12 @@ describe('comportement conservé', () => {
       expect(header, `lien ${href}`).toContain(href)
     }
     expect(header).toContain('href="/"')
-    expect(header).toContain('src="/logo-horizontal.webp"')
-    expect(header).toContain('alt="Eflex — accueil"')
+    // Le logo passe par BrandLogo (versions officielles couleur / inversée, charte docs/brand).
+    expect(header).toContain('<BrandLogo')
+    expect(header).not.toMatch(/variant="mark"/)
+    expect(brandLogo).toContain("light: '/logo-horizontal.webp'")
+    expect(brandLogo).toContain("dark: '/logo-horizontal-inverse.webp'")
+    expect(header).toContain('alt="EFLEX — accueil"')
   })
 
   it('reste collant et identifié comme navigation de site', () => {

@@ -70,7 +70,7 @@ describe('filtres du journal d’audit', () => {
       action: 'user.ban',
       targetType: 'user',
       targetId: 'user_123',
-      actorEmail: 'Admin@Eflex.app',
+      actorEmail: 'Admin@EFLEX.app',
       createdAt: '2026-11-11T11:00:00.000Z',
     }
     expect(matchesAuditFilters(entry, parseAuditQuery({ action: 'user.ban', acteur: 'admin@' }), NOW)).toBe(true)

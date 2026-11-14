@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { Activity, Bell, ChevronsLeft, ChevronsRight, FolderKanban, Gauge, LifeBuoy, Settings, Users, type LucideIcon } from 'lucide-react'
@@ -15,6 +14,7 @@ import { PlanWidget } from '@/components/dashboard/plan-widget'
 import { PlatformStatusIndicator } from '@/components/platform-status-indicator'
 import type { billingSummary } from '@/lib/billing'
 import { cn } from '@/lib/utils'
+import { BrandLogo } from '@/components/brand-logo'
 
 const TAB_ICONS: Record<DashboardTabKey, LucideIcon> = {
   projects: FolderKanban,
@@ -150,9 +150,9 @@ export function DashboardShell({
         )}
       >
         <div className={cn('flex h-14 items-center border-b border-border px-3', collapsedPref === null ? 'md:max-lg:justify-center md:max-lg:px-0' : collapsed ? 'md:justify-center md:px-0' : '')}>
-          <Link href="/dashboard" className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" title="Eflex — accueil de la console">
-            <Image src="/logo-mark.png" alt="Eflex — accueil de la console" width={28} height={28} className="h-7 w-7 shrink-0" priority />
-            <span className={cn('text-sm font-semibold text-foreground', labelClass)}>Eflex</span>
+          <Link href="/dashboard" className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" title="EFLEX — accueil de la console">
+            <BrandLogo variant="mark" alt="EFLEX — accueil de la console" className="h-7 w-7 shrink-0" priority />
+            <span className={cn('text-sm font-semibold text-foreground', labelClass)}>EFLEX</span>
           </Link>
         </div>
 
@@ -244,7 +244,7 @@ export function DashboardShell({
         <header className="sticky top-0 z-30 border-b border-border bg-card/85 backdrop-blur supports-[backdrop-filter]:bg-card/70">
           <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4 sm:gap-3 sm:px-6">
             <Link href="/dashboard" className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden">
-              <Image src="/logo-mark.png" alt="Eflex — accueil de la console" width={28} height={28} className="h-7 w-7" priority />
+              <BrandLogo variant="mark" alt="EFLEX — accueil de la console" className="h-7 w-7" priority />
             </Link>
             <span aria-hidden="true" className="hidden select-none text-xl font-light text-border sm:inline md:hidden">/</span>
             <OrgSwitcher className="min-w-0 max-w-[45vw] sm:max-w-xs md:hidden" />

@@ -81,12 +81,12 @@ export default function GlobalError({
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="color-scheme" content="light dark" />
-        <title>Erreur critique — Eflex</title>
+        <title>Erreur critique — EFLEX</title>
         <style dangerouslySetInnerHTML={{ __html: CRITICAL_STYLES }} />
       </head>
       <body>
         <main id="contenu" tabIndex={-1} className="screen">
-          <p className="brand">Eflex</p>
+          <p className="brand">EFLEX</p>
 
           <span aria-hidden="true" className="badge">
             <svg
@@ -105,7 +105,7 @@ export default function GlobalError({
             </svg>
           </span>
 
-          <h1>Eflex n’a pas pu charger cette page</h1>
+          <h1>EFLEX n’a pas pu charger cette page</h1>
           <p>Une erreur inattendue a empêché l’affichage de l’application.</p>
           <p>Réessayez dans quelques instants. Si le problème persiste, consultez le statut des services.</p>
 

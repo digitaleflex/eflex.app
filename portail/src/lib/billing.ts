@@ -53,7 +53,7 @@ export interface OrganizationBillingState {
 const DAY_MS = 86_400_000
 
 export const SUSPENDED_MESSAGE =
-  'Cette organisation est suspendue : la création de projets et les nouveaux déploiements sont bloqués. Les applications déjà en ligne et vos données restent intactes. Contactez le support Eflex pour la réactiver.'
+  'Cette organisation est suspendue : la création de projets et les nouveaux déploiements sont bloqués. Les applications déjà en ligne et vos données restent intactes. Contactez le support EFLEX pour la réactiver.'
 
 const dateFr = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long' })
 

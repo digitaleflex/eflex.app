@@ -231,7 +231,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json(
         {
           error:
-            `Eflex n'a pas pu déterminer comment déployer « ${root || 'la racine'} ». ` +
+            `EFLEX n'a pas pu déterminer comment déployer « ${root || 'la racine'} ». ` +
             "Ajoutez un Dockerfile ou un fichier eflex.json dans ce dossier, puis relancez l'analyse.",
         },
         { status: 422 },

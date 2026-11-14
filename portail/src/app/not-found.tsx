@@ -4,7 +4,7 @@ import { SearchX } from 'lucide-react'
 import { SystemLink, SystemScreen } from '@/components/system-screen'
 
 export const metadata: Metadata = {
-  title: 'Page introuvable — Eflex',
+  title: 'Page introuvable — EFLEX',
   description: 'L’adresse demandée n’existe pas ou n’est plus disponible.',
 }
 

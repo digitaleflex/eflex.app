@@ -34,13 +34,13 @@ const steps = [
   },
   {
     icon: SearchCheck,
-    title: "Vérifiez ce qu'Eflex a compris",
+    title: "Vérifiez ce qu'EFLEX a compris",
     text: 'Framework, version, commandes de build, port : chaque choix est expliqué. Vous corrigez si besoin.',
   },
   {
     icon: Rocket,
     title: 'Mettez en ligne',
-    text: "Eflex construit l'application, la démarre et active HTTPS. Vous recevez l'adresse de votre site.",
+    text: "EFLEX construit l'application, la démarre et active HTTPS. Vous recevez l'adresse de votre site.",
   },
 ]
 
@@ -51,23 +51,23 @@ const faqs = [
   },
   {
     q: 'Dois-je écrire un Dockerfile ?',
-    a: "Non. Eflex déduit la configuration de votre dépôt. Si vous en avez déjà un, il est utilisé tel quel : c'est vous qui gardez la main.",
+    a: "Non. EFLEX déduit la configuration de votre dépôt. Si vous en avez déjà un, il est utilisé tel quel : c'est vous qui gardez la main.",
   },
   {
-    q: "Que se passe-t-il si Eflex se trompe de stack ?",
-    a: "Vous pouvez choisir une autre stack parmi celles qu'Eflex a détectées à la création du projet, ou ajouter un fichier eflex.json à la racine du dépôt. Ce fichier a toujours priorité sur la détection automatique.",
+    q: "Que se passe-t-il si EFLEX se trompe de stack ?",
+    a: "Vous pouvez choisir une autre stack parmi celles qu'EFLEX a détectées à la création du projet, ou ajouter un fichier eflex.json à la racine du dépôt. Ce fichier a toujours priorité sur la détection automatique.",
   },
   {
     q: "Où sont stockées mes variables d'environnement ?",
-    a: "Dans Eflex, jamais dans votre dépôt. Elles sont chiffrées en base (AES-256-GCM), transmises à l'application au démarrage et ne s'affichent plus une fois enregistrées.",
+    a: "Dans EFLEX, jamais dans votre dépôt. Elles sont chiffrées en base (AES-256-GCM), transmises à l'application au démarrage et ne s'affichent plus une fois enregistrées.",
   },
   {
     q: 'Mes dépôts privés sont-ils compatibles ?',
-    a: "Oui. Connectez la GitHub App (recommandée) ou ajoutez un jeton personnel dans Paramètres → Connexion GitHub. Eflex lit le dépôt avec un accès à durée limitée et crée une clé de déploiement en lecture seule.",
+    a: "Oui. Connectez la GitHub App (recommandée) ou ajoutez un jeton personnel dans Paramètres → Connexion GitHub. EFLEX lit le dépôt avec un accès à durée limitée et crée une clé de déploiement en lecture seule.",
   },
   {
     q: 'Mon dépôt contient plusieurs applications. Ça marche ?',
-    a: "Oui, pour en publier une. Eflex reconnaît les monorepos (pnpm, Turborepo, Nx, Lerna…) et vous demande laquelle déployer. Aujourd'hui, un seul service est publié par projet : les dépendances partagées et les applications annexes ne sont pas déployées automatiquement.",
+    a: "Oui, pour en publier une. EFLEX reconnaît les monorepos (pnpm, Turborepo, Nx, Lerna…) et vous demande laquelle déployer. Aujourd'hui, un seul service est publié par projet : les dépendances partagées et les applications annexes ne sont pas déployées automatiquement.",
   },
   {
     q: "Qu'est-ce qui n'est pas encore pris en charge ?",
@@ -172,10 +172,10 @@ export default function HomePage() {
               <div className="space-y-5">
                 <h1 className="text-display font-bold text-balance text-white">
                   Poussez votre code.{' '}
-                  <span className="text-eflexblue">Eflex le met en ligne.</span>
+                  <span className="text-eflexblue">EFLEX le met en ligne.</span>
                 </h1>
                 <p className="max-w-xl text-lead-lg text-white/80 text-pretty">
-                  Indiquez votre dépôt GitHub : Eflex reconnaît la stack, construit l&apos;application et la publie
+                  Indiquez votre dépôt GitHub : EFLEX reconnaît la stack, construit l&apos;application et la publie
                   en HTTPS. Pas de serveur à configurer, pas de Dockerfile à écrire.
                 </p>
               </div>
@@ -235,7 +235,7 @@ export default function HomePage() {
                 Du dépôt à l&apos;URL, en <span className="text-primary">trois étapes</span>
               </>
             }
-            lead="Vous connectez le dépôt, vous validez ce qu'Eflex a compris, puis l'application est mise en ligne."
+            lead="Vous connectez le dépôt, vous validez ce qu'EFLEX a compris, puis l'application est mise en ligne."
           />
           <ol className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {steps.map((step, i) => {
@@ -289,7 +289,7 @@ export default function HomePage() {
                 Déployez vos applications avec vos <span className="text-eflexblue">technologies préférées</span>
               </h2>
               <p className="text-lead-lg text-white/80 text-pretty">
-                Eflex reconnaît la stack de votre dépôt et propose la commande de build, le démarrage et le port.
+                EFLEX reconnaît la stack de votre dépôt et propose la commande de build, le démarrage et le port.
                 Vous relisez et corrigez si besoin.
               </p>
             </div>
@@ -345,7 +345,7 @@ export default function HomePage() {
             <SectionHeading
               id="fonctionnalites-titre"
               title="Pensé pour les vrais projets, pas seulement pour les démos"
-              lead="Détection expliquée, dépôts privés, HTTPS automatique, variables chiffrées : ce que Eflex automatise pour vous."
+              lead="Détection expliquée, dépôts privés, HTTPS automatique, variables chiffrées : ce que EFLEX automatise pour vous."
             />
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -354,7 +354,7 @@ export default function HomePage() {
                 icon={SearchCheck}
                 title="Des choix expliqués, pas une boîte noire"
                 description={
-                  "Eflex vous montre ce qu'il a trouvé dans votre dépôt et pourquoi. En cas de doute, il vous pose la question au lieu de deviner."
+                  "EFLEX vous montre ce qu'il a trouvé dans votre dépôt et pourquoi. En cas de doute, il vous pose la question au lieu de deviner."
                 }
                 className="sm:col-span-2 lg:row-span-2"
               >
@@ -392,7 +392,7 @@ export default function HomePage() {
                 title="Plusieurs services, un seul fichier"
                 description={
                   'Serveur web, file d’attente, planificateur : décrivez vos services dans un fichier ' +
-                  'docker-compose.yml ou compose.yaml à la racine de l’application, Eflex les déploie ensemble. ' +
+                  'docker-compose.yml ou compose.yaml à la racine de l’application, EFLEX les déploie ensemble. ' +
                   'Laravel et PHP sont reconnus.'
                 }
               />
@@ -402,7 +402,7 @@ export default function HomePage() {
                 title="HTTPS sans y penser"
                 description={
                   "Certificats Let's Encrypt émis automatiquement et vérifiés après chaque déploiement, sur " +
-                  "l'adresse fournie par Eflex comme sur votre domaine après vérification DNS."
+                  "l'adresse fournie par EFLEX comme sur votre domaine après vérification DNS."
                 }
               />
 
@@ -410,7 +410,7 @@ export default function HomePage() {
                 icon={KeyRound}
                 title="Vos secrets restent hors de Git"
                 description={
-                  "Déclarez vos variables d'environnement dans Eflex : elles sont chiffrées (AES-256-GCM) et " +
+                  "Déclarez vos variables d'environnement dans EFLEX : elles sont chiffrées (AES-256-GCM) et " +
                   'injectées au démarrage, jamais écrites dans le dépôt.'
                 }
               />
@@ -419,7 +419,7 @@ export default function HomePage() {
                 icon={Boxes}
                 title="Monorepos : une application à la fois"
                 description={
-                  'pnpm, Turborepo, Nx, Lerna : Eflex repère vos applications et vous demande laquelle publier. ' +
+                  'pnpm, Turborepo, Nx, Lerna : EFLEX repère vos applications et vous demande laquelle publier. ' +
                   "Seule celle-ci est déployée : les dépendances de workspace partagées et les services annexes " +
                   'ne sont pas encore publiés.'
                 }
@@ -482,10 +482,10 @@ export default function HomePage() {
           <div className="grid grid-cols-1 items-center gap-10 rounded-3xl bg-primary px-6 py-12 text-white sm:px-12 md:py-16 lg:grid-cols-[1.2fr_1fr]">
             <div className="space-y-6">
               <h2 id="appel-titre" className="text-3xl font-bold tracking-tight text-balance text-white sm:text-4xl">
-                Publiez votre premier projet avec Eflex.
+                Publiez votre premier projet avec EFLEX.
               </h2>
               <p className="text-lg text-white/90 text-pretty">
-                Créez un compte, connectez votre dépôt GitHub et laissez Eflex se charger du build, du déploiement et du
+                Créez un compte, connectez votre dépôt GitHub et laissez EFLEX se charger du build, du déploiement et du
                 HTTPS. Vous voyez le plan avant la publication.
               </p>
               <div className="flex flex-col gap-4 pt-2 sm:flex-row">

@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
-/** Détache une installation GitHub du compte Eflex (sans la désinstaller de GitHub). */
+/** Détache une installation GitHub du compte EFLEX (sans la désinstaller de GitHub). */
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ installationId: string }> },

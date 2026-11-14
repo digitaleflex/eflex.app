@@ -15,7 +15,7 @@ export const PLANS: Record<PlanId, Plan> = {
   free: {
     id: 'free',
     label: 'Découverte',
-    tagline: 'Pour tester Eflex sur quelques projets.',
+    tagline: 'Pour tester EFLEX sur quelques projets.',
     priceFcfa: 0,
     projectLimit: 5,
     memberLimit: 5,

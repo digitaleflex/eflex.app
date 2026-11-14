@@ -24,7 +24,7 @@ export function oauthErrorMessage(params: URLSearchParams): string | null {
   if (!error) return 'La connexion avec Google a échoué. Réessayez dans un instant.'
   if (error === 'access_denied') return 'Connexion avec Google annulée.'
   if (error === 'signup_disabled') return 'La création de compte avec Google est désactivée. Utilisez votre adresse e-mail.'
-  if (error === 'account_not_linked') return 'Ce compte Google n’est pas associé à un compte Eflex.'
+  if (error === 'account_not_linked') return 'Ce compte Google n’est pas associé à un compte EFLEX.'
   return 'La connexion avec Google a échoué. Réessayez ou utilisez votre adresse e-mail.'
 }
 

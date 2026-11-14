@@ -21,7 +21,7 @@ import {
 } from '@/lib/infrastructure-health'
 import { collectInfrastructure, type SourceInfo, type SourceKey } from './collect'
 
-export const metadata = { title: 'Infrastructure — Administration Eflex' }
+export const metadata = { title: 'Infrastructure — Administration EFLEX' }
 // Sondes réseau et base à chaque visite : jamais de cache.
 export const dynamic = 'force-dynamic'
 
@@ -233,7 +233,7 @@ export default async function AdminInfrastructurePage() {
             <div>
               <h2 className="text-lg font-semibold">Applications sans projet</h2>
               <p className="text-sm text-muted-foreground">
-                Présentes côté Coolify, liées à aucun projet Eflex : conteneurs oubliés à nettoyer.
+                Présentes côté Coolify, liées à aucun projet EFLEX : conteneurs oubliés à nettoyer.
               </p>
             </div>
             <LevelBadge

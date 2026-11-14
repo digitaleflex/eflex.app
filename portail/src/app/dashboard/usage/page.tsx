@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { loadBillingState } from '@/lib/billing'
 import { UsageView, type UsageProject, type UsageQuotaSummary } from '@/components/dashboard/usage-view'
 
-export const metadata = { title: 'Utilisation — Eflex' }
+export const metadata = { title: 'Utilisation — EFLEX' }
 export const dynamic = 'force-dynamic'
 
 export default async function UsagePage() {

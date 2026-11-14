@@ -3,7 +3,7 @@ import { FrameworkIcon } from '@/components/framework-icon'
 import { GithubMark } from '@/components/icons/github-mark'
 
 /**
- * Aperçu illustratif de la console Eflex pour la hero de l'accueil.
+ * Aperçu illustratif de la console EFLEX pour la hero de l'accueil.
  *
  * Règles (identiques à l'ancienne démonstration) : rien n'est exécuté, aucune donnée réelle, aucun
  * chiffre présenté comme une mesure. Les noms, domaines et valeurs sont fictifs et la légende le dit.
@@ -36,7 +36,7 @@ export function HeroConsolePreview() {
     <figure className="relative mx-auto w-full max-w-[36rem] lg:max-w-none">
       <div
         role="img"
-        aria-label="Illustration : liste de projets dans la console Eflex, avec des données fictives."
+        aria-label="Illustration : liste de projets dans la console EFLEX, avec des données fictives."
         className="relative sm:py-16"
       >
         {/* Halo : purement décoratif, derrière la fenêtre. */}

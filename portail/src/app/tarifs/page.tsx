@@ -9,9 +9,9 @@ import { cn } from '@/lib/utils'
 import { GRACE_PERIOD_DAYS, PERIOD_DAYS, PLAN_IDS, PLANS, formatFcfa, formatPrice } from '@/lib/plans'
 
 export const metadata: Metadata = {
-  title: 'Tarifs — Eflex',
+  title: 'Tarifs — EFLEX',
   description:
-    'Plans Eflex en FCFA : limites projets, membres et domaines personnalisés. Paiement mobile money et carte, période de 30 jours avec 7 jours de grâce en cas d’impayé.',
+    'Plans EFLEX en FCFA : limites projets, membres et domaines personnalisés. Paiement mobile money et carte, période de 30 jours avec 7 jours de grâce en cas d’impayé.',
 }
 
 const billingFaq = [
@@ -139,7 +139,7 @@ export default function TarifsPage() {
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <table className="w-full min-w-[520px] text-left text-sm">
-                  <caption className="sr-only">Comparatif des plans Eflex</caption>
+                  <caption className="sr-only">Comparatif des plans EFLEX</caption>
                   <thead>
                     <tr className="border-b border-border">
                       <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Plan</th>

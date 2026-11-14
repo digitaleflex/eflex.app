@@ -3,7 +3,7 @@ import { EventsProvider } from '@/hooks/events-provider'
 import { LiveRefresh } from '@/components/live-refresh'
 import { AdminShell } from '@/components/admin/admin-shell'
 
-export const metadata = { title: 'Administration — Eflex', robots: { index: false, follow: false } }
+export const metadata = { title: 'Administration — EFLEX', robots: { index: false, follow: false } }
 // Données sensibles et propres à chaque session : jamais en cache.
 export const dynamic = 'force-dynamic'
 

@@ -344,7 +344,7 @@ export function csvCell(value: CsvValue): string {
  */
 export function adminMetricsCsv(metrics: AdminMetrics, generatedAt = new Date()): string {
   const rows: CsvValue[][] = [
-    ['Rapport Eflex — métriques d’administration'],
+    ['Rapport EFLEX — métriques d’administration'],
     ['Période', `${metrics.days} jours`],
     ['Généré le', generatedAt.toISOString()],
     [],

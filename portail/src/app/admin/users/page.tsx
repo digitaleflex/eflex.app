@@ -35,7 +35,7 @@ import {
   userListWhere,
 } from '@/lib/admin-users'
 
-export const metadata = { title: 'Utilisateurs — Administration Eflex' }
+export const metadata = { title: 'Utilisateurs — Administration EFLEX' }
 export const dynamic = 'force-dynamic'
 
 const date = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' })

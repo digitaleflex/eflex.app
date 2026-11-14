@@ -229,7 +229,7 @@ export async function processDeployment(
       deploymentId,
       `Ce plan nécessite plusieurs services (${artifacts.services.join(', ')}), mais la plateforme ne génère pas de compose multi-services. ` +
         "Action : ajoutez un fichier `docker-compose.yml` (ou `compose.yaml`) à la racine de l’application dans votre dépôt, avec tous les services nécessaires. " +
-        "Eflex déploiera alors ce compose fourni tel quel (voie D1). Sans ce fichier, le déploiement ne peut pas continuer et aucun compose n’est écrit dans le dépôt.",
+        "EFLEX déploiera alors ce compose fourni tel quel (voie D1). Sans ce fichier, le déploiement ne peut pas continuer et aucun compose n’est écrit dans le dépôt.",
     )
     return
   }

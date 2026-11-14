@@ -49,9 +49,9 @@ const MESSAGES: Record<string, string> = {
   YOU_CANNOT_LEAVE_THE_ORGANIZATION_WITHOUT_AN_OWNER: "Désignez un autre propriétaire avant de quitter l'organisation.",
   INVITATION_NOT_FOUND: 'Cette invitation est introuvable, expirée ou déjà utilisée.',
   YOU_ARE_NOT_THE_RECIPIENT_OF_THE_INVITATION: "Cette invitation a été envoyée à une autre adresse e-mail. Connectez-vous avec l'adresse invitée.",
-  SOCIAL_ACCOUNT_ALREADY_LINKED: 'Ce compte Google est déjà associé à un autre compte Eflex.',
+  SOCIAL_ACCOUNT_ALREADY_LINKED: 'Ce compte Google est déjà associé à un autre compte EFLEX.',
   LINKING_NOT_ALLOWED: 'La liaison avec Google a été refusée. Réessayez depuis vos paramètres.',
-  LINKING_DIFFERENT_EMAILS_NOT_ALLOWED: "L'adresse du compte Google doit être identique à celle de votre compte Eflex.",
+  LINKING_DIFFERENT_EMAILS_NOT_ALLOWED: "L'adresse du compte Google doit être identique à celle de votre compte EFLEX.",
   LINKING_FAILED: 'La liaison avec Google a échoué. Réessayez dans un instant.',
   // Passkeys (WebAuthn)
   AUTH_CANCELLED: 'Connexion par passkey annulée.',

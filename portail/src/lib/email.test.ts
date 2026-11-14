@@ -42,9 +42,9 @@ describe('configuration', () => {
   })
 
   it('utilise une adresse d’expédition par défaut ou configurée', () => {
-    expect(emailFrom()).toBe('Eflex <noreply@eflex.app>')
-    process.env.EMAIL_FROM = 'Eflex <contact@eflex.app>'
-    expect(emailFrom()).toBe('Eflex <contact@eflex.app>')
+    expect(emailFrom()).toBe('EFLEX <noreply@eflex.app>')
+    process.env.EMAIL_FROM = 'EFLEX <contact@eflex.app>'
+    expect(emailFrom()).toBe('EFLEX <contact@eflex.app>')
   })
 
   it('construit une URL absolue depuis BETTER_AUTH_URL, avec eflex.app par défaut', () => {
@@ -75,7 +75,7 @@ describe('sendEmail', () => {
     expect(init.method).toBe('POST')
     expect(init.headers.Authorization).toBe(`Bearer ${KEY}`)
     const body = JSON.parse(init.body)
-    expect(body.from).toBe('Eflex <noreply@eflex.app>')
+    expect(body.from).toBe('EFLEX <noreply@eflex.app>')
     expect(body.to).toEqual(['client@exemple.fr'])
     expect(body.subject).toBe('Sujet')
     expect(body.html).toBe('<p>Bonjour</p>')
@@ -150,7 +150,7 @@ describe('gabarits', () => {
 
   it('borne l’objet du mail à une seule ligne', () => {
     expect(notificationEmailSubject('  Déploiement\néchoué  ')).toBe('Déploiement échoué')
-    expect(notificationEmailSubject('')).toBe('Nouvelle notification Eflex')
+    expect(notificationEmailSubject('')).toBe('Nouvelle notification EFLEX')
     expect(notificationEmailSubject('a'.repeat(200))).toHaveLength(118)
   })
 })

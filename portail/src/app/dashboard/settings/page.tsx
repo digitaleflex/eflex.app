@@ -44,7 +44,7 @@ export default async function SettingsPage() {
     <div className="max-w-3xl space-y-8 animate-fade-in">
       <PageHeader
         title="Paramètres"
-        description="Profil, apparence, sécurité et connexions de votre compte Eflex. Chaque section enregistre séparément et affiche son propre retour."
+        description="Profil, apparence, sécurité et connexions de votre compte EFLEX. Chaque section enregistre séparément et affiche son propre retour."
       />
 
       <nav aria-label="Sections des paramètres" className="flex flex-wrap gap-2">

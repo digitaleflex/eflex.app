@@ -22,6 +22,8 @@ const ALLOWED_PATHS = new Set([
   '/apple-icon.png',
   '/favicon.ico',
   '/logo-horizontal.webp',
+  '/logo-horizontal-inverse.webp',
+  '/logo-mark-inverse.png',
 ])
 
 export function middleware(request: NextRequest) {

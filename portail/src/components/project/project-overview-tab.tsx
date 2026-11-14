@@ -291,7 +291,7 @@ export function ProjectOverviewTab({
             id="analysis"
             title="Détection du dépôt"
             icon={Sparkles}
-            description="Eflex déduit la stack des fichiers du dépôt. Le niveau de confiance est une estimation, pas une garantie : les points signalés expliquent les échecs possibles."
+            description="EFLEX déduit la stack des fichiers du dépôt. Le niveau de confiance est une estimation, pas une garantie : les points signalés expliquent les échecs possibles."
             actions={
               typeof analysis.confidence === 'number' ? (
                 <span className="text-xs text-muted-foreground" title="Estimation calculée à partir des fichiers reconnus">
@@ -304,7 +304,7 @@ export function ProjectOverviewTab({
             <div className="space-y-4 px-4 py-4 sm:px-5">
               {analysis.reasons.length > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Ce qu’Eflex a reconnu</p>
+                  <p className="text-xs font-medium text-muted-foreground">Ce qu’EFLEX a reconnu</p>
                   <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
                     {analysis.reasons.map((reason, index) => (
                       <li key={`${index}-${reason}`} className="flex gap-2">
