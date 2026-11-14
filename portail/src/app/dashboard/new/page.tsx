@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { GitBranch, Plus, Search, TriangleAlert, X } from 'lucide-react'
+import { GitBranch, Search, TriangleAlert } from 'lucide-react'
 import type { BuildPlan } from '@eflex/detector'
 import type { RepoAnalysis } from '@/lib/repo-analysis'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,8 @@ import { DetectionCard } from '@/components/new-project/detection-card'
 import { ApplicationPicker } from '@/components/new-project/application-picker'
 import { ApplicationMultiSelect } from '@/components/new-project/application-multi-select'
 import { GitHubPicker } from '@/components/new-project/github-picker'
+import { EnvEditor } from '@/components/env/env-editor'
+import { rowsToVars } from '@/lib/env-parse'
 import { frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 
 interface EnvVar {
@@ -163,7 +165,7 @@ export default function NewProjectPage() {
           ...(appsPayload.length > 1 ? { apps: appsPayload } : {}),
           installationId: installationId || undefined,
           usePat: usePat || undefined,
-          envVars: envVars.filter((v) => v.key.trim() !== ''),
+          envVars: rowsToVars(envVars),
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -181,8 +183,6 @@ export default function NewProjectPage() {
     }
   }
 
-  const updateEnvVar = (index: number, field: keyof EnvVar, value: string) =>
-    setEnvVars((vars) => vars.map((v, i) => (i === index ? { ...v, [field]: value } : v)))
 
   return (
     <div className="max-w-3xl space-y-8 animate-fade-in">
@@ -423,44 +423,8 @@ export default function NewProjectPage() {
                     Injectées au moment du déploiement. Elles ne sont jamais écrites dans votre dépôt.
                   </p>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  {envVars.map((env, idx) => (
-                    <div key={idx} className="flex items-start gap-2">
-                      <Input
-                        aria-label={`Nom de la variable ${idx + 1}`}
-                        placeholder="NOM_DE_LA_VARIABLE"
-                        autoComplete="off"
-                        spellCheck={false}
-                        value={env.key}
-                        onChange={(e) => updateEnvVar(idx, 'key', e.target.value)}
-                        className="flex-1"
-                      />
-                      <Input
-                        aria-label={`Valeur de la variable ${idx + 1}`}
-                        placeholder="valeur"
-                        type="password"
-                        autoComplete="off"
-                        value={env.value}
-                        onChange={(e) => updateEnvVar(idx, 'value', e.target.value)}
-                        className="flex-1"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        type="button"
-                        onClick={() => setEnvVars((vars) => vars.filter((_, i) => i !== idx))}
-                        disabled={envVars.length === 1}
-                        aria-label={`Supprimer la variable ${idx + 1}`}
-                        className="h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive"
-                      >
-                        <X className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button variant="ghost" type="button" size="sm" onClick={() => setEnvVars((vars) => [...vars, { key: '', value: '' }])}>
-                    <Plus className="h-4 w-4" aria-hidden="true" />
-                    Ajouter une variable
-                  </Button>
+                <CardContent>
+                  <EnvEditor rows={envVars} onChange={setEnvVars} disabled={submitting} />
                 </CardContent>
               </Card>
 
