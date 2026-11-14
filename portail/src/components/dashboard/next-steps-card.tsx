@@ -38,11 +38,11 @@ export function NextStepsCard({ steps }: { steps: NextStep[] }) {
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
-      <ul className="mt-3 space-y-2">
+      <ul className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-3">
         {steps.map((step) => (
           <li key={step.id}>
-            <Link href={step.href} className={cn('flex items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', step.done && 'text-muted-foreground')}>
-              {step.done ? <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" /> : <Circle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />}
+            <Link href={step.href} className={cn('flex min-h-11 items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', step.done && 'text-muted-foreground')}>
+              {step.done ? <CheckCircle2 className="h-4 w-4 shrink-0 text-success" aria-hidden="true" /> : <Circle className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
               <span className={step.done ? 'line-through' : 'font-medium'}>{step.label}</span>
             </Link>
           </li>

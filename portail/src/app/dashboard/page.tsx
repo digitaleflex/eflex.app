@@ -77,8 +77,6 @@ export default async function DashboardPage() {
         <>
           <OverviewStrip data={data} />
           <AttentionList items={data.attention} />
-          {nextSteps.length > 0 && <NextStepsCard steps={nextSteps} />}
-          <UsageTile />
 
           {/* `grid-cols-1` (= minmax(0, 1fr)) sous 2xl : sans définition de colonne, la piste implicite est
               `auto` et les enfants prennent la largeur minimale de leur contenu, ce qui fait déborder la
@@ -93,6 +91,10 @@ export default async function DashboardPage() {
               <ActivityFeed items={data.activity.slice(0, 8)} />
             </aside>
           </div>
+
+          {/* L'action principale (les projets) vient avant l'aide à la mise en route et le résumé d'usage. */}
+          {nextSteps.length > 0 && <NextStepsCard steps={nextSteps} />}
+          <UsageTile />
         </>
       ) : (
         <DashboardOnboarding organizationName={organizationName} canManage={canManage} />

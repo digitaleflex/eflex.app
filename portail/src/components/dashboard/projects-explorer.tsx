@@ -66,8 +66,8 @@ export function ProjectsExplorer({
       <h2 id="projects-title" className="sr-only">Projets</h2>
 
       <div className="space-y-2">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative min-w-0 sm:flex-[1_1_16rem]">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="relative min-w-0 sm:min-w-[12rem] sm:flex-[1_1_16rem]">
             <label htmlFor={searchId} className="sr-only">Rechercher un projet</label>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <input
