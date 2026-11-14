@@ -4,6 +4,7 @@ import {
   PRIVATE_NO_STORE_CACHE_CONTROL,
   PUBLIC_PAGE_CACHE_CONTROL,
   PUBLIC_PAGE_PATHS,
+  PUBLIC_STATIC_ASSET_PATHS,
   STATIC_ASSET_CACHE_CONTROL,
   cacheHeadersConfig,
 } from './cache-headers.mjs'
@@ -15,8 +16,9 @@ function cacheValueFor(config: { source: string; headers: { key: string; value: 
 describe('cacheHeadersConfig', () => {
   it('met en cache les logos et images publiques avec revalidation en arrière-plan', () => {
     const config = cacheHeadersConfig()
-    expect(cacheValueFor(config, '/logos/:path*')).toBe(STATIC_ASSET_CACHE_CONTROL)
-    expect(cacheValueFor(config, '/logo-:path*')).toBe(STATIC_ASSET_CACHE_CONTROL)
+    for (const path of PUBLIC_STATIC_ASSET_PATHS) {
+      expect(cacheValueFor(config, path)).toBe(STATIC_ASSET_CACHE_CONTROL)
+    }
   })
 
   it('désactive le cache pour les données utilisateur (API et tableau de bord)', () => {

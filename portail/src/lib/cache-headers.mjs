@@ -24,6 +24,14 @@ export const PUBLIC_PAGE_PATHS = [
   '/sitemap.xml',
 ]
 
+/** Assets publics (logos/images) servis depuis `public/` avec un nom stable. */
+export const PUBLIC_STATIC_ASSET_PATHS = [
+  '/logos/:path*',
+  '/logo-horizontal.png',
+  '/logo-horizontal.webp',
+  '/logo-mark.png',
+]
+
 export const STATIC_ASSET_CACHE_CONTROL = 'public, max-age=86400, stale-while-revalidate=604800'
 export const PRIVATE_NO_STORE_CACHE_CONTROL = 'private, no-store'
 export const PUBLIC_PAGE_CACHE_CONTROL = 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400'
@@ -35,14 +43,10 @@ export const PUBLIC_PAGE_CACHE_CONTROL = 'public, max-age=0, s-maxage=3600, stal
  */
 export function cacheHeadersConfig() {
   return [
-    {
-      source: '/logos/:path*',
+    ...PUBLIC_STATIC_ASSET_PATHS.map((source) => ({
+      source,
       headers: [{ key: 'Cache-Control', value: STATIC_ASSET_CACHE_CONTROL }],
-    },
-    {
-      source: '/logo-:path*',
-      headers: [{ key: 'Cache-Control', value: STATIC_ASSET_CACHE_CONTROL }],
-    },
+    })),
     {
       source: '/api/:path*',
       headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE_CACHE_CONTROL }],
