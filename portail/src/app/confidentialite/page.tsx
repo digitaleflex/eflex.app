@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import { LegalPage, LegalSection, PlaceholderNotice } from '@/components/marketing/legal-page'
 
 export const metadata: Metadata = {
-  title: 'Politique de confidentialité — Eflex',
-  description: 'Informations sur les données traitées dans le cadre du service Eflex.',
+  title: 'Politique de confidentialité — EFLEX',
+  description: 'Informations sur les données traitées dans le cadre du service EFLEX.',
 }
 
 export default function ConfidentialitePage() {

@@ -3,8 +3,8 @@ import { LegalPage, LegalSection, PlaceholderNotice } from '@/components/marketi
 import { getLegalCompanyInfo } from '@/lib/legal-info'
 
 export const metadata: Metadata = {
-  title: 'Mentions légales — Eflex',
-  description: 'Informations sur l’éditeur et l’hébergement du service Eflex.',
+  title: 'Mentions légales — EFLEX',
+  description: 'Informations sur l’éditeur et l’hébergement du service EFLEX.',
 }
 
 export default function MentionsLegalesPage() {

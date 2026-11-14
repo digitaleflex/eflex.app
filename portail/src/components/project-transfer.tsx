@@ -146,7 +146,7 @@ export function ProjectTransfer({
         </li>
         <li>
           <span className="font-medium text-foreground">Ce qui suit le projet :</span> domaines, variables
-          d’environnement chiffrées, bases de données et historique de déploiements. Le domaine Eflex,
+          d’environnement chiffrées, bases de données et historique de déploiements. Le domaine EFLEX,
           l’identifiant technique et l’application hébergée ne changent pas.
         </li>
         <li>

@@ -9,6 +9,8 @@
    ───────────────────────────────────────────────────────────────────────────── */
 @layer base {
   :root {
+    /* Titres : même police que le texte (Plus Jakarta Sans, charte EFLEX). */
+    --font-display: var(--font-sans);
     --eflex-navy: 215 69% 14%;
     --eflex-royalblue: 221 83% 53%;
     --eflex-blue: 217 91% 60%;
@@ -101,13 +103,6 @@
     scrollbar-color: hsl(var(--muted-foreground) / 0.45) transparent;
   }
 
-  /* L'asset original (marine + dégradé bleu) reste INTACT : on lui offre
-     simplement une plaque claire au lieu de le rendre monochrome. */
-  :root.dark img[alt^='Eflex'] {
-    background-color: #ffffff;
-    border-radius: 0.5rem;
-    padding: 0.3rem 0.45rem;
-  }
 }
 
 @layer base {
@@ -321,11 +316,16 @@
     background-color: hsl(var(--background) / 0.95);
   }
 
-  /* En thème sombre, la plaque blanche réservée au logo n'a plus lieu d'être
-     sur une homepage explicitement claire : le logo reprend sa place exacte. */
-  :root.dark .homepage-light img[alt^='Eflex'] {
-    background-color: transparent;
-    border-radius: 0;
-    padding: 0;
-  }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Logo EFLEX (composant BrandLogo, charte docs/brand/README.md) : version couleur
+   sur fond clair, version inversée officielle (blanche) sur fond sombre. Jamais de
+   filtre ni de plaque. Règles hors @layer : elles l'emportent sur les utilitaires.
+   ───────────────────────────────────────────────────────────────────────────── */
+.brand-logo-on-dark { display: none; }
+:root.dark .brand-logo-on-light { display: none; }
+:root.dark .brand-logo-on-dark { display: unset; }
+/* Pages forcées en clair (accueil, tarifs, pages légales) : version couleur même en thème sombre. */
+:root.dark .homepage-light .brand-logo-on-light { display: unset; }
+:root.dark .homepage-light .brand-logo-on-dark { display: none; }

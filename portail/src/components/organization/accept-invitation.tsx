@@ -40,7 +40,7 @@ export function AcceptInvitation({ invitationId }: { invitationId: string }) {
         <CardHeader><h1 className="text-xl font-semibold">Invitation à rejoindre une organisation</h1></CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Vous avez été invité à rejoindre une organisation sur Eflex. En acceptant, vous accéderez à ses projets selon votre rôle.
+            Vous avez été invité à rejoindre une organisation sur EFLEX. En acceptant, vous accéderez à ses projets selon votre rôle.
           </p>
           {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
           <div className="flex gap-3">

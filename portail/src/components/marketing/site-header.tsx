@@ -1,12 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Menu, X } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-switcher'
 import { cn } from '@/lib/utils'
+import { BrandLogo } from '@/components/brand-logo'
 
 const links = [
   { href: '/#fonctionnement', label: 'Fonctionnement' },
@@ -91,14 +91,7 @@ export function SiteHeader() {
           href="/"
           className="flex min-h-11 shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <Image
-            src="/logo-horizontal.webp"
-            alt="Eflex — accueil"
-            width={1200}
-            height={312}
-            className="h-6 w-auto sm:h-7 lg:h-8"
-            priority
-          />
+          <BrandLogo alt="EFLEX — accueil" className="h-6 w-auto sm:h-7 lg:h-8" priority />
         </Link>
 
         <ul className="hidden lg:flex items-center gap-1">

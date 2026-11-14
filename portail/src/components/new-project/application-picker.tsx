@@ -37,7 +37,7 @@ export function ApplicationPicker({
         <p className="text-sm text-muted-foreground">
           {multiApp
             ? "Choisissez l'application principale à analyser. Les autres pourront rejoindre le même projet juste après."
-            : "Choisissez l'application à analyser. Dans cette version, Eflex déploie une seule application par projet."}
+            : "Choisissez l'application à analyser. Dans cette version, EFLEX déploie une seule application par projet."}
         </p>
       </CardHeader>
       <CardContent>

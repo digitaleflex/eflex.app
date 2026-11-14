@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { OrganizationPanel } from '@/components/organization/organization-panel'
 
-export const metadata = { title: 'Équipe — Eflex' }
+export const metadata = { title: 'Équipe — EFLEX' }
 
 export default async function OrganizationPage() {
   const session = await getSession()

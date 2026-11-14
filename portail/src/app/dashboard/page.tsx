@@ -12,7 +12,7 @@ import { NextStepsCard } from '@/components/dashboard/next-steps-card'
 import { UsageTile } from '@/components/dashboard/usage-tile'
 import { ProjectsExplorer } from '@/components/dashboard/projects-explorer'
 
-export const metadata = { title: 'Projets — Eflex' }
+export const metadata = { title: 'Projets — EFLEX' }
 export const dynamic = 'force-dynamic'
 
 function greeting(date = new Date()): string {

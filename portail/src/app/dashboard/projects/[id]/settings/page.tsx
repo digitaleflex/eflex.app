@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { ProjectSettings } from '@/components/project-settings'
 
-export const metadata = { title: 'Paramètres du projet — Eflex' }
+export const metadata = { title: 'Paramètres du projet — EFLEX' }
 export const dynamic = 'force-dynamic'
 
 export default async function ProjectSettingsPage({ params }: { params: Promise<{ id: string }> }) {

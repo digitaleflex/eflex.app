@@ -45,7 +45,7 @@ const capabilities = [
   {
     icon: SearchCheck,
     title: 'Analyse de compatibilité',
-    text: 'Eflex repère votre stack, vos variables et les fonctions propres à la plateforme d’origine.',
+    text: 'EFLEX repère votre stack, vos variables et les fonctions propres à la plateforme d’origine.',
   },
   {
     icon: SlidersHorizontal,
@@ -60,7 +60,7 @@ const capabilities = [
   {
     icon: Repeat,
     title: 'Bascule guidée',
-    text: 'Testez sur Eflex, validez, puis changez vos DNS. L’ancien hébergement reste en place jusque-là.',
+    text: 'Testez sur EFLEX, validez, puis changez vos DNS. L’ancien hébergement reste en place jusque-là.',
   },
 ]
 
@@ -69,7 +69,7 @@ const journey = [
   { icon: Boxes, label: 'Sélectionnez vos projets' },
   { icon: ScanSearch, label: 'Analysez la compatibilité' },
   { icon: SlidersHorizontal, label: 'Configurez et testez' },
-  { icon: Rocket, label: 'Migrez vers Eflex' },
+  { icon: Rocket, label: 'Migrez vers EFLEX' },
 ]
 
 export function MigrationTeaser({ contactEmail }: { contactEmail: string }) {
@@ -78,7 +78,7 @@ export function MigrationTeaser({ contactEmail }: { contactEmail: string }) {
       <div className="container space-y-12 py-16 md:py-24">
         <div className="mx-auto max-w-3xl space-y-4 text-center">
           <h2 id="migration-titre" className="text-3xl font-bold tracking-tight text-balance md:text-4xl">
-            Migrez vos projets vers <span className="text-eflexblue">Eflex</span>, étape par étape
+            Migrez vos projets vers <span className="text-eflexblue">EFLEX</span>, étape par étape
           </h2>
           <p className="text-lead-lg text-white/80 text-pretty">
             <span className="mr-2 inline-block rounded-md border border-eflexsky/50 px-2 py-0.5 align-middle text-xs font-semibold text-eflexsky">

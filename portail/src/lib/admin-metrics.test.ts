@@ -320,7 +320,7 @@ describe('export CSV', () => {
 
     const csv = adminMetricsCsv(metrics, new Date('2026-11-10T12:00:00Z'))
     const lines = csv.split('\r\n')
-    expect(lines[0]).toBe('Rapport Eflex — métriques d’administration')
+    expect(lines[0]).toBe('Rapport EFLEX — métriques d’administration')
     expect(lines).toContain('Période;30 jours')
     expect(lines).toContain('Généré le;2026-11-10T12:00:00.000Z')
     expect(lines).toContain('Déploiements par jour')

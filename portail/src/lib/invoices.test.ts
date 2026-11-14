@@ -27,7 +27,7 @@ describe('factures', () => {
   })
 
   it('produit un PDF valide', async () => {
-    const pdf = await generateInvoicePdf(payment, { name: 'Eflex SARL' }, { name: 'Client Test', email: 'client@example.com' })
+    const pdf = await generateInvoicePdf(payment, { name: 'EFLEX SARL' }, { name: 'Client Test', email: 'client@example.com' })
     expect(Buffer.from(pdf).subarray(0, 4).toString()).toBe('%PDF')
     expect(pdf.byteLength).toBeGreaterThan(1000)
   })

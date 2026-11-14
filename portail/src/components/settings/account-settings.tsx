@@ -255,7 +255,7 @@ export function AccountSettings({
           <p className="text-sm text-muted-foreground mt-1">
             {hasPassword
               ? 'Changez votre phrase secrète. Les autres sessions seront déconnectées.'
-              : 'Vous vous connectez avec Google : ce compte n’a pas de phrase secrète Eflex.'}
+              : 'Vous vous connectez avec Google : ce compte n’a pas de phrase secrète EFLEX.'}
           </p>
         </CardHeader>
         <CardContent>

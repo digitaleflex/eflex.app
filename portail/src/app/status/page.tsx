@@ -24,9 +24,9 @@ import { cn } from '@/lib/utils'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Statut des services — Eflex',
+  title: 'Statut des services — EFLEX',
   description:
-    'État observé des services Eflex : portail, base de données, cache, déploiement et moteur Axiom, avec l’historique des relevés et des incidents déclarés.',
+    'État observé des services EFLEX : portail, base de données, cache, déploiement et moteur Axiom, avec l’historique des relevés et des incidents déclarés.',
 }
 
 type BadgeVariant = 'success' | 'warning' | 'destructive' | 'outline'

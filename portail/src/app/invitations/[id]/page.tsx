@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { AcceptInvitation } from '@/components/organization/accept-invitation'
 
-export const metadata = { title: 'Invitation — Eflex' }
+export const metadata = { title: 'Invitation — EFLEX' }
 
 export default async function InvitationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

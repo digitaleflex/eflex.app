@@ -189,7 +189,7 @@ export default function NewProjectPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Nouveau projet</h1>
         <p className="text-muted-foreground">
-          Indiquez votre dépôt GitHub : Eflex reconnaît la stack et prépare le déploiement.
+          Indiquez votre dépôt GitHub : EFLEX reconnaît la stack et prépare le déploiement.
         </p>
       </div>
 
@@ -265,7 +265,7 @@ export default function NewProjectPage() {
             : ''}
       </p>
 
-      {/* 2. Ce qu'Eflex a compris (le statut ci-dessus annonce le résultat ; pas de double annonce). */}
+      {/* 2. Ce qu'EFLEX a compris (le statut ci-dessus annonce le résultat ; pas de double annonce). */}
       <div className="space-y-6">
         {analysis && (
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
@@ -298,7 +298,7 @@ export default function NewProjectPage() {
                 Quelle application déployer ?
               </h2>
               <p className="text-sm text-muted-foreground">
-                Ce dépôt en contient plusieurs. Eflex en déploie une à la fois.
+                Ce dépôt en contient plusieurs. EFLEX en déploie une à la fois.
               </p>
             </CardHeader>
             <CardContent>
@@ -372,7 +372,7 @@ export default function NewProjectPage() {
                       <span className="font-medium">{frameworkLabel(plan.framework)}</span>
                       <span className="text-muted-foreground">
                         {runtimeLabel(plan.runtime)}
-                        {index === 0 && ' · proposé par Eflex'}
+                        {index === 0 && ' · proposé par EFLEX'}
                       </span>
                     </label>
                   ))}

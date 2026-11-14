@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { CheckCircle2 } from 'lucide-react'
 
 import { ThemeToggle } from '@/components/theme-switcher'
+import { BrandLogo } from '@/components/brand-logo'
 
 const POINTS = [
   'Détection automatique de votre stack',
@@ -34,28 +34,21 @@ export function AuthLayout({
     <div className="min-h-screen bg-background">
       <div className="lg:grid lg:min-h-screen lg:grid-cols-[minmax(0,44%)_minmax(0,56%)]">
         <aside
-          aria-label="Présentation d’Eflex"
+          aria-label="Présentation d’EFLEX"
           className="hidden border-r border-white/10 bg-eflexnavy px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between xl:px-14"
         >
           <Link
             href="/"
-            className="inline-flex w-fit rounded-xl bg-white px-4 py-2.5 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-eflexnavy"
+            className="inline-flex w-fit rounded-xl py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-eflexnavy"
           >
-            <Image
-              src="/logo-horizontal.webp"
-              alt="Eflex — accueil"
-              width={1200}
-              height={312}
-              className="h-7 w-auto"
-              priority
-            />
+            <BrandLogo tone="dark" alt="EFLEX — accueil" className="h-8 w-auto" priority />
           </Link>
 
           <div className="max-w-sm space-y-6 py-10">
             <p className="text-2xl font-semibold leading-snug">
               Poussez votre code.
               <br />
-              Eflex le met en ligne.
+              EFLEX le met en ligne.
             </p>
             <p className="text-sm leading-relaxed text-white/80">
               Détection de la stack, construction et publication : votre projet passe du dépôt à une URL
@@ -71,23 +64,16 @@ export function AuthLayout({
             </ul>
           </div>
 
-          <p className="text-xs text-white/75">Console de déploiement Eflex</p>
+          <p className="text-xs text-white/75">Console de déploiement EFLEX</p>
         </aside>
 
         <div className="flex min-h-screen flex-col">
           <header className="flex h-16 items-center justify-between gap-4 bg-eflexnavy px-4 sm:px-6 lg:justify-end lg:bg-transparent lg:px-8">
             <Link
               href="/"
-              className="inline-flex rounded-lg bg-white px-3 py-1.5 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-eflexnavy lg:hidden"
+              className="inline-flex rounded-lg py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-eflexnavy lg:hidden"
             >
-              <Image
-                src="/logo-horizontal.webp"
-                alt="Eflex — accueil"
-                width={1200}
-                height={312}
-                className="h-6 w-auto"
-                priority
-              />
+              <BrandLogo alt="EFLEX — accueil" className="h-6 w-auto" priority />
             </Link>
             <ThemeToggle />
           </header>

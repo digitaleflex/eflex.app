@@ -224,7 +224,7 @@ export function UsageView({ projects, quota }: { projects: UsageProject[]; quota
             </p>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
-            Comparaison entre les quotas de votre abonnement et la consommation <strong className="font-medium text-foreground">comptabilisée</strong> dans Eflex.
+            Comparaison entre les quotas de votre abonnement et la consommation <strong className="font-medium text-foreground">comptabilisée</strong> dans EFLEX.
             Source : base de données de l’organisation (abonnement et compteurs). Unités et périodes sont précisées ci-dessous ; aucune valeur estimée n’est affichée.
           </p>
           <dl className="mt-4 grid gap-3 sm:grid-cols-3">

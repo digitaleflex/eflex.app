@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { AdminPaymentRow } from '@/components/admin/payment-row'
 import { planById } from '@/lib/plans'
 
-export const metadata = { title: 'Paiements — Administration Eflex' }
+export const metadata = { title: 'Paiements — Administration EFLEX' }
 export const dynamic = 'force-dynamic'
 
 const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })

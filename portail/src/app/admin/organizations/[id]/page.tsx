@@ -10,7 +10,7 @@ import { computeBillingState } from '@/lib/billing'
 import { OrganizationAdminActions } from '@/components/admin/organization-admin-actions'
 import { TimeFr } from '@/components/admin/time-fr'
 
-export const metadata = { title: 'Organisation — Administration Eflex' }
+export const metadata = { title: 'Organisation — Administration EFLEX' }
 export const dynamic = 'force-dynamic'
 
 const ROLE_LABEL: Record<string, string> = {

@@ -160,7 +160,7 @@ export function ProjectsExplorer({
           title="Aucun projet pour l’instant"
           description={
             canManage
-              ? 'Importez un dépôt GitHub : Eflex reconnaît la stack, construit l’application et la publie avec son adresse.'
+              ? 'Importez un dépôt GitHub : EFLEX reconnaît la stack, construit l’application et la publie avec son adresse.'
               : 'Un propriétaire ou un administrateur de l’organisation peut importer le premier dépôt.'
           }
           action={

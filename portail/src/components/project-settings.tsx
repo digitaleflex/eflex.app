@@ -659,7 +659,7 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
             id="domaines"
             title="Domaines"
             icon={Globe}
-            description="Le domaine Eflex reste stable. Ajoutez vos propres domaines avec un CNAME ; le certificat SSL est émis automatiquement après vérification."
+            description="Le domaine EFLEX reste stable. Ajoutez vos propres domaines avec un CNAME ; le certificat SSL est émis automatiquement après vérification."
           >
             <ProjectDomains projectId={project.id} apps={apps.map((app) => ({ id: app.id, name: app.name }))} />
           </SettingsSection>

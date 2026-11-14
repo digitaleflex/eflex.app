@@ -1,4 +1,4 @@
-/** Gabarits d'e-mails transactionnels, en français, aux couleurs Eflex. */
+/** Gabarits d'e-mails transactionnels, en français, aux couleurs EFLEX. */
 
 export interface EmailTemplate {
   html: string
@@ -44,7 +44,7 @@ function layout(
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden">
         <tr><td style="padding:28px 32px 8px">
-          <p style="margin:0;font-size:18px;font-weight:700;letter-spacing:-0.02em;color:#0b1f3b">Eflex</p>
+          <p style="margin:0;font-size:18px;font-weight:700;letter-spacing:-0.02em;color:#0b1f3b">EFLEX</p>
         </td></tr>
         <tr><td style="padding:8px 32px 0">
           <h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;letter-spacing:-0.02em;color:#0b1f3b">${safeTitle}</h1>
@@ -71,7 +71,7 @@ function layout(
 export function verificationEmail(url: string): EmailTemplate {
   return layout(
     'Vérifiez votre adresse e-mail',
-    'Bienvenue sur Eflex. Confirmez votre adresse pour activer votre compte et déployer votre premier projet.',
+    'Bienvenue sur EFLEX. Confirmez votre adresse pour activer votre compte et déployer votre premier projet.',
     'Vérifier mon adresse',
     url,
     'Ce lien expire dans 1 heure. Si vous n’êtes pas à l’origine de cette inscription, ignorez cet e-mail.',
@@ -81,7 +81,7 @@ export function verificationEmail(url: string): EmailTemplate {
 export function resetPasswordEmail(url: string): EmailTemplate {
   return layout(
     'Réinitialiser votre phrase secrète',
-    'Une demande de réinitialisation a été faite pour votre compte Eflex. Choisissez une nouvelle phrase secrète.',
+    'Une demande de réinitialisation a été faite pour votre compte EFLEX. Choisissez une nouvelle phrase secrète.',
     'Choisir une nouvelle phrase secrète',
     url,
     'Ce lien expire dans 1 heure et ne peut être utilisé qu’une fois. Si vous n’avez rien demandé, ignorez cet e-mail : votre phrase secrète reste inchangée.',
@@ -105,20 +105,20 @@ export interface NotificationEmailInput {
 export function notificationEmail({ title, body, url, preferencesUrl }: NotificationEmailInput): EmailTemplate {
   const detail = body?.trim()
   const intro = detail
-    ? `${detail}\n\nOuvrez Eflex pour voir le détail.`
-    : 'Une nouvelle notification vous attend sur Eflex. Ouvrez l’application pour voir le détail.'
+    ? `${detail}\n\nOuvrez EFLEX pour voir le détail.`
+    : 'Une nouvelle notification vous attend sur EFLEX. Ouvrez l’application pour voir le détail.'
   const introHtml = detail
-    ? `${escapeHtml(detail)}<br><br>Ouvrez Eflex pour voir le détail.`
-    : 'Une nouvelle notification vous attend sur Eflex. Ouvrez l’application pour voir le détail.'
+    ? `${escapeHtml(detail)}<br><br>Ouvrez EFLEX pour voir le détail.`
+    : 'Une nouvelle notification vous attend sur EFLEX. Ouvrez l’application pour voir le détail.'
   const note = `Vous recevez cet e-mail selon vos préférences. Gérer mes préférences : ${preferencesUrl}`
   const noteHtml = `Vous recevez cet e-mail selon vos préférences. <a href="${escapeHtml(preferencesUrl)}" style="color:#2563eb;text-decoration:underline">Gérer mes préférences</a>.`
 
-  return layout(title, intro, 'Ouvrir dans Eflex', url, note, { introHtml, noteHtml })
+  return layout(title, intro, 'Ouvrir dans EFLEX', url, note, { introHtml, noteHtml })
 }
 
 /** Objet de l'e-mail : une seule ligne, longueur bornée. */
 export function notificationEmailSubject(title: string): string {
   const single = title.replace(/\s+/g, ' ').trim()
-  if (!single) return 'Nouvelle notification Eflex'
+  if (!single) return 'Nouvelle notification EFLEX'
   return single.length > 120 ? `${single.slice(0, 117)}…` : single
 }

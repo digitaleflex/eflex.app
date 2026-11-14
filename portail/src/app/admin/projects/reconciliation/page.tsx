@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { listApplications } from '@/lib/coolify'
 import { reconcileApplications, type AdminApplicationRef } from '@/lib/admin-projects'
 
-export const metadata = { title: 'Réconciliation — Administration Eflex' }
+export const metadata = { title: 'Réconciliation — Administration EFLEX' }
 export const dynamic = 'force-dynamic'
 
 const dateTime = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
@@ -129,7 +129,7 @@ export default async function AdminReconciliationPage() {
               </ul>
             )}
             <p className="px-4 pb-4 pt-2 text-xs text-muted-foreground">
-              Une application orpheline peut être un service géré hors Eflex (proxy, outil interne). Vérifiez avant
+              Une application orpheline peut être un service géré hors EFLEX (proxy, outil interne). Vérifiez avant
               toute suppression manuelle dans Coolify.
             </p>
           </Card>
@@ -164,7 +164,7 @@ export default async function AdminReconciliationPage() {
               </ul>
             )}
             <p className="px-4 pb-4 pt-2 text-xs text-muted-foreground">
-              Application supprimée hors Eflex ? Ouvrez la fiche du projet : vous pouvez relancer un déploiement pour la
+              Application supprimée hors EFLEX ? Ouvrez la fiche du projet : vous pouvez relancer un déploiement pour la
               recréer ou corriger la référence depuis les opérations d’infrastructure.
             </p>
           </Card>

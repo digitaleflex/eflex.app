@@ -1,6 +1,6 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import { getLegalCompanyInfo } from '@/lib/legal-info'
+import { BrandLogo } from '@/components/brand-logo'
 
 const productLinks = [
   { href: '/#fonctionnement', label: 'Fonctionnement' },
@@ -48,7 +48,7 @@ export function SiteFooter() {
     <footer className="border-t border-border bg-background">
       <div className="container grid gap-10 py-10 sm:grid-cols-2 sm:py-12 lg:grid-cols-5">
         <div className="space-y-3 lg:col-span-2">
-          <Image src="/logo-horizontal.webp" alt="Eflex" width={1200} height={312} className="h-6 w-auto" />
+          <BrandLogo className="h-6 w-auto" />
           <p className="max-w-sm text-sm text-muted-foreground">Le déploiement depuis Git, sans DevOps.</p>
           <div className="text-sm text-muted-foreground">
             <p className="font-medium text-foreground">Contact / support</p>

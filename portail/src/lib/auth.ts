@@ -140,7 +140,7 @@ export const auth = betterAuth({
       const template = resetPasswordEmail(url)
       await sendEmail({
         to: user.email,
-        subject: 'Réinitialiser votre phrase secrète Eflex',
+        subject: 'Réinitialiser votre phrase secrète EFLEX',
         ...template,
       })
     },
@@ -154,7 +154,7 @@ export const auth = betterAuth({
       const template = verificationEmail(url)
       await sendEmail({
         to: user.email,
-        subject: 'Vérifiez votre adresse e-mail Eflex',
+        subject: 'Vérifiez votre adresse e-mail EFLEX',
         ...template,
       })
     },
@@ -294,7 +294,7 @@ export const auth = betterAuth({
     }),
     // Connexion sans mot de passe (WebAuthn / FIDO2) : empreinte, visage, clé de sécurité.
     passkey({
-      rpName: 'Eflex',
+      rpName: 'EFLEX',
       rpID: passkeyRpID,
       origin: authOrigin,
     }),
@@ -390,7 +390,7 @@ export const auth = betterAuth({
     // Administration de la plateforme (utilisateurs, suspension, usurpation).
     admin(),
     // Double authentification TOTP + codes de secours.
-    twoFactor({ issuer: 'Eflex' }),
+    twoFactor({ issuer: 'EFLEX' }),
     // Doit rester en dernier : permet de poser les cookies depuis les Server Actions.
     nextCookies(),
   ],

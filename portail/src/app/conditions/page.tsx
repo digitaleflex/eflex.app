@@ -2,15 +2,15 @@ import type { Metadata } from 'next'
 import { LegalPage, LegalSection, PlaceholderNotice } from '@/components/marketing/legal-page'
 
 export const metadata: Metadata = {
-  title: 'Conditions d’utilisation et de vente — Eflex',
-  description: 'Conditions générales d’utilisation et, le cas échéant, de vente du service Eflex.',
+  title: 'Conditions d’utilisation et de vente — EFLEX',
+  description: 'Conditions générales d’utilisation et, le cas échéant, de vente du service EFLEX.',
 }
 
 export default function ConditionsPage() {
   return (
     <LegalPage
       title="Conditions d’utilisation et de vente"
-      description="Cadre contractuel applicable à l’utilisation du service Eflex (CGU) et, le cas échéant, aux abonnements (CGV)."
+      description="Cadre contractuel applicable à l’utilisation du service EFLEX (CGU) et, le cas échéant, aux abonnements (CGV)."
       updatedAt="À compléter"
     >
       <LegalSection title="Objet du service">

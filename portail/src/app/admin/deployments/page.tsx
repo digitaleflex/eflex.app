@@ -16,7 +16,7 @@ import {
   stuckBefore,
 } from '@/lib/admin-projects'
 
-export const metadata = { title: 'Déploiements — Administration Eflex' }
+export const metadata = { title: 'Déploiements — Administration EFLEX' }
 export const dynamic = 'force-dynamic'
 
 const dateTime = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })

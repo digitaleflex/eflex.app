@@ -28,7 +28,7 @@ import {
   parseActivityPage,
 } from '@/lib/activity'
 
-export const metadata = { title: 'Activité — Eflex' }
+export const metadata = { title: 'Activité — EFLEX' }
 export const dynamic = 'force-dynamic'
 
 const dateTime = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })

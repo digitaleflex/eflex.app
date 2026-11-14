@@ -5,8 +5,8 @@ import { SystemLink, SystemScreen } from '@/components/system-screen'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Maintenance — Eflex',
-  description: 'État de maintenance de la plateforme Eflex.',
+  title: 'Maintenance — EFLEX',
+  description: 'État de maintenance de la plateforme EFLEX.',
 }
 
 export default function MaintenancePage() {
@@ -23,7 +23,7 @@ export default function MaintenancePage() {
         title="Aucune maintenance en cours"
         description={
           <>
-            <p>La plateforme Eflex fonctionne normalement.</p>
+            <p>La plateforme EFLEX fonctionne normalement.</p>
             <p>
               Cette page reste disponible si vous avez suivi un ancien lien. Le statut des services
               donne l’état observé des composants.

@@ -1,4 +1,7 @@
-# Sources de marque Eflex
+# Sources de marque EFLEX
+
+Charte complète (règles d'usage, couleurs, typographie) : **`docs/brand/README.md`**. Planches de
+référence : `charte-logo-variantes.webp`, `charte-logo-horizontal.webp`, `charte-planche-couleurs-typo.webp`.
 
 Fichiers source haute résolution de la marque. **Les versions servies par le
 portail** sont dans `portail/public/` :

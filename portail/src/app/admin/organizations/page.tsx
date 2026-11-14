@@ -9,7 +9,7 @@ import { computeBillingState } from '@/lib/billing'
 import { TimeFr } from '@/components/admin/time-fr'
 import { cn } from '@/lib/utils'
 
-export const metadata = { title: 'Organisations — Administration Eflex' }
+export const metadata = { title: 'Organisations — Administration EFLEX' }
 export const dynamic = 'force-dynamic'
 
 type Search = { plan?: string; paiement?: string; suspendue?: string; inactive?: string; vue?: string }

@@ -201,7 +201,7 @@ export function SecuritySettings({
       const result = await authClient.twoFactor.enable({
         ...(hasPassword ? { password } : {}),
         method: 'totp',
-        issuer: 'Eflex',
+        issuer: 'EFLEX',
       })
       if (result.error) {
         setFeedback({ tone: 'error', message: authErrorMessage(result.error, 'Impossible d’activer la 2FA.') })

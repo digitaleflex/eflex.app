@@ -1,8 +1,8 @@
 import Link from 'next/link'
-import Image from 'next/image'
 import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { BrandLogo } from '@/components/brand-logo'
 
 export type SystemTone = 'neutral' | 'warning' | 'destructive'
 
@@ -73,14 +73,7 @@ export function SystemScreen({
       tabIndex={-1}
       className="flex min-h-screen flex-col items-center justify-center gap-8 bg-background px-4 py-16 text-center text-foreground"
     >
-      <Image
-        src="/logo-horizontal.webp"
-        alt="Eflex"
-        width={1200}
-        height={312}
-        className="h-8 w-auto"
-        priority
-      />
+      <BrandLogo className="h-8 w-auto" priority />
 
       <div className="flex max-w-lg flex-col items-center gap-4">
         <span
