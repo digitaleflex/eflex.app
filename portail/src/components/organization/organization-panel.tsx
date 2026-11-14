@@ -508,7 +508,12 @@ function RenameForm({
           required
         />
       </div>
-      <Button type="submit" loading={loading} disabled={!value.trim() || value.trim() === name}>
+      <Button
+        type="submit"
+        loading={loading}
+        disabled={!value.trim() || value.trim() === name}
+        disabledReason={value.trim() ? 'Aucune modification à enregistrer' : 'Le nom ne peut pas être vide'}
+      >
         Enregistrer le nom
       </Button>
     </form>

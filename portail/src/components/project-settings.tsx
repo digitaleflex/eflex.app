@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { cn } from '@/lib/utils'
 import {
   Activity,
   ArrowLeft,
@@ -516,7 +517,7 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
   ]
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <div>
         <Link
           href={`/dashboard/projects/${project.id}`}
@@ -538,13 +539,22 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
         </p>
       </header>
 
-      <nav aria-label="Sections des paramètres" className="sticky top-0 z-10 -mx-1 rounded-lg border border-border bg-background/95 p-2 backdrop-blur">
-        <ul className="flex flex-wrap gap-1">
+      {/* Ordinateur : colonne de sections à gauche. Mobile : une seule ligne défilante sous l'en-tête collant
+          (8 sections passaient sur 4 lignes et masquaient le contenu). */}
+      <div className="lg:grid lg:grid-cols-[12rem_minmax(0,1fr)] lg:items-start lg:gap-8">
+      <nav
+        aria-label="Sections des paramètres"
+        className="sticky top-14 z-10 -mx-4 border-b border-border bg-background/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:top-24 lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none"
+      >
+        <ul className="flex gap-1 overflow-x-auto [scrollbar-width:none] lg:flex-col lg:overflow-visible">
           {nav.map((item) => (
             <li key={item.href}>
               <a
                 href={item.href}
-                className="inline-flex min-h-9 items-center rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground [@media(pointer:coarse)]:min-h-11"
+                className={cn(
+                  'inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:w-full',
+                  item.href === '#zone-dangereuse' ? 'text-destructive hover:text-destructive' : 'text-muted-foreground hover:text-foreground',
+                )}
               >
                 {item.label}
               </a>
@@ -553,6 +563,7 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
         </ul>
       </nav>
 
+      <div className="min-w-0 space-y-6">
       <SettingsSection
         id="general"
         title="Général"
@@ -573,7 +584,7 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
               required
             />
             <div className="flex justify-end">
-              <Button type="submit" loading={savingGeneral} disabled={name.trim() === project.name}>
+              <Button type="submit" loading={savingGeneral} disabled={name.trim() === project.name} disabledReason="Aucune modification à enregistrer">
                 Enregistrer le nom
               </Button>
             </div>
@@ -636,7 +647,7 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
               required
             />
             <div className="flex justify-end">
-              <Button type="submit" loading={savingBranch} disabled={branch.trim() === project.branch}>
+              <Button type="submit" loading={savingBranch} disabled={branch.trim() === project.branch} disabledReason="Aucune modification à enregistrer">
                 Enregistrer la branche
               </Button>
             </div>
@@ -1127,6 +1138,8 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
           </div>
         </details>
       </section>
+      </div>
+      </div>
 
       <ConfirmDialog
         open={confirmEnvDelete !== null}
