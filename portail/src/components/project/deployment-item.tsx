@@ -65,7 +65,7 @@ export function DeploymentItem({
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium">
                 <span className="font-mono">{commitLabel}</span>
                 {deployment.app && (
-                  <span className="rounded-full border border-border px-1.5 text-[11px] font-normal text-muted-foreground">
+                  <span className="rounded-full border border-border px-1.5 text-xs font-normal text-muted-foreground">
                     {deployment.app.name}
                   </span>
                 )}
@@ -74,12 +74,12 @@ export function DeploymentItem({
                   {branch}
                 </span>
                 {isLast && (
-                  <span className="rounded-full border border-border px-1.5 text-[11px] font-medium text-muted-foreground">
+                  <span className="rounded-full border border-border px-1.5 text-xs font-medium text-muted-foreground">
                     Dernier
                   </span>
                 )}
                 {isProduction && (
-                  <span className="rounded-full bg-primary/10 px-1.5 text-[11px] font-semibold text-primary">
+                  <span className="rounded-full bg-primary/10 px-1.5 text-xs font-semibold text-primary">
                     Production
                   </span>
                 )}
@@ -98,7 +98,7 @@ export function DeploymentItem({
                     <p className="font-medium text-foreground">{diagnosis.cause}</p>
                     <Link
                       href={diagnosis.action.href}
-                      className="mt-1 inline-flex rounded font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="mt-1 inline-flex rounded-md font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {diagnosis.action.label}
                     </Link>

@@ -38,7 +38,7 @@ export function ProjectsTable({ projects }: { projects: DashboardProject[] }) {
                       >
                         <span className="truncate">{project.name}</span>
                         {project.appCount > 1 && (
-                          <span className="shrink-0 rounded-full border border-border bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          <span className="shrink-0 rounded-full border border-border bg-muted/60 px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                             {project.appCount} apps
                           </span>
                         )}
@@ -63,7 +63,7 @@ export function ProjectsTable({ projects }: { projects: DashboardProject[] }) {
                         href={`https://${project.domain}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="relative z-10 inline-flex max-w-full items-center gap-0.5 text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                        className="relative z-10 inline-flex max-w-full items-center gap-0.5 text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
                       >
                         <span className="truncate max-w-[14rem]">{project.domain}</span>
                         <ArrowUpRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />

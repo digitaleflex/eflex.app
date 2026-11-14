@@ -167,7 +167,7 @@ export function DeploymentChart({
             )
           })}
         </div>
-        <div className="mt-1 flex justify-between text-[11px] text-muted-foreground" aria-hidden="true">
+        <div className="mt-1 flex justify-between text-xs text-muted-foreground" aria-hidden="true">
           <span>{first ? formatDayShort(first) : ''}</span>
           {middle && daily.length > 2 && <span>{formatDayShort(middle)}</span>}
           <span>{last ? formatDayShort(last) : ''}</span>
@@ -175,15 +175,15 @@ export function DeploymentChart({
 
         <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <li className="flex items-center gap-1.5">
-            <span aria-hidden="true" className="h-2.5 w-2.5 rounded-sm bg-success" />
+            <span aria-hidden="true" className="h-2.5 w-2.5 rounded-md bg-success" />
             Réussis
           </li>
           <li className="flex items-center gap-1.5">
-            <span aria-hidden="true" className="h-2.5 w-2.5 rounded-sm bg-destructive" style={failedPattern} />
+            <span aria-hidden="true" className="h-2.5 w-2.5 rounded-md bg-destructive" style={failedPattern} />
             Échecs (hachures)
           </li>
           <li className="flex items-center gap-1.5">
-            <span aria-hidden="true" className="h-2.5 w-2.5 rounded-sm bg-warning/80" />
+            <span aria-hidden="true" className="h-2.5 w-2.5 rounded-md bg-warning/80" />
             Autres (en cours ou annulés)
           </li>
         </ul>

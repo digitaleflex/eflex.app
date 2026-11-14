@@ -146,7 +146,7 @@ export function DataTable<T>({
                             onClick={() => toggleSort(column)}
                             aria-label={`Trier par ${labelFor(column)}`}
                             className={cn(
-                              'inline-flex min-h-11 items-center gap-1.5 rounded-sm font-medium',
+                              'inline-flex min-h-11 items-center gap-1.5 rounded-md font-medium',
                               'transition-colors duration-200 ease-out-expo hover:text-foreground',
                               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                               active && 'text-foreground'

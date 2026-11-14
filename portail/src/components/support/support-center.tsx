@@ -19,10 +19,10 @@ type Ticket = {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  open: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900',
-  in_progress: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900',
-  waiting_user: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-900',
-  resolved: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900',
+  open: 'border-info/30 bg-info/10 text-info',
+  in_progress: 'border-warning/30 bg-warning/10 text-warning',
+  waiting_user: 'border-primary/30 bg-primary/10 text-primary',
+  resolved: 'border-success/30 bg-success/10 text-success',
   closed: 'bg-muted text-muted-foreground border-border',
 }
 
@@ -100,7 +100,7 @@ export function SupportCenter() {
       </div>
 
       {error && <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</div>}
-      {success && <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">{success}</div>}
+      {success && <div role="status" className="rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">{success}</div>}
 
       {openForm && (
         <form onSubmit={submit} className="rounded-xl border border-border bg-card p-4 sm:p-6 space-y-4">

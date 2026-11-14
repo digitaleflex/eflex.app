@@ -709,7 +709,7 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="break-all font-mono text-sm">{item.key}</p>
                           {multiApp && (
-                            <span className="rounded-full border border-border px-1.5 text-[11px] text-muted-foreground">
+                            <span className="rounded-full border border-border px-1.5 text-xs text-muted-foreground">
                               {scopeLabel(item.appId, appNameById)}
                             </span>
                           )}

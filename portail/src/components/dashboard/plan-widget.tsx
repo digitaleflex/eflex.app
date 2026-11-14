@@ -30,9 +30,9 @@ export function PlanWidget({ billing, className }: { billing: BillingLite; class
       <div className="flex items-center justify-between gap-2">
         <span className="truncate text-xs font-semibold text-foreground">Votre plan · {billing.plan.label}</span>
         {billing.blocked ? (
-          <span className="shrink-0 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">Bloqué</span>
+          <span className="shrink-0 rounded-full bg-destructive/10 px-1.5 py-0.5 text-xs font-medium text-destructive">Bloqué</span>
         ) : level !== 'ok' ? (
-          <span className={cn('shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium', level === 'full' ? 'bg-destructive/10 text-destructive' : 'bg-warning/15 text-warning')}>
+          <span className={cn('shrink-0 rounded-full px-1.5 py-0.5 text-xs font-medium', level === 'full' ? 'bg-destructive/10 text-destructive' : 'bg-warning/15 text-warning')}>
             {usageLabel(level)}
           </span>
         ) : null}
@@ -46,7 +46,7 @@ export function PlanWidget({ billing, className }: { billing: BillingLite; class
           style={{ width: `${pct}%` }}
         />
       </div>
-      <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <span className="tabular-nums">{used} / {limit} applications</span>
         <span className="font-medium text-primary">{cta}</span>
       </div>

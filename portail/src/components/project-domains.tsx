@@ -89,7 +89,7 @@ function DnsGuide({
         <dl className="space-y-1.5 text-xs">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <dt className="text-muted-foreground">Type</dt>
-            <dd className="rounded bg-background px-1.5 py-0.5 font-mono text-foreground">CNAME</dd>
+            <dd className="rounded-md bg-background px-1.5 py-0.5 font-mono text-foreground">CNAME</dd>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <dt className="text-muted-foreground">Nom / hôte</dt>

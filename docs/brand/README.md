@@ -62,13 +62,24 @@ Règles :
   `-foreground`), **jamais la palette brute de Tailwind** (`emerald-*`, `amber-*`, `slate-*`…).
 - Contraste : toute paire texte/fond ≥ 4,5:1 dans les deux thèmes (contrôlé par axe en CI).
 
+## Fondations (contrôlées par `portail/src/lib/design-rules.test.ts`)
+
+- **Couleurs** : uniquement les tokens. Statuts : `success`, `warning`, `info`, `destructive` (teintes
+  `/10` à `/20` pour les fonds, `/30` pour les contours). Bandeau collant : `bg-warning-surface`
+  (opaque). Sur une bande navy d'une page claire, poser `surface-navy` sur la section : les statuts y
+  prennent leurs valeurs lisibles sur fond sombre. Exception : le terminal des journaux (couleurs ANSI).
+- **Arrondis** : `rounded-md` (petits éléments : badges carrés, touches, cases), `rounded-lg`
+  (contrôles : boutons, champs, menus), `rounded-xl` (cartes et panneaux), `rounded-2xl`/`3xl`
+  (grandes surfaces marketing), `rounded-full` (pastilles, avatars). Jamais `rounded` nu, `-sm` ni de
+  valeur arbitraire (exception : le halo décoratif de l'aperçu de la console).
+- **Texte** : 12 px minimum (`text-xs`).
+
 ## Typographie
 
 - **Plus Jakarta Sans** (Light, Regular, Medium, Semibold, Bold) pour le texte et les titres
   (`--font-sans`, `--font-display`).
 - **JetBrains Mono** pour le code, les commits, les journaux et les valeurs techniques (`font-mono`,
   avec `tabular-nums`). Hors planche, conservée pour la lisibilité des valeurs techniques.
-- Taille minimale : **12 px**.
 
 ## Iconographie
 

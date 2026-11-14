@@ -49,13 +49,13 @@ export function MaintenanceBanner() {
     return (
       <div
         role="status"
-        className="sticky top-0 z-[60] border-b border-amber-500/30 bg-amber-50 px-4 py-2.5 text-center text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100"
+        className="sticky top-0 z-[60] border-b border-warning/40 bg-warning-surface px-4 py-2.5 text-center text-sm text-foreground"
       >
         <span className="font-medium">Maintenance en cours.</span>{' '}
         {state.message || 'Certaines fonctionnalités peuvent être momentanément indisponibles.'}{' '}
         <Link
           href="/status"
-          className="font-medium underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+          className="font-medium underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
         >
           Consulter l’état des services
         </Link>
@@ -71,7 +71,7 @@ export function MaintenanceBanner() {
       role={warning ? 'alert' : 'status'}
       className={
         warning
-          ? 'sticky top-0 z-[60] border-b border-amber-500/30 bg-amber-50 px-4 py-2.5 text-center text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100'
+          ? 'sticky top-0 z-[60] border-b border-warning/40 bg-warning-surface px-4 py-2.5 text-center text-sm text-foreground'
           : 'sticky top-0 z-[60] border-b border-primary/20 bg-primary/5 px-4 py-2.5 text-center text-sm text-foreground'
       }
     >

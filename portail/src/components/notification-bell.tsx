@@ -73,7 +73,7 @@ export function NotificationBell({ className }: { className?: string }) {
         <Bell className="h-5 w-5" aria-hidden="true" />
         <span className="sr-only">Notifications{unread > 0 ? `, ${unread} non lue${unread > 1 ? 's' : ''}` : ''}</span>
         {unread > 0 && (
-          <span aria-hidden="true" className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-bold text-destructive-foreground">
+          <span aria-hidden="true" className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-xs font-bold text-destructive-foreground">
             {unread > 9 ? '9+' : unread}
           </span>
         )}

@@ -129,7 +129,7 @@ export function DashboardShell({
   )
 
   const sectionTitleClass = cn(
-    'px-3 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground',
+    'px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground',
     collapsedPref === null ? 'md:max-lg:hidden' : collapsed ? 'md:hidden' : '',
   )
 
@@ -287,7 +287,7 @@ export function DashboardShell({
                     href={tab.href}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'relative flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 pb-2 pt-2.5 text-[10px] font-medium leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring min-[380px]:text-[11px]',
+                      'relative flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 pb-2 pt-2.5 text-xs font-medium leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring min-[380px]:text-xs',
                       active ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
                     )}
                   >

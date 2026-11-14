@@ -38,7 +38,7 @@ export function OrgSwitcher({ className }: { className?: string }) {
     <div className={className}>
       <label htmlFor={id} className="sr-only">Organisation active</label>
       <div className="relative">
-        <span aria-hidden="true" className="pointer-events-none absolute left-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md bg-gradient-to-br from-eflexnavy to-eflexroyalblue text-[10px] font-bold text-white">
+        <span aria-hidden="true" className="pointer-events-none absolute left-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md bg-gradient-to-br from-eflexnavy to-eflexroyalblue text-xs font-bold text-white">
           {(active?.name ?? organizations[0]?.name ?? '?').charAt(0).toUpperCase()}
         </span>
         <select

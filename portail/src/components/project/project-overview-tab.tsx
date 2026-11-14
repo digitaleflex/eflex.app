@@ -267,7 +267,7 @@ export function ProjectOverviewTab({
                         {relativeTime(deployment.createdAt)}
                       </time>
                       {deployment.app && multiApp && (
-                        <span className="rounded-full border border-border px-1.5 text-[11px] font-normal text-muted-foreground">
+                        <span className="rounded-full border border-border px-1.5 text-xs font-normal text-muted-foreground">
                           {deployment.app.name}
                         </span>
                       )}

@@ -24,7 +24,7 @@ export default function MentionsLegalesPage() {
           <dd>{company.address || 'À renseigner (INVOICE_COMPANY_ADDRESS)'}</dd>
           <dt className="font-medium text-muted-foreground">Contact</dt>
           <dd>
-            <a href={`mailto:${company.email}`} className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+            <a href={`mailto:${company.email}`} className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
               {company.email}
             </a>
           </dd>

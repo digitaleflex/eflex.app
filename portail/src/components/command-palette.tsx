@@ -167,7 +167,7 @@ export function CommandPalette({ className, hotkey = true }: { className?: strin
         <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span className="hidden sm:inline">Rechercher…</span>
         <span className="sr-only sm:hidden">Rechercher</span>
-        <kbd className="ml-auto hidden rounded border border-border bg-muted px-1.5 font-sans text-[11px] sm:inline">{isMac ? '⌘' : 'Ctrl'} K</kbd>
+        <kbd className="ml-auto hidden rounded-md border border-border bg-muted px-1.5 font-sans text-xs sm:inline">{isMac ? '⌘' : 'Ctrl'} K</kbd>
       </button>
 
       <dialog
@@ -235,7 +235,7 @@ export function CommandPalette({ className, hotkey = true }: { className?: strin
             const header = i === 0 || results[i - 1]!.group !== item.group
             return (
               <li key={`${item.group}-${item.id}`} role="presentation">
-                {header && <p role="presentation" className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{item.group}</p>}
+                {header && <p role="presentation" className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{item.group}</p>}
                 <div
                   id={`${listId}-${item.id}`}
                   role="option"
@@ -253,7 +253,7 @@ export function CommandPalette({ className, hotkey = true }: { className?: strin
             )
           })}
         </ul>
-        <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">↑ ↓ pour naviguer · Entrée pour ouvrir · Échap pour fermer</p>
+        <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">↑ ↓ pour naviguer · Entrée pour ouvrir · Échap pour fermer</p>
       </dialog>
     </>
   )

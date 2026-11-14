@@ -74,7 +74,7 @@ const journey = [
 
 export function MigrationTeaser({ contactEmail }: { contactEmail: string }) {
   return (
-    <section id="migration" aria-labelledby="migration-titre" className="scroll-mt-20 bg-eflexnavy text-white">
+    <section id="migration" aria-labelledby="migration-titre" className="surface-navy scroll-mt-20 bg-eflexnavy text-white">
       <div className="container space-y-12 py-16 md:py-24">
         <div className="mx-auto max-w-3xl space-y-4 text-center">
           <h2 id="migration-titre" className="text-3xl font-bold tracking-tight text-balance md:text-4xl">
@@ -184,7 +184,7 @@ export function MigrationTeaser({ contactEmail }: { contactEmail: string }) {
         <div className="mx-auto flex max-w-4xl flex-col items-center gap-4 rounded-2xl bg-white p-6 text-center text-eflexnavy sm:flex-row sm:justify-between sm:text-left">
           <div className="space-y-1">
             <h3 className="text-xl font-bold">Prêt à migrer vos projets ?</h3>
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-muted-foreground">
               Dites-nous ce que vous voulez migrer : nous vous prévenons au lancement.
             </p>
           </div>

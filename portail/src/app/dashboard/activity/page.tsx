@@ -175,7 +175,7 @@ export default async function ActivityPage({
                       <time dateTime={deployment.createdAt.toISOString()} title={dateTime.format(deployment.createdAt)}>
                         {relativeTime(deployment.createdAt)}
                       </time>
-                      <span className="block text-[11px] text-muted-foreground">
+                      <span className="block text-xs text-muted-foreground">
                         {dateTime.format(deployment.createdAt)}
                       </span>
                     </dd>
