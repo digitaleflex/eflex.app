@@ -28,7 +28,7 @@ export function ActivityFeed({
   return (
     <section aria-labelledby="activity-feed-title" className="rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-        <h2 id="activity-feed-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <h2 id="activity-feed-title" className="text-sm font-semibold text-foreground">
           Activité récente
         </h2>
         {showAllLink && (

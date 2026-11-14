@@ -8,8 +8,6 @@ import { ProjectsTable } from '@/components/dashboard/projects-table'
 import { EmptyPanel } from '@/components/dashboard/section'
 import {
   PROJECT_FILTERS,
-  PROJECT_SORTS,
-  PROJECT_SORT_HINTS,
   projectFilterCounts,
   selectProjects,
   type ProjectFilter,
@@ -37,10 +35,10 @@ export function ProjectsExplorer({
 }) {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<ProjectFilter>('all')
-  const [sort, setSort] = useState<ProjectSort>(initialSort)
+  const sort: ProjectSort = initialSort
   const [view, setView] = useState<View>('list')
   const searchId = useId()
-  const sortId = useId()
+  const filterId = useId()
 
   // Préférence d'affichage propre à ce navigateur (jamais indispensable).
   useEffect(() => {
@@ -65,92 +63,56 @@ export function ProjectsExplorer({
     <section aria-labelledby="projects-title" className="space-y-3">
       <h2 id="projects-title" className="sr-only">Projets</h2>
 
-      <div className="space-y-2">
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <div className="relative min-w-0 sm:min-w-[12rem] sm:flex-[1_1_16rem]">
-            <label htmlFor={searchId} className="sr-only">Rechercher un projet</label>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <input
-              id={searchId}
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Rechercher un projet…"
-              className="h-10 w-full rounded-lg border border-input bg-card pl-9 pr-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Sur mobile, la barre de filtres défile horizontalement au lieu de déborder. */}
-            <div
-              role="group"
-              aria-label="Filtrer par statut"
-              className="flex min-w-0 max-w-full overflow-x-auto rounded-lg border border-border bg-card p-0.5 [scrollbar-width:none]"
-            >
-              {PROJECT_FILTERS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-pressed={filter === item.id}
-                  onClick={() => setFilter(item.id)}
-                  className={cn(
-                    'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11',
-                    filter === item.id ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {item.label}
-                  <span className={cn('tabular-nums', filter === item.id ? 'text-background/70' : 'text-muted-foreground/80')}>
-                    {counts[item.id]}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <label htmlFor={sortId} className="sr-only">Trier les projets</label>
-            <select
-              id={sortId}
-              value={sort}
-              onChange={(e) => setSort(e.target.value as ProjectSort)}
-              className="h-9 rounded-lg border border-border bg-card px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11"
-            >
-              {PROJECT_SORTS.map((item) => (
-                <option key={item.id} value={item.id}>{item.label}</option>
-              ))}
-            </select>
-
-            <div role="group" aria-label="Affichage" className="flex rounded-lg border border-border bg-card p-0.5">
-              {([['grid', LayoutGrid, 'Grille'], ['list', List, 'Tableau']] as const).map(([value, Icon, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={view === value}
-                  onClick={() => chooseView(value)}
-                  className={cn('flex h-8 w-8 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11', view === value ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}
-                >
-                  <Icon className="h-4 w-4" aria-hidden="true" />
-                  <span className="sr-only">{label}</span>
-                </button>
-              ))}
-            </div>
-
-            {canManage && (
-              <Link
-                href="/dashboard/new"
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-foreground px-3 text-xs font-semibold text-background hover:bg-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [@media(pointer:coarse)]:h-11"
+      {/* Barre d'outils réduite à l'essentiel (Vercel) : une recherche, un filtre de statut, l'affichage.
+          Le tri reste automatique : ce qui demande une action d'abord, sinon l'activité récente. */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1">
+          <label htmlFor={searchId} className="sr-only">Rechercher un projet</label>
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <input
+            id={searchId}
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Rechercher un projet…"
+            className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label htmlFor={filterId} className="sr-only">Filtrer par statut</label>
+          <select
+            id={filterId}
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as ProjectFilter)}
+            className="h-10 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11"
+          >
+            {PROJECT_FILTERS.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.id === 'all' ? 'Tous les statuts' : item.label} ({counts[item.id]})
+              </option>
+            ))}
+          </select>
+          <div role="group" aria-label="Affichage" className="flex rounded-lg border border-input p-0.5">
+            {([['grid', LayoutGrid, 'Grille'], ['list', List, 'Liste']] as const).map(([value, Icon, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={view === value}
+                onClick={() => chooseView(value)}
+                className={cn(
+                  'flex h-8 w-8 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:w-10',
+                  view === value ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+                )}
               >
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                Nouveau projet
-              </Link>
-            )}
+                <Icon className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only">{label}</span>
+              </button>
+            ))}
           </div>
         </div>
-
-        <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
-          <span className="tabular-nums">
-            {filtered ? `${countLabel(visible.length)} sur ${projects.length}` : countLabel(visible.length)}
-          </span>
-          {' · '}
-          {PROJECT_SORT_HINTS[sort]}
+        {/* Annonce le résultat de la recherche aux lecteurs d'écran, sans ligne visible en plus. */}
+        <p role="status" aria-live="polite" className="sr-only">
+          {filtered ? `${countLabel(visible.length)} sur ${projects.length}` : countLabel(visible.length)}
         </p>
       </div>
 

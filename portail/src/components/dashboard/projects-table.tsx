@@ -14,13 +14,13 @@ export function ProjectsTable({ projects }: { projects: DashboardProject[] }) {
     <div className="overflow-x-auto rounded-xl border border-border bg-card">
       <table className="min-w-full border-collapse text-left text-sm">
         <caption className="sr-only">Projets de l’organisation</caption>
-        <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+        <thead className="border-b border-border text-xs text-muted-foreground">
           <tr>
-            <th scope="col" className="px-4 py-3 font-semibold">Application</th>
-            <th scope="col" className="hidden px-4 py-3 font-semibold lg:table-cell">Framework</th>
-            <th scope="col" className="px-4 py-3 font-semibold">Statut</th>
-            <th scope="col" className="hidden px-4 py-3 font-semibold md:table-cell">Domaine</th>
-            <th scope="col" className="hidden px-4 py-3 font-semibold xl:table-cell">Dernier déploiement</th>
+            <th scope="col" className="px-4 py-2.5 font-medium">Application</th>
+            <th scope="col" className="hidden px-4 py-2.5 font-medium lg:table-cell">Framework</th>
+            <th scope="col" className="px-4 py-2.5 font-medium">Statut</th>
+            <th scope="col" className="hidden px-4 py-2.5 font-medium md:table-cell">Domaine</th>
+            <th scope="col" className="hidden px-4 py-2.5 font-medium xl:table-cell">Dernier déploiement</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">

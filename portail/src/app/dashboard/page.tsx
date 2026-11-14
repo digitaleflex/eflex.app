@@ -1,4 +1,6 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { Plus } from 'lucide-react'
 import { getSession } from '@/lib/session'
 import { canManageBilling, canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { loadDashboard } from '@/lib/dashboard-data'
@@ -6,19 +8,13 @@ import { prisma } from '@/lib/prisma'
 import { billingSummary } from '@/lib/billing'
 import { computeNextSteps } from '@/lib/next-steps'
 import { LiveRefresh } from '@/components/live-refresh'
-import { ActivityFeed, AttentionList, OverviewStrip } from '@/components/dashboard/overview'
+import { ActivityFeed, AttentionList } from '@/components/dashboard/overview'
 import { DashboardOnboarding } from '@/components/dashboard/onboarding'
 import { NextStepsCard } from '@/components/dashboard/next-steps-card'
-import { UsageTile } from '@/components/dashboard/usage-tile'
 import { ProjectsExplorer } from '@/components/dashboard/projects-explorer'
 
 export const metadata = { title: 'Projets — EFLEX' }
 export const dynamic = 'force-dynamic'
-
-function greeting(date = new Date()): string {
-  const hour = Number(new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', hour12: false, timeZone: 'Europe/Paris' }).format(date))
-  return hour >= 18 || hour < 5 ? 'Bonsoir' : 'Bonjour'
-}
 
 export default async function DashboardPage() {
   const session = await getSession()
@@ -40,7 +36,6 @@ export default async function DashboardPage() {
     prisma.projectDomain.count({ where: { project: { organizationId: org.organizationId }, verifiedAt: { not: null } } }),
     prisma.deployment.count({ where: { project: { organizationId: org.organizationId }, status: 'live' } }),
   ])
-  const firstName = session.user.name.split(' ')[0]
   const organizationName = organization?.name ?? 'cette organisation'
   const hasProjects = data.summary.total > 0
 
@@ -65,22 +60,38 @@ export default async function DashboardPage() {
         delayMs={1500}
       />
 
-      <header className="flex flex-col gap-1">
-        <h1 className="font-display text-2xl font-bold tracking-tight text-balance">
-          {greeting()}, {firstName}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {!hasProjects
-            ? `Aucun projet dans ${organizationName} pour l’instant.`
-            : data.summary.needsAttention > 0
-              ? `${data.summary.needsAttention} élément${data.summary.needsAttention > 1 ? 's demandent' : ' demande'} votre attention dans ${organizationName}.`
-              : `Tous les projets de ${organizationName} sont en ordre.`}
-        </p>
+      {/* Une page, un but (Vercel) : la liste des projets. Les chiffres détaillés vivent sur Activité et
+          Utilisation ; ici, une seule ligne de résumé. */}
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight">Projets</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {!hasProjects
+              ? `Aucun projet dans ${organizationName} pour l’instant.`
+              : [
+                  `${data.summary.total} projet${data.summary.total > 1 ? 's' : ''}`,
+                  `${data.summary.live} en ligne`,
+                  data.summary.needsAttention > 0
+                    ? `${data.summary.needsAttention} à regarder`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+          </p>
+        </div>
+        {hasProjects && canManage && (
+          <Link
+            href="/dashboard/new"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [@media(pointer:coarse)]:h-11"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Nouveau projet
+          </Link>
+        )}
       </header>
 
       {hasProjects ? (
         <>
-          <OverviewStrip data={data} />
           <AttentionList items={data.attention} />
 
           {/* `grid-cols-1` (= minmax(0, 1fr)) sous 2xl : sans définition de colonne, la piste implicite est
@@ -99,7 +110,6 @@ export default async function DashboardPage() {
 
           {/* L'action principale (les projets) vient avant l'aide à la mise en route et le résumé d'usage. */}
           {nextSteps.length > 0 && <NextStepsCard steps={nextSteps} />}
-          <UsageTile />
         </>
       ) : (
         <DashboardOnboarding organizationName={organizationName} canManage={canManage} />

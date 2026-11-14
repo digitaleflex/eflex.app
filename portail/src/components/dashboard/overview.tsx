@@ -106,7 +106,7 @@ export function AttentionList({ items }: { items: DashboardData['attention'] }) 
   return (
     <section aria-labelledby="attention-title" className="overflow-hidden rounded-xl border border-border bg-card">
       <div className="border-b border-border px-4 py-2.5">
-        <h2 id="attention-title" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <h2 id="attention-title" className="flex items-center gap-2 text-sm font-semibold text-foreground">
           À regarder
           <span className="rounded-full bg-muted px-1.5 text-xs font-medium tabular-nums text-muted-foreground">{items.length}</span>
         </h2>
