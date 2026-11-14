@@ -11,7 +11,6 @@ import {
   ChevronDown,
   Database,
   Download,
-  FileUp,
   GitBranch,
   Globe,
   KeyRound,
@@ -30,10 +29,11 @@ import { Input } from '@/components/ui/input'
 import { ProjectRuntimeControls } from '@/components/project-runtime-controls'
 import { ProjectDomains } from '@/components/project-domains'
 import { ProjectDatabases } from '@/components/project-databases'
+import { EnvEditor } from '@/components/env/env-editor'
+import { rowsToVars, type EnvRow } from '@/lib/env-parse'
 import { ProjectTransfer, type TransferTarget } from '@/components/project-transfer'
 
 const NETWORK_ERROR = 'Impossible de contacter le serveur. Vérifiez votre connexion et réessayez.'
-const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 type Feedback = { tone: 'success' | 'error'; message: string } | null
 
@@ -67,16 +67,6 @@ interface ProjectSettingsProps {
   transferTargets: TransferTarget[]
 }
 
-interface ParsedEnvEntry {
-  key: string
-  value: string
-  line: number
-}
-
-interface EnvParseResult {
-  entries: ParsedEnvEntry[]
-  invalid: { line: number; content: string; reason: string }[]
-}
 
 function FeedbackMessage({ feedback, id }: { feedback: Feedback; id: string }) {
   if (!feedback) return null
@@ -149,44 +139,6 @@ function sortEnvVars(list: EnvVarKey[]): EnvVarKey[] {
   })
 }
 
-function parseEnvText(text: string): EnvParseResult {
-  const entries: ParsedEnvEntry[] = []
-  const invalid: EnvParseResult['invalid'] = []
-  const lines = text.split(/\r?\n/)
-  for (let i = 0; i < lines.length; i++) {
-    const lineNumber = i + 1
-    const raw = lines[i]
-    const trimmed = raw.trim()
-    if (trimmed === '' || trimmed.startsWith('#')) continue
-    const normalized = trimmed.startsWith('export ') ? trimmed.slice(7).trim() : trimmed
-    const eq = normalized.indexOf('=')
-    if (eq <= 0) {
-      invalid.push({ line: lineNumber, content: raw.trim(), reason: 'format invalide (attendu NOM=valeur)' })
-      continue
-    }
-    const key = normalized.slice(0, eq).trim()
-    let value = normalized.slice(eq + 1)
-    if (!ENV_KEY_RE.test(key)) {
-      invalid.push({ line: lineNumber, content: key || raw.trim(), reason: 'nom de variable invalide' })
-      continue
-    }
-    if (
-      (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
-      (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
-    ) {
-      value = value.slice(1, -1)
-    }
-    entries.push({ key, value, line: lineNumber })
-  }
-  return { entries, invalid }
-}
-
-function dedupeParsedEntries(entries: ParsedEnvEntry[]): ParsedEnvEntry[] {
-  const byKey = new Map<string, ParsedEnvEntry>()
-  for (const entry of entries) byKey.set(entry.key, entry)
-  return Array.from(byKey.values())
-}
-
 export function ProjectSettings({ project, apps: initialApps = [], envVars: initialEnvVars, transferTargets }: ProjectSettingsProps) {
   const router = useRouter()
   const [apps, setApps] = useState<SettingsApp[]>(initialApps)
@@ -202,17 +154,11 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
   const [branchFeedback, setBranchFeedback] = useState<Feedback>(null)
 
   const [envVars, setEnvVars] = useState<EnvVarKey[]>(initialEnvVars)
-  const [newKey, setNewKey] = useState('')
-  const [newValue, setNewValue] = useState('')
+  const [envRows, setEnvRows] = useState<EnvRow[]>([{ key: '', value: '' }])
   const [envScope, setEnvScope] = useState('')
   const [savingEnv, setSavingEnv] = useState(false)
   const [envFeedback, setEnvFeedback] = useState<Feedback>(null)
   const [confirmEnvDelete, setConfirmEnvDelete] = useState<EnvVarKey | null>(null)
-
-  const [envImportText, setEnvImportText] = useState('')
-  const [envImportScope, setEnvImportScope] = useState('')
-  const [envImporting, setEnvImporting] = useState(false)
-  const [envImportFeedback, setEnvImportFeedback] = useState<Feedback>(null)
 
   const [renameDrafts, setRenameDrafts] = useState<Record<string, string>>({})
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -225,15 +171,12 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
   const [confirmProjectDelete, setConfirmProjectDelete] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  const envImportTargetAppId = multiApp && envImportScope ? envImportScope : null
-  const envImportParsed = useMemo(() => parseEnvText(envImportText), [envImportText])
-  const envImportPreview = useMemo(() => {
-    const unique = dedupeParsedEntries(envImportParsed.entries)
-    return unique.map((entry) => ({
-      ...entry,
-      conflict: envVars.some((v) => v.key === entry.key && envScopeId(v.appId) === envScopeId(envImportTargetAppId)),
-    }))
-  }, [envImportParsed.entries, envImportTargetAppId, envVars])
+  const envToSave = useMemo(() => rowsToVars(envRows), [envRows])
+  const envTargetAppId = multiApp && envScope ? envScope : null
+  const existingEnvKeys = useMemo(
+    () => new Set(envVars.filter((v) => envScopeId(v.appId) === envScopeId(envTargetAppId)).map((v) => v.key)),
+    [envVars, envTargetAppId],
+  )
 
   async function saveGeneral(e: React.FormEvent) {
     e.preventDefault()
@@ -295,33 +238,38 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
     }
   }
 
-  async function saveEnvVar(e: React.FormEvent) {
-    e.preventDefault()
+  async function saveEnvRows() {
     setEnvFeedback(null)
-    const key = newKey.trim()
-    if (key === '') {
-      setEnvFeedback({ tone: 'error', message: 'Indiquez le nom de la variable.' })
+    if (envToSave.length === 0) {
+      setEnvFeedback({ tone: 'error', message: 'Indiquez au moins un nom de variable.' })
       return
     }
     const appId = multiApp && envScope ? envScope : undefined
     setSavingEnv(true)
     try {
-      const response = await fetch(`/api/projects/${project.id}/env-vars`, {
+      const response = await fetch(`/api/projects/${project.id}/env-vars/bulk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(appId ? { key, value: newValue, appId } : { key, value: newValue }),
+        body: JSON.stringify(appId ? { vars: envToSave, appId } : { vars: envToSave }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        setEnvFeedback({ tone: 'error', message: data.error || 'La variable n’a pas pu être enregistrée.' })
+        setEnvFeedback({ tone: 'error', message: data.error || 'Les variables n’ont pas pu être enregistrées.' })
         return
       }
-      const saved = data.envVar as EnvVarKey
-      const savedId = envItemId(saved)
-      setEnvVars((current) => sortEnvVars([...current.filter((item) => envItemId(item) !== savedId), saved]))
-      setNewKey('')
-      setNewValue('')
-      setEnvFeedback({ tone: 'success', message: 'Variable enregistrée. Elle sera appliquée au prochain déploiement.' })
+      const saved = (data.envVars ?? []) as EnvVarKey[]
+      const savedIds = new Set(saved.map((item) => envItemId(item)))
+      setEnvVars((current) => sortEnvVars([...current.filter((item) => !savedIds.has(envItemId(item))), ...saved]))
+      setEnvRows([{ key: '', value: '' }])
+      const created = Number(data.created ?? 0)
+      const updated = Number(data.updated ?? 0)
+      setEnvFeedback({
+        tone: 'success',
+        message:
+          `${saved.length} variable${saved.length > 1 ? 's' : ''} enregistrée${saved.length > 1 ? 's' : ''}` +
+          (updated > 0 ? ` (${created} nouvelle${created > 1 ? 's' : ''}, ${updated} remplacée${updated > 1 ? 's' : ''})` : '') +
+          '. Elles seront appliquées au prochain déploiement.',
+      })
       router.refresh()
     } catch {
       setEnvFeedback({ tone: 'error', message: NETWORK_ERROR })
@@ -350,53 +298,6 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
       router.refresh()
     } catch {
       setEnvFeedback({ tone: 'error', message: NETWORK_ERROR })
-    }
-  }
-
-  async function importEnvVars() {
-    setEnvImportFeedback(null)
-    if (envImportPreview.length === 0) {
-      setEnvImportFeedback({ tone: 'error', message: 'Aucune variable valide à importer.' })
-      return
-    }
-    setEnvImporting(true)
-    const imported: EnvVarKey[] = []
-    const errors: string[] = []
-    const appId = envImportTargetAppId ?? undefined
-    try {
-      for (const entry of envImportPreview) {
-        const response = await fetch(`/api/projects/${project.id}/env-vars`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(appId ? { key: entry.key, value: entry.value, appId } : { key: entry.key, value: entry.value }),
-        })
-        const data = await response.json().catch(() => ({}))
-        if (!response.ok) {
-          errors.push(`${entry.key} : ${data.error || 'échec'}`)
-          continue
-        }
-        if (data.envVar) imported.push(data.envVar as EnvVarKey)
-      }
-      if (imported.length > 0) {
-        setEnvVars((current) => {
-          const importedIds = new Set(imported.map((item) => envItemId(item)))
-          return sortEnvVars([...current.filter((item) => !importedIds.has(envItemId(item))), ...imported])
-        })
-        router.refresh()
-      }
-      if (errors.length === 0) {
-        setEnvImportText('')
-        setEnvImportFeedback({ tone: 'success', message: `${imported.length} variable${imported.length > 1 ? 's' : ''} importée${imported.length > 1 ? 's' : ''}. Elles seront appliquées au prochain déploiement.` })
-      } else {
-        setEnvImportFeedback({
-          tone: 'error',
-          message: `${imported.length} variable${imported.length > 1 ? 's' : ''} importée${imported.length > 1 ? 's' : ''}, ${errors.length} en échec : ${errors.slice(0, 3).join(' ; ')}${errors.length > 3 ? '…' : ''}`,
-        })
-      }
-    } catch {
-      setEnvImportFeedback({ tone: 'error', message: NETWORK_ERROR })
-    } finally {
-      setEnvImporting(false)
     }
   }
 
@@ -753,8 +654,16 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
             </div>
           )}
 
-          <form onSubmit={saveEnvVar} className="space-y-4 rounded-lg border border-border bg-muted/20 p-4">
-            <p className="text-sm font-medium">Ajouter ou remplacer une variable</p>
+          <section aria-labelledby="env-add-title" className="space-y-4 rounded-lg border border-border bg-muted/20 p-4">
+            <div>
+              <h3 id="env-add-title" className="text-sm font-medium">
+                Ajouter ou remplacer des variables
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Collez votre .env d’un coup, déposez le fichier ou saisissez les variables une à une. Une valeur
+                saisie à nouveau remplace l’ancienne, qui ne peut pas être relue.
+              </p>
+            </div>
             {multiApp && (
               <div>
                 <label htmlFor="env-scope" className="mb-1.5 block text-sm font-medium">
@@ -778,164 +687,11 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
                 </p>
               </div>
             )}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input
-                id="env-key"
-                label="Nom"
-                placeholder="DATABASE_URL"
-                value={newKey}
-                onChange={(e) => setNewKey(e.target.value)}
-                spellCheck={false}
-                autoComplete="off"
-                required
-              />
-              <Input
-                id="env-value"
-                label="Valeur"
-                type="password"
-                placeholder="valeur secrète"
-                value={newValue}
-                onChange={(e) => setNewValue(e.target.value)}
-                spellCheck={false}
-                autoComplete="new-password"
-                hint="La valeur est chiffrée et ne sera plus jamais affichée."
-              />
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-muted-foreground">
-                Pour remplacer une valeur existante, saisissez-la à nouveau : l’ancienne ne peut pas être relue.
-              </p>
-              <Button type="submit" loading={savingEnv}>
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                Ajouter ou mettre à jour
-              </Button>
-            </div>
-          </form>
-
-          <section aria-labelledby="env-import-title" className="space-y-4 rounded-lg border border-border p-4">
-            <div>
-              <h3 id="env-import-title" className="flex items-center gap-2 text-sm font-medium">
-                <FileUp className="h-4 w-4 text-primary" aria-hidden="true" />
-                Importer depuis un fichier .env
-              </h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Collez le contenu ou importez un fichier texte. Les valeurs ne sont jamais affichées ; seules les clés sont prévisualisées. En cas de clé en double, la dernière valeur fournie est conservée.
-              </p>
-            </div>
-            <FeedbackMessage feedback={envImportFeedback} id="project-env-import-feedback" />
-            {multiApp && (
-              <div>
-                <label htmlFor="env-import-scope" className="mb-1.5 block text-sm font-medium">
-                  Portée de l’import
-                </label>
-                <select
-                  id="env-import-scope"
-                  value={envImportScope}
-                  onChange={(e) => setEnvImportScope(e.target.value)}
-                  className="min-h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <option value="">Toutes les applications</option>
-                  {apps.map((app) => (
-                    <option key={app.id} value={app.id}>
-                      Application : {app.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div className="space-y-2">
-              <label htmlFor="env-import-file" className="block text-sm font-medium">
-                Fichier texte (optionnel)
-              </label>
-              <input
-                id="env-import-file"
-                type="file"
-                accept=".env,text/plain"
-                className="block w-full text-sm text-muted-foreground file:mr-3 file:min-h-9 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:text-sm file:font-medium file:text-foreground"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
-                  try {
-                    setEnvImportText(await file.text())
-                    setEnvImportFeedback(null)
-                  } catch {
-                    setEnvImportFeedback({ tone: 'error', message: 'Impossible de lire le fichier.' })
-                  }
-                  e.target.value = ''
-                }}
-              />
-            </div>
-            <div>
-              <label htmlFor="env-import-text" className="mb-1.5 block text-sm font-medium">
-                Contenu .env
-              </label>
-              <textarea
-                id="env-import-text"
-                value={envImportText}
-                onChange={(e) => {
-                  setEnvImportText(e.target.value)
-                  setEnvImportFeedback(null)
-                }}
-                rows={6}
-                spellCheck={false}
-                autoComplete="off"
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                placeholder={'API_KEY=...\n# commentaire ignoré\nexport TOKEN=...'}
-              />
-            </div>
-
-            {(envImportPreview.length > 0 || envImportParsed.invalid.length > 0) && (
-              <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
-                {envImportPreview.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">
-                      Prévisualisation ({envImportPreview.length} clé{envImportPreview.length > 1 ? 's' : ''})
-                    </p>
-                    <ul className="space-y-1">
-                      {envImportPreview.map((entry) => (
-                        <li key={entry.key} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                          <span className="font-mono">{entry.key}</span>
-                          <span
-                            className={
-                              entry.conflict
-                                ? 'rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs text-foreground'
-                                : 'rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-xs text-foreground'
-                            }
-                          >
-                            {entry.conflict ? 'Existante (sera remplacée)' : 'Nouvelle'}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="text-xs text-muted-foreground">
-                      {envImportPreview.filter((e) => e.conflict).length} conflit{envImportPreview.filter((e) => e.conflict).length > 1 ? 's' : ''} · les valeurs ne sont pas affichées.
-                    </p>
-                  </div>
-                )}
-                {envImportParsed.invalid.length > 0 && (
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-destructive">Lignes invalides</p>
-                    <ul className="space-y-1 text-xs text-destructive">
-                      {envImportParsed.invalid.map((item, idx) => (
-                        <li key={`${item.line}-${idx}`}>
-                          Ligne {item.line} : {item.reason}
-                          {item.content ? ` (« ${item.content} »)` : ''}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-
+            <EnvEditor rows={envRows} onChange={setEnvRows} existingKeys={existingEnvKeys} disabled={savingEnv} />
             <div className="flex justify-end">
-              <Button
-                type="button"
-                loading={envImporting}
-                disabled={envImportPreview.length === 0}
-                onClick={() => void importEnvVars()}
-              >
-                Importer {envImportPreview.length > 0 ? `(${envImportPreview.length})` : ''}
+              <Button type="button" loading={savingEnv} disabled={envToSave.length === 0} onClick={() => void saveEnvRows()}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Enregistrer {envToSave.length > 0 ? `(${envToSave.length})` : ''}
               </Button>
             </div>
           </section>
