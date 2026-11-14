@@ -8,6 +8,12 @@
    Chaque token de surface possède son pendant « -foreground ».
    ───────────────────────────────────────────────────────────────────────────── */
 @layer base {
+  /* Cases à cocher et boutons radio natifs aux couleurs de la marque (bleu principal), dans les deux thèmes. */
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: hsl(var(--primary));
+  }
+
   :root {
     /* Titres : même police que le texte (Plus Jakarta Sans, charte EFLEX). */
     --font-display: var(--font-sans);

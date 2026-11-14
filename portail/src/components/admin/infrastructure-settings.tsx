@@ -202,7 +202,7 @@ export function InfrastructureSettingsForm({
       </div>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
-        <Button type="button" loading={saving} disabled={!dirty} onClick={() => void save()}>
+        <Button type="button" loading={saving} disabled={!dirty} disabledReason="Aucune modification à enregistrer" onClick={() => void save()}>
           Enregistrer les réglages
         </Button>
         <Button
