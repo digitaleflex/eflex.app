@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { attentionItems, dailySeries, successRate, summarize, type ProjectLite } from '@/lib/dashboard-metrics'
 import { getPrimaryApp } from '@/lib/project-apps'
+import { statusInfo } from '@/lib/project-status'
 
 const DAYS = 14
 
@@ -149,7 +150,7 @@ export async function loadDashboard(organizationId: string, now = new Date(), op
         updatedAt: true,
         tlsValid: true,
         tlsExpiresAt: true,
-        deployments: { orderBy: { createdAt: 'desc' }, take: 8, select: { id: true, status: true, commitSha: true, createdAt: true, logsSummary: true } },
+        deployments: { orderBy: { createdAt: 'desc' }, take: 8, select: { id: true, status: true, commitSha: true, createdAt: true } },
         apps: {
           orderBy: [{ position: 'asc' }, { name: 'asc' }],
           select: { id: true, name: true, position: true, framework: true, runtime: true, domain: true, tlsValid: true, tlsExpiresAt: true },
@@ -199,6 +200,21 @@ export async function loadDashboard(organizationId: string, now = new Date(), op
     }),
   ])
 
+  // Journaux : lus uniquement pour le dernier déploiement des projets dont il est en échec. Avant, les
+  // 8 derniers déploiements de chaque projet les emportaient (jusqu'à 4 000 caractères chacun).
+  const failedIds = projects
+    .map((p) => p.deployments[0])
+    .filter((d): d is NonNullable<typeof d> => Boolean(d) && statusInfo(d?.status).tone === 'danger')
+    .map((d) => d.id)
+  const failedLogs = new Map<string, string | null>()
+  if (failedIds.length > 0) {
+    const rows = await prisma.deployment.findMany({
+      where: { id: { in: failedIds } },
+      select: { id: true, logsSummary: true },
+    })
+    for (const row of rows) failedLogs.set(row.id, row.logsSummary)
+  }
+
   const derived = projects.map((p) => {
     const primary = getPrimaryApp(p.apps)
     return {
@@ -217,7 +233,14 @@ export async function loadDashboard(organizationId: string, now = new Date(), op
     framework: p._framework,
     domain: p._domain,
     tlsExpiresAt: p._tlsExpiresAt,
-    deployments: p.deployments.map((d) => ({ id: d.id, status: d.status, createdAt: d.createdAt, commitSha: d.commitSha, logsSummary: d.logsSummary })),
+    // Le journal ne sert qu'au diagnostic du DERNIER déploiement, et seulement s'il a échoué.
+    deployments: p.deployments.map((d, index) => ({
+      id: d.id,
+      status: d.status,
+      createdAt: d.createdAt,
+      commitSha: d.commitSha,
+      logsSummary: index === 0 ? failedLogs.get(d.id) ?? null : null,
+    })),
     apps: p.apps.map((app) => ({ framework: app.framework, domain: app.domain, position: app.position, name: app.name })),
   }))
   const cards: DashboardProject[] = derived.map((p) => {

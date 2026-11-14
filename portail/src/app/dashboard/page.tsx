@@ -58,7 +58,12 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Temps réel : toute création ou changement de statut recharge ces données côté serveur. */}
-      <LiveRefresh types={['project.created', 'project.updated', 'project.deleted', 'project.transferred', 'deployment.created', 'deployment.status']} />
+      {/* 1,5 s : un déploiement enchaîne une dizaine de changements d'état ; chaque rafraîchissement relance
+          les requêtes du tableau de bord, donc on regroupe les rafales plus largement que le défaut (0,4 s). */}
+      <LiveRefresh
+        types={['project.created', 'project.updated', 'project.deleted', 'project.transferred', 'deployment.created', 'deployment.status']}
+        delayMs={1500}
+      />
 
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-bold tracking-tight text-balance">
