@@ -223,25 +223,6 @@
     transition: transform 220ms var(--ease-out-expo), background-color 220ms var(--ease-out-expo);
   }
 
-  /* Survol : la pastille se soulève et sature sa couleur de marque. */
-  .stacks-grid > li:hover .framework-icon {
-    transform: translateY(-3px) scale(1.06);
-    background-color: color-mix(in srgb, rgb(var(--brand-rgb, 100 116 139)) 26%, white);
-  }
-
-  /* Un seul moment orchestré : apparition en cascade au fil du scroll.
-     CSS uniquement — les navigateurs sans `animation-timeline` voient la
-     grille normalement, et `prefers-reduced-motion` désactive l'effet. */
-  @supports (animation-timeline: view()) {
-    @media (prefers-reduced-motion: no-preference) {
-      .stacks-grid > li {
-        animation: reveal 1s var(--ease-out-expo) both;
-        animation-timeline: view();
-        animation-range: entry calc(var(--i, 0) * 2%) entry calc(60% + var(--i, 0) * 2%);
-      }
-    }
-  }
-
   /* Un seul moment d'entrée orchestré, avec décalage optionnel. */
   .animate-reveal {
     animation: reveal 0.7s var(--ease-out-expo) both;
@@ -257,6 +238,55 @@
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: none; }
 }
+/* ─── Démonstration de déploiement (accueil, `components/marketing/deploy-demo.tsx`) ───
+   Boucle de 10 s : chaque étape s’allume à son tour, puis l’adresse en ligne apparaît.
+   Opacité minimale 0.7 : le texte « en attente » garde un contraste AA sur le navy. */
+.deploy-demo .dd-step { opacity: 0.7; animation: 10s ease infinite both; }
+.deploy-demo .dd-1 { animation-name: dd-1; }
+.deploy-demo .dd-2 { animation-name: dd-2; }
+.deploy-demo .dd-3 { animation-name: dd-3; }
+.deploy-demo .dd-4 { animation-name: dd-4; }
+.deploy-demo .dd-5 { animation-name: dd-5; }
+.deploy-demo .dd-url { opacity: 0; animation: dd-url 10s var(--ease-out-expo) infinite both; }
+.deploy-demo .dd-bar { width: 0; animation: dd-bar 10s cubic-bezier(0.4, 0, 0.2, 1) infinite both; }
+.deploy-demo[data-paused='true'] * { animation-play-state: paused !important; }
+@keyframes dd-1 { 0%, 6% { opacity: 0.7; } 10%, 94% { opacity: 1; } 100% { opacity: 0.7; } }
+@keyframes dd-2 { 0%, 18% { opacity: 0.7; } 22%, 94% { opacity: 1; } 100% { opacity: 0.7; } }
+@keyframes dd-3 { 0%, 30% { opacity: 0.7; } 34%, 94% { opacity: 1; } 100% { opacity: 0.7; } }
+@keyframes dd-4 { 0%, 50% { opacity: 0.7; } 54%, 94% { opacity: 1; } 100% { opacity: 0.7; } }
+@keyframes dd-5 { 0%, 62% { opacity: 0.7; } 66%, 94% { opacity: 1; } 100% { opacity: 0.7; } }
+@keyframes dd-url {
+  0%, 72% { opacity: 0; transform: translateY(8px) scale(0.98); }
+  78%, 94% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
+@keyframes dd-bar { 0% { width: 0; } 66%, 94% { width: 100%; } 100% { width: 0; } }
+
+/* ─── Défilé des technologies (accueil, `components/marketing/tech-marquee.tsx`) ───
+   Deux rangées en sens opposé ; pause au survol, au focus et par le bouton. */
+.tech-marquee-row {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+.tech-marquee-track { animation: tech-marquee 50s linear infinite; }
+.tech-marquee-reverse { animation-direction: reverse; animation-duration: 60s; }
+.tech-marquee:hover .tech-marquee-track,
+.tech-marquee:focus-within .tech-marquee-track,
+.tech-marquee[data-paused='true'] .tech-marquee-track { animation-play-state: paused; }
+/* La copie et le pas de 12 px (gap-3) rendent la boucle exacte : on décale d'une liste + un espace. */
+@keyframes tech-marquee { to { transform: translateX(calc(-50% - 6px)); } }
+
+/* ─── Cartes « Fonctionnement » : apparition en cascade au défilement (CSS seul) ─── */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal-on-view {
+      animation: reveal 1s var(--ease-out-expo) both;
+      animation-timeline: view();
+      animation-range: entry calc(var(--i, 0) * 6%) entry calc(55% + var(--i, 0) * 6%);
+    }
+  }
+}
+
 @keyframes demo-ping {
   75%, 100% { transform: scale(2); opacity: 0; }
 }
@@ -269,6 +299,12 @@
     transition-duration: 0.01ms !important;
   }
   .animate-reveal { opacity: 1; }
+  /* Animations de l'accueil : état final, immobile. */
+  .deploy-demo .dd-step, .deploy-demo .dd-url { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .deploy-demo .dd-bar { animation: none !important; width: 100% !important; }
+  .tech-marquee-track { animation: none !important; flex-wrap: wrap; width: auto; justify-content: center; }
+  .tech-marquee-row { -webkit-mask-image: none; mask-image: none; }
+  .tech-marquee-copy { display: none !important; }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

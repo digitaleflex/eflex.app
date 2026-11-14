@@ -71,7 +71,7 @@ Règles :
 - **Arrondis** : `rounded-md` (petits éléments : badges carrés, touches, cases), `rounded-lg`
   (contrôles : boutons, champs, menus), `rounded-xl` (cartes et panneaux), `rounded-2xl`/`3xl`
   (grandes surfaces marketing), `rounded-full` (pastilles, avatars). Jamais `rounded` nu, `-sm` ni de
-  valeur arbitraire (exception : le halo décoratif de l'aperçu de la console).
+  valeur arbitraire.
 - **Texte** : 12 px minimum (`text-xs`).
 
 ## Typographie

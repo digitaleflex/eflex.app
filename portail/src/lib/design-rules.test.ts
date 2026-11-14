@@ -40,7 +40,6 @@ describe('charte EFLEX : fondations', () => {
     // Hors échelle : `rounded` nu, `-sm`, un côté sans taille (`rounded-t`) et toute valeur arbitraire.
     const offScale =
       /(?<=[\s"'`])rounded(?:-(?:t|r|b|l|tl|tr|bl|br|s|e|ss|se|es|ee))?(?:-sm)?(?=[\s"'`])|rounded-\[[^\]]+\]/g
-    // Exception : halo décoratif flou derrière l'aperçu de la console (forme, pas un composant).
-    expect(offenders(offScale, ['components/marketing/hero-console-preview.tsx'])).toEqual([])
+    expect(offenders(offScale, [])).toEqual([])
   })
 })

@@ -11,7 +11,6 @@ import { BrandLogo } from '@/components/brand-logo'
 const links = [
   { href: '/#fonctionnement', label: 'Fonctionnement' },
   { href: '/#fonctionnalites', label: 'Fonctionnalités' },
-  { href: '/tarifs', label: 'Tarifs' },
   { href: '/#questions', label: 'Questions' },
   { href: '/status', label: 'Statut' },
 ]

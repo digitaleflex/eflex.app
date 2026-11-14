@@ -5,7 +5,6 @@ import { BrandLogo } from '@/components/brand-logo'
 const productLinks = [
   { href: '/#fonctionnement', label: 'Fonctionnement' },
   { href: '/#fonctionnalites', label: 'Fonctionnalités' },
-  { href: '/tarifs', label: 'Tarifs' },
   { href: '/#questions', label: 'Questions' },
 ]
 
