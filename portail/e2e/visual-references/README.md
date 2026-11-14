@@ -48,3 +48,8 @@ Ce sont des limites de la capture, pas des défauts de l'interface :
 
 Voir `e2e/README.md` pour la base et le serveur de production, puis `PLAYWRIGHT_AUTH=1 PLAYWRIGHT_ADMIN=1 npm run test:screenshots`. Le test pose l'état de la barre latérale dans le cookie **et** dans `localStorage` (la barre lit d'abord `localStorage`). Le limiteur de connexion de l'application (10 par minute) peut interrompre une longue série : vider la table `RateLimit` et relancer les largeurs concernées avec `-g`.
 
+
+
+## Références publiques (versionnées)
+
+Le dossier `public/<thème>/<largeur>/` contient des captures de référence des pages publiques clés (accueil, connexion, statut, 404) en thèmes clair/sombre et aux largeurs 360/768/1440 px, générées via `e2e/screenshots.spec.ts` (parcours public).
