@@ -223,7 +223,7 @@ export function AccountSettings({
               required
             />
             <div className="flex justify-end">
-              <Button type="submit" loading={savingName} disabled={name.trim() === user.name}>
+              <Button type="submit" loading={savingName} disabled={name.trim() === user.name} disabledReason="Aucune modification à enregistrer">
                 Enregistrer
               </Button>
             </div>
