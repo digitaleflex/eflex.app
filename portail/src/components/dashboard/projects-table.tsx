@@ -20,7 +20,7 @@ export function ProjectsTable({ projects }: { projects: DashboardProject[] }) {
             <th scope="col" className="hidden px-4 py-3 font-semibold lg:table-cell">Framework</th>
             <th scope="col" className="px-4 py-3 font-semibold">Statut</th>
             <th scope="col" className="hidden px-4 py-3 font-semibold md:table-cell">Domaine</th>
-            <th scope="col" className="hidden px-4 py-3 font-semibold sm:table-cell">Dernier déploiement</th>
+            <th scope="col" className="hidden px-4 py-3 font-semibold xl:table-cell">Dernier déploiement</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -84,7 +84,7 @@ export function ProjectsTable({ projects }: { projects: DashboardProject[] }) {
                     <span className="text-muted-foreground">—</span>
                   )}
                 </td>
-                <td className="hidden px-4 py-3 text-xs text-muted-foreground sm:table-cell">
+                <td className="hidden px-4 py-3 text-xs text-muted-foreground xl:table-cell">
                   {project.lastAt ? (
                     <div className="space-y-0.5">
                       <div><time dateTime={project.lastAt} suppressHydrationWarning>{relativeTime(project.lastAt)}</time></div>
