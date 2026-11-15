@@ -7,7 +7,7 @@ import { canManageProjects } from '@/lib/organizations'
 import { platformDomain, validateCustomDomain } from '@/lib/custom-domain'
 import { effectivePlan } from '@/lib/billing'
 import { getPrimaryApp, resolveEffectiveApp } from '@/lib/project-primary'
-import { allowOrg } from '@/lib/rate-limit'
+import { allowOrg, check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
@@ -46,8 +46,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
+  const readLimit = await check(`project-domains:${session.user.id}`, 120, 60_000, { action: 'project-domains-list', scope: 'user' })
+  if (!readLimit.allowed) {
+    return rateLimitedResponse(readLimit, 'Trop de consultations des domaines. Patientez une minute.')
+  }
+
   const org = await requireOrg(session)
   if (!org) return tenantNotFound('Projet introuvable')
+
+  const orgLimit = await checkOrg(org.organizationId, 'project-domains-list', 300, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de consultations de domaines pour cette organisation. Patientez une minute.')
+  }
 
   const { id } = await params
   const requestedAppId = new URL(request.url).searchParams.get('appId')?.trim() || null
@@ -108,11 +118,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Votre rôle ne permet pas de modifier les domaines.' }, { status: 403 })
   }
 
-  if (!(await allowOrg(org.organizationId, 'domain-mutate', 20, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de modifications de domaines pour cette organisation en peu de temps. Patientez une minute.' },
-      { status: 429 },
-    )
+  const mutateLimit = await checkOrg(org.organizationId, 'domain-mutate', 20, 60_000)
+  if (!mutateLimit.allowed) {
+    return rateLimitedResponse(mutateLimit, 'Trop de modifications de domaines pour cette organisation en peu de temps. Patientez une minute.')
   }
 
   const { id } = await params

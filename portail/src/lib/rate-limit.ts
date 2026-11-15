@@ -1,9 +1,10 @@
 import Redis from 'ioredis'
+import { NextResponse } from 'next/server'
 
 /**
  * Limiteur de débit partagé (Redis) avec repli mémoire si Redis est indisponible.
  *
- * Stratégie (fenêtre fixe) : `INCR` + `PEXPIRE` sur une clé préfixée.
+ * Stratégie (fenêtre fixe côté Redis, fenêtre glissante en mémoire) :
  * - Redis disponible : limite distribuée entre instances (recommandé en prod).
  * - Redis absent ou en erreur : repli mémoire **par processus** pour ne pas casser
  *   les flux légitimes. Ce repli n'est pas partagé entre instances et se réinitialise
@@ -20,6 +21,25 @@ const hits = new Map<string, number[]>()
 let client: Redis | null | undefined
 let redisDegradedUntil = 0
 let redisDegradedLogged = false
+
+export type RateLimitScope = 'user' | 'org' | 'ip' | 'key'
+
+export interface RateLimitMeta {
+  /** Action logique (jamais d'identifiant/secret). */
+  action?: string
+  scope?: RateLimitScope
+}
+
+export interface RateLimitResult {
+  allowed: boolean
+  limit: number
+  remaining: number
+  /** Secondes entières avant nouvelle tentative (>= 1 quand refusé). */
+  retryAfterSec: number
+  /** Horodatage (ms) de fin de fenêtre estimée. */
+  resetAt: number
+  mode: 'redis' | 'memory' | 'redis-degraded'
+}
 
 function redis(): Redis | null {
   if (client !== undefined) return client
@@ -54,11 +74,24 @@ function markRedisDegraded(now = Date.now()): void {
   }
 }
 
-export function allowMemory(key: string, limit: number, windowMs: number, now = Date.now()): boolean {
+function memoryResult(allowed: boolean, limit: number, recentCount: number, retryAfterSec: number, resetAt: number): RateLimitResult {
+  return {
+    allowed,
+    limit,
+    remaining: Math.max(0, limit - recentCount),
+    retryAfterSec: allowed ? 0 : Math.max(1, retryAfterSec),
+    resetAt,
+    mode: 'memory',
+  }
+}
+
+export function checkMemory(key: string, limit: number, windowMs: number, now = Date.now()): RateLimitResult {
   const recent = (hits.get(key) ?? []).filter((t) => now - t < windowMs)
   if (recent.length >= limit) {
     hits.set(key, recent)
-    return false
+    const oldest = recent[0] ?? now
+    const resetAt = oldest + windowMs
+    return memoryResult(false, limit, recent.length, Math.ceil((resetAt - now) / 1000), resetAt)
   }
   recent.push(now)
   hits.set(key, recent)
@@ -66,7 +99,12 @@ export function allowMemory(key: string, limit: number, windowMs: number, now = 
   if (hits.size > 5_000) {
     for (const [k, times] of hits) if (times.every((t) => now - t >= windowMs)) hits.delete(k)
   }
-  return true
+  const oldest = recent[0] ?? now
+  return memoryResult(true, limit, recent.length, 0, oldest + windowMs)
+}
+
+export function allowMemory(key: string, limit: number, windowMs: number, now = Date.now()): boolean {
+  return checkMemory(key, limit, windowMs, now).allowed
 }
 
 /** État du stockage distribué : utile pour le diagnostic, pas pour la décision métier. */
@@ -84,24 +122,67 @@ export function __resetRateLimitStateForTests(): void {
   client = undefined
 }
 
-/** Retourne true si l'appel est autorisé, et le comptabilise. */
-export async function allow(key: string, limit: number, windowMs: number): Promise<boolean> {
+function logRateLimitRefused(result: RateLimitResult, meta?: RateLimitMeta): void {
+  try {
+    console.warn(
+      JSON.stringify({
+        event: 'rate_limit.refused',
+        action: meta?.action ?? 'unknown',
+        scope: meta?.scope ?? 'key',
+        mode: result.mode,
+        limit: result.limit,
+        retryAfterSec: result.retryAfterSec,
+      }),
+    )
+  } catch {
+    // La journalisation ne doit jamais casser la réponse.
+  }
+}
+
+/** Vérifie et comptabilise un appel. Journalise les refus de façon structurée (sans PII). */
+export async function check(
+  key: string,
+  limit: number,
+  windowMs: number,
+  meta?: RateLimitMeta,
+): Promise<RateLimitResult> {
+  const now = Date.now()
   const store = redis()
   if (store) {
-    if (redisDegradedUntil <= Date.now()) {
+    if (redisDegradedUntil <= now) {
       try {
         if (store.status === 'wait' || store.status === 'end' || store.status === 'close') await store.connect()
         const redisKey = `${PREFIX}${key}`
         const count = await store.incr(redisKey)
         if (count === 1) await store.pexpire(redisKey, windowMs)
         markRedisHealthy()
-        return count <= limit
+        const ttl = await store.pttl(redisKey)
+        const resetAt = ttl > 0 ? now + ttl : now + windowMs
+        const allowed = count <= limit
+        const result: RateLimitResult = {
+          allowed,
+          limit,
+          remaining: Math.max(0, limit - count),
+          retryAfterSec: allowed ? 0 : Math.max(1, Math.ceil((resetAt - now) / 1000)),
+          resetAt,
+          mode: 'redis',
+        }
+        if (!allowed) logRateLimitRefused(result, meta)
+        return result
       } catch {
-        markRedisDegraded()
+        markRedisDegraded(now)
       }
     }
   }
-  return allowMemory(key, limit, windowMs)
+  const result = checkMemory(key, limit, windowMs, now)
+  if (redisDegradedUntil > now) result.mode = 'redis-degraded'
+  if (!result.allowed) logRateLimitRefused(result, meta)
+  return result
+}
+
+/** Retourne true si l'appel est autorisé, et le comptabilise. */
+export async function allow(key: string, limit: number, windowMs: number): Promise<boolean> {
+  return (await check(key, limit, windowMs)).allowed
 }
 
 /**
@@ -109,15 +190,23 @@ export async function allow(key: string, limit: number, windowMs: number): Promi
  * limites par utilisateur. Permet de contenir un usage abusif réparti entre
  * plusieurs comptes d'une même organisation.
  */
+export async function checkOrg(
+  organizationId: string,
+  action: string,
+  limit: number,
+  windowMs: number,
+): Promise<RateLimitResult> {
+  return check(`org:${organizationId}:${action}`, limit, windowMs, { action, scope: 'org' })
+}
+
 export async function allowOrg(
   organizationId: string,
   action: string,
   limit: number,
   windowMs: number,
 ): Promise<boolean> {
-  return allow(`org:${organizationId}:${action}`, limit, windowMs)
+  return (await checkOrg(organizationId, action, limit, windowMs)).allowed
 }
-
 
 /** Extrait la meilleure IP cliente disponible (proxy de confiance en tête). */
 export function getClientIp(request: Request): string {
@@ -134,6 +223,38 @@ export function getClientIp(request: Request): string {
 }
 
 /** Limite par adresse IP (utile pour les points d'entrée non authentifiés). */
+export async function checkIp(
+  request: Request,
+  action: string,
+  limit: number,
+  windowMs: number,
+): Promise<RateLimitResult> {
+  return check(`ip:${getClientIp(request)}:${action}`, limit, windowMs, { action, scope: 'ip' })
+}
+
 export async function allowIp(request: Request, action: string, limit: number, windowMs: number): Promise<boolean> {
-  return allow(`ip:${getClientIp(request)}:${action}`, limit, windowMs)
+  return (await checkIp(request, action, limit, windowMs)).allowed
+}
+
+/** En-têtes standard de limitation (Retry-After seulement si refusé). */
+export function rateLimitHeaders(result: Pick<RateLimitResult, 'allowed' | 'limit' | 'remaining' | 'retryAfterSec' | 'resetAt'>): Record<string, string> {
+  const headers: Record<string, string> = {
+    'X-RateLimit-Limit': String(result.limit),
+    'X-RateLimit-Remaining': String(Math.max(0, result.remaining)),
+    'X-RateLimit-Reset': String(Math.ceil(result.resetAt / 1000)),
+  }
+  if (!result.allowed) headers['Retry-After'] = String(Math.max(1, result.retryAfterSec))
+  return headers
+}
+
+/** Réponse JSON 429 standard avec en-têtes de limitation. */
+export function rateLimitedResponse(
+  result: RateLimitResult,
+  error = 'Trop de requêtes. Patientez un instant.',
+  extraHeaders?: Record<string, string>,
+): NextResponse {
+  return NextResponse.json(
+    { error },
+    { status: 429, headers: { ...rateLimitHeaders(result), ...extraHeaders } },
+  )
 }

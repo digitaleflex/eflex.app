@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { Prisma } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { allow, allowOrg } from '@/lib/rate-limit'
+import { allow, allowOrg, check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { publish } from '@/lib/event-bus'
 import { audit } from '@/lib/audit'
 import { deleteApplication, deletePrivateKey, deleteManagedDatabase } from '@/lib/coolify'
@@ -19,10 +19,20 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
+  const readLimit = await check(`project-read:${session.user.id}`, 180, 60_000, { action: 'project-read', scope: 'user' })
+  if (!readLimit.allowed) {
+    return rateLimitedResponse(readLimit, 'Trop de consultations de projet. Patientez une minute.')
+  }
+
   const { id } = await params
 
   const org = await requireOrg(session)
   if (!org) return tenantNotFound('Projet introuvable')
+
+  const orgLimit = await checkOrg(org.organizationId, 'project-read', 600, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de consultations de projets pour cette organisation. Patientez une minute.')
+  }
 
   // Le filtre sur l'organisation garantit qu'on ne lit que les projets de son organisation.
   const projectResult = await requireProject(org, id, {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { allow, allowIp } from '@/lib/rate-limit'
+import { check, checkIp, rateLimitHeaders } from '@/lib/rate-limit'
 import {
   collectPayloadSchema,
   hasDoNotTrackSignal,
@@ -21,8 +21,8 @@ const CORS_HEADERS = {
   'Cache-Control': 'no-store',
 }
 
-function noContent(status = 204) {
-  return new NextResponse(null, { status, headers: CORS_HEADERS })
+function noContent(status = 204, extraHeaders?: Record<string, string>) {
+  return new NextResponse(null, { status, headers: { ...CORS_HEADERS, ...extraHeaders } })
 }
 
 export async function OPTIONS() {
@@ -31,8 +31,10 @@ export async function OPTIONS() {
 
 export async function POST(request: Request) {
   // Limite IP globale pour contenir les abus sur le point d'ingestion public.
-  if (!(await allowIp(request, 'analytics-collect', 120, 60_000))) {
-    return noContent(429)
+  const ipLimit = await checkIp(request, 'analytics-collect', 120, 60_000)
+  if (!ipLimit.allowed) {
+    // Silencieux sur abus : pas de 429 explicite ni de corps.
+    return noContent(204, rateLimitHeaders(ipLimit))
   }
 
   let body: unknown
@@ -55,8 +57,9 @@ export async function POST(request: Request) {
   if (!isAnalyticsPublicKey(publicKey)) return noContent(204)
 
   // Limite par clé d'écriture pour éviter qu'un seul projet ne sature l'ingestion.
-  if (!(await allow(`analytics-key:${publicKey}`, 600, 60_000))) {
-    return noContent(429)
+  const keyLimit = await check(`analytics-key:${publicKey}`, 600, 60_000, { action: 'analytics-collect-key', scope: 'key' })
+  if (!keyLimit.allowed) {
+    return noContent(204, rateLimitHeaders(keyLimit))
   }
 
   const config = await prisma.projectAnalytics.findUnique({

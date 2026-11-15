@@ -1,12 +1,17 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   __resetRateLimitStateForTests,
   allow,
   allowIp,
   allowMemory,
   allowOrg,
+  check,
+  checkIp,
+  checkMemory,
+  checkOrg,
   getClientIp,
   getRateLimitMode,
+  rateLimitHeaders,
 } from './rate-limit'
 
 describe('getClientIp', () => {
@@ -51,6 +56,17 @@ describe('rate-limit (mémoire, sans Redis)', () => {
     expect(allowMemory('k', 1, 1_000, now + 1_001)).toBe(true)
   })
 
+  it('checkMemory expose limite, restant et délai avant réessai', () => {
+    const now = 1_700_000_000_000
+    const ok = checkMemory('meta', 2, 60_000, now)
+    expect(ok).toMatchObject({ allowed: true, limit: 2, remaining: 1, retryAfterSec: 0, mode: 'memory' })
+    checkMemory('meta', 2, 60_000, now + 1)
+    const refused = checkMemory('meta', 2, 60_000, now + 2)
+    expect(refused.allowed).toBe(false)
+    expect(refused.remaining).toBe(0)
+    expect(refused.retryAfterSec).toBeGreaterThanOrEqual(1)
+  })
+
   it('expose le mode mémoire sans REDIS_URL', () => {
     expect(getRateLimitMode()).toBe('memory')
   })
@@ -65,5 +81,37 @@ describe('rate-limit (mémoire, sans Redis)', () => {
     const req = new Request('https://example.test', { headers: { 'x-forwarded-for': '203.0.113.9' } })
     expect(await allowIp(req, 'webhook:test', 1, 60_000)).toBe(true)
     expect(await allowIp(req, 'webhook:test', 1, 60_000)).toBe(false)
+  })
+
+  it('check/checkOrg/checkIp renvoient métadonnées et journalisent les refus sans PII', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const ok = await check('u:1:read', 1, 60_000, { action: 'read', scope: 'user' })
+    expect(ok.allowed).toBe(true)
+    expect(warn).not.toHaveBeenCalled()
+
+    const refused = await check('u:1:read', 1, 60_000, { action: 'read', scope: 'user' })
+    expect(refused.allowed).toBe(false)
+    expect(refused.retryAfterSec).toBeGreaterThanOrEqual(1)
+    expect(warn).toHaveBeenCalledTimes(1)
+    const logged = String(warn.mock.calls[0]?.[0] ?? '')
+    expect(logged).toContain('"event":"rate_limit.refused"')
+    expect(logged).toContain('"action":"read"')
+    expect(logged).toContain('"scope":"user"')
+    expect(logged).not.toContain('u:1')
+
+    const org = await checkOrg('org-1', 'projects-list', 1, 60_000)
+    expect(org.allowed).toBe(true)
+    const req = new Request('https://example.test', { headers: { 'x-forwarded-for': '203.0.113.9' } })
+    const ip = await checkIp(req, 'events-stream', 1, 60_000)
+    expect(ip.allowed).toBe(true)
+    warn.mockRestore()
+  })
+
+  it('rateLimitHeaders fournit Retry-After et compteurs', () => {
+    const headers = rateLimitHeaders({ allowed: false, limit: 10, remaining: 0, retryAfterSec: 42, resetAt: 1_700_000_060_000 })
+    expect(headers['Retry-After']).toBe('42')
+    expect(headers['X-RateLimit-Limit']).toBe('10')
+    expect(headers['X-RateLimit-Remaining']).toBe('0')
+    expect(headers['X-RateLimit-Reset']).toBe('1700000060')
   })
 })

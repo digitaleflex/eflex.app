@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { STATUS_LABELS, isDeploymentStatus } from '@/lib/deployment-state'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { requireOrg, requireProject, requireProjectApp, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
@@ -23,9 +24,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
+  const readLimit = await check(`project-deployments:${session.user.id}`, 120, 60_000, { action: 'project-deployments-list', scope: 'user' })
+  if (!readLimit.allowed) {
+    return rateLimitedResponse(readLimit, 'Trop de consultations des déploiements. Patientez une minute.')
+  }
+
   const { id } = await params
   const org = await requireOrg(session)
   if (!org) return tenantNotFound('Projet introuvable')
+
+  const orgLimit = await checkOrg(org.organizationId, 'project-deployments-list', 300, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de consultations de déploiements pour cette organisation. Patientez une minute.')
+  }
 
   const projectResult = await requireProject(org, id, { id: true })
   if ('response' in projectResult) return projectResult.response

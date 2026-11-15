@@ -3,6 +3,7 @@ import type { BuildPlan } from '@eflex/detector'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { resolveOrganization } from '@/lib/organizations'
+import { check, rateLimitedResponse } from '@/lib/rate-limit'
 import { getApplicationLogs } from '@/lib/coolify'
 import { decrypt } from '@/lib/crypto'
 import { collectProjectSecretValues } from '@/lib/log-lines'
@@ -48,10 +49,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   })
   if (!project) return NextResponse.json({ error: 'Projet introuvable' }, { status: 404 })
 
+  const openLimit = await check(`runtime-logs-open:${userId}`, 60, 60_000, { action: 'runtime-logs-stream-open', scope: 'user' })
+  if (!openLimit.allowed) {
+    return rateLimitedResponse(openLimit, 'Trop d’ouvertures de flux de journaux en peu de temps. Patientez une minute.')
+  }
+
   if ((open.get(userId) ?? 0) >= MAX_STREAMS_PER_USER) {
     return NextResponse.json(
       { error: 'Trop de flux ouverts. Fermez un onglet de journaux puis réessayez.' },
-      { status: 429 },
+      { status: 429, headers: { 'Retry-After': '30' } },
     )
   }
 

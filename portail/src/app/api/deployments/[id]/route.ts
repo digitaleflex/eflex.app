@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { STATUS_LABELS, isDeploymentStatus } from '@/lib/deployment-state'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { requireDeploymentById, requireOrg, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
@@ -12,10 +13,20 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
+  const readLimit = await check(`deployment-read:${session.user.id}`, 120, 60_000, { action: 'deployment-read', scope: 'user' })
+  if (!readLimit.allowed) {
+    return rateLimitedResponse(readLimit, 'Trop de consultations de déploiement. Patientez une minute.')
+  }
+
   const { id } = await params
   // Le filtre relationnel garantit qu'on ne lit que les déploiements de son organisation.
   const org = await requireOrg(session)
   if (!org) return tenantNotFound('Déploiement introuvable')
+
+  const orgLimit = await checkOrg(org.organizationId, 'deployment-read', 300, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de consultations de déploiements pour cette organisation. Patientez une minute.')
+  }
   const result = await requireDeploymentById(org, id, {
     id: true,
     status: true,

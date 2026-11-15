@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { isAdmin } from '@/lib/admin'
+import { check, rateLimitedResponse } from '@/lib/rate-limit'
 import { resolveOrganization } from '@/lib/organizations'
 import { eventsSince, isVisibleTo, latestEventId, subscribe, type PlatformEvent } from '@/lib/event-bus'
 import { sleep, sseResponse } from '@/lib/sse'
@@ -24,8 +25,16 @@ export async function GET(request: Request) {
   const userId = session.user.id
   const sessionId = session.session.id
 
+  const openLimit = await check(`events-open:${userId}`, 60, 60_000, { action: 'events-stream-open', scope: 'user' })
+  if (!openLimit.allowed) {
+    return rateLimitedResponse(openLimit, 'Trop d’ouvertures de flux en peu de temps. Patientez une minute.')
+  }
+
   if ((open.get(userId) ?? 0) >= MAX_STREAMS_PER_USER) {
-    return NextResponse.json({ error: 'Trop de flux ouverts. Fermez un onglet puis réessayez.' }, { status: 429 })
+    return NextResponse.json(
+      { error: 'Trop de flux ouverts. Fermez un onglet puis réessayez.' },
+      { status: 429, headers: { 'Retry-After': '30' } },
+    )
   }
 
   const org = await resolveOrganization(session)

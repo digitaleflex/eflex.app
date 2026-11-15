@@ -5,6 +5,7 @@ import { getDeploymentDetails } from '@/lib/coolify'
 import { decrypt } from '@/lib/crypto'
 import { streamDeploymentLogs } from '@/lib/deployment-stream'
 import { sseResponse } from '@/lib/sse'
+import { check, rateLimitedResponse } from '@/lib/rate-limit'
 import { requireDeployment, requireOrg, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
@@ -47,8 +48,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     project: { id: string; envVars: Array<{ key: string; value: string }> }
   }
 
+  const openLimit = await check(`deployment-logs-open:${userId}`, 60, 60_000, { action: 'deployment-logs-stream-open', scope: 'user' })
+  if (!openLimit.allowed) {
+    return rateLimitedResponse(openLimit, 'Trop d’ouvertures de flux de journaux en peu de temps. Patientez une minute.')
+  }
+
   if ((open.get(userId) ?? 0) >= MAX_STREAMS_PER_USER) {
-    return NextResponse.json({ error: 'Trop de flux ouverts. Fermez un onglet de journaux puis réessayez.' }, { status: 429 })
+    return NextResponse.json(
+      { error: 'Trop de flux ouverts. Fermez un onglet de journaux puis réessayez.' },
+      { status: 429, headers: { 'Retry-After': '30' } },
+    )
   }
 
   const url = new URL(request.url)

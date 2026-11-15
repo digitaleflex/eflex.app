@@ -4,7 +4,7 @@ import type { BuildPlan } from '@eflex/detector'
 import type { Prisma } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { allow, allowOrg } from '@/lib/rate-limit'
+import { allow, allowOrg, check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { analyzeGitHubRepo, type RepoAnalysis } from '@/lib/repo-analysis'
 import { errorResponse, normalizeRoot, repoFields, resolveRepo } from '@/lib/analysis-request'
 import { resolveUserRepoToken } from '@/lib/git-credentials'
@@ -152,11 +152,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Configuration du serveur incomplète.' }, { status: 500 })
   }
 
-  if (!(await allow(`create:${userId}`, 10, 60_000))) {
-    return NextResponse.json({ error: 'Trop de créations en peu de temps. Patientez une minute.' }, { status: 429 })
+  const createLimit = await check(`create:${userId}`, 10, 60_000, { action: 'project-create', scope: 'user' })
+  if (!createLimit.allowed) {
+    return rateLimitedResponse(createLimit, 'Trop de créations en peu de temps. Patientez une minute.')
   }
-  if (!(await allowOrg(org.organizationId, 'create', 20, 60_000))) {
-    return NextResponse.json({ error: 'Trop de créations pour cette organisation en peu de temps. Patientez une minute.' }, { status: 429 })
+  const createOrgLimit = await checkOrg(org.organizationId, 'create', 20, 60_000)
+  if (!createOrgLimit.allowed) {
+    return rateLimitedResponse(createOrgLimit, 'Trop de créations pour cette organisation en peu de temps. Patientez une minute.')
   }
 
   let body: unknown
@@ -475,8 +477,18 @@ export async function GET() {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
+  const readLimit = await check(`projects-list:${session.user.id}`, 120, 60_000, { action: 'projects-list', scope: 'user' })
+  if (!readLimit.allowed) {
+    return rateLimitedResponse(readLimit, 'Trop de lectures de projets. Patientez une minute.')
+  }
+
   const org = await resolveOrganization(session)
   if (!org) return NextResponse.json({ projects: [] })
+
+  const orgLimit = await checkOrg(org.organizationId, 'projects-list', 300, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de lectures de projets pour cette organisation. Patientez une minute.')
+  }
 
   const projects = await prisma.project.findMany({
     where: { organizationId: org.organizationId },
