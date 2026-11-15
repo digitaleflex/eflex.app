@@ -113,23 +113,24 @@ function phaseLabel(phase: string): string {
 }
 
 function QuotaBar({ used, limit, label }: { used: number; limit: number; label: string }) {
-  const ratio = limit > 0 ? Math.max(0, Math.min(1, used / limit)) : 0
+  const unlimited = !Number.isFinite(limit)
+  const ratio = unlimited ? 0 : limit > 0 ? Math.max(0, Math.min(1, used / limit)) : 0
   return (
     <div
       className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
       role="meter"
       aria-label={label}
       aria-valuemin={0}
-      aria-valuemax={limit}
+      aria-valuemax={unlimited ? undefined : limit}
       aria-valuenow={used}
-      aria-valuetext={`${used} sur ${limit}`}
+      aria-valuetext={unlimited ? `${used} sur illimité` : `${used} sur ${limit}`}
     >
       <div
         className={cn(
           'h-full rounded-full transition-[width] duration-300',
-          ratio >= 1 ? 'bg-destructive' : ratio >= 0.8 ? 'bg-warning' : 'bg-primary',
+          !unlimited && ratio >= 1 ? 'bg-destructive' : !unlimited && ratio >= 0.8 ? 'bg-warning' : 'bg-primary',
         )}
-        style={{ width: `${Math.min(100, ratio * 100)}%` }}
+        style={{ width: `${unlimited ? 0 : Math.min(100, ratio * 100)}%` }}
       />
     </div>
   )
@@ -231,7 +232,7 @@ export function UsageView({ projects, quota }: { projects: UsageProject[]; quota
             <div className="rounded-lg border border-border bg-background p-3">
               <dt className="text-xs font-medium text-muted-foreground">Applications déployables</dt>
               <dd className="mt-1 font-mono text-base font-semibold tabular-nums">
-                {quota.apps.used.toLocaleString('fr-FR')} / {quota.apps.limit.toLocaleString('fr-FR')}
+                {quota.apps.used.toLocaleString('fr-FR')} / {Number.isFinite(quota.apps.limit) ? quota.apps.limit.toLocaleString('fr-FR') : 'Illimité'}
               </dd>
               <QuotaBar used={quota.apps.used} limit={quota.apps.limit} label="Quota d’applications" />
               <p className="mt-2 text-xs text-muted-foreground">Unité : applications (compte organisation). Source : compteur de projets/applications.</p>

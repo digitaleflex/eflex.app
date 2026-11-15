@@ -90,20 +90,21 @@ const formatDate = (value: string) => dateFormat.format(new Date(value))
 const utcTitle = (value: string) => `${utcFormat.format(new Date(value))} (UTC)`
 
 function UsageBar({ label, value, limit }: { label: string; value: number; limit: number }) {
-  const percent = Math.min(100, Math.round((value / Math.max(1, limit)) * 100))
-  const full = value >= limit
+  const unlimited = !Number.isFinite(limit)
+  const percent = unlimited ? 0 : Math.min(100, Math.round((value / Math.max(1, limit)) * 100))
+  const full = !unlimited && value >= limit
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2 text-sm">
         <span className="text-muted-foreground">{label}</span>
         <span className={cn('font-medium tabular-nums', full && 'text-warning')}>
-          {value} / {limit}
+          {value} / {unlimited ? 'Illimité' : limit}
         </span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-muted" role="presentation">
         <div
           className={cn('h-full rounded-full', full ? 'bg-warning' : 'bg-primary')}
-          style={{ width: `${percent}%` }}
+          style={{ width: `${unlimited ? 0 : percent}%` }}
         />
       </div>
     </div>
@@ -382,7 +383,7 @@ export function BillingCard() {
                   <p className="mt-1 text-xs text-muted-foreground">{plan.tagline}</p>
                 </div>
                 <ul className="space-y-1 text-xs text-muted-foreground">
-                  <li>{plan.projectLimit} applications</li>
+                  <li>{Number.isFinite(plan.projectLimit) ? plan.projectLimit : 'Applications illimitées'}</li>
                   <li>{plan.memberLimit} membres</li>
                   <li>{plan.customDomainLimit} domaines par projet</li>
                 </ul>

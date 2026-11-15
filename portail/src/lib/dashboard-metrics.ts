@@ -79,7 +79,7 @@ export function attentionItems(
     }
   }
   const quota = options?.quota
-  if (quota && quota.limit > 0 && quota.used / quota.limit >= 0.8) {
+  if (quota && quota.limit > 0 && Number.isFinite(quota.limit) && quota.used / quota.limit >= 0.8) {
     items.push({ kind: 'quota', at: now, used: quota.used, limit: quota.limit })
   }
   return items.sort((a, b) => {

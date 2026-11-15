@@ -94,7 +94,7 @@ export default function TarifsPage() {
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col gap-4 pt-0">
                   <ul className="divide-y divide-border">
-                    <LimitRow label="Applications déployables" value={plan.projectLimit.toLocaleString('fr-FR')} />
+                    <LimitRow label="Applications déployables" value={Number.isFinite(plan.projectLimit) ? plan.projectLimit.toLocaleString('fr-FR') : 'Illimité'} />
                     <LimitRow label="Membres" value={plan.memberLimit.toLocaleString('fr-FR')} />
                     <LimitRow label="Domaines personnalisés / projet" value={plan.customDomainLimit.toLocaleString('fr-FR')} />
                   </ul>
@@ -154,7 +154,7 @@ export default function TarifsPage() {
                       <tr key={plan.id} className={cn('border-b border-border last:border-0', plan.highlighted && 'bg-primary/5')}>
                         <th scope="row" className="py-3 pr-3 font-medium">{plan.label}</th>
                         <td className="py-3 pr-3 tabular-nums">{formatPrice(plan.priceFcfa)}</td>
-                        <td className="py-3 pr-3 tabular-nums">{plan.projectLimit.toLocaleString('fr-FR')}</td>
+                        <td className="py-3 pr-3 tabular-nums">{Number.isFinite(plan.projectLimit) ? plan.projectLimit.toLocaleString('fr-FR') : 'Illimité'}</td>
                         <td className="py-3 pr-3 tabular-nums">{plan.memberLimit.toLocaleString('fr-FR')}</td>
                         <td className="py-3 tabular-nums">{plan.customDomainLimit.toLocaleString('fr-FR')}</td>
                       </tr>
