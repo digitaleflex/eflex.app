@@ -308,6 +308,7 @@ describe('export CSV', () => {
           { organizationId: 'o', name: 'Client; Premium', kind: 'projects', used: 6, limit: 5, plan: 'Découverte' },
         ],
       },
+      recurringErrors: [{ label: 'Mémoire insuffisante', count: 2, lastSeenAt: '2026-11-10T11:00:00.000Z' }],
       alerts: [
         {
           id: 'failed-deployments',
@@ -328,6 +329,9 @@ describe('export CSV', () => {
     expect(lines).toContain('2026-11-10;7;2;1;10')
     expect(lines).toContain('Stack;Réussis;Échecs;Autres;Total;Taux (%)')
     expect(lines).toContain('nextjs;7;2;1;10;78')
+    expect(lines).toContain('Erreurs récurrentes (échecs sur la période)')
+    expect(lines).toContain('Cause probable;Occurrences;Dernière occurrence')
+    expect(lines).toContain('Mémoire insuffisante;2;2026-11-10T11:00:00.000Z')
     expect(lines).toContain('"Client; Premium";projets;6;5;Découverte')
     expect(lines).toContain('Gravité;Titre;Détail')
     expect(lines).toContain('warning;2 déploiements en échec;Taux d’échec de 22 %.')

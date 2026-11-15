@@ -232,6 +232,12 @@ export function quotaOverruns(
 export type AlertSeverity = 'critical' | 'warning' | 'info'
 export type AdminAlert = { id: string; severity: AlertSeverity; title: string; detail: string }
 
+export type RecurringError = {
+  label: string
+  count: number
+  lastSeenAt: string | null
+}
+
 const SEVERITY_RANK: Record<AlertSeverity, number> = { critical: 0, warning: 1, info: 2 }
 
 /** Alertes simples, déterministes et triées : le critique d'abord. */
@@ -324,6 +330,7 @@ export type AdminMetrics = {
   revenue: RevenueSummary
   unpaid: UnpaidSummary
   quotas: { checkedOrganizations: number; overruns: QuotaOverrun[] }
+  recurringErrors: RecurringError[]
   alerts: AdminAlert[]
 }
 
@@ -390,6 +397,10 @@ export function adminMetricsCsv(metrics: AdminMetrics, generatedAt = new Date())
       stack.total,
       stack.successRate ?? '',
     ]),
+    [],
+    ['Erreurs récurrentes (échecs sur la période)'],
+    ['Cause probable', 'Occurrences', 'Dernière occurrence'],
+    ...metrics.recurringErrors.map((error) => [error.label, error.count, error.lastSeenAt ?? '']),
     [],
     ['Alertes'],
     ['Gravité', 'Titre', 'Détail'],

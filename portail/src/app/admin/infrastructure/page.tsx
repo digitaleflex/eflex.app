@@ -439,8 +439,8 @@ export default async function AdminInfrastructurePage() {
               <dl>
                 <DataRow label="En attente">{number.format(snapshot.queue.counts.waiting)}</DataRow>
                 <DataRow label="En cours">{number.format(snapshot.queue.counts.active)}</DataRow>
-                <DataRow label="Différés">{number.format(snapshot.queue.counts.delayed)}</DataRow>
-                <DataRow label="Échoués">{number.format(snapshot.queue.counts.failed)}</DataRow>
+                <DataRow label="Différés (en retard)">{number.format(snapshot.queue.counts.delayed)}</DataRow>
+                <DataRow label="Échoués (BullMQ)">{number.format(snapshot.queue.counts.failed)}</DataRow>
                 <DataRow label="Terminés">{number.format(snapshot.queue.counts.completed)}</DataRow>
                 <DataRow label="En pause">{number.format(snapshot.queue.counts.paused)}</DataRow>
                 <DataRow label="Latence de la sonde">{formatLatency(snapshot.queue.latencyMs)}</DataRow>
@@ -448,9 +448,23 @@ export default async function AdminInfrastructurePage() {
             ) : (
               <p className="text-sm text-muted-foreground">Compteurs indisponibles.</p>
             )}
+            {snapshot.queue.counts && snapshot.queue.counts.delayed > 0 && (
+              <p role="status" className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-sm text-warning-foreground">
+                {number.format(snapshot.queue.counts.delayed)} job{snapshot.queue.counts.delayed > 1 ? 's' : ''} différé
+                {snapshot.queue.counts.delayed > 1 ? 's' : ''} : traitement reporté (nouvelle tentative ou délai programmé).
+                Une accumulation durable peut signaler un worker ralenti ou des erreurs répétées.
+              </p>
+            )}
+            {snapshot.queue.counts && snapshot.queue.counts.failed > 0 && (
+              <p role="status" className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {number.format(snapshot.queue.counts.failed)} job{snapshot.queue.counts.failed > 1 ? 's' : ''} en échec
+                côté file BullMQ (après tentatives). Consultez les déploiements concernés et les journaux du worker.
+              </p>
+            )}
             <SourceError source={src('queue')} />
             <p className="mt-3 text-xs text-muted-foreground">
-              Alerte à partir de 10 jobs en attente (à surveiller) puis 50 (critique) : le worker ne suit plus.
+              Indicateur « jobs en attente » : alerte à partir de 10 (à surveiller) puis 50 (critique). Les jobs
+              « différés » sont des exécutions retardées, pas forcément bloquées si le nombre ne croît pas.
             </p>
           </CardContent>
         </Card>

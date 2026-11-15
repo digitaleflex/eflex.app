@@ -24,6 +24,7 @@ import {
   DeploymentChart,
   ExportCsvLink,
   PeriodSelector,
+  RecurringErrorsPanel,
   StackTable,
 } from '@/components/admin/metrics'
 
@@ -198,7 +199,10 @@ export default async function AdminOverview({
 
       <DeploymentChart daily={metrics.deployments.daily} days={days} />
 
-      <StackTable stacks={metrics.deployments.stacks} days={days} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <RecurringErrorsPanel errors={metrics.recurringErrors} days={days} />
+        <StackTable stacks={metrics.deployments.stacks} days={days} />
+      </div>
     </div>
   )
 }

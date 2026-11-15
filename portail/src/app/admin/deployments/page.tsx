@@ -10,6 +10,8 @@ import { LiveRefresh } from '@/components/live-refresh'
 import { ACTIVE_DEPLOYMENT_STATUSES } from '@/lib/deployment-state'
 import { deploymentTimeoutMs } from '@/lib/deployment-watchdog'
 import { relativeTime } from '@/lib/relative-time'
+import { deploymentsQueue, getDeploymentQueueDiagnosticsBatch } from '@/lib/queue'
+import { normalizeQueueCounts } from '@/lib/infrastructure-health'
 import {
   deploymentDuration,
   formatDuration,
@@ -65,6 +67,29 @@ export default async function AdminDeploymentsPage({
     }),
   ])
 
+  const [queueCounts, queueDiagnostics] = await Promise.all([
+    process.env.REDIS_URL
+      ? deploymentsQueue()
+          .getJobCounts()
+          .then(normalizeQueueCounts)
+          .catch(() => null)
+      : Promise.resolve(null),
+    getDeploymentQueueDiagnosticsBatch(active.map((deployment) => deployment.id)),
+  ])
+  const number = new Intl.NumberFormat('fr-FR')
+
+  const queueStateLabel: Record<string, string> = {
+    waiting: 'en attente',
+    delayed: 'différé',
+    prioritized: 'priorisé',
+    active: 'actif',
+    'waiting-children': 'en attente (dépendances)',
+    completed: 'terminé (BullMQ)',
+    failed: 'en échec (BullMQ)',
+    missing: 'absent de la file',
+    unknown: 'état inconnu',
+  }
+
   const stuckCount = active.filter((deployment) => deployment.createdAt.getTime() <= threshold.getTime()).length
 
   return (
@@ -95,6 +120,30 @@ export default async function AdminDeploymentsPage({
       )}
 
       <Card>
+        <div className="p-4 pb-2">
+          <h2 className="text-sm font-semibold">État de la file (BullMQ / Redis)</h2>
+          <p className="text-xs text-muted-foreground">Indicateurs internes du worker, factuels au moment du chargement.</p>
+        </div>
+        {queueCounts ? (
+          <div className="space-y-2 p-4 pt-0 text-sm">
+            <p className="text-muted-foreground tabular-nums">
+              En attente {number.format(queueCounts.waiting)} · En cours {number.format(queueCounts.active)} · Différés {number.format(queueCounts.delayed)} · Échoués {number.format(queueCounts.failed)} · Terminés {number.format(queueCounts.completed)} · En pause {number.format(queueCounts.paused)}
+            </p>
+            {(queueCounts.delayed > 0 || queueCounts.failed > 0) && (
+              <p className="text-xs text-muted-foreground">
+                {queueCounts.delayed > 0 ? `${number.format(queueCounts.delayed)} job${queueCounts.delayed > 1 ? 's' : ''} différé${queueCounts.delayed > 1 ? 's' : ''} (nouvelle tentative ou délai programmé). ` : ''}
+                {queueCounts.failed > 0 ? `${number.format(queueCounts.failed)} job${queueCounts.failed > 1 ? 's' : ''} en échec côté BullMQ après tentatives.` : ''}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="p-4 pt-0 text-sm text-muted-foreground">
+            Indisponible : Redis/BullMQ non configuré ou injoignable. Les statuts ci-dessous restent ceux enregistrés en base.
+          </p>
+        )}
+      </Card>
+
+      <Card>
         <div className="flex flex-wrap items-center justify-between gap-2 p-4 pb-2">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
             <ListOrdered className="h-4 w-4 text-primary" aria-hidden="true" />
@@ -108,6 +157,11 @@ export default async function AdminDeploymentsPage({
           <ul className="divide-y divide-border">
             {active.map((deployment) => {
               const stuck = deployment.createdAt.getTime() <= threshold.getTime()
+              const queue = queueDiagnostics[deployment.id]
+              const queueLabel = queue ? queueStateLabel[queue.state] ?? queue.state : null
+              const queueAlert =
+                queue &&
+                (queue.state === 'missing' || queue.state === 'failed' || queue.state === 'delayed' || queue.stalled)
               return (
                 <li key={deployment.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
                   <div className="min-w-0 space-y-1">
@@ -117,12 +171,21 @@ export default async function AdminDeploymentsPage({
                       </Link>
                       <StatusPill status={deployment.status} />
                       {stuck && <Badge variant="destructive">Bloqué</Badge>}
+                      {queueLabel && (
+                        <Badge variant={queueAlert ? 'destructive' : 'outline'}>File : {queueLabel}</Badge>
+                      )}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {deployment.project.organization.name} ·{' '}
                       <span className="font-mono">{deployment.commitSha.slice(0, 10)}</span> · depuis{' '}
                       {formatDuration(now.getTime() - deployment.createdAt.getTime())}
+                      {queue?.attemptsMade != null && queue.attemptsMax != null
+                        ? ` · tentative ${queue.attemptsMade}/${queue.attemptsMax}`
+                        : ''}
                     </p>
+                    {queue?.failedReason && (
+                      <p className="text-xs text-destructive">Raison BullMQ : {queue.failedReason}</p>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Link

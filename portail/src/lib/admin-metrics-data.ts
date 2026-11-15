@@ -13,7 +13,9 @@ import {
   unpaidSummary,
   type AdminMetrics,
   type PeriodDays,
+  type RecurringError,
 } from '@/lib/admin-metrics'
+import { probableFailureCause } from '@/lib/admin-projects'
 
 const MS_DAY = 86_400_000
 const STUCK_AFTER_MS = 30 * 60_000
@@ -50,6 +52,7 @@ export async function loadAdminMetrics(days: PeriodDays, now = new Date()): Prom
     pastDueSubscriptionAggregate,
     projectGroups,
     memberGroups,
+    failedDeployments,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { banned: true } }),
@@ -104,6 +107,12 @@ export async function loadAdminMetrics(days: PeriodDays, now = new Date()): Prom
     }),
     prisma.project.groupBy({ by: ['organizationId'], _count: { _all: true } }),
     prisma.member.groupBy({ by: ['organizationId'], _count: { _all: true } }),
+    prisma.deployment.findMany({
+      where: { status: 'failed', createdAt: { gte: since } },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      select: { logsSummary: true, createdAt: true },
+    }),
   ])
 
   const daily = dailyDeploymentSeries(dailyRows, days, now)
@@ -149,6 +158,23 @@ export async function loadAdminMetrics(days: PeriodDays, now = new Date()): Prom
     memberGroups.map((group) => ({ organizationId: group.organizationId, count: group._count._all })),
   )
 
+  const errorBuckets = new Map<string, { count: number; lastSeenAt: string | null }>()
+  for (const deployment of failedDeployments) {
+    const cause = probableFailureCause(deployment.logsSummary)
+    const label = cause?.label ?? 'Cause non identifiée automatiquement'
+    const current = errorBuckets.get(label) ?? { count: 0, lastSeenAt: null }
+    const seenAt = deployment.createdAt.toISOString()
+    errorBuckets.set(label, {
+      count: current.count + 1,
+      lastSeenAt:
+        current.lastSeenAt === null || seenAt > current.lastSeenAt ? seenAt : current.lastSeenAt,
+    })
+  }
+  const recurringErrors: RecurringError[] = [...errorBuckets.entries()]
+    .map(([label, value]) => ({ label, ...value }))
+    .sort((a, b) => b.count - a.count || (b.lastSeenAt ?? '').localeCompare(a.lastSeenAt ?? ''))
+    .slice(0, 8)
+
   const alerts = buildAdminAlerts({
     failedDeployments: totals.failed,
     finishedDeployments: totals.live + totals.failed,
@@ -179,6 +205,7 @@ export async function loadAdminMetrics(days: PeriodDays, now = new Date()): Prom
     revenue,
     unpaid,
     quotas: { checkedOrganizations: organizations.length, overruns },
+    recurringErrors,
     alerts,
   }
 }

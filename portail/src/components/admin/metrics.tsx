@@ -13,6 +13,7 @@ import {
   type AdminMetrics,
   type PeriodDays,
 } from '@/lib/admin-metrics'
+import { relativeTime } from '@/lib/relative-time'
 
 /** Sélecteur de période : de vrais liens, utilisables au clavier et sans JavaScript. */
 export function PeriodSelector({ days }: { days: PeriodDays }) {
@@ -236,6 +237,65 @@ export function DeploymentChart({
 }
 
 /** Réussite par stack : le tableau est lui-même l'alternative textuelle du graphique. */
+export function RecurringErrorsPanel({
+  errors,
+  days,
+}: {
+  errors: AdminMetrics['recurringErrors']
+  days: PeriodDays
+}) {
+  return (
+    <section aria-labelledby="admin-recurring-errors-title" className="rounded-xl border border-border bg-card p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="admin-recurring-errors-title" className="font-semibold">
+          Erreurs récurrentes
+        </h2>
+        <p className="text-xs text-muted-foreground">Échecs sur {days} jours (échantillon de journaux stockés)</p>
+      </div>
+
+      {errors.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">
+          Aucun échec récurrent identifié sur la période, ou aucun déploiement en échec.
+        </p>
+      ) : (
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-sm">
+            <caption className="sr-only">Causes probables récurrentes des déploiements en échec</caption>
+            <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th scope="col" className="px-2 py-2 font-medium">Cause probable</th>
+                <th scope="col" className="px-2 py-2 text-right font-medium">Occurrences</th>
+                <th scope="col" className="px-2 py-2 text-right font-medium">Dernière occurrence</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {errors.map((error) => (
+                <tr key={error.label}>
+                  <th scope="row" className="px-2 py-2.5 text-left font-medium">
+                    {error.label}
+                  </th>
+                  <td className="px-2 py-2.5 text-right tabular-nums">{formatInteger(error.count)}</td>
+                  <td className="px-2 py-2.5 text-right text-xs text-muted-foreground">
+                    {error.lastSeenAt ? (
+                      <time dateTime={error.lastSeenAt}>{relativeTime(new Date(error.lastSeenAt))}</time>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="mt-3 text-xs text-muted-foreground">
+        Causes déduites automatiquement des extraits de journaux déjà enregistrés (secrets masqués). « Cause non
+        identifiée automatiquement » signifie que le journal ne correspond à aucun motif connu.
+      </p>
+    </section>
+  )
+}
+
 export function StackTable({ stacks, days }: { stacks: AdminMetrics['deployments']['stacks']; days: PeriodDays }) {
   return (
     <section aria-labelledby="admin-stacks-title" className="rounded-xl border border-border bg-card p-5">
