@@ -1,11 +1,25 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BarChart3, ExternalLink, Info, RefreshCw, ShieldCheck } from 'lucide-react'
+import {
+  BarChart3,
+  Download,
+  ExternalLink,
+  Flag,
+  Info,
+  KeyRound,
+  ListChecks,
+  Plus,
+  RefreshCw,
+  ShieldCheck,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { SectionCard } from '@/components/dashboard/section'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Notice } from '@/components/dashboard/notice'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { CopyButton } from '@/components/ui/copy-button'
 
 type AnalyticsConfig = {
@@ -14,21 +28,29 @@ type AnalyticsConfig = {
   respectDnt: boolean
   collectPath: boolean
   retentionDays: number
+  goalEvents: string[]
   snippet: string | null
   snippetConsent: string | null
+  eventSnippet: string | null
   collectUrl: string
   createdAt: string | null
   updatedAt: string | null
 }
+
+type EventStat = { name: string; count: number; goal: boolean }
 
 type StatsPayload = {
   rangeDays: number
   total: number
   days: { date: string; views: number }[]
   paths: { path: string; views: number }[]
+  events: EventStat[]
+  goalEvents: string[]
 }
 
 const PERIODS = [7, 14, 30, 90] as const
+const EVENT_NAME_PATTERN = /^[a-z0-9][a-z0-9_.:-]{0,63}$/
+const GOAL_EVENTS_MAX = 20
 
 const dateFormat = new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short' })
 
@@ -48,6 +70,14 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [showConsentSnippet, setShowConsentSnippet] = useState(false)
+  const [goalInput, setGoalInput] = useState('')
+  const [goalDraft, setGoalDraft] = useState<string[]>([])
+  const [savingGoals, setSavingGoals] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmRotate, setConfirmRotate] = useState(false)
+  const [rotating, setRotating] = useState(false)
+  const [exporting, setExporting] = useState<'json' | 'csv' | null>(null)
 
   const load = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -67,8 +97,11 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
         if (!statsRes.ok) {
           throw new Error(statsData.error ?? 'Impossible de charger les statistiques.')
         }
-        setConfig((configData.config ?? null) as AnalyticsConfig | null)
-        setStats(statsData as StatsPayload)
+        const nextConfig = (configData.config ?? null) as AnalyticsConfig | null
+        const nextStats = statsData as StatsPayload
+        setConfig(nextConfig)
+        setStats(nextStats)
+        setGoalDraft(nextConfig?.goalEvents ?? nextStats.goalEvents ?? [])
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Impossible de contacter le serveur.')
       } finally {
@@ -106,12 +139,134 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
     }
   }
 
+  const addGoal = () => {
+    const normalized = goalInput.trim().toLowerCase()
+    if (!normalized) return
+    if (!EVENT_NAME_PATTERN.test(normalized)) {
+      setError('Nom d’objectif invalide : utilisez des lettres/chiffres minuscules, . _ : - (sans espace).')
+      return
+    }
+    if (goalDraft.includes(normalized)) {
+      setGoalInput('')
+      return
+    }
+    if (goalDraft.length >= GOAL_EVENTS_MAX) {
+      setError(`Vous pouvez définir au plus ${GOAL_EVENTS_MAX} objectifs.`)
+      return
+    }
+    setError('')
+    setGoalDraft((prev) => [...prev, normalized])
+    setGoalInput('')
+  }
+
+  const removeGoal = (name: string) => {
+    setGoalDraft((prev) => prev.filter((g) => g !== name))
+  }
+
+  const saveGoals = async () => {
+    if (!canManage) return
+    setSavingGoals(true)
+    setError('')
+    setNotice('')
+    try {
+      const res = await fetch(`/api/projects/${projectId}/analytics`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goalEvents: goalDraft }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? 'Impossible d’enregistrer les objectifs.')
+      setConfig((data.config ?? null) as AnalyticsConfig | null)
+      setNotice('Objectifs de conversion mis à jour.')
+      await load({ silent: true })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Impossible d’enregistrer les objectifs.')
+    } finally {
+      setSavingGoals(false)
+    }
+  }
+
+  const deleteStats = async () => {
+    if (!canManage) return
+    setDeleting(true)
+    setError('')
+    setNotice('')
+    try {
+      const res = await fetch(`/api/projects/${projectId}/analytics/stats`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? 'Suppression impossible.')
+      const count = typeof data.deleted === 'number' ? data.deleted : 0
+      setConfirmDelete(false)
+      setNotice(`Statistiques supprimées (${count.toLocaleString('fr-FR')} ligne(s) agrégée(s) effacée(s)).`)
+      await load({ silent: true })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Suppression impossible.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const rotateKey = async () => {
+    if (!canManage) return
+    setRotating(true)
+    setError('')
+    setNotice('')
+    try {
+      const res = await fetch(`/api/projects/${projectId}/analytics`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ regenerateKey: true }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? 'Rotation de la clé impossible.')
+      setConfig((data.config ?? null) as AnalyticsConfig | null)
+      setConfirmRotate(false)
+      setNotice('Nouvelle clé de mesure générée. Mettez à jour les snippets intégrés sur vos sites.')
+      await load({ silent: true })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Rotation de la clé impossible.')
+    } finally {
+      setRotating(false)
+    }
+  }
+
+  const downloadExport = async (format: 'json' | 'csv') => {
+    if (!canManage) return
+    setExporting(format)
+    setError('')
+    try {
+      const res = await fetch(`/api/projects/${projectId}/analytics/export?format=${format}`, { cache: 'no-store' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? 'Export impossible.')
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `analytics-${projectId}.${format}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      setNotice(`Export ${format.toUpperCase()} téléchargé.`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Export impossible.')
+    } finally {
+      setExporting(null)
+    }
+  }
+
   const maxDayViews = useMemo(() => Math.max(1, ...(stats?.days.map((d) => d.views) ?? [1])), [stats])
 
-  const hasData = (stats?.total ?? 0) > 0
+  const hasPageData = (stats?.total ?? 0) > 0
+  const events = stats?.events ?? []
+  const hasEventData = events.length > 0
   const configured = config !== null
   const enabled = config?.enabled === true
   const snippet = showConsentSnippet ? config?.snippetConsent : config?.snippet
+  const goalEvents = config?.goalEvents ?? stats?.goalEvents ?? []
+  const goalsDirty = JSON.stringify(goalDraft) !== JSON.stringify(goalEvents)
 
   if (loading) {
     return (
@@ -132,7 +287,7 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
         id="analytics"
         title="Analytique"
         icon={BarChart3}
-        description="Pages vues agrégées mesurées par EFLEX, sans cookie, sans identifiant visiteur et sans profilage nominatif. Aucune donnée inventée : seules les pages vues effectivement reçues sont comptabilisées."
+        description="Pages vues et événements nommés agrégés mesurés par EFLEX, sans cookie, sans identifiant visiteur, sans profilage nominatif et sans propriété libre. Aucune donnée inventée : seules les mesures effectivement reçues sont comptabilisées."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <label className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm [@media(pointer:coarse)]:min-h-11">
@@ -177,7 +332,7 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {enabled
-                    ? 'Les pages vues reçues depuis vos sites intégrés sont agrégées par jour et par chemin.'
+                    ? 'Les pages vues et événements nommés reçus depuis vos sites intégrés sont agrégés par jour, par chemin et par nom.'
                     : 'Aucune collecte n’a lieu tant que la mesure n’est pas activée. Les données affichées ci-dessous correspondent uniquement aux statistiques déjà conservées, le cas échéant.'}
                 </p>
                 {config && (
@@ -185,6 +340,7 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
                     <li>Rétention : <span className="tabular-nums">{config.retentionDays}</span> jours</li>
                     <li>Respect DNT/GPC : {config.respectDnt ? 'activé' : 'désactivé'}</li>
                     <li>Collecte du chemin : {config.collectPath ? 'activée' : 'désactivée (compteur global)'}</li>
+                    <li>Objectifs définis : <span className="tabular-nums">{goalEvents.length}</span></li>
                   </ul>
                 )}
               </div>
@@ -207,20 +363,20 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
             )}
           </div>
 
-          {!enabled && !hasData && (
+          {!enabled && !hasPageData && !hasEventData && (
             <EmptyState
               icon={BarChart3}
               title="Collecte non activée"
               description={
                 canManage
-                  ? 'Activez la mesure d’audience pour ce projet, puis intégrez le snippet sur votre site. Les statistiques apparaîtront ici après réception d’événements réels.'
-                  : 'La mesure d’audience n’est pas activée pour ce projet. Lorsqu’elle le sera et que des événements auront été reçus, les statistiques agrégées apparaîtront ici.'
+                  ? 'Activez la mesure d’audience pour ce projet, puis intégrez les snippets sur votre site. Les statistiques apparaîtront ici après réception de mesures réelles.'
+                  : 'La mesure d’audience n’est pas activée pour ce projet. Lorsqu’elle le sera et que des mesures auront été reçues, les statistiques agrégées apparaîtront ici.'
               }
               className="py-8"
             />
           )}
 
-          {hasData && (
+          {hasPageData && (
             <>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-lg border border-border bg-card p-4">
@@ -241,7 +397,7 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
               </div>
 
               <Notice tone="info" title="Métriques disponibles">
-                Ce tableau de bord affiche uniquement les indicateurs issus des données réelles collectées : pages vues agrégées, évolution quotidienne et chemins les plus consultés. Les visiteurs uniques, sessions, durée de visite et taux de rebond ne sont pas mesurés par ce dispositif et ne sont donc pas affichés.
+                Ce tableau de bord affiche uniquement les indicateurs issus des données réelles collectées : pages vues agrégées, évolution quotidienne, chemins les plus consultés et événements nommés comptabilisés. Les visiteurs uniques, sessions, durée de visite, taux de rebond et propriétés d’événement ne sont pas mesurés et ne sont donc pas affichés.
               </Notice>
 
               <div className="grid gap-6 lg:grid-cols-2">
@@ -291,83 +447,288 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
             </>
           )}
 
-          {enabled && !hasData && (
+          {enabled && !hasPageData && (
             <EmptyState
               icon={Info}
-              title="Aucune donnée collectée sur la période"
+              title="Aucune page vue collectée sur la période"
               description="La mesure est activée, mais aucun événement de page vue n’a encore été reçu pour la période sélectionnée. Vérifiez que le snippet est intégré sur votre site et que des visites ont bien eu lieu (en respectant, le cas échéant, le consentement et les signaux DNT/GPC)."
               className="py-8"
             />
           )}
 
-          {configured && (snippet || canManage) && (
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="flex items-center gap-2 text-sm font-semibold">
+                  <ListChecks className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  Événements nommés et objectifs
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Comptages agrégés par nom d’événement sur la période sélectionnée (sans propriété ni identifiant). Les événements marqués « Objectif » correspondent aux objectifs de conversion définis.
+                </p>
+              </div>
+            </div>
+
+            {hasEventData ? (
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[20rem] text-sm">
+                  <caption className="sr-only">Événements nommés agrégés sur la période</caption>
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                      <th scope="col" className="px-2 py-2 font-medium">Événement</th>
+                      <th scope="col" className="px-2 py-2 text-right font-medium">Occurrences</th>
+                      <th scope="col" className="px-2 py-2 font-medium">Type</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {events.map((event) => (
+                      <tr key={event.name} className="border-b border-border last:border-0">
+                        <th scope="row" className="px-2 py-2 text-left font-mono text-xs font-medium sm:text-sm">{event.name}</th>
+                        <td className="px-2 py-2 text-right font-mono text-xs tabular-nums sm:text-sm">{event.count.toLocaleString('fr-FR')}</td>
+                        <td className="px-2 py-2">
+                          {event.goal ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-foreground">
+                              <Flag className="h-3 w-3" aria-hidden="true" />
+                              Objectif
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Événement</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-muted-foreground">
+                Aucun événement nommé reçu sur la période sélectionnée. {canManage ? 'Vous pouvez définir des objectifs et intégrer le snippet d’événement ci-dessous.' : 'Les événements nommés apparaîtront ici lorsqu’ils auront été mesurés.'}
+              </p>
+            )}
+
+            {canManage && (
+              <div className="mt-5 space-y-3 rounded-lg border border-border bg-muted/20 p-4">
+                <div>
+                  <h4 className="text-sm font-medium">Objectifs de conversion</h4>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Définissez les noms d’événements à considérer comme objectifs (minuscules, chiffres, <code>.</code> <code>_</code> <code>:</code> <code>-</code>, 20 maximum). Ces objectifs servent à marquer les événements agrégés mesurés.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="flex-1">
+                    <label htmlFor={`goal-input-${projectId}`} className="mb-1 block text-xs font-medium text-muted-foreground">
+                      Ajouter un objectif
+                    </label>
+                    <input
+                      id={`goal-input-${projectId}`}
+                      value={goalInput}
+                      onChange={(e) => setGoalInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          addGoal()
+                        }
+                      }}
+                      placeholder="ex. signup, purchase"
+                      className="min-h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={addGoal} disabled={goalDraft.length >= GOAL_EVENTS_MAX || goalInput.trim() === ''}>
+                    <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                    Ajouter
+                  </Button>
+                </div>
+
+                {goalDraft.length > 0 ? (
+                  <ul className="flex flex-wrap gap-2" aria-label="Objectifs définis">
+                    {goalDraft.map((goal) => (
+                      <li key={goal} className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-1 text-xs">
+                        <span className="font-mono">{goal}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeGoal(goal)}
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          aria-label={`Retirer l’objectif ${goal}`}
+                        >
+                          <X className="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Aucun objectif défini.</p>
+                )}
+
+                <div className="flex justify-end">
+                  <Button type="button" size="sm" onClick={() => void saveGoals()} loading={savingGoals} disabled={!goalsDirty} disabledReason="Aucune modification à enregistrer">
+                    Enregistrer les objectifs
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {!canManage && goalEvents.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs font-medium text-muted-foreground">Objectifs configurés</p>
+                <ul className="mt-2 flex flex-wrap gap-2">
+                  {goalEvents.map((goal) => (
+                    <li key={goal} className="rounded-full border border-border bg-muted/30 px-2 py-1 font-mono text-xs">{goal}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {configured && (snippet || config?.eventSnippet || canManage) && (
             <div className="rounded-lg border border-border bg-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold">Intégration</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Ajoutez le snippet sur les pages de votre site pour mesurer les pages vues. Le mode conditionné n’émet rien sans consentement explicite.
+                    Intégrez les snippets sur votre site pour mesurer les pages vues et les événements nommés. Aucune donnée n’est envoyée tant que la mesure n’est pas activée et le snippet intégré (en mode conditionné, le consentement est requis).
                   </p>
                 </div>
-                {snippet && <CopyButton value={snippet} label="Copier le snippet" />}
               </div>
 
-              {snippet ? (
-                <div className="mt-3 space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowConsentSnippet(false)}
-                      className={`min-h-9 rounded-lg border px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-11 ${!showConsentSnippet ? 'border-foreground bg-muted font-medium' : 'border-border text-muted-foreground hover:text-foreground'}`}
-                      aria-pressed={!showConsentSnippet}
-                    >
-                      Émission immédiate
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowConsentSnippet(true)}
-                      className={`min-h-9 rounded-lg border px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-11 ${showConsentSnippet ? 'border-foreground bg-muted font-medium' : 'border-border text-muted-foreground hover:text-foreground'}`}
-                      aria-pressed={showConsentSnippet}
-                    >
-                      Conditionné au consentement
-                    </button>
+              <div className="mt-4 space-y-5">
+                <section aria-labelledby={`pageview-snippet-${projectId}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 id={`pageview-snippet-${projectId}`} className="text-sm font-medium">Pages vues</h4>
+                    {snippet && <CopyButton value={snippet} label="Copier le snippet page vue" />}
                   </div>
-                  <pre className="overflow-x-auto rounded-lg border border-border bg-muted/40 p-3 font-mono text-xs leading-relaxed">
-                    <code>{snippet}</code>
-                  </pre>
-                  <p className="flex items-start gap-2 text-xs text-muted-foreground">
-                    <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    <span>
-                      Point de collecte : <span className="font-mono">{config?.collectUrl}</span>. Aucune donnée n’est envoyée tant que le snippet n’est pas intégré (et, en mode conditionné, tant que le consentement n’est pas recueilli).
-                    </span>
-                  </p>
-                </div>
-              ) : (
-                <p className="mt-3 text-sm text-muted-foreground">
-                  {canManage
-                    ? 'Activez la collecte pour générer un snippet d’intégration propre à ce projet.'
-                    : 'Le snippet d’intégration sera disponible une fois la collecte configurée par un gestionnaire.'}
-                </p>
-              )}
+                  {snippet ? (
+                    <div className="mt-2 space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowConsentSnippet(false)}
+                          className={`min-h-9 rounded-lg border px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-11 ${!showConsentSnippet ? 'border-foreground bg-muted font-medium' : 'border-border text-muted-foreground hover:text-foreground'}`}
+                          aria-pressed={!showConsentSnippet}
+                        >
+                          Émission immédiate
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowConsentSnippet(true)}
+                          className={`min-h-9 rounded-lg border px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-11 ${showConsentSnippet ? 'border-foreground bg-muted font-medium' : 'border-border text-muted-foreground hover:text-foreground'}`}
+                          aria-pressed={showConsentSnippet}
+                        >
+                          Conditionné au consentement
+                        </button>
+                      </div>
+                      <pre className="overflow-x-auto rounded-lg border border-border bg-muted/40 p-3 font-mono text-xs leading-relaxed">
+                        <code>{snippet}</code>
+                      </pre>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {canManage
+                        ? 'Activez la collecte pour générer le snippet de pages vues propre à ce projet.'
+                        : 'Le snippet sera disponible une fois la collecte configurée par un gestionnaire.'}
+                    </p>
+                  )}
+                </section>
 
+                <section aria-labelledby={`event-snippet-${projectId}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 id={`event-snippet-${projectId}`} className="text-sm font-medium">Événements nommés</h4>
+                    {config?.eventSnippet && <CopyButton value={config.eventSnippet} label="Copier le snippet événement" />}
+                  </div>
+                  {config?.eventSnippet ? (
+                    <div className="mt-2 space-y-2">
+                      <pre className="overflow-x-auto rounded-lg border border-border bg-muted/40 p-3 font-mono text-xs leading-relaxed">
+                        <code>{config.eventSnippet}</code>
+                      </pre>
+                      <p className="text-xs text-muted-foreground">
+                        Appelez <code className="font-mono">window.__eflexTrackEvent(&apos;nom&apos;)</code> après une action (ex. inscription). Seul le nom normalisé est comptabilisé, sans propriété ni identifiant.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-muted-foreground">Le snippet d’événement sera disponible lorsque la configuration analytique sera créée.</p>
+                  )}
+                </section>
+
+                <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                  <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span>
+                    Point de collecte : <span className="font-mono">{config?.collectUrl}</span>. Les données sont agrégées côté serveur (pages vues et noms d’événements uniquement).
+                  </span>
+                </p>
+
+                <p className="text-xs text-muted-foreground">
+                  Référence :{' '}
+                  <a
+                    href="https://github.com/digitaleflex/eflex/blob/main/docs/operations/analytics.md"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                  >
+                    documentation de la mesure d’audience
+                    <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                    <span className="sr-only"> (nouvel onglet)</span>
+                  </a>
+                  .
+                </p>
+              </div>
+            </div>
+          )}
+
+          {canManage && (
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold">Gestion des données</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Exportez ou supprimez les statistiques agrégées conservées pour ce projet. Ces actions concernent uniquement les mesures collectées (pages vues et événements nommés), pas la configuration.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => void downloadExport('json')} loading={exporting === 'json'} disabled={exporting !== null}>
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                  Exporter en JSON
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => void downloadExport('csv')} loading={exporting === 'csv'} disabled={exporting !== null}>
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                  Exporter en CSV
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setConfirmDelete(true)}>
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  Supprimer les statistiques
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setConfirmRotate(true)}>
+                  <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
+                  Régénérer la clé
+                </Button>
+              </div>
               <p className="mt-3 text-xs text-muted-foreground">
-                Référence :{' '}
-                <a
-                  href="https://github.com/digitaleflex/eflex/blob/main/docs/operations/analytics.md"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-                >
-                  documentation de la mesure d’audience
-                  <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                  <span className="sr-only"> (nouvel onglet)</span>
-                </a>
-                .
+                La régénération crée une nouvelle clé publique : les snippets déjà intégrés devront être remplacés. La suppression efface définitivement les statistiques conservées ; la clé, les objectifs et les réglages restent inchangés.
               </p>
             </div>
           )}
         </div>
       </SectionCard>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Supprimer les statistiques ?"
+        description="Toutes les statistiques agrégées conservées pour ce projet (pages vues et événements nommés) seront supprimées définitivement. La configuration analytique (activation, clé, objectifs, rétention) sera conservée."
+        confirmLabel="Supprimer les statistiques"
+        destructive
+        onConfirm={deleteStats}
+        onCancel={() => {
+          if (!deleting) setConfirmDelete(false)
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmRotate}
+        title="Régénérer la clé de mesure ?"
+        description="Une nouvelle clé publique sera générée pour ce projet. Les snippets et intégrations déjà en place cesseront d’envoyer des données valides tant qu’ils n’auront pas été mis à jour avec la nouvelle clé."
+        confirmLabel="Régénérer la clé"
+        onConfirm={rotateKey}
+        onCancel={() => {
+          if (!rotating) setConfirmRotate(false)
+        }}
+      />
     </div>
   )
 }
