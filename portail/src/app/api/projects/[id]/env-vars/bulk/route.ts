@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { allow, allowOrg } from '@/lib/rate-limit'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { assertCryptoConfig, encrypt } from '@/lib/crypto'
 import { publish } from '@/lib/event-bus'
 import { envBulkSchema, firstIssue } from '@/lib/project-settings'
@@ -28,11 +28,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Configuration du serveur incomplète.' }, { status: 500 })
   }
 
-  if (!(await allow(`env-bulk:${session.user.id}`, 20, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de modifications en peu de temps. Patientez une minute.' },
-      { status: 429 },
-    )
+  const userLimit = await check(`env-bulk:${session.user.id}`, 20, 60_000, { action: 'env-mutate-bulk', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de modifications en peu de temps. Patientez une minute.')
   }
 
   const org = await requireOrg(session)
@@ -43,11 +41,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       { status: 403 },
     )
   }
-  if (!(await allowOrg(org.organizationId, 'env-mutate', 40, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de modifications de variables pour cette organisation. Patientez une minute.' },
-      { status: 429 },
-    )
+  const orgLimit = await checkOrg(org.organizationId, 'env-mutate', 40, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de modifications de variables pour cette organisation. Patientez une minute.')
   }
 
   let body: unknown

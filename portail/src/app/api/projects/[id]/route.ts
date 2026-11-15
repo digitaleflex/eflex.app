@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { Prisma } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { allow, allowOrg, check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { publish } from '@/lib/event-bus'
 import { audit } from '@/lib/audit'
 import { deleteApplication, deletePrivateKey, deleteManagedDatabase } from '@/lib/coolify'
@@ -125,8 +125,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { id } = await params
 
-  if (!(await allow(`project-update:${session.user.id}`, 30, 60_000))) {
-    return NextResponse.json({ error: 'Trop de modifications en peu de temps. Patientez une minute.' }, { status: 429 })
+  const userLimit = await check(`project-update:${session.user.id}`, 30, 60_000, { action: 'project-update', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de modifications en peu de temps. Patientez une minute.')
   }
 
   const org = await requireOrg(session)
@@ -138,11 +139,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       { status: 403 },
     )
   }
-  if (!(await allowOrg(org.organizationId, 'project-mutate', 60, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de modifications de projets pour cette organisation. Patientez une minute.' },
-      { status: 429 },
-    )
+  const orgLimit = await checkOrg(org.organizationId, 'project-mutate', 60, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de modifications de projets pour cette organisation. Patientez une minute.')
   }
 
   let body: unknown
@@ -157,7 +156,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: firstIssue(parsed.error) }, { status: 400 })
   }
 
-  const existingResult = await requireProject(org, id, { id: true })
+  const existingResult = await requireProject(org, id, {
+    id: true,
+    name: true,
+    branch: true,
+    slug: true,
+    domain: true,
+  })
   if ('response' in existingResult) return existingResult.response
   const existing = existingResult.project
 
@@ -168,11 +173,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     data.productionBranch = parsed.data.branch
   }
 
-  const project = await prisma.project.update({
-    where: { id: existing.id },
+  const updated = await prisma.project.updateMany({
+    where: { id: existing.id, organizationId: org.organizationId },
     data,
-    select: { id: true, name: true, branch: true, slug: true, domain: true },
   })
+  if (updated.count === 0) return tenantNotFound('Projet introuvable')
+
+  const project = {
+    id: existing.id,
+    name: parsed.data.name ?? existing.name,
+    branch: parsed.data.branch ?? existing.branch,
+    slug: existing.slug,
+    domain: existing.domain,
+  }
 
   await publish({
     type: 'project.updated',
@@ -199,8 +212,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   const { id } = await params
 
-  if (!(await allow(`project-delete:${session.user.id}`, 10, 60_000))) {
-    return NextResponse.json({ error: 'Trop de suppressions en peu de temps. Patientez une minute.' }, { status: 429 })
+  const userLimit = await check(`project-delete:${session.user.id}`, 10, 60_000, { action: 'project-delete', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de suppressions en peu de temps. Patientez une minute.')
   }
 
   const org = await requireOrg(session)
@@ -212,11 +226,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       { status: 403 },
     )
   }
-  if (!(await allowOrg(org.organizationId, 'project-mutate', 30, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de modifications de projets pour cette organisation. Patientez une minute.' },
-      { status: 429 },
-    )
+  const orgLimit = await checkOrg(org.organizationId, 'project-mutate', 30, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de modifications de projets pour cette organisation. Patientez une minute.')
   }
 
   const projectResult = await requireProject(org, id, {
@@ -284,7 +296,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     }
   }
 
-  await prisma.project.delete({ where: { id: project.id } })
+  const deleted = await prisma.project.deleteMany({
+    where: { id: project.id, organizationId: org.organizationId },
+  })
+  if (deleted.count === 0) return tenantNotFound('Projet introuvable')
 
   await audit({
     actor: { id: session.user.id, email: session.user.email },

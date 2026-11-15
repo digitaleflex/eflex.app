@@ -5,7 +5,7 @@ import { audit } from '@/lib/audit'
 import { canManageProjects } from '@/lib/organizations'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
 import { isAppDeployed } from '@/lib/project-primary'
-import { allowOrg } from '@/lib/rate-limit'
+import { checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { requireOrg, requireProjectDomain, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
@@ -25,10 +25,11 @@ export async function DELETE(
     return NextResponse.json({ error: 'Votre rôle ne permet pas de retirer ce domaine.' }, { status: 403 })
   }
 
-  if (!(await allowOrg(org.organizationId, 'domain-mutate', 20, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de modifications de domaines pour cette organisation en peu de temps. Patientez une minute.' },
-      { status: 429 },
+  const mutateLimit = await checkOrg(org.organizationId, 'domain-mutate', 20, 60_000)
+  if (!mutateLimit.allowed) {
+    return rateLimitedResponse(
+      mutateLimit,
+      'Trop de modifications de domaines pour cette organisation en peu de temps. Patientez une minute.',
     )
   }
 
@@ -63,7 +64,8 @@ export async function DELETE(
     }
   }
 
-  await prisma.projectDomain.delete({ where: { id: domain.id } })
+  const deleted = await prisma.projectDomain.deleteMany({ where: { id: domain.id, projectId: id } })
+  if (deleted.count === 0) return tenantNotFound('Domaine introuvable.')
 
   await audit({
     actor: { id: session.user.id, email: session.user.email },

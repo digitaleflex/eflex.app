@@ -7,7 +7,7 @@ import { canManageProjects } from '@/lib/organizations'
 import { platformDomain, validateCustomDomain } from '@/lib/custom-domain'
 import { effectivePlan } from '@/lib/billing'
 import { getPrimaryApp, resolveEffectiveApp } from '@/lib/project-primary'
-import { allowOrg, check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'

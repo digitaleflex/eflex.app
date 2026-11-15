@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { allow, allowOrg } from '@/lib/rate-limit'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 import { assertProjectManager, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 import { appUrl } from '@/lib/email'
@@ -104,14 +104,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const denied = assertProjectManager(org)
   if (denied) return denied
 
-  if (!(await allow(`analytics-config:${session.user.id}`, 30, 60_000))) {
-    return NextResponse.json({ error: 'Trop de modifications en peu de temps. Patientez une minute.' }, { status: 429 })
+  const userLimit = await check(`analytics-config:${session.user.id}`, 30, 60_000, { action: 'analytics-config', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de modifications en peu de temps. Patientez une minute.')
   }
-  if (!(await allowOrg(org.organizationId, 'analytics-config', 60, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de modifications pour cette organisation. Patientez une minute.' },
-      { status: 429 },
-    )
+  const orgLimit = await checkOrg(org.organizationId, 'analytics-config', 60, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de modifications pour cette organisation. Patientez une minute.')
   }
 
   const { id } = await params

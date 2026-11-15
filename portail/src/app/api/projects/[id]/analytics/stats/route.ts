@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { audit } from '@/lib/audit'
-import { allow, allowOrg } from '@/lib/rate-limit'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { assertProjectManager, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 import { deleteAllTrafficStatsForProject, purgeTrafficStatsForProject } from '@/lib/analytics'
 
@@ -102,14 +102,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const denied = assertProjectManager(org)
   if (denied) return denied
 
-  if (!(await allow(`analytics-delete:${session.user.id}`, 10, 60_000))) {
-    return NextResponse.json({ error: 'Trop de suppressions en peu de temps. Patientez une minute.' }, { status: 429 })
+  const userLimit = await check(`analytics-delete:${session.user.id}`, 10, 60_000, { action: 'analytics-delete', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de suppressions en peu de temps. Patientez une minute.')
   }
-  if (!(await allowOrg(org.organizationId, 'analytics-delete', 20, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de suppressions pour cette organisation. Patientez une minute.' },
-      { status: 429 },
-    )
+  const orgLimit = await checkOrg(org.organizationId, 'analytics-delete', 20, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de suppressions pour cette organisation. Patientez une minute.')
   }
 
   const { id } = await params

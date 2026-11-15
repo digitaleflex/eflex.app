@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { allow } from '@/lib/rate-limit'
+import { check, rateLimitedResponse } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 import { resolveOrganization } from '@/lib/organizations'
 import { memberIds, notify } from '@/lib/notifications'
@@ -46,8 +46,9 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-  if (!(await allow(`support:create:${session.user.id}`, 5, 60 * 60_000))) {
-    return NextResponse.json({ error: 'Trop de tickets soumis récemment. Réessayez dans une heure.' }, { status: 429 })
+  const userLimit = await check(`support:create:${session.user.id}`, 5, 60 * 60_000, { action: 'support-create', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de tickets soumis récemment. Réessayez dans une heure.')
   }
 
   const body = await request.json().catch(() => null)

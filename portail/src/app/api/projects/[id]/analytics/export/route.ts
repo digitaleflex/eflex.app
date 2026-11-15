@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { audit } from '@/lib/audit'
-import { allow, allowOrg } from '@/lib/rate-limit'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { assertProjectManager, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 import { purgeTrafficStatsForProject } from '@/lib/analytics'
 
@@ -26,14 +26,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const denied = assertProjectManager(org)
   if (denied) return denied
 
-  if (!(await allow(`analytics-export:${session.user.id}`, 20, 60_000))) {
-    return NextResponse.json({ error: 'Trop d’exports en peu de temps. Patientez une minute.' }, { status: 429 })
+  const userLimit = await check(`analytics-export:${session.user.id}`, 20, 60_000, { action: 'analytics-export', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop d’exports en peu de temps. Patientez une minute.')
   }
-  if (!(await allowOrg(org.organizationId, 'analytics-export', 40, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop d’exports pour cette organisation. Patientez une minute.' },
-      { status: 429 },
-    )
+  const orgLimit = await checkOrg(org.organizationId, 'analytics-export', 40, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop d’exports pour cette organisation. Patientez une minute.')
   }
 
   const { id } = await params

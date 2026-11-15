@@ -4,7 +4,7 @@ import { getSession } from '@/lib/session'
 import { getApplicationLogs } from '@/lib/coolify'
 import { decrypt } from '@/lib/crypto'
 import { collectProjectSecretValues, countSuspiciousLines, parseLogs, sanitizeLogText } from '@/lib/log-lines'
-import { allow, allowOrg } from '@/lib/rate-limit'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { getPrimaryApp } from '@/lib/project-primary'
 import { requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
@@ -15,8 +15,9 @@ export const runtime = 'nodejs'
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-  if (!(await allow(`runtime-logs:${session.user.id}`, 30, 60_000))) {
-    return NextResponse.json({ error: 'Trop de lectures de journaux. Patientez une minute.' }, { status: 429 })
+  const userLimit = await check(`runtime-logs:${session.user.id}`, 30, 60_000, { action: 'runtime-logs', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de lectures de journaux. Patientez une minute.')
   }
 
   const org = await requireOrg(session)
@@ -25,11 +26,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (org.role === 'billing') {
     return NextResponse.json({ error: 'Le rôle facturation n’a pas accès aux journaux.' }, { status: 403 })
   }
-  if (!(await allowOrg(org.organizationId, 'runtime-logs', 120, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de lectures de journaux pour cette organisation en peu de temps. Patientez une minute.' },
-      { status: 429 },
-    )
+  const orgLimit = await checkOrg(org.organizationId, 'runtime-logs', 120, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de lectures de journaux pour cette organisation en peu de temps. Patientez une minute.')
   }
 
   const { id } = await params
@@ -57,6 +56,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   let targetApp: { id: string; name: string; position: number; coolifyAppId: string | null; plan: unknown } | null = null
   const apps = project.apps
+  if (apps.length > 1 && !requestedAppId) {
+    return NextResponse.json(
+      { error: 'Plusieurs applications existent pour ce projet. Précisez le paramètre « appId ».' },
+      { status: 400 },
+    )
+  }
   if (requestedAppId) {
     targetApp = apps.find((app) => app.id === requestedAppId) ?? null
     if (!targetApp) {

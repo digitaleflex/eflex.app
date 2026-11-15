@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { allow } from '@/lib/rate-limit'
+import { check, rateLimitedResponse } from '@/lib/rate-limit'
 import { getPatSummary, listPatRepositories } from '@/lib/git-credentials'
 import { listInstallationRepositories, type GitHubRepoSummary } from '@/lib/github-app'
 
@@ -24,11 +24,9 @@ export async function GET() {
   }
   const userId = session.user.id
 
-  if (!(await allow(`github-repositories:${userId}`, 30, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de demandes de dépôts en peu de temps. Patientez une minute.' },
-      { status: 429 },
-    )
+  const userLimit = await check(`github-repositories:${userId}`, 30, 60_000, { action: 'github-repositories', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de demandes de dépôts en peu de temps. Patientez une minute.')
   }
 
   const [installations, pat] = await Promise.all([

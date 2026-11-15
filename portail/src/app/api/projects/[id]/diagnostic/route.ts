@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 import { diagnoseFailure } from '@/lib/deployment-diagnosis'
-import { allow, allowOrg } from '@/lib/rate-limit'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,14 +30,16 @@ function repoLabel(repoUrl: string | null | undefined, repoFullName: string | nu
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-  if (!(await allow(`diagnostic-export:${session.user.id}`, 10, 60_000))) {
-    return NextResponse.json({ error: 'Trop de demandes. Réessayez dans une minute.' }, { status: 429 })
+  const userLimit = await check(`diagnostic-export:${session.user.id}`, 10, 60_000, { action: 'diagnostic-export', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de demandes. Réessayez dans une minute.')
   }
 
   const org = await requireOrg(session)
   if (!org) return tenantNotFound('Projet introuvable')
-  if (!(await allowOrg(org.organizationId, 'diagnostic-export', 30, 60_000))) {
-    return NextResponse.json({ error: 'Trop de demandes pour cette organisation. Réessayez dans une minute.' }, { status: 429 })
+  const orgLimit = await checkOrg(org.organizationId, 'diagnostic-export', 30, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de demandes pour cette organisation. Réessayez dans une minute.')
   }
   const { id } = await params
   const projectResult = await requireProject(org, id, {

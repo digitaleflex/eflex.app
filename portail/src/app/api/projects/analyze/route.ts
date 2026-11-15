@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/session'
-import { allow, allowOrg } from '@/lib/rate-limit'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { analyzeGitHubRepo } from '@/lib/repo-analysis'
 import { errorResponse, repoFields, resolveRepo } from '@/lib/analysis-request'
 import { resolveUserRepoToken } from '@/lib/git-credentials'
@@ -23,17 +23,13 @@ export async function POST(request: NextRequest) {
   }
 
   // Chaque analyse consomme des requêtes GitHub : on limite par utilisateur et par organisation.
-  if (!(await allow(`analyze:${session.user.id}`, 10, 60_000))) {
-    return NextResponse.json(
-      { error: "Trop d'analyses en peu de temps. Patientez une minute avant de réessayer." },
-      { status: 429 },
-    )
+  const userLimit = await check(`analyze:${session.user.id}`, 10, 60_000, { action: 'analyze', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, "Trop d'analyses en peu de temps. Patientez une minute avant de réessayer.")
   }
-  if (!(await allowOrg(org.organizationId, 'analyze', 30, 60_000))) {
-    return NextResponse.json(
-      { error: "Trop d'analyses pour cette organisation en peu de temps. Patientez une minute." },
-      { status: 429 },
-    )
+  const orgLimit = await checkOrg(org.organizationId, 'analyze', 30, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, "Trop d'analyses pour cette organisation en peu de temps. Patientez une minute.")
   }
 
   let body: unknown

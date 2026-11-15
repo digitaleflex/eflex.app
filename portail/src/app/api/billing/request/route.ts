@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { canManageBilling, resolveOrganization } from '@/lib/organizations'
-import { allow, allowOrg } from '@/lib/rate-limit'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { publish } from '@/lib/event-bus'
 import { PLANS, isPlanId } from '@/lib/plans'
 
@@ -27,11 +27,13 @@ export async function POST(request: NextRequest) {
       { status: 403 },
     )
   }
-  if (!(await allow(`billing-request:${session.user.id}`, 10, 60_000))) {
-    return NextResponse.json({ error: 'Trop de demandes en peu de temps. Patientez une minute.' }, { status: 429 })
+  const userLimit = await check(`billing-request:${session.user.id}`, 10, 60_000, { action: 'billing-request', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de demandes en peu de temps. Patientez une minute.')
   }
-  if (!(await allowOrg(org.organizationId, 'billing-mutate', 20, 60_000))) {
-    return NextResponse.json({ error: 'Trop de demandes pour cette organisation. Patientez une minute.' }, { status: 429 })
+  const orgLimit = await checkOrg(org.organizationId, 'billing-mutate', 20, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de demandes pour cette organisation. Patientez une minute.')
   }
 
   let body: unknown

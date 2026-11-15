@@ -6,7 +6,7 @@ import { canManageProjects } from '@/lib/organizations'
 import { checkDomainDns } from '@/lib/custom-domain'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
 import { isAppDeployed } from '@/lib/project-primary'
-import { allowOrg } from '@/lib/rate-limit'
+import { checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { requireOrg, requireProjectDomain, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
@@ -26,10 +26,11 @@ export async function POST(
     return NextResponse.json({ error: 'Votre rôle ne permet pas de vérifier ce domaine.' }, { status: 403 })
   }
 
-  if (!(await allowOrg(org.organizationId, 'domain-mutate', 20, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de modifications de domaines pour cette organisation en peu de temps. Patientez une minute.' },
-      { status: 429 },
+  const mutateLimit = await checkOrg(org.organizationId, 'domain-mutate', 20, 60_000)
+  if (!mutateLimit.allowed) {
+    return rateLimitedResponse(
+      mutateLimit,
+      'Trop de modifications de domaines pour cette organisation en peu de temps. Patientez une minute.',
     )
   }
 
@@ -72,10 +73,11 @@ export async function POST(
     )
   }
 
-  await prisma.projectDomain.update({
-    where: { id: domain.id },
+  const updated = await prisma.projectDomain.updateMany({
+    where: { id: domain.id, projectId: id },
     data: { verifiedAt: new Date() },
   })
+  if (updated.count === 0) return tenantNotFound('Domaine introuvable.')
 
   let deploymentId: string | null = null
   const shouldEnqueue = domain.app

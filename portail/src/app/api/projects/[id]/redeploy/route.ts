@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
 import { multiAppEnabled } from '@/lib/multi-app'
-import { allow, allowOrg } from '@/lib/rate-limit'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { getPrimaryApp } from '@/lib/project-primary'
 import { assertProjectManager, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
@@ -21,11 +21,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
-  if (!(await allow(`redeploy:${session.user.id}`, 10, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de redéploiements en peu de temps. Patientez une minute.' },
-      { status: 429 },
-    )
+  const userLimit = await check(`redeploy:${session.user.id}`, 10, 60_000, { action: 'redeploy', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de redéploiements en peu de temps. Patientez une minute.')
   }
 
   const { id } = await params
@@ -38,11 +36,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (denied) {
     return NextResponse.json({ error: 'Votre rôle dans cette organisation ne permet pas de relancer un déploiement.' }, { status: 403 })
   }
-  if (!(await allowOrg(org.organizationId, 'redeploy', 30, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de redéploiements pour cette organisation en peu de temps. Patientez une minute.' },
-      { status: 429 },
-    )
+  const orgLimit = await checkOrg(org.organizationId, 'redeploy', 30, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de redéploiements pour cette organisation en peu de temps. Patientez une minute.')
   }
   const projectResult = await requireProject(org, id, {
     id: true,

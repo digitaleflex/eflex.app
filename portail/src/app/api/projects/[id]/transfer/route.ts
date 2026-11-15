@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
-import { allow, allowOrg } from '@/lib/rate-limit'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { firstIssue } from '@/lib/project-settings'
 import { transferProject, transferProjectSchema } from '@/lib/project-transfer'
 import { requireOrg, tenantNotFound } from '@/lib/tenant'
@@ -18,17 +18,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
-  if (!(await allow(`project-transfer:${session.user.id}`, 10, 60_000))) {
-    return NextResponse.json({ error: 'Trop de transferts en peu de temps. Patientez une minute.' }, { status: 429 })
+  const userLimit = await check(`project-transfer:${session.user.id}`, 10, 60_000, { action: 'project-transfer', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de transferts en peu de temps. Patientez une minute.')
   }
 
   const org = await requireOrg(session)
   if (!org) return tenantNotFound('Projet introuvable')
-  if (!(await allowOrg(org.organizationId, 'project-mutate', 20, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de modifications de projets pour cette organisation. Patientez une minute.' },
-      { status: 429 },
-    )
+  const orgLimit = await checkOrg(org.organizationId, 'project-mutate', 20, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de modifications de projets pour cette organisation. Patientez une minute.')
   }
 
   const { id } = await params

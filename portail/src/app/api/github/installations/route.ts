@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { allow } from '@/lib/rate-limit'
+import { check, rateLimitedResponse } from '@/lib/rate-limit'
 import { GITHUB_INSTALL_STATE_COOKIE, installationExists } from '@/lib/github-app'
 
 export const dynamic = 'force-dynamic'
@@ -19,8 +19,9 @@ export async function POST(request: NextRequest) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
-  if (!(await allow(`github-installation:${session.user.id}`, 15, 60_000))) {
-    return NextResponse.json({ error: 'Trop de tentatives en peu de temps. Patientez une minute.' }, { status: 429 })
+  const userLimit = await check(`github-installation:${session.user.id}`, 15, 60_000, { action: 'github-installation', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de tentatives en peu de temps. Patientez une minute.')
   }
 
   let body: unknown

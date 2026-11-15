@@ -6,7 +6,7 @@ import { canManageProjects } from '@/lib/organizations'
 import { publish } from '@/lib/event-bus'
 import { deleteApplication } from '@/lib/coolify'
 import { ACTIVE_DEPLOYMENT_STATUSES } from '@/lib/deployment-state'
-import { allowOrg } from '@/lib/rate-limit'
+import { checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { requireOrg, requireProject, requireProjectApp, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
@@ -62,10 +62,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     )
   }
 
-  if (!(await allowOrg(org.organizationId, 'app-mutate', 30, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de modifications d’applications pour cette organisation en peu de temps. Patientez une minute.' },
-      { status: 429 },
+  const mutateLimit = await checkOrg(org.organizationId, 'app-mutate', 30, 60_000)
+  if (!mutateLimit.allowed) {
+    return rateLimitedResponse(
+      mutateLimit,
+      'Trop de modifications d’applications pour cette organisation en peu de temps. Patientez une minute.',
     )
   }
 
@@ -156,10 +157,11 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     )
   }
 
-  if (!(await allowOrg(org.organizationId, 'app-mutate', 30, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de modifications d’applications pour cette organisation en peu de temps. Patientez une minute.' },
-      { status: 429 },
+  const mutateLimit = await checkOrg(org.organizationId, 'app-mutate', 30, 60_000)
+  if (!mutateLimit.allowed) {
+    return rateLimitedResponse(
+      mutateLimit,
+      'Trop de modifications d’applications pour cette organisation en peu de temps. Patientez une minute.',
     )
   }
 

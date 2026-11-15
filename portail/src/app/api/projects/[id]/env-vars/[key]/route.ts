@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { allow, allowOrg } from '@/lib/rate-limit'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { publish } from '@/lib/event-bus'
 import { ENV_KEY_MAX, ENV_KEY_PATTERN } from '@/lib/project-settings'
 import { assertProjectManager, requireOrg, requireProject, requireProjectApp, tenantNotFound } from '@/lib/tenant'
@@ -25,11 +25,9 @@ export async function DELETE(
     return NextResponse.json({ error: 'Nom de variable invalide.' }, { status: 400 })
   }
 
-  if (!(await allow(`env:${session.user.id}`, 60, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de modifications en peu de temps. Patientez une minute.' },
-      { status: 429 },
-    )
+  const userLimit = await check(`env:${session.user.id}`, 60, 60_000, { action: 'env-mutate', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de modifications en peu de temps. Patientez une minute.')
   }
 
   const org = await requireOrg(session)
@@ -41,11 +39,9 @@ export async function DELETE(
       { status: 403 },
     )
   }
-  if (!(await allowOrg(org.organizationId, 'env-mutate', 120, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de modifications de variables pour cette organisation. Patientez une minute.' },
-      { status: 429 },
-    )
+  const orgLimit = await checkOrg(org.organizationId, 'env-mutate', 120, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de modifications de variables pour cette organisation. Patientez une minute.')
   }
 
   const projectResult = await requireProject(org, id, { id: true })

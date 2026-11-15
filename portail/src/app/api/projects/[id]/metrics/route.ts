@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { getApplicationMetrics, getApplicationRuntime } from '@/lib/coolify'
-import { allow, allowOrg } from '@/lib/rate-limit'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { getPrimaryApp } from '@/lib/project-apps'
 import { requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
@@ -13,20 +13,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  if (!(await allow(`runtime-metrics:${session.user.id}`, 30, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de lectures de métriques. Patientez une minute.' },
-      { status: 429 },
-    )
+  const userLimit = await check(`runtime-metrics:${session.user.id}`, 30, 60_000, { action: 'runtime-metrics', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de lectures de métriques. Patientez une minute.')
   }
 
   const org = await requireOrg(session)
   if (!org) return tenantNotFound('Projet introuvable')
-  if (!(await allowOrg(org.organizationId, 'runtime-metrics', 120, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de lectures de métriques pour cette organisation en peu de temps. Patientez une minute.' },
-      { status: 429 },
-    )
+  const orgLimit = await checkOrg(org.organizationId, 'runtime-metrics', 120, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de lectures de métriques pour cette organisation en peu de temps. Patientez une minute.')
   }
 
   const { id } = await params
@@ -49,6 +45,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   let targetApp: { id: string; coolifyAppId: string | null } | null = null
   const apps = project.apps
+  if (apps.length > 1 && !requestedAppId) {
+    return NextResponse.json(
+      { error: 'Plusieurs applications existent pour ce projet. Précisez le paramètre « appId ».' },
+      { status: 400 },
+    )
+  }
   if (requestedAppId) {
     targetApp = apps.find((app) => app.id === requestedAppId) ?? null
     if (!targetApp) {

@@ -3,7 +3,7 @@ import { headers } from 'next/headers'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { getSession } from '@/lib/session'
-import { allow } from '@/lib/rate-limit'
+import { check, rateLimitedResponse } from '@/lib/rate-limit'
 import { PASSPHRASE_MAX_LENGTH, PASSPHRASE_MIN_LENGTH } from '@/lib/auth-validation'
 
 const schema = z.object({
@@ -21,8 +21,9 @@ export async function POST(request: Request) {
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Session expirée.' }, { status: 401 })
 
-  if (!(await allow(`set-password:${session.user.id}`, 5, 60_000))) {
-    return NextResponse.json({ error: 'Trop de tentatives. Patientez une minute.' }, { status: 429 })
+  const userLimit = await check(`set-password:${session.user.id}`, 5, 60_000, { action: 'set-password', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de tentatives. Patientez une minute.')
   }
 
   const parsed = schema.safeParse(await request.json().catch(() => null))

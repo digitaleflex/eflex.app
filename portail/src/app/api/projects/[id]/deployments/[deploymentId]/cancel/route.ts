@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { canManageProjects } from '@/lib/organizations'
-import { allow, allowOrg } from '@/lib/rate-limit'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { cancelDeployment as cancelCoolifyDeployment } from '@/lib/coolify'
 import { removeQueuedDeployment } from '@/lib/queue'
 import { isTerminal } from '@/lib/deployment-state'
@@ -42,17 +42,13 @@ export async function POST(
     )
   }
 
-  if (!(await allow(`cancel-deployment:${session.user.id}`, 10, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop d’annulations en peu de temps. Patientez une minute.' },
-      { status: 429 },
-    )
+  const userLimit = await check(`cancel-deployment:${session.user.id}`, 10, 60_000, { action: 'deployment-cancel', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop d’annulations en peu de temps. Patientez une minute.')
   }
-  if (!(await allowOrg(org.organizationId, 'deployment-cancel', 30, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop d’annulations pour cette organisation en peu de temps. Patientez une minute.' },
-      { status: 429 },
-    )
+  const orgLimit = await checkOrg(org.organizationId, 'deployment-cancel', 30, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop d’annulations pour cette organisation en peu de temps. Patientez une minute.')
   }
 
   const { id, deploymentId } = await params

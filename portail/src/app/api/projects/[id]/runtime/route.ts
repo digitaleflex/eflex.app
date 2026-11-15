@@ -4,7 +4,7 @@ import { getSession } from '@/lib/session'
 import { canManageProjects } from '@/lib/organizations'
 import { applicationAction, getApplicationRuntime, type ApplicationAction } from '@/lib/coolify'
 import { getPrimaryApp } from '@/lib/project-primary'
-import { allowOrg } from '@/lib/rate-limit'
+import { checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
@@ -57,27 +57,38 @@ type RuntimeProject = {
   }>
 }
 
+const APP_ID_REQUIRED = 'Plusieurs applications existent pour ce projet. Précisez le paramètre « appId ».'
+
 function resolveTarget(
   project: RuntimeProject,
   requestedAppId: string | null,
-): { target: { id: string | null; coolifyAppId: string | null; tlsValid: boolean | null; tlsExpiresAt: Date | null; tlsCheckedAt: Date | null }; notFound: boolean } {
+): { target: { id: string | null; coolifyAppId: string | null; tlsValid: boolean | null; tlsExpiresAt: Date | null; tlsCheckedAt: Date | null }; notFound: boolean; ambiguous: boolean } {
+  if (project.apps.length > 1 && !requestedAppId) {
+    return {
+      target: { id: null, coolifyAppId: null, tlsValid: null, tlsExpiresAt: null, tlsCheckedAt: null },
+      notFound: false,
+      ambiguous: true,
+    }
+  }
   if (requestedAppId) {
     const app = project.apps.find((item) => item.id === requestedAppId)
     if (!app) {
       return {
         target: { id: null, coolifyAppId: null, tlsValid: null, tlsExpiresAt: null, tlsCheckedAt: null },
         notFound: true,
+        ambiguous: false,
       }
     }
-    return { target: { id: app.id, coolifyAppId: app.coolifyAppId, tlsValid: app.tlsValid, tlsExpiresAt: app.tlsExpiresAt, tlsCheckedAt: app.tlsCheckedAt }, notFound: false }
+    return { target: { id: app.id, coolifyAppId: app.coolifyAppId, tlsValid: app.tlsValid, tlsExpiresAt: app.tlsExpiresAt, tlsCheckedAt: app.tlsCheckedAt }, notFound: false, ambiguous: false }
   }
   if (project.apps.length > 0) {
     const app = project.apps.find((item) => item.coolifyAppId) ?? getPrimaryApp(project.apps) ?? project.apps[0]!
-    return { target: { id: app.id, coolifyAppId: app.coolifyAppId, tlsValid: app.tlsValid, tlsExpiresAt: app.tlsExpiresAt, tlsCheckedAt: app.tlsCheckedAt }, notFound: false }
+    return { target: { id: app.id, coolifyAppId: app.coolifyAppId, tlsValid: app.tlsValid, tlsExpiresAt: app.tlsExpiresAt, tlsCheckedAt: app.tlsCheckedAt }, notFound: false, ambiguous: false }
   }
   return {
     target: { id: null, coolifyAppId: project.coolifyAppId, tlsValid: project.tlsValid, tlsExpiresAt: project.tlsExpiresAt, tlsCheckedAt: project.tlsCheckedAt },
     notFound: false,
+    ambiguous: false,
   }
 }
 
@@ -103,7 +114,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const project = projectResult.project as unknown as RuntimeProject
 
   const requestedAppId = new URL(request.url).searchParams.get('appId')?.trim() || null
-  const { target, notFound } = resolveTarget(project, requestedAppId)
+  const { target, notFound, ambiguous } = resolveTarget(project, requestedAppId)
+  if (ambiguous) return NextResponse.json({ error: APP_ID_REQUIRED }, { status: 400 })
   if (notFound) return NextResponse.json({ error: 'Application introuvable.' }, { status: 404 })
 
   const tls = tlsPayload(target)
@@ -130,10 +142,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Votre rôle ne permet pas cette action.' }, { status: 403 })
   }
 
-  if (!(await allowOrg(org.organizationId, 'runtime-action', 30, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop d’actions d’exécution pour cette organisation en peu de temps. Patientez une minute.' },
-      { status: 429 },
+  const mutateLimit = await checkOrg(org.organizationId, 'runtime-action', 30, 60_000)
+  if (!mutateLimit.allowed) {
+    return rateLimitedResponse(
+      mutateLimit,
+      'Trop d’actions d’exécution pour cette organisation en peu de temps. Patientez une minute.',
     )
   }
 
@@ -154,7 +167,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const requestedAppId = parsed.data.appId ?? new URL(request.url).searchParams.get('appId')?.trim() ?? null
-  const { target, notFound } = resolveTarget(project, requestedAppId)
+  const { target, notFound, ambiguous } = resolveTarget(project, requestedAppId)
+  if (ambiguous) return NextResponse.json({ error: APP_ID_REQUIRED }, { status: 400 })
   if (notFound) return NextResponse.json({ error: 'Application introuvable.' }, { status: 404 })
   if (!target.coolifyAppId) {
     return NextResponse.json({ error: "Cette application n'a pas encore été déployée." }, { status: 409 })

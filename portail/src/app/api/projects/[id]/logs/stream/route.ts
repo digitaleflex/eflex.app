@@ -65,6 +65,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const requestedAppId = search.get('appId')?.trim() || null
 
   let targetApp = null as null | { id: string; name: string; position: number; coolifyAppId: string | null; plan: unknown }
+  if (project.apps.length > 1 && !requestedAppId) {
+    return NextResponse.json(
+      { error: 'Plusieurs applications existent pour ce projet. Précisez le paramètre « appId ».' },
+      { status: 400 },
+    )
+  }
   if (requestedAppId) {
     targetApp = project.apps.find((app) => app.id === requestedAppId) ?? null
     if (!targetApp) return NextResponse.json({ error: 'Application introuvable.' }, { status: 404 })

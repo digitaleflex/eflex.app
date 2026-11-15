@@ -16,7 +16,7 @@ import { MAINTENANCE_DEPLOYMENT_MESSAGE, isMaintenanceActive } from '@/lib/platf
 import { assertDeploymentAllowed, assertProjectQuota } from '@/lib/billing'
 import { resolveProjectToken } from '@/lib/git-credentials'
 import { appDomain, appNameFromRoot, normalizeAppRoot, uniqueAppName } from '@/lib/project-apps'
-import { allowOrg } from '@/lib/rate-limit'
+import { checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
@@ -119,10 +119,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     )
   }
 
-  if (!(await allowOrg(org.organizationId, 'app-create', 20, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de créations d’applications pour cette organisation en peu de temps. Patientez une minute.' },
-      { status: 429 },
+  const createLimit = await checkOrg(org.organizationId, 'app-create', 20, 60_000)
+  if (!createLimit.allowed) {
+    return rateLimitedResponse(
+      createLimit,
+      'Trop de créations d’applications pour cette organisation en peu de temps. Patientez une minute.',
     )
   }
 

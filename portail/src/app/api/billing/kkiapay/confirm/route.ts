@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { canManageBilling, resolveOrganization } from '@/lib/organizations'
-import { allow, allowOrg } from '@/lib/rate-limit'
+import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { findPayment, kkiapayConfigured, verifyKkiapayTransaction, activatePayment } from '@/lib/payments'
 
 export const dynamic = 'force-dynamic'
@@ -18,8 +18,9 @@ export async function POST(request: NextRequest) {
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   if (!kkiapayConfigured()) return NextResponse.json({ error: 'Kkiapay non configuré.' }, { status: 503 })
-  if (!(await allow(`kkiapay-confirm:${session.user.id}`, 10, 60_000))) {
-    return NextResponse.json({ error: 'Trop de tentatives. Patientez une minute.' }, { status: 429 })
+  const userLimit = await check(`kkiapay-confirm:${session.user.id}`, 10, 60_000, { action: 'billing-kkiapay-confirm', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de tentatives. Patientez une minute.')
   }
 
   const org = await resolveOrganization(session)
@@ -27,8 +28,9 @@ export async function POST(request: NextRequest) {
   if (!canManageBilling(org.role)) {
     return NextResponse.json({ error: 'Accès à la facturation non autorisé.' }, { status: 403 })
   }
-  if (!(await allowOrg(org.organizationId, 'billing-mutate', 20, 60_000))) {
-    return NextResponse.json({ error: 'Trop de tentatives pour cette organisation. Patientez une minute.' }, { status: 429 })
+  const orgLimit = await checkOrg(org.organizationId, 'billing-mutate', 20, 60_000)
+  if (!orgLimit.allowed) {
+    return rateLimitedResponse(orgLimit, 'Trop de tentatives pour cette organisation. Patientez une minute.')
   }
 
   let body: unknown

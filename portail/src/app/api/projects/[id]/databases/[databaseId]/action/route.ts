@@ -4,7 +4,7 @@ import { getSession } from '@/lib/session'
 import { audit } from '@/lib/audit'
 import { canManageProjects } from '@/lib/organizations'
 import { projectDatabaseAction } from '@/lib/project-databases'
-import { allowOrg } from '@/lib/rate-limit'
+import { checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { requireOrg, requireProjectDatabase, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
@@ -26,10 +26,11 @@ export async function POST(
     return NextResponse.json({ error: 'Votre rôle ne permet pas cette action.' }, { status: 403 })
   }
 
-  if (!(await allowOrg(org.organizationId, 'database-mutate', 20, 60_000))) {
-    return NextResponse.json(
-      { error: 'Trop de modifications de bases pour cette organisation en peu de temps. Patientez une minute.' },
-      { status: 429 },
+  const mutateLimit = await checkOrg(org.organizationId, 'database-mutate', 20, 60_000)
+  if (!mutateLimit.allowed) {
+    return rateLimitedResponse(
+      mutateLimit,
+      'Trop de modifications de bases pour cette organisation en peu de temps. Patientez une minute.',
     )
   }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/session'
-import { allow } from '@/lib/rate-limit'
+import { check, rateLimitedResponse } from '@/lib/rate-limit'
 import { AnalysisError } from '@/lib/repo-analysis'
 import { deletePat, savePat } from '@/lib/git-credentials'
 
@@ -25,8 +25,9 @@ export async function POST(request: NextRequest) {
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  if (!(await allow(`github-pat:${session.user.id}`, 5, 60_000))) {
-    return NextResponse.json({ error: 'Trop de tentatives. Patientez une minute.' }, { status: 429 })
+  const userLimit = await check(`github-pat:${session.user.id}`, 5, 60_000, { action: 'github-pat', scope: 'user' })
+  if (!userLimit.allowed) {
+    return rateLimitedResponse(userLimit, 'Trop de tentatives. Patientez une minute.')
   }
 
   let body: unknown
