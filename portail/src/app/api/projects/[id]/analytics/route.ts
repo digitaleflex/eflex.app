@@ -3,7 +3,7 @@ import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
-import { assertProjectManager, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
+import { assertProjectManager, requireManagedProject, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 import { appUrl } from '@/lib/email'
 import {
   ANALYTICS_RETENTION_DEFAULT_DAYS,
@@ -56,15 +56,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
-  const org = await requireOrg(session)
-  if (!org) return tenantNotFound('Projet introuvable')
-
   const { id } = await params
-  const projectResult = await requireProject(org, id, { id: true })
-  if ('response' in projectResult) return projectResult.response
+  const scoped = await requireManagedProject(session, id, { id: true })
+  if ('response' in scoped) return scoped.response
 
   const config = await prisma.projectAnalytics.findUnique({
-    where: { projectId: projectResult.project.id },
+    where: { projectId: scoped.project.id },
   })
 
   if (!config) {
@@ -87,7 +84,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   // Rétention effectivement appliquée : purge opportuniste des statistiques expirées.
-  await purgeTrafficStatsForProject(prisma, projectResult.project.id)
+  await purgeTrafficStatsForProject(prisma, scoped.project.id)
 
   return NextResponse.json({ config: serializeConfig(config) })
 }

@@ -6,7 +6,7 @@ import { audit } from '@/lib/audit'
 import { canManageProjects } from '@/lib/organizations'
 import { DATABASE_KINDS, createProjectDatabase, isDatabaseKind, refreshProjectDatabase } from '@/lib/project-databases'
 import { checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
-import { requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
+import { requireManagedProject, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -18,16 +18,16 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const org = await requireOrg(session)
-  if (!org) return tenantNotFound('Projet introuvable')
-
   const { id } = await params
-  const projectResult = await requireProject(org, id, {
+  const scoped = await requireManagedProject(session, id, {
     id: true,
     databases: { orderBy: { createdAt: 'asc' } },
   })
-  if ('response' in projectResult) return projectResult.response
-  const project = projectResult.project as unknown as { id: string; databases: ProjectDatabase[] }
+  if ('response' in scoped) return scoped.response
+  const { org, project } = scoped as unknown as {
+    org: { organizationId: string; role: string }
+    project: { id: string; databases: ProjectDatabase[] }
+  }
 
   const databases = await Promise.all(
     project.databases.map(async (database) => {

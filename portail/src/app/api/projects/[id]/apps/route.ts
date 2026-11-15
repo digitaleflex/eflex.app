@@ -17,7 +17,7 @@ import { assertDeploymentAllowed, assertProjectQuota } from '@/lib/billing'
 import { resolveProjectToken } from '@/lib/git-credentials'
 import { appDomain, appNameFromRoot, normalizeAppRoot, uniqueAppName } from '@/lib/project-apps'
 import { checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
-import { requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
+import { requireManagedProject, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,12 +61,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params
-  const org = await requireOrg(session)
-  if (!org) return tenantNotFound('Projet introuvable')
-
-  const projectResult = await requireProject(org, id, { id: true })
-  if ('response' in projectResult) return projectResult.response
-  const project = projectResult.project
+  const scoped = await requireManagedProject(session, id, { id: true })
+  if ('response' in scoped) return scoped.response
+  const project = scoped.project
 
   const apps = await prisma.projectApp.findMany({
     where: { projectId: project.id },

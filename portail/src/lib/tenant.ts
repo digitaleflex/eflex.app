@@ -38,6 +38,45 @@ export function assertProjectManager(org: ResolvedOrg): NextResponse | null {
 }
 
 /**
+ * Résout organisation + projet en garantissant le scoping tenant.
+ * Retourne 404 anti-fuite si org/projet inaccessible.
+ */
+export async function requireManagedProject<T extends Prisma.ProjectSelect>(
+  session: SessionLike,
+  projectId: string,
+  select: T,
+): Promise<
+  | { org: ResolvedOrg; project: Prisma.ProjectGetPayload<{ select: T }> }
+  | { response: NextResponse }
+> {
+  const org = await requireOrg(session)
+  if (!org) return { response: tenantNotFound('Projet introuvable') }
+  const projectResult = await requireProject(org, projectId, select)
+  if ('response' in projectResult) return projectResult
+  return { org, project: projectResult.project }
+}
+
+/**
+ * Comme `requireManagedProject`, mais impose aussi le rôle de gestion de projet.
+ */
+export async function requireManagedProjectForMutation<T extends Prisma.ProjectSelect>(
+  session: SessionLike,
+  projectId: string,
+  select: T,
+  message = 'Votre rôle dans cette organisation ne permet pas d’effectuer cette action.',
+): Promise<
+  | { org: ResolvedOrg; project: Prisma.ProjectGetPayload<{ select: T }> }
+  | { response: NextResponse }
+> {
+  const org = await requireOrg(session)
+  if (!org) return { response: tenantNotFound('Projet introuvable') }
+  if (!canManageProjects(org.role)) return { response: forbidden(message) }
+  const projectResult = await requireProject(org, projectId, select)
+  if ('response' in projectResult) return projectResult
+  return { org, project: projectResult.project }
+}
+
+/**
  * Charge un projet en garantissant qu'il appartient à l'organisation résolue.
  * Ne jamais remplacer par un `findUnique` sur l'id seul pour une route tenant-scopée.
  */

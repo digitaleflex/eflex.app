@@ -3,7 +3,7 @@ import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { audit } from '@/lib/audit'
 import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
-import { assertProjectManager, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
+import { assertProjectManager, requireManagedProject, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 import { deleteAllTrafficStatsForProject, purgeTrafficStatsForProject } from '@/lib/analytics'
 
 export const dynamic = 'force-dynamic'
@@ -24,13 +24,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
-  const org = await requireOrg(session)
-  if (!org) return tenantNotFound('Projet introuvable')
-
   const { id } = await params
-  const projectResult = await requireProject(org, id, { id: true })
-  if ('response' in projectResult) return projectResult.response
-  const projectId = projectResult.project.id
+  const scoped = await requireManagedProject(session, id, { id: true })
+  if ('response' in scoped) return scoped.response
+  const projectId = scoped.project.id
 
   // Applique la rétention configurée : les statistiques expirées ne sont ni exposées ni conservées.
   await purgeTrafficStatsForProject(prisma, projectId)

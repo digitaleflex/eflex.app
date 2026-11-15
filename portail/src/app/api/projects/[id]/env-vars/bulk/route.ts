@@ -82,13 +82,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const encrypted = encrypt(item.value, `${project.id}:${item.key}`)
     const existingId = existingByKey.get(item.key)
     return existingId
-      ? prisma.envVar.update({ where: { id: existingId }, data: { value: encrypted }, select })
+      ? prisma.envVar.updateMany({
+          where: { id: existingId, projectId: project.id, appId: appId ?? null },
+          data: { value: encrypted },
+        })
       : prisma.envVar.create({
           data: { projectId: project.id, appId: appId ?? null, key: item.key, value: encrypted },
           select,
         })
   })
-  const envVars = await prisma.$transaction(operations)
+  await prisma.$transaction(operations)
+
+  const envVarsRows = await prisma.envVar.findMany({
+    where: { projectId: project.id, appId: appId ?? null, key: { in: vars.map((item) => item.key) } },
+    select,
+  })
+  const byKey = new Map(envVarsRows.map((row) => [row.key, row]))
+  const envVars = vars.map((item) => byKey.get(item.key)).filter((row): row is (typeof envVarsRows)[number] => Boolean(row))
 
   await publish({
     type: 'project.updated',

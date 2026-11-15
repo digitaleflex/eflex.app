@@ -77,15 +77,20 @@ export async function POST(
     removeQueuedJob: removeQueuedDeployment,
     cancelCoolify: cancelCoolifyDeployment,
     markCancelled: async (targetId, note) => {
-      const current = await prisma.deployment.findUnique({
-        where: { id: targetId },
+      const current = await prisma.deployment.findFirst({
+        where: { id: targetId, projectId: id, project: { organizationId: org.organizationId } },
         select: { status: true, logsSummary: true },
       })
       if (!current || isTerminal(current.status)) return false
       // Mise à jour conditionnelle : une transition concurrente (live/failed/
       // cancelled) gagne toujours, on n'écrase jamais un état terminal.
       const updated = await prisma.deployment.updateMany({
-        where: { id: targetId, status: { notIn: ['live', 'failed', 'cancelled'] } },
+        where: {
+          id: targetId,
+          projectId: id,
+          project: { organizationId: org.organizationId },
+          status: { notIn: ['live', 'failed', 'cancelled'] },
+        },
         data: {
           status: 'cancelled',
           logsSummary: [current.logsSummary, note]

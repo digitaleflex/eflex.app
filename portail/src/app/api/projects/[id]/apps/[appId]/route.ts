@@ -7,7 +7,7 @@ import { publish } from '@/lib/event-bus'
 import { deleteApplication } from '@/lib/coolify'
 import { ACTIVE_DEPLOYMENT_STATUSES } from '@/lib/deployment-state'
 import { checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
-import { requireOrg, requireProject, requireProjectApp, tenantNotFound } from '@/lib/tenant'
+import { requireManagedProject, requireOrg, requireProject, requireProjectApp, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,12 +19,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id, appId } = await params
-  const org = await requireOrg(session)
-  if (!org) return tenantNotFound('Projet introuvable')
-
-  const projectResult = await requireProject(org, id, { id: true })
-  if ('response' in projectResult) return projectResult.response
-  const project = projectResult.project
+  const scoped = await requireManagedProject(session, id, { id: true })
+  if ('response' in scoped) return scoped.response
+  const { org, project } = scoped
 
   const appResult = await requireProjectApp(org, project.id, appId, {
     id: true,
@@ -112,9 +109,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     )
   }
 
-  const updated = await prisma.projectApp.update({
-    where: { id: app.id },
+  const updatedResult = await prisma.projectApp.updateMany({
+    where: { id: app.id, projectId: project.id },
     data: { name },
+  })
+  if (updatedResult.count === 0) return tenantNotFound('Application introuvable.')
+
+  const updated = await prisma.projectApp.findFirst({
+    where: { id: app.id, projectId: project.id },
     select: {
       id: true,
       name: true,
@@ -127,6 +129,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       position: true,
     },
   })
+  if (!updated) return tenantNotFound('Application introuvable.')
 
   await publish({
     type: 'project.updated',
@@ -198,7 +201,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
 
   const active = await prisma.deployment.findFirst({
-    where: { appId, status: { in: [...ACTIVE_DEPLOYMENT_STATUSES] } },
+    where: { appId, projectId: project.id, status: { in: [...ACTIVE_DEPLOYMENT_STATUSES] } },
     select: { id: true },
   })
   if (active) {

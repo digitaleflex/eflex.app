@@ -89,11 +89,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       select: { id: true },
     })
     if (existing) {
-      envVar = await prisma.envVar.update({
-        where: { id: existing.id },
+      const updatedCount = await prisma.envVar.updateMany({
+        where: { id: existing.id, projectId: project.id, appId },
         data: { value: encrypted },
+      })
+      if (updatedCount.count === 0) {
+        return NextResponse.json({ error: 'Variable introuvable.' }, { status: 404 })
+      }
+      const updatedEnvVar = await prisma.envVar.findFirst({
+        where: { projectId: project.id, appId, key },
         select: { key: true, updatedAt: true, appId: true },
       })
+      if (!updatedEnvVar) {
+        return NextResponse.json({ error: 'Variable introuvable.' }, { status: 404 })
+      }
+      envVar = updatedEnvVar
     } else {
       envVar = await prisma.envVar.create({
         data: { projectId: project.id, appId, key, value: encrypted },
