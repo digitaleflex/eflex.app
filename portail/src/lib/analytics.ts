@@ -4,19 +4,22 @@ import type { PrismaClient } from '@prisma/client'
 
 /**
  * Collecte de trafic agrégée (socle #109, conformité/confidentialité #112).
+ * Incrément #111 (événements nommés / objectifs de conversion) : base minimale,
+ * agrégée et sans propriété libre.
  *
  * Principes :
  * - désactivée par défaut (opt-in explicite, aucune collecte implicite) ;
  * - minimisation : pas d'adresse IP brute, pas d'identifiant visiteur,
  *   pas de cookie, pas de profilage nominatif, pas de recoupement entre sites ;
- * - agrégation quotidienne par chemin (donnée mesurée reçue par /api/collect) ;
+ * - agrégation quotidienne par chemin (pages vues) et par nom d'événement ;
+ * - aucun identifiant ni propriété arbitraire stocké pour les événements nommés ;
  * - respect optionnel de Do Not Track / Global Privacy Control ;
  * - rétention configurable et bornée, avec purge des statistiques expirées.
  *
  * Le consentement préalable au dépôt/lecture d'informations côté visiteur ou à
  * toute mesure non exemptée relève du responsable du site intégré : le snippet
  * peut être conditionné (voir `buildAnalyticsSnippet`, option `requireConsent`).
- * Aucune donnée n'est inventée : seules les pages vues effectivement reçues sont comptées.
+ * Aucune donnée n'est inventée : seules les mesures effectivement reçues sont comptées.
  */
 
 export const ANALYTICS_PUBLIC_KEY_PREFIX = 'efx_pub_'
@@ -25,6 +28,11 @@ export const ANALYTICS_PATH_MAX = 500
 export const ANALYTICS_RETENTION_MIN_DAYS = 7
 export const ANALYTICS_RETENTION_MAX_DAYS = 365
 export const ANALYTICS_RETENTION_DEFAULT_DAYS = 90
+
+/** Événements nommés (#111) : nom borné, jeu de caractères restreint (pas de contenu libre sensible). */
+export const ANALYTICS_EVENT_NAME_MAX = 64
+export const ANALYTICS_EVENT_NAME_PATTERN = /^[a-z0-9][a-z0-9_.:-]{0,63}$/
+export const ANALYTICS_GOAL_EVENTS_MAX = 20
 
 export function generateAnalyticsPublicKey(): string {
   return `${ANALYTICS_PUBLIC_KEY_PREFIX}${randomBytes(ANALYTICS_PUBLIC_KEY_BYTES).toString('base64url')}`
@@ -70,6 +78,20 @@ export function normalizeAnalyticsPath(input: unknown): string {
   return value || '/'
 }
 
+/**
+ * Normalise un nom d'événement personnalisé (#111). Retourne `null` si le nom
+ * est absent, vide ou invalide. Minuscules, caractères sûrs uniquement, longueur
+ * bornée : aucune donnée libre/sensible n'est acceptée.
+ */
+export function normalizeAnalyticsEventName(input: unknown): string | null {
+  if (typeof input !== 'string') return null
+  const value = input.trim().toLowerCase()
+  if (!value) return null
+  if (value.length > ANALYTICS_EVENT_NAME_MAX) return null
+  if (!ANALYTICS_EVENT_NAME_PATTERN.test(value)) return null
+  return value
+}
+
 /** Date UTC tronquée au jour (pour la clé d'agrégation quotidienne). */
 export function utcDay(date = new Date()): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
@@ -84,6 +106,13 @@ export function hasDoNotTrackSignal(headers: Headers): boolean {
   return false
 }
 
+const goalEventNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(ANALYTICS_EVENT_NAME_MAX)
+  .regex(ANALYTICS_EVENT_NAME_PATTERN, "Nom d'événement invalide (lettres/chiffres minuscules, . _ : -).")
+
 export const analyticsConfigUpdateSchema = z
   .object({
     enabled: z.boolean().optional(),
@@ -96,6 +125,11 @@ export const analyticsConfigUpdateSchema = z
       .max(ANALYTICS_RETENTION_MAX_DAYS, `La rétention maximale est de ${ANALYTICS_RETENTION_MAX_DAYS} jours.`)
       .optional(),
     regenerateKey: z.boolean().optional(),
+    /** Objectifs de conversion (#111) : liste bornée de noms d'événements. */
+    goalEvents: z
+      .array(goalEventNameSchema)
+      .max(ANALYTICS_GOAL_EVENTS_MAX, `Au plus ${ANALYTICS_GOAL_EVENTS_MAX} objectifs.`)
+      .optional(),
   })
   .refine(
     (value) =>
@@ -103,20 +137,33 @@ export const analyticsConfigUpdateSchema = z
       value.respectDnt !== undefined ||
       value.collectPath !== undefined ||
       value.retentionDays !== undefined ||
-      value.regenerateKey === true,
+      value.regenerateKey === true ||
+      value.goalEvents !== undefined,
     { message: 'Aucune modification fournie.' },
   )
 
 export type AnalyticsConfigUpdate = z.infer<typeof analyticsConfigUpdateSchema>
 
-export const collectPayloadSchema = z.object({
-  /** Clé publique d'écriture du projet. */
-  k: z.string().min(1).max(200),
-  /** Chemin ou URL de la page vue. */
-  p: z.string().max(2048).optional().default('/'),
-  /** Type d'événement (réservé ; seule la page vue est comptée). */
-  t: z.enum(['pageview']).optional().default('pageview'),
-})
+export const collectPayloadSchema = z
+  .object({
+    /** Clé publique d'écriture du projet. */
+    k: z.string().min(1).max(200),
+    /** Chemin ou URL de la page vue (ignoré pour les événements nommés). */
+    p: z.string().max(2048).optional().default('/'),
+    /** Type : page vue (défaut, rétrocompatibilité) ou événement nommé (#111). */
+    t: z.enum(['pageview', 'event']).optional().default('pageview'),
+    /** Nom de l'événement nommé, requis si t = "event". */
+    n: z.string().max(ANALYTICS_EVENT_NAME_MAX).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.t === 'event' && normalizeAnalyticsEventName(value.n) === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['n'],
+        message: "Nom d'événement invalide.",
+      })
+    }
+  })
 
 export type CollectPayload = z.infer<typeof collectPayloadSchema>
 
@@ -126,6 +173,7 @@ export interface AnalyticsConfigShape {
   respectDnt: boolean
   collectPath: boolean
   retentionDays: number
+  goalEvents: string[]
 }
 
 export interface AnalyticsSnippetOptions {
@@ -167,6 +215,26 @@ export function buildAnalyticsSnippet(
 }
 
 /**
+ * Exemple d'envoi d'un événement nommé (#111), sans propriété ni identifiant.
+ * Le nom doit respecter le format validé côté serveur (minuscules, chiffres, . _ : -).
+ */
+export function buildAnalyticsEventSnippet(publicKey: string, collectUrl: string): string {
+  const safeKey = JSON.stringify(publicKey)
+  const safeUrl = JSON.stringify(collectUrl)
+  return [
+    '<script>',
+    '// Exemple : envoyer un événement nommé (aucune propriété, aucun identifiant).',
+    'window.__eflexTrackEvent = function(name){try{',
+    `var d={k:${safeKey},t:"event",n:String(name||"")};`,
+    'var b=JSON.stringify(d);',
+    `(navigator.sendBeacon&&navigator.sendBeacon(${safeUrl},new Blob([b],{type:"application/json"})))||`,
+    `fetch(${safeUrl},{method:"POST",headers:{"content-type":"application/json"},body:b,keepalive:true,mode:"cors"});`,
+    '}catch(_){} };',
+    '</script>',
+  ].join('\n')
+}
+
+/**
  * Borne de rétention (jours) ramenée à l'intervalle autorisé. Sert aussi de garde
  * avant toute requête de purge pour ne jamais supprimer plus large que prévu.
  */
@@ -183,6 +251,20 @@ export function analyticsRetentionCutoff(retentionDays: number, now = new Date()
   return cutoff
 }
 
+/** Normalise/déduplique une liste d'objectifs de conversion (bornée). */
+export function normalizeGoalEvents(input: readonly string[]): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const raw of input) {
+    const name = normalizeAnalyticsEventName(raw)
+    if (!name || seen.has(name)) continue
+    seen.add(name)
+    out.push(name)
+    if (out.length >= ANALYTICS_GOAL_EVENTS_MAX) break
+  }
+  return out
+}
+
 export interface TrafficStatRow {
   date: Date
   path: string
@@ -190,12 +272,12 @@ export interface TrafficStatRow {
 }
 
 /**
- * Purge les statistiques quotidiennes d'un projet antérieures à sa rétention.
- * Ne supprime rien si la configuration n'existe pas (aucune donnée collectée).
- * Retourne le nombre de lignes supprimées.
+ * Purge les statistiques quotidiennes d'un projet antérieures à sa rétention
+ * (pages vues et événements nommés). Ne supprime rien si la configuration
+ * n'existe pas. Retourne le nombre total de lignes supprimées.
  */
 export async function purgeTrafficStatsForProject(
-  prisma: Pick<PrismaClient, 'projectAnalytics' | 'trafficDailyStat'>,
+  prisma: Pick<PrismaClient, 'projectAnalytics' | 'trafficDailyStat' | 'analyticsEventDaily'>,
   projectId: string,
 ): Promise<number> {
   const config = await prisma.projectAnalytics.findUnique({
@@ -204,19 +286,23 @@ export async function purgeTrafficStatsForProject(
   })
   if (!config) return 0
   const cutoff = analyticsRetentionCutoff(config.retentionDays)
-  const result = await prisma.trafficDailyStat.deleteMany({
-    where: { projectId, date: { lt: cutoff } },
-  })
-  return result.count
+  const [traffic, events] = await Promise.all([
+    prisma.trafficDailyStat.deleteMany({ where: { projectId, date: { lt: cutoff } } }),
+    prisma.analyticsEventDaily.deleteMany({ where: { projectId, date: { lt: cutoff } } }),
+  ])
+  return traffic.count + events.count
 }
 
-/** Supprime toutes les statistiques quotidiennes d'un projet (droit à l'effacement des mesures). */
+/** Supprime toutes les statistiques d'un projet (droit à l'effacement des mesures). */
 export async function deleteAllTrafficStatsForProject(
-  prisma: Pick<PrismaClient, 'trafficDailyStat'>,
+  prisma: Pick<PrismaClient, 'trafficDailyStat' | 'analyticsEventDaily'>,
   projectId: string,
 ): Promise<number> {
-  const result = await prisma.trafficDailyStat.deleteMany({ where: { projectId } })
-  return result.count
+  const [traffic, events] = await Promise.all([
+    prisma.trafficDailyStat.deleteMany({ where: { projectId } }),
+    prisma.analyticsEventDaily.deleteMany({ where: { projectId } }),
+  ])
+  return traffic.count + events.count
 }
 
 /** Première issue Zod lisible (cohérent avec project-settings.ts). */

@@ -5,6 +5,7 @@ import {
   collectPayloadSchema,
   hasDoNotTrackSignal,
   isAnalyticsPublicKey,
+  normalizeAnalyticsEventName,
   normalizeAnalyticsPath,
   utcDay,
 } from '@/lib/analytics'
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
   const parsed = collectPayloadSchema.safeParse(body)
   if (!parsed.success) return noContent(204)
 
-  const { k: publicKey, p } = parsed.data
+  const { k: publicKey, p, t, n } = parsed.data
   if (!isAnalyticsPublicKey(publicKey)) return noContent(204)
 
   // Limite par clé d'écriture pour éviter qu'un seul projet ne sature l'ingestion.
@@ -70,15 +71,27 @@ export async function POST(request: Request) {
     return noContent(204)
   }
 
-  const path = config.collectPath ? normalizeAnalyticsPath(p) : '/'
   const date = utcDay()
 
   try {
-    await prisma.trafficDailyStat.upsert({
-      where: { projectId_date_path: { projectId: config.projectId, date, path } },
-      create: { projectId: config.projectId, date, path, views: 1 },
-      update: { views: { increment: 1 } },
-    })
+    if (t === 'event') {
+      // Événement nommé (#111) : agrégation quotidienne par nom uniquement, sans
+      // propriété ni chemin, pour préserver la minimisation.
+      const name = normalizeAnalyticsEventName(n)
+      if (!name) return noContent(204)
+      await prisma.analyticsEventDaily.upsert({
+        where: { projectId_date_name: { projectId: config.projectId, date, name } },
+        create: { projectId: config.projectId, date, name, count: 1 },
+        update: { count: { increment: 1 } },
+      })
+    } else {
+      const path = config.collectPath ? normalizeAnalyticsPath(p) : '/'
+      await prisma.trafficDailyStat.upsert({
+        where: { projectId_date_path: { projectId: config.projectId, date, path } },
+        create: { projectId: config.projectId, date, path, views: 1 },
+        update: { views: { increment: 1 } },
+      })
+    }
   } catch {
     // Ne jamais exposer d'erreur interne sur un endpoint public de collecte.
     return noContent(204)

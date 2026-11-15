@@ -180,6 +180,7 @@ model Project {
   supportTickets        SupportTicket[]
   analytics             ProjectAnalytics?
   trafficStats          TrafficDailyStat[]
+  eventStats            AnalyticsEventDaily[]
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 
@@ -641,6 +642,8 @@ model ProjectAnalytics {
   collectPath   Boolean  @default(true)
   /// Durée de conservation cible des statistiques quotidiennes (jours). Borne appliquée côté API.
   retentionDays Int      @default(90)
+  /// Noms d'événements considérés comme objectifs de conversion (#111). Liste bornée, sans propriétés ni données nominatives.
+  goalEvents    String[] @default([])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -660,6 +663,23 @@ model TrafficDailyStat {
   views     Int      @default(0)
 
   @@unique([projectId, date, path])
+  @@index([projectId, date])
+}
+
+/// Statistique quotidienne agrégée d'événements nommés (#111). Aucun identifiant visiteur,
+/// aucune propriété libre : uniquement un compteur par nom d'événement validé.
+model AnalyticsEventDaily {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// Jour UTC de la mesure.
+  date      DateTime @db.Date
+  /// Nom d'événement normalisé/validé (liste contrôlée côté API, bornée en longueur).
+  name      String   @db.VarChar(64)
+  /// Nombre d'occurrences agrégées reçues pour cet événement et ce jour.
+  count     Int      @default(0)
+
+  @@unique([projectId, date, name])
   @@index([projectId, date])
 }
 

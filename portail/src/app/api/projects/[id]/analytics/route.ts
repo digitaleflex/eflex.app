@@ -7,9 +7,11 @@ import { appUrl } from '@/lib/email'
 import {
   ANALYTICS_RETENTION_DEFAULT_DAYS,
   analyticsConfigUpdateSchema,
+  buildAnalyticsEventSnippet,
   buildAnalyticsSnippet,
   firstAnalyticsIssue,
   generateAnalyticsPublicKey,
+  normalizeGoalEvents,
   purgeTrafficStatsForProject,
 } from '@/lib/analytics'
 
@@ -26,6 +28,7 @@ function serializeConfig(config: {
   respectDnt: boolean
   collectPath: boolean
   retentionDays: number
+  goalEvents: string[]
   createdAt: Date
   updatedAt: Date
 }) {
@@ -36,8 +39,10 @@ function serializeConfig(config: {
     respectDnt: config.respectDnt,
     collectPath: config.collectPath,
     retentionDays: config.retentionDays,
+    goalEvents: config.goalEvents ?? [],
     snippet: buildAnalyticsSnippet(config.publicKey, url),
     snippetConsent: buildAnalyticsSnippet(config.publicKey, url, { requireConsent: true }),
+    eventSnippet: buildAnalyticsEventSnippet(config.publicKey, url),
     collectUrl: url,
     createdAt: config.createdAt.toISOString(),
     updatedAt: config.updatedAt.toISOString(),
@@ -69,8 +74,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         respectDnt: true,
         collectPath: true,
         retentionDays: ANALYTICS_RETENTION_DEFAULT_DAYS,
+        goalEvents: [],
         snippet: null,
         snippetConsent: null,
+        eventSnippet: null,
         collectUrl: collectUrl(),
         createdAt: null,
         updatedAt: null,
@@ -131,12 +138,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     collectPath?: boolean
     retentionDays?: number
     publicKey?: string
+    goalEvents?: string[]
   } = {}
 
   if (parsed.data.enabled !== undefined) data.enabled = parsed.data.enabled
   if (parsed.data.respectDnt !== undefined) data.respectDnt = parsed.data.respectDnt
   if (parsed.data.collectPath !== undefined) data.collectPath = parsed.data.collectPath
   if (parsed.data.retentionDays !== undefined) data.retentionDays = parsed.data.retentionDays
+  if (parsed.data.goalEvents !== undefined) data.goalEvents = normalizeGoalEvents(parsed.data.goalEvents)
   if (!existing || parsed.data.regenerateKey) data.publicKey = generateAnalyticsPublicKey()
 
   const config = existing
@@ -149,6 +158,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           respectDnt: data.respectDnt ?? true,
           collectPath: data.collectPath ?? true,
           retentionDays: data.retentionDays ?? ANALYTICS_RETENTION_DEFAULT_DAYS,
+          goalEvents: data.goalEvents ?? [],
         },
       })
 

@@ -32,24 +32,44 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   // L'export reflète les données effectivement conservées selon la rétention.
   await purgeTrafficStatsForProject(prisma, projectId)
 
-  const rows = await prisma.trafficDailyStat.findMany({
-    where: { projectId },
-    orderBy: [{ date: 'asc' }, { path: 'asc' }],
-    select: { date: true, path: true, views: true },
-  })
+  const [rows, eventRows, config] = await Promise.all([
+    prisma.trafficDailyStat.findMany({
+      where: { projectId },
+      orderBy: [{ date: 'asc' }, { path: 'asc' }],
+      select: { date: true, path: true, views: true },
+    }),
+    prisma.analyticsEventDaily.findMany({
+      where: { projectId },
+      orderBy: [{ date: 'asc' }, { name: 'asc' }],
+      select: { date: true, name: true, count: true },
+    }),
+    prisma.projectAnalytics.findUnique({ where: { projectId }, select: { goalEvents: true } }),
+  ])
 
   const data = rows.map((row) => ({
     date: row.date.toISOString().slice(0, 10),
     path: row.path,
     views: row.views,
   }))
+  const goalSet = new Set(config?.goalEvents ?? [])
+  const eventData = eventRows.map((row) => ({
+    date: row.date.toISOString().slice(0, 10),
+    name: row.name,
+    count: row.count,
+    goal: goalSet.has(row.name),
+  }))
 
   const url = new URL(request.url)
   const format = url.searchParams.get('format')
   if (format === 'csv') {
-    const header = 'date,path,views'
-    const lines = data.map((row) => `${row.date},${escapeCsv(row.path)},${row.views}`)
-    const csv = [header, ...lines].join('\n')
+    const header = 'type,date,key,count,goal'
+    const trafficLines = data.map(
+      (row) => `pageview,${row.date},${escapeCsv(row.path)},${row.views},`,
+    )
+    const eventLines = eventData.map(
+      (row) => `event,${row.date},${escapeCsv(row.name)},${row.count},${row.goal ? 'true' : 'false'}`,
+    )
+    const csv = [header, ...trafficLines, ...eventLines].join('\n')
     return new NextResponse(csv, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
@@ -64,5 +84,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     exportedAt: new Date().toISOString(),
     retentionApplied: true,
     rows: data,
+    events: eventData,
+    goalEvents: config?.goalEvents ?? [],
   })
 }

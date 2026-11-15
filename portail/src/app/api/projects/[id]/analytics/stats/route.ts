@@ -40,11 +40,22 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   since.setUTCHours(0, 0, 0, 0)
   since.setUTCDate(since.getUTCDate() - (days - 1))
 
-  const stats = await prisma.trafficDailyStat.findMany({
-    where: { projectId, date: { gte: since } },
-    orderBy: [{ date: 'asc' }, { views: 'desc' }],
-    select: { date: true, path: true, views: true },
-  })
+  const [stats, eventStats, config] = await Promise.all([
+    prisma.trafficDailyStat.findMany({
+      where: { projectId, date: { gte: since } },
+      orderBy: [{ date: 'asc' }, { views: 'desc' }],
+      select: { date: true, path: true, views: true },
+    }),
+    prisma.analyticsEventDaily.findMany({
+      where: { projectId, date: { gte: since } },
+      orderBy: [{ date: 'asc' }, { count: 'desc' }],
+      select: { date: true, name: true, count: true },
+    }),
+    prisma.projectAnalytics.findUnique({
+      where: { projectId },
+      select: { goalEvents: true },
+    }),
+  ])
 
   const byDay = new Map<string, number>()
   const byPath = new Map<string, number>()
@@ -65,7 +76,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     .slice(0, 50)
     .map(([path, views]) => ({ path, views }))
 
-  return NextResponse.json({ rangeDays: days, total, days: daysSeries, paths })
+  const goalSet = new Set(config?.goalEvents ?? [])
+  const byEvent = new Map<string, number>()
+  for (const row of eventStats) {
+    byEvent.set(row.name, (byEvent.get(row.name) ?? 0) + row.count)
+  }
+  const events = Array.from(byEvent.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 50)
+    .map(([name, count]) => ({ name, count, goal: goalSet.has(name) }))
+
+  return NextResponse.json({ rangeDays: days, total, days: daysSeries, paths, events, goalEvents: config?.goalEvents ?? [] })
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -3,13 +3,16 @@ import {
   ANALYTICS_PUBLIC_KEY_PREFIX,
   analyticsConfigUpdateSchema,
   analyticsRetentionCutoff,
+  buildAnalyticsEventSnippet,
   buildAnalyticsSnippet,
   clampRetentionDays,
   collectPayloadSchema,
   generateAnalyticsPublicKey,
   hasDoNotTrackSignal,
   isAnalyticsPublicKey,
+  normalizeAnalyticsEventName,
   normalizeAnalyticsPath,
+  normalizeGoalEvents,
   utcDay,
 } from './analytics'
 
@@ -92,6 +95,22 @@ describe('utcDay', () => {
   })
 })
 
+describe('normalizeAnalyticsEventName', () => {
+  it('normalise un nom valide en minuscules', () => {
+    expect(normalizeAnalyticsEventName('Signup_Click')).toBe('signup_click')
+    expect(normalizeAnalyticsEventName(' achat:valide ')).toBe('achat:valide')
+  })
+
+  it('refuse les noms invalides ou sensibles/libres', () => {
+    expect(normalizeAnalyticsEventName('')).toBeNull()
+    expect(normalizeAnalyticsEventName('   ')).toBeNull()
+    expect(normalizeAnalyticsEventName('bad name')).toBeNull()
+    expect(normalizeAnalyticsEventName('été')).toBeNull()
+    expect(normalizeAnalyticsEventName('a'.repeat(65))).toBeNull()
+    expect(normalizeAnalyticsEventName(undefined)).toBeNull()
+  })
+})
+
 describe('collectPayloadSchema', () => {
   it('accepte une page vue minimale', () => {
     const parsed = collectPayloadSchema.safeParse({ k: 'efx_pub_abcdefghijklmnopqrstuvwxyz', p: '/accueil' })
@@ -100,6 +119,22 @@ describe('collectPayloadSchema', () => {
       expect(parsed.data.t).toBe('pageview')
       expect(parsed.data.p).toBe('/accueil')
     }
+  })
+
+  it('accepte un événement nommé sans propriété', () => {
+    const parsed = collectPayloadSchema.safeParse({ k: 'efx_pub_abcdefghijklmnopqrstuvwxyz', t: 'event', n: 'signup' })
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      expect(parsed.data.t).toBe('event')
+      expect(parsed.data.n).toBe('signup')
+    }
+  })
+
+  it('refuse un événement nommé invalide ou sans nom', () => {
+    expect(collectPayloadSchema.safeParse({ k: 'efx_pub_abcdefghijklmnopqrstuvwxyz', t: 'event' }).success).toBe(false)
+    expect(
+      collectPayloadSchema.safeParse({ k: 'efx_pub_abcdefghijklmnopqrstuvwxyz', t: 'event', n: 'bad name' }).success,
+    ).toBe(false)
   })
 
   it('refuse une charge utile sans clé', () => {
@@ -117,6 +152,13 @@ describe('analyticsConfigUpdateSchema', () => {
     expect(analyticsConfigUpdateSchema.safeParse({ retentionDays: 30 }).success).toBe(true)
     expect(analyticsConfigUpdateSchema.safeParse({ retentionDays: 1 }).success).toBe(false)
     expect(analyticsConfigUpdateSchema.safeParse({ retentionDays: 9999 }).success).toBe(false)
+  })
+
+  it('accepte des objectifs de conversion bornés et validés', () => {
+    expect(analyticsConfigUpdateSchema.safeParse({ goalEvents: ['signup', 'purchase'] }).success).toBe(true)
+    expect(analyticsConfigUpdateSchema.safeParse({ goalEvents: [] }).success).toBe(true)
+    expect(analyticsConfigUpdateSchema.safeParse({ goalEvents: ['bad name'] }).success).toBe(false)
+    expect(analyticsConfigUpdateSchema.safeParse({ goalEvents: Array(21).fill('a') }).success).toBe(false)
   })
 })
 
@@ -150,6 +192,23 @@ describe('buildAnalyticsSnippet', () => {
   it('n’impose pas de garde de consentement par défaut', () => {
     const snippet = buildAnalyticsSnippet('efx_pub_testkey123456789012', 'https://eflex.app/api/collect')
     expect(snippet).not.toContain('__EFLEX_ANALYTICS_CONSENT')
+  })
+})
+
+describe('buildAnalyticsEventSnippet', () => {
+  it('génère un helper d’événement nommé sans propriété', () => {
+    const snippet = buildAnalyticsEventSnippet('efx_pub_testkey123456789012', 'https://eflex.app/api/collect')
+    expect(snippet).toContain('__eflexTrackEvent')
+    expect(snippet).toContain('t:"event"')
+    expect(snippet).toContain('efx_pub_testkey123456789012')
+    expect(snippet).not.toContain('user_id')
+    expect(snippet).not.toContain('email')
+  })
+})
+
+describe('normalizeGoalEvents', () => {
+  it('normalise, déduplique et borne les objectifs', () => {
+    expect(normalizeGoalEvents(['Signup', 'signup', 'purchase', 'bad name'])).toEqual(['signup', 'purchase'])
   })
 })
 
