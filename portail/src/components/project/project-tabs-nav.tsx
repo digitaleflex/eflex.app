@@ -16,7 +16,7 @@ export function ProjectTabsNav({
   return (
     <nav
       aria-label="Sections du projet"
-      className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-card p-1 sm:flex sm:gap-0 sm:rounded-none sm:border-0 sm:border-b sm:bg-transparent sm:p-0"
+      className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-card p-1 sm:flex sm:flex-wrap sm:gap-0 sm:rounded-none sm:border-0 sm:border-b sm:bg-transparent sm:p-0"
     >
       {PROJECT_TABS.map((item) => {
         const active = activeTab === item.id
@@ -27,7 +27,7 @@ export function ProjectTabsNav({
             href={projectTabHref(projectId, item.id)}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:-mb-px sm:justify-start sm:rounded-none sm:border-b-2',
+              'inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:-mb-px sm:justify-start sm:rounded-none sm:border-b-2',
               active
                 ? 'bg-muted text-foreground sm:bg-transparent sm:border-foreground'
                 : 'text-muted-foreground hover:text-foreground sm:border-transparent',

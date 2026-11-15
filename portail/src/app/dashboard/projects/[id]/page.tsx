@@ -25,6 +25,7 @@ import { ProjectDeploymentsTab } from '@/components/project/project-deployments-
 import { toDeploymentItemData } from '@/lib/deployment-item-data'
 import { ProjectVariablesTab } from '@/components/project/project-variables-tab'
 import { ProjectRuntimeLogsTab } from '@/components/project/project-runtime-logs-tab'
+import { ProjectAnalyticsTab } from '@/components/project/project-analytics-tab'
 import { statusInfo } from '@/lib/project-status'
 import { runtimeHealth, tlsHealth } from '@/lib/project-health'
 import { nextProjectAction, projectSituation, type NextProjectAction } from '@/lib/project-actions'
@@ -359,6 +360,8 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           appNameById={appNameById}
         />
       )}
+
+      {tab === 'analytics' && <ProjectAnalyticsTab projectId={project.id} canManage={canManage} />}
 
       {tab === 'logs' && (
         <ProjectRuntimeLogsTab

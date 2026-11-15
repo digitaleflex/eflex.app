@@ -4,6 +4,7 @@ export const PROJECT_TABS = [
   { id: 'overview', label: "Vue d'ensemble", short: 'Aperçu' },
   { id: 'deployments', label: 'Déploiements', short: 'Déploiements' },
   { id: 'variables', label: 'Variables', short: 'Variables' },
+  { id: 'analytics', label: 'Analytique', short: 'Analytique' },
   { id: 'logs', label: 'Logs', short: 'Logs' },
 ] as const
 
