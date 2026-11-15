@@ -15,7 +15,7 @@ import { ApplicationMultiSelect } from '@/components/new-project/application-mul
 import { GitHubPicker } from '@/components/new-project/github-picker'
 import { VercelImport } from '@/components/new-project/vercel-import'
 import { EnvEditor } from '@/components/env/env-editor'
-import { rowsToVars } from '@/lib/env-parse'
+import { mergeEnvRows, rowsToVars } from '@/lib/env-parse'
 import { frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 
 interface EnvVar {
@@ -237,6 +237,9 @@ export default function NewProjectPage() {
                     `Framework déclaré sur Vercel : ${prefill.framework}. EFLEX le détectera depuis le dépôt lors de l'analyse.`,
                   )
                 }
+                if (prefill.envRows && prefill.envRows.length > 0) {
+                  setEnvVars((current) => mergeEnvRows(current, prefill.envRows!))
+                }
                 setImportHints(hints)
               }}
             />
@@ -278,7 +281,9 @@ export default function NewProjectPage() {
                   ))}
                 </ul>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Les variables d&apos;environnement ne sont pas importées : ressaisissez les valeurs nécessaires ci-dessous. Les secrets Vercel sensibles ne sont pas relisibles et ne seront jamais devinés.
+                  Les variables d&apos;environnement peuvent être préparées depuis Vercel (lecture à usage unique) : les valeurs
+                  réellement lisibles sont proposées masquées et modifiables, les valeurs sensibles ou non relisibles doivent être
+                  ressaisies. Aucune valeur n&apos;est devinée.
                 </p>
               </div>
             )}
