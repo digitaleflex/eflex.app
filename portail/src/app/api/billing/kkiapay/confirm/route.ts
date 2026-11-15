@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { canManageBilling, resolveOrganization } from '@/lib/organizations'
-import { allow } from '@/lib/rate-limit'
+import { allow, allowOrg } from '@/lib/rate-limit'
 import { findPayment, kkiapayConfigured, verifyKkiapayTransaction, activatePayment } from '@/lib/payments'
 
 export const dynamic = 'force-dynamic'
@@ -26,6 +26,9 @@ export async function POST(request: NextRequest) {
   if (!org) return NextResponse.json({ error: 'Aucune organisation active.' }, { status: 404 })
   if (!canManageBilling(org.role)) {
     return NextResponse.json({ error: 'Accès à la facturation non autorisé.' }, { status: 403 })
+  }
+  if (!(await allowOrg(org.organizationId, 'billing-mutate', 20, 60_000))) {
+    return NextResponse.json({ error: 'Trop de tentatives pour cette organisation. Patientez une minute.' }, { status: 429 })
   }
 
   let body: unknown

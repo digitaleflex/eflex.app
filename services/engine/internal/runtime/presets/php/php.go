@@ -3,11 +3,17 @@
 // Supervisor.
 //
 // Why one container: the planner has no multi-service or volume model yet, so
-// Axiom cannot attach an nginx sidecar, a queue worker or a persistent storage
-// volume to a deployment. Nginx and PHP-FPM therefore share the image (a
-// Supervisor process runs both), Laravel migrations run at container start,
-// and the queue/scheduler workers are not started. The limits are documented
-// in docs/axiom-engine.md and must not be reported as supported.
+// Axiom cannot attach an nginx sidecar, separate queue/scheduler services, or
+// a persistent storage volume to a deployment. Nginx and PHP-FPM therefore
+// share the image and, for Laravel, Supervisor also runs the queue worker and
+// the scheduler inside the same container.
+//
+// Laravel entrypoint: package discovery, config cache and migrations
+// (migrate --force) run at container start when artisan is present, so a
+// migration failure prevents the app from becoming ready. The container
+// filesystem is ephemeral: storage/ and bootstrap/cache are prepared but not
+// backed by a persistent volume. Limits are documented in docs/axiom-engine.md
+// and must not be reported as supported.
 //
 // Safety properties, mirrored from the Python preset:
 //   - The base image is a pinned constant (php:<minor>-fpm-bookworm) and
@@ -209,6 +215,7 @@ func Dockerfile(f Facts, buildCommand, startCommand string, port int) (string, e
 		"#!/bin/sh",
 		"set -eu",
 		"if [ -f /var/www/html/artisan ]; then",
+		"  php artisan package:discover --ansi",
 		"  php artisan config:cache",
 		"  php artisan migrate --force",
 		"fi",

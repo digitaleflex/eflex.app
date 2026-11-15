@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { allow } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,6 +12,9 @@ export async function DELETE(
 ) {
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  if (!(await allow(`github-installation:${session.user.id}`, 15, 60_000))) {
+    return NextResponse.json({ error: 'Trop de tentatives en peu de temps. Patientez une minute.' }, { status: 429 })
+  }
 
   const { installationId } = await params
   if (!/^\d+$/.test(installationId)) {

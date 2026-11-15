@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { allow } from '@/lib/rate-limit'
 import { getPatSummary, listPatRepositories } from '@/lib/git-credentials'
 import { listInstallationRepositories, type GitHubRepoSummary } from '@/lib/github-app'
 
@@ -22,6 +23,13 @@ export async function GET() {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
   const userId = session.user.id
+
+  if (!(await allow(`github-repositories:${userId}`, 30, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop de demandes de dépôts en peu de temps. Patientez une minute.' },
+      { status: 429 },
+    )
+  }
 
   const [installations, pat] = await Promise.all([
     prisma.gitInstallation.findMany({

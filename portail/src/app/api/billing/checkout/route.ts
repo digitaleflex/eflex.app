@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { canManageBilling, resolveOrganization } from '@/lib/organizations'
-import { allow } from '@/lib/rate-limit'
+import { allow, allowOrg } from '@/lib/rate-limit'
 import { startCheckout, type PaymentProvider } from '@/lib/payments'
 
 export const dynamic = 'force-dynamic'
@@ -28,6 +28,9 @@ export async function POST(request: NextRequest) {
   }
   if (!(await allow(`checkout:${session.user.id}`, 10, 60_000))) {
     return NextResponse.json({ error: 'Trop de tentatives. Patientez une minute.' }, { status: 429 })
+  }
+  if (!(await allowOrg(org.organizationId, 'billing-mutate', 20, 60_000))) {
+    return NextResponse.json({ error: 'Trop de tentatives pour cette organisation. Patientez une minute.' }, { status: 429 })
   }
 
   let body: unknown

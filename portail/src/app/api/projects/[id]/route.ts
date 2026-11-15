@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { Prisma } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { allow, allowOrg } from '@/lib/rate-limit'
 import { publish } from '@/lib/event-bus'
 import { audit } from '@/lib/audit'
 import { deleteApplication, deletePrivateKey, deleteManagedDatabase } from '@/lib/coolify'
@@ -114,6 +115,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { id } = await params
 
+  if (!(await allow(`project-update:${session.user.id}`, 30, 60_000))) {
+    return NextResponse.json({ error: 'Trop de modifications en peu de temps. Patientez une minute.' }, { status: 429 })
+  }
+
   const org = await requireOrg(session)
   if (!org) return tenantNotFound('Projet introuvable')
   const denied = assertProjectManager(org)
@@ -121,6 +126,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json(
       { error: 'Votre rôle dans cette organisation ne permet pas de modifier ce projet.' },
       { status: 403 },
+    )
+  }
+  if (!(await allowOrg(org.organizationId, 'project-mutate', 60, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop de modifications de projets pour cette organisation. Patientez une minute.' },
+      { status: 429 },
     )
   }
 
@@ -178,6 +189,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   const { id } = await params
 
+  if (!(await allow(`project-delete:${session.user.id}`, 10, 60_000))) {
+    return NextResponse.json({ error: 'Trop de suppressions en peu de temps. Patientez une minute.' }, { status: 429 })
+  }
+
   const org = await requireOrg(session)
   if (!org) return tenantNotFound('Projet introuvable')
   const denied = assertProjectManager(org)
@@ -185,6 +200,12 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     return NextResponse.json(
       { error: 'Votre rôle dans cette organisation ne permet pas de supprimer ce projet.' },
       { status: 403 },
+    )
+  }
+  if (!(await allowOrg(org.organizationId, 'project-mutate', 30, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop de modifications de projets pour cette organisation. Patientez une minute.' },
+      { status: 429 },
     )
   }
 

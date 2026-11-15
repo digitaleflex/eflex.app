@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
+import { allow, allowOrg } from '@/lib/rate-limit'
 import { firstIssue } from '@/lib/project-settings'
 import { transferProject, transferProjectSchema } from '@/lib/project-transfer'
 import { requireOrg, tenantNotFound } from '@/lib/tenant'
@@ -17,8 +18,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
+  if (!(await allow(`project-transfer:${session.user.id}`, 10, 60_000))) {
+    return NextResponse.json({ error: 'Trop de transferts en peu de temps. Patientez une minute.' }, { status: 429 })
+  }
+
   const org = await requireOrg(session)
   if (!org) return tenantNotFound('Projet introuvable')
+  if (!(await allowOrg(org.organizationId, 'project-mutate', 20, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop de modifications de projets pour cette organisation. Patientez une minute.' },
+      { status: 429 },
+    )
+  }
 
   const { id } = await params
 

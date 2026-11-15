@@ -158,8 +158,9 @@ func TestDockerfileConstructs(t *testing.T) {
 		"COPY composer.lock ./",
 		"RUN npm ci",
 		"COPY --from=assets /app/public ./public",
-		"php artisan migrate --force",
+		"php artisan package:discover --ansi",
 		"php artisan config:cache",
+		"php artisan migrate --force",
 		"php-fpm -F",
 		"nginx -g",
 		"root /var/www/html/public;",
@@ -197,8 +198,9 @@ func TestGenericDockerfileDoesNotStartLaravelWorkers(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"php artisan migrate --force",
+		"php artisan package:discover --ansi",
 		"php artisan config:cache",
+		"php artisan migrate --force",
 		"[program:php-fpm]",
 		"[program:nginx]",
 	} {
