@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   ANALYTICS_PUBLIC_KEY_PREFIX,
   analyticsConfigUpdateSchema,
+  analyticsRetentionCutoff,
   buildAnalyticsSnippet,
+  clampRetentionDays,
   collectPayloadSchema,
   generateAnalyticsPublicKey,
   hasDoNotTrackSignal,
@@ -134,5 +136,36 @@ describe('buildAnalyticsSnippet', () => {
     const snippet = buildAnalyticsSnippet('key"</script>', 'https://x.test/a"b')
     expect(snippet).not.toContain('key"</script><script>')
     expect(snippet).toContain('\\"')
+  })
+
+  it('peut conditionner l’envoi à un consentement explicite', () => {
+    const snippet = buildAnalyticsSnippet('efx_pub_testkey123456789012', 'https://eflex.app/api/collect', {
+      requireConsent: true,
+    })
+    expect(snippet).toContain('__EFLEX_ANALYTICS_CONSENT')
+    expect(snippet).toContain('__eflexTrackPageview')
+    expect(snippet).toContain('sendBeacon')
+  })
+
+  it('n’impose pas de garde de consentement par défaut', () => {
+    const snippet = buildAnalyticsSnippet('efx_pub_testkey123456789012', 'https://eflex.app/api/collect')
+    expect(snippet).not.toContain('__EFLEX_ANALYTICS_CONSENT')
+  })
+})
+
+describe('clampRetentionDays', () => {
+  it('borne la rétention dans l’intervalle autorisé', () => {
+    expect(clampRetentionDays(90)).toBe(90)
+    expect(clampRetentionDays(1)).toBe(7)
+    expect(clampRetentionDays(9999)).toBe(365)
+    expect(clampRetentionDays(30.9)).toBe(30)
+  })
+})
+
+describe('analyticsRetentionCutoff', () => {
+  it('calcule une date de coupure en jours UTC', () => {
+    const now = new Date('2026-05-12T15:00:00.000Z')
+    const cutoff = analyticsRetentionCutoff(30, now)
+    expect(cutoff.toISOString()).toBe('2026-04-12T00:00:00.000Z')
   })
 })

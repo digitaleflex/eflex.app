@@ -10,6 +10,7 @@ import {
   buildAnalyticsSnippet,
   firstAnalyticsIssue,
   generateAnalyticsPublicKey,
+  purgeTrafficStatsForProject,
 } from '@/lib/analytics'
 
 export const dynamic = 'force-dynamic'
@@ -36,6 +37,7 @@ function serializeConfig(config: {
     collectPath: config.collectPath,
     retentionDays: config.retentionDays,
     snippet: buildAnalyticsSnippet(config.publicKey, url),
+    snippetConsent: buildAnalyticsSnippet(config.publicKey, url, { requireConsent: true }),
     collectUrl: url,
     createdAt: config.createdAt.toISOString(),
     updatedAt: config.updatedAt.toISOString(),
@@ -68,12 +70,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         collectPath: true,
         retentionDays: ANALYTICS_RETENTION_DEFAULT_DAYS,
         snippet: null,
+        snippetConsent: null,
         collectUrl: collectUrl(),
         createdAt: null,
         updatedAt: null,
       },
     })
   }
+
+  // Rétention effectivement appliquée : purge opportuniste des statistiques expirées.
+  await purgeTrafficStatsForProject(prisma, projectResult.project.id)
 
   return NextResponse.json({ config: serializeConfig(config) })
 }
@@ -146,8 +152,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         },
       })
 
-  // La désactivation/rotation de clé est un changement sensible de collecte : journalisé sans exposer la clé.
-  // (audit importé seulement si utile ; on garde l'incrément simple et on peut ajouter audit fin plus tard)
+  // Après modification (activation, rétention, rotation de clé), on applique la rétention en vigueur.
+  await purgeTrafficStatsForProject(prisma, project.id)
 
   return NextResponse.json({ config: serializeConfig(config) })
 }

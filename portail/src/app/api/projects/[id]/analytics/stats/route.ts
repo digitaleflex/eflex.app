@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
+import { allowOrg } from '@/lib/rate-limit'
+import { assertProjectManager, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
+import { deleteAllTrafficStatsForProject, purgeTrafficStatsForProject } from '@/lib/analytics'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -27,6 +29,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params
   const projectResult = await requireProject(org, id, { id: true })
   if ('response' in projectResult) return projectResult.response
+  const projectId = projectResult.project.id
+
+  // Applique la rétention configurée : les statistiques expirées ne sont ni exposées ni conservées.
+  await purgeTrafficStatsForProject(prisma, projectId)
 
   const url = new URL(request.url)
   const days = clampDays(url.searchParams.get('days'))
@@ -35,7 +41,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   since.setUTCDate(since.getUTCDate() - (days - 1))
 
   const stats = await prisma.trafficDailyStat.findMany({
-    where: { projectId: projectResult.project.id, date: { gte: since } },
+    where: { projectId, date: { gte: since } },
     orderBy: [{ date: 'asc' }, { views: 'desc' }],
     select: { date: true, path: true, views: true },
   })
@@ -60,4 +66,31 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     .map(([path, views]) => ({ path, views }))
 
   return NextResponse.json({ rangeDays: days, total, days: daysSeries, paths })
+}
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  }
+
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
+
+  const denied = assertProjectManager(org)
+  if (denied) return denied
+
+  if (!(await allowOrg(org.organizationId, 'analytics-delete', 20, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop de suppressions pour cette organisation. Patientez une minute.' },
+      { status: 429 },
+    )
+  }
+
+  const { id } = await params
+  const projectResult = await requireProject(org, id, { id: true })
+  if ('response' in projectResult) return projectResult.response
+
+  const deleted = await deleteAllTrafficStatsForProject(prisma, projectResult.project.id)
+  return NextResponse.json({ deleted })
 }

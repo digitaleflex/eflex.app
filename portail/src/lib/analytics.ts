@@ -1,18 +1,22 @@
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
+import type { PrismaClient } from '@prisma/client'
 
 /**
- * Socle initial de collecte de trafic (ANALYTICS-2).
+ * Collecte de trafic agrégée (socle #109, conformité/confidentialité #112).
  *
- * Principes (voir #112, confidentialité/consentement) :
- * - désactivé par défaut (opt-in explicite, aucune collecte implicite) ;
- * - minimisation : pas d'adresse IP brute stockée, pas d'identifiant visiteur,
- *   pas de cookie, pas de profilage nominatif ; agrégation quotidienne par chemin ;
- * - respect optionnel de DNT / Global Privacy Control ;
- * - rétention configurable au niveau du schéma (la purge effective relève de #112).
+ * Principes :
+ * - désactivée par défaut (opt-in explicite, aucune collecte implicite) ;
+ * - minimisation : pas d'adresse IP brute, pas d'identifiant visiteur,
+ *   pas de cookie, pas de profilage nominatif, pas de recoupement entre sites ;
+ * - agrégation quotidienne par chemin (donnée mesurée reçue par /api/collect) ;
+ * - respect optionnel de Do Not Track / Global Privacy Control ;
+ * - rétention configurable et bornée, avec purge des statistiques expirées.
  *
- * Aucune donnée n'est inventée : seules les pages vues réellement reçues via le
- * point d'ingestion public (authentifié par clé d'écriture) sont comptabilisées.
+ * Le consentement préalable au dépôt/lecture d'informations côté visiteur ou à
+ * toute mesure non exemptée relève du responsable du site intégré : le snippet
+ * peut être conditionné (voir `buildAnalyticsSnippet`, option `requireConsent`).
+ * Aucune donnée n'est inventée : seules les pages vues effectivement reçues sont comptées.
  */
 
 export const ANALYTICS_PUBLIC_KEY_PREFIX = 'efx_pub_'
@@ -124,20 +128,95 @@ export interface AnalyticsConfigShape {
   retentionDays: number
 }
 
+export interface AnalyticsSnippetOptions {
+  /**
+   * Lorsque vrai, le snippet n'émet une page vue que si le site a recueilli un
+   * consentement explicite et positionné `window.__EFLEX_ANALYTICS_CONSENT = true`
+   * (ou appelé `window.__eflexTrackPageview()` après accord). Sans consentement,
+   * aucune requête n'est envoyée. À utiliser lorsque la mesure n'est pas exemptée.
+   */
+  requireConsent?: boolean
+}
+
 /**
- * Génère un extrait d'intégration minimal (sans cookie, sans identifiant).
- * L'envoi est non bloquant (sendBeacon/fetch keepalive) et ignore les erreurs.
+ * Extrait d'intégration minimal (sans cookie, sans identifiant, sans recoupement).
+ * Envoi non bloquant (sendBeacon/fetch keepalive), erreurs ignorées. Ne lit pas
+ * l'URL complète (chemin seul) et ne pose aucun stockage navigateur.
  */
-export function buildAnalyticsSnippet(publicKey: string, collectUrl: string): string {
+export function buildAnalyticsSnippet(
+  publicKey: string,
+  collectUrl: string,
+  options: AnalyticsSnippetOptions = {},
+): string {
   const safeKey = JSON.stringify(publicKey)
   const safeUrl = JSON.stringify(collectUrl)
-  const body =
-    `(()=>{try{var d={k:${safeKey},p:location.pathname,t:"pageview"};` +
+  const send =
+    `var d={k:${safeKey},p:location.pathname,t:"pageview"};` +
     `var b=JSON.stringify(d);` +
     `(navigator.sendBeacon&&navigator.sendBeacon(${safeUrl},new Blob([b],{type:"application/json"})))||` +
-    `fetch(${safeUrl},{method:"POST",headers:{"content-type":"application/json"},body:b,keepalive:true,mode:"cors"})` +
-    `}catch(_){}})();`
+    `fetch(${safeUrl},{method:"POST",headers:{"content-type":"application/json"},body:b,keepalive:true,mode:"cors"})`
+
+  const body = options.requireConsent
+    ? `(()=>{try{var s=function(){try{${send}}catch(_){}};` +
+      `window.__eflexTrackPageview=s;` +
+      `if(window.__EFLEX_ANALYTICS_CONSENT===true)s();` +
+      `}catch(_){}})();`
+    : `(()=>{try{${send}}catch(_){}})();`
+
   return `<script defer data-eflex-analytics>${body}</script>`
+}
+
+/**
+ * Borne de rétention (jours) ramenée à l'intervalle autorisé. Sert aussi de garde
+ * avant toute requête de purge pour ne jamais supprimer plus large que prévu.
+ */
+export function clampRetentionDays(value: number): number {
+  if (!Number.isFinite(value)) return ANALYTICS_RETENTION_DEFAULT_DAYS
+  return Math.min(ANALYTICS_RETENTION_MAX_DAYS, Math.max(ANALYTICS_RETENTION_MIN_DAYS, Math.trunc(value)))
+}
+
+/** Date (UTC, minuit) avant laquelle les statistiques sont considérées expirées. */
+export function analyticsRetentionCutoff(retentionDays: number, now = new Date()): Date {
+  const days = clampRetentionDays(retentionDays)
+  const cutoff = utcDay(now)
+  cutoff.setUTCDate(cutoff.getUTCDate() - days)
+  return cutoff
+}
+
+export interface TrafficStatRow {
+  date: Date
+  path: string
+  views: number
+}
+
+/**
+ * Purge les statistiques quotidiennes d'un projet antérieures à sa rétention.
+ * Ne supprime rien si la configuration n'existe pas (aucune donnée collectée).
+ * Retourne le nombre de lignes supprimées.
+ */
+export async function purgeTrafficStatsForProject(
+  prisma: Pick<PrismaClient, 'projectAnalytics' | 'trafficDailyStat'>,
+  projectId: string,
+): Promise<number> {
+  const config = await prisma.projectAnalytics.findUnique({
+    where: { projectId },
+    select: { retentionDays: true },
+  })
+  if (!config) return 0
+  const cutoff = analyticsRetentionCutoff(config.retentionDays)
+  const result = await prisma.trafficDailyStat.deleteMany({
+    where: { projectId, date: { lt: cutoff } },
+  })
+  return result.count
+}
+
+/** Supprime toutes les statistiques quotidiennes d'un projet (droit à l'effacement des mesures). */
+export async function deleteAllTrafficStatsForProject(
+  prisma: Pick<PrismaClient, 'trafficDailyStat'>,
+  projectId: string,
+): Promise<number> {
+  const result = await prisma.trafficDailyStat.deleteMany({ where: { projectId } })
+  return result.count
 }
 
 /** Première issue Zod lisible (cohérent avec project-settings.ts). */
