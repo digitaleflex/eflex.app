@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { prisma } from '@/lib/prisma'
-import { enqueueDeployment, removeQueuedDeployment } from '@/lib/queue'
+import { acquireDeploymentLocks, enqueueDeployment, removeQueuedDeployment } from '@/lib/queue'
 import { publish } from '@/lib/event-bus'
 import { isDeploymentStatus, STATUS_LABELS, ACTIVE_DEPLOYMENT_STATUSES } from '@/lib/deployment-state'
 import { CANCEL_NOTE } from '@/lib/deployment-cancel'
@@ -117,19 +117,28 @@ export async function enqueueProjectDeployment(
     return { error: billing.error, code: billing.code, status: billing.status }
   }
 
-  let targetApps: DeploymentAppRef[] =
-    options.apps ??
-    (multiAppEnabled()
-      ? await prisma.projectApp.findMany({
-          where: { projectId: project.id },
-          orderBy: [{ position: 'asc' }, { name: 'asc' }],
-          select: { id: true, name: true },
-        })
-      : [])
+  const lock = await acquireDeploymentLocks([`eflex:deploy-lock:${project.id}`])
+  if (!lock.acquired) {
+    return {
+      error: 'Un déploiement est déjà en cours de préparation pour ce projet. Réessayez dans un instant.',
+      code: 'deployment_in_progress',
+    }
+  }
 
-  const skipped: SkippedDeploymentApp[] = []
+  try {
+    let targetApps: DeploymentAppRef[] =
+      options.apps ??
+      (multiAppEnabled()
+        ? await prisma.projectApp.findMany({
+            where: { projectId: project.id },
+            orderBy: [{ position: 'asc' }, { name: 'asc' }],
+            select: { id: true, name: true },
+          })
+        : [])
 
-  if (options.exclusive) {
+    const skipped: SkippedDeploymentApp[] = []
+
+    if (options.exclusive) {
     const active = await prisma.deployment.findMany({
       where: {
         projectId: project.id,
@@ -277,17 +286,20 @@ export async function enqueueProjectDeployment(
     })
   }
 
-  const first = enqueued[0]
-  if (!first) return { error: 'Aucun déploiement n’a pu être préparé.' }
+    const first = enqueued[0]
+    if (!first) return { error: 'Aucun déploiement n’a pu être préparé.' }
 
-  if (queueError) {
-    return {
-      error: queueError,
-      deployments: enqueued,
-      deploymentId: first.id,
-      groupId,
+    if (queueError) {
+      return {
+        error: queueError,
+        deployments: enqueued,
+        deploymentId: first.id,
+        groupId,
+      }
     }
-  }
 
-  return { deploymentId: first.id, deployments: enqueued, groupId, skipped }
+    return { deploymentId: first.id, deployments: enqueued, groupId, skipped }
+  } finally {
+    await lock.release()
+  }
 }

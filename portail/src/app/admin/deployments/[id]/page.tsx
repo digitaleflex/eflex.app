@@ -13,6 +13,7 @@ import { frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 import { STATUS_LABELS, isDeploymentStatus } from '@/lib/deployment-state'
 import { relativeTime } from '@/lib/relative-time'
 import { getPrimaryApp } from '@/lib/project-apps'
+import { getDeploymentQueueDiagnostics } from '@/lib/queue'
 import {
   deploymentDuration,
   isActiveDeploymentStatus,
@@ -60,7 +61,10 @@ export default async function AdminDeploymentPage({ params }: { params: Promise<
   })
   if (!deployment) notFound()
 
-  const primary = getPrimaryApp(deployment.project.apps)
+  const [primary, queue] = [
+    getPrimaryApp(deployment.project.apps),
+    await getDeploymentQueueDiagnostics(deployment.id),
+  ]
   const app = deployment.app ?? primary
   const plan = summarizePlan(app?.plan)
   const summary = maskProjectLogs(deployment.project.id, deployment.project.envVars, deployment.logsSummary)
@@ -68,6 +72,17 @@ export default async function AdminDeploymentPage({ params }: { params: Promise<
   const timing = deploymentDuration(deployment, now)
   const active = isActiveDeploymentStatus(deployment.status)
   const statusLabel = isDeploymentStatus(deployment.status) ? STATUS_LABELS[deployment.status] : deployment.status
+  const queueStateLabel: Record<string, string> = {
+    waiting: 'En attente',
+    delayed: 'Différé',
+    prioritized: 'Priorisé',
+    active: 'Actif',
+    'waiting-children': 'En attente (dépendances)',
+    completed: 'Terminé (BullMQ)',
+    failed: 'En échec (BullMQ)',
+    missing: 'Absent de la file',
+    unknown: 'Inconnu',
+  }
 
   return (
     <div className="space-y-6">
@@ -161,6 +176,47 @@ export default async function AdminDeploymentPage({ params }: { params: Promise<
           {deployment.status === 'failed' && (
             <p className="mt-3 text-xs text-muted-foreground">
               Déduction automatique à partir de l’extrait de journal (secrets masqués). Elle peut être incomplète.
+            </p>
+          )}
+        </Card>
+
+        <Card className="p-4">
+          <h2 className="text-sm font-semibold">File BullMQ</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Diagnostic de la file de déploiement (idempotence, reprises, jobs bloqués ou absents).
+          </p>
+          {queue ? (
+            <dl className="mt-3 space-y-2 text-sm">
+              <div className="flex flex-wrap justify-between gap-2">
+                <dt className="text-muted-foreground">État du job</dt>
+                <dd>{queueStateLabel[queue.state] ?? queue.state}</dd>
+              </div>
+              <div className="flex flex-wrap justify-between gap-2">
+                <dt className="text-muted-foreground">Tentatives</dt>
+                <dd className="tabular-nums">
+                  {queue.attemptsMade != null && queue.attemptsMax != null
+                    ? `${queue.attemptsMade} / ${queue.attemptsMax}`
+                    : '—'}
+                </dd>
+              </div>
+              <div className="flex flex-wrap justify-between gap-2">
+                <dt className="text-muted-foreground">Pris en charge</dt>
+                <dd className="tabular-nums">{queue.processedOn ? dateTime.format(new Date(queue.processedOn)) : '—'}</dd>
+              </div>
+              <div className="flex flex-wrap justify-between gap-2">
+                <dt className="text-muted-foreground">Terminé (BullMQ)</dt>
+                <dd className="tabular-nums">{queue.finishedOn ? dateTime.format(new Date(queue.finishedOn)) : '—'}</dd>
+              </div>
+              {queue.failedReason && (
+                <div className="space-y-1 sm:col-span-2">
+                  <dt className="text-muted-foreground">Raison d’échec BullMQ</dt>
+                  <dd className="break-words text-destructive">{queue.failedReason}</dd>
+                </div>
+              )}
+            </dl>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Diagnostic indisponible (Redis non configuré ou injoignable).
             </p>
           )}
         </Card>

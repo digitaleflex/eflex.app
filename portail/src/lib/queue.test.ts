@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { DEPLOYMENT_QUEUE, redisConnection } from './queue'
+import {
+  DEPLOYMENT_QUEUE,
+  acquireDeploymentLocks,
+  getDeploymentQueueDiagnostics,
+  redisConnection,
+} from './queue'
 
 let savedUrl: string | undefined
 
@@ -35,5 +40,19 @@ describe('redisConnection', () => {
 
   it('expose un nom de file stable', () => {
     expect(DEPLOYMENT_QUEUE).toBe('eflex-deployments')
+  })
+})
+
+describe('diagnostics et verrous sans Redis', () => {
+  it('retourne null pour le diagnostic si REDIS_URL est absente', async () => {
+    delete process.env.REDIS_URL
+    await expect(getDeploymentQueueDiagnostics('dep-1')).resolves.toBeNull()
+  })
+
+  it('n’acquiert pas de verrou distribué sans Redis (garde-fous DB conservés)', async () => {
+    delete process.env.REDIS_URL
+    const lock = await acquireDeploymentLocks(['eflex:deploy-lock:projet'])
+    expect(lock.acquired).toBe(true)
+    await expect(lock.release()).resolves.toBeUndefined()
   })
 })

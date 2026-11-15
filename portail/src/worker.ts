@@ -162,7 +162,7 @@ async function appendLogs(id: string, line: string): Promise<void> {
 
 export async function processDeployment(
   deploymentId: string,
-  options: { rollback?: boolean } = {},
+  options: { rollback?: boolean; attemptsMade?: number } = {},
 ): Promise<void> {
   const deployment = await prisma.deployment.findUnique({
     where: { id: deploymentId },
@@ -174,11 +174,18 @@ export async function processDeployment(
   if (!deployment) return
   if (isTerminal(deployment.status)) return // idempotence
 
+  const attempt = (options.attemptsMade ?? 0) + 1
   if (deployment.status !== 'queued') {
     // Reprise/retraitement (redémarrage, livraison dupliquée ou tentative
     // BullMQ) : on poursuit depuis l'état courant sans régresser.
     console.info(
-      `[eflex/worker] reprise du déploiement ${deploymentId} depuis l’état « ${deployment.status} ».`,
+      `[eflex/worker] reprise du déploiement ${deploymentId} (tentative ${attempt}) depuis l’état « ${deployment.status} ».`,
+    )
+  }
+  if (attempt > 1) {
+    await appendLogs(
+      deploymentId,
+      `[worker] Reprise automatique BullMQ (tentative ${attempt}) depuis l’état « ${deployment.status} ».`,
     )
   }
 
@@ -198,18 +205,8 @@ export async function processDeployment(
     return
   }
 
-  // Annulé avant même le démarrage (job encore en file) : rien à faire.
-  if (!(await setStatus(deploymentId, 'analyzing'))) {
-    const status = await currentStatus(deploymentId)
-    if (status && !isTerminal(status)) {
-      console.warn(
-        `[eflex/worker] déploiement ${deploymentId} non démarrable depuis « ${status} » (verrou ou état incohérent).`,
-      )
-    }
-    return
-  }
-
-  // Résolution du contexte : source ProjectApp (Lot G) avec repli miroirs Project.*.
+  // Résolution du contexte (pure) : utile aussi pour reprendre le suivi d'un
+  // build Coolify déjà déclenché sans le redéclencher.
   const resolved = resolveDeploymentContext({
     project: { ...project, apps: project.apps },
     app: effectiveApp
@@ -229,6 +226,39 @@ export async function processDeployment(
   }
   const context = resolved.context
   const { plan, hosts, domain } = context
+
+  // Idempotence/reprise : si un build Coolify est déjà associé, on ne relance
+  // pas un nouveau déploiement (les retries BullMQ ne doivent pas créer de
+  // doublon côté hébergement). On reprend le suivi du build existant.
+  if (deployment.coolifyBuildId) {
+    await appendLogs(
+      deploymentId,
+      `[reprise] Build Coolify déjà associé (${deployment.coolifyBuildId}) : reprise du suivi sans nouveau déclenchement.`,
+    )
+    console.info(
+      `[eflex/worker] déploiement ${deploymentId} : suivi du build existant ${deployment.coolifyBuildId}.`,
+    )
+    await monitorDeployment(deploymentId, deployment.coolifyBuildId, {
+      hosts,
+      domain,
+      app,
+      projectId: project.id,
+      primary: context.primary,
+    })
+    return
+  }
+
+  // Annulé avant même le démarrage (job encore en file) : rien à faire.
+  if (!(await setStatus(deploymentId, 'analyzing'))) {
+    const status = await currentStatus(deploymentId)
+    if (status && !isTerminal(status)) {
+      console.warn(
+        `[eflex/worker] déploiement ${deploymentId} non démarrable depuis « ${status} » (verrou ou état incohérent).`,
+      )
+    }
+    return
+  }
+
   const artifacts = buildProjectArtifacts(plan, context.deployKey, domain ?? undefined)
   const settings = coolifyApplicationSettings(plan)
   const composeSource = artifacts.repositoryCompose
@@ -594,9 +624,29 @@ export async function processDeployment(
 
   // L'utilisateur a pu annuler pendant l'appel à Coolify : l'identifiant de
   // build n'existait pas encore côté route d'annulation, on l'annule ici.
+  await monitorDeployment(deploymentId, started.deploymentId, {
+    hosts,
+    domain,
+    app,
+    projectId: project.id,
+    primary: context.primary,
+  })
+}
+
+async function monitorDeployment(
+  deploymentId: string,
+  buildId: string,
+  context: {
+    hosts: string[]
+    domain: string | null
+    app: { id: string } | null
+    projectId: string
+    primary: boolean
+  },
+): Promise<void> {
   if (!(await setStatus(deploymentId, 'deploying'))) {
     if ((await currentStatus(deploymentId)) === 'cancelled') {
-      const cancelled = await cancelCoolifyDeployment(started.deploymentId)
+      const cancelled = await cancelCoolifyDeployment(buildId)
       if ('error' in cancelled) {
         console.warn(`[eflex/worker] annulation distante impossible : ${cancelled.error}`)
       }
@@ -613,7 +663,7 @@ export async function processDeployment(
       outcome = 'cancelled'
       break
     }
-    const status = await getDeploymentStatus(started.deploymentId)
+    const status = await getDeploymentStatus(buildId)
     if ('error' in status) continue
     const value = status.status.toLowerCase()
     if (COOLIFY_LIVE.has(value)) { outcome = 'live'; break }
@@ -637,12 +687,14 @@ export async function processDeployment(
     // ne garantit pas que Let's Encrypt a émis le certificat ni que le DNS
     // pointe encore vers le serveur. On l'ajoute au journal, sans rétrograder
     // un déploiement qui fonctionne déjà.
-    if (hosts.length > 0) {
+    if (context.hosts.length > 0) {
       const checks = await Promise.all(
-        hosts.map((host) => waitForTls(host, { attempts: host === domain ? 12 : 6 })),
+        context.hosts.map((host) =>
+          waitForTls(host, { attempts: host === context.domain ? 12 : 6 }),
+        ),
       )
-      for (let index = 0; index < hosts.length; index += 1) {
-        const host = hosts[index]!
+      for (let index = 0; index < context.hosts.length; index += 1) {
+        const host = context.hosts[index]!
         const tls = checks[index]!
         const line = tls.ok
           ? `[SSL] Certificat valide pour ${host}${tls.expiresAt ? ` (expire le ${new Date(tls.expiresAt).toLocaleDateString('fr-FR')})` : ''}.`
@@ -656,22 +708,22 @@ export async function processDeployment(
         // Domaine principal de l'application : `ProjectApp` (lot C) et miroir
         // `Project.*` pour l'application principale. Les alias restent des
         // `ProjectDomain`, rattachés à l'application quand `appId` est renseigné.
-        if (host === domain) {
-          if (app) {
-            await prisma.projectApp.update({ where: { id: app.id }, data })
+        if (host === context.domain) {
+          if (context.app) {
+            await prisma.projectApp.update({ where: { id: context.app.id }, data })
             if (context.primary) {
-              await prisma.project.update({ where: { id: project.id }, data })
+              await prisma.project.update({ where: { id: context.projectId }, data })
             }
           } else {
-            await prisma.project.update({ where: { id: project.id }, data })
+            await prisma.project.update({ where: { id: context.projectId }, data })
           }
         } else {
           await prisma.projectDomain.updateMany({
             where: {
-              projectId: project.id,
+              projectId: context.projectId,
               hostname: host,
-              ...(app
-                ? { OR: [{ appId: app.id }, ...(context.primary ? [{ appId: null }] : [])] }
+              ...(context.app
+                ? { OR: [{ appId: context.app.id }, ...(context.primary ? [{ appId: null }] : [])] }
                 : {}),
             },
             data,
@@ -747,6 +799,7 @@ export function startDeploymentWorker(): Worker {
       await runDeploymentWatchdog()
       await processDeployment(String(job.data.deploymentId), {
         rollback: job.data.rollback === true,
+        attemptsMade: job.attemptsMade,
       })
     },
     { connection: redisConnection(), concurrency: 2 },

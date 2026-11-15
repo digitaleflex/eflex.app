@@ -4,10 +4,36 @@
  * ne peut pas être traité deux fois en parallèle.
  */
 import { Queue, type ConnectionOptions } from 'bullmq'
+import IORedis, { type Redis } from 'ioredis'
 
 export const DEPLOYMENT_QUEUE = 'eflex-deployments'
 
 let queue: Queue | null = null
+let redis: Redis | null = null
+
+export type DeploymentJobQueueState =
+  | 'waiting'
+  | 'delayed'
+  | 'prioritized'
+  | 'active'
+  | 'waiting-children'
+  | 'completed'
+  | 'failed'
+  | 'missing'
+  | 'unknown'
+
+export interface DeploymentQueueDiagnostics {
+  deploymentId: string
+  state: DeploymentJobQueueState
+  attemptsMade: number | null
+  attemptsMax: number | null
+  failedReason: string | null
+  timestamp: string | null
+  processedOn: string | null
+  finishedOn: string | null
+  delay: number | null
+  stalled: boolean
+}
 
 export function redisConnection(): ConnectionOptions {
   const raw = process.env.REDIS_URL
@@ -40,6 +66,139 @@ export function deploymentsQueue(): Queue {
     })
   }
   return queue
+}
+
+function redisClient(): Redis | null {
+  if (!process.env.REDIS_URL) return null
+  if (!redis) {
+    redis = new IORedis(process.env.REDIS_URL, {
+      maxRetriesPerRequest: 1,
+      enableReadyCheck: false,
+      lazyConnect: false,
+    })
+    redis.on('error', () => {
+      // Les lectures de diagnostic/verrou ne doivent jamais faire tomber le portail.
+    })
+  }
+  return redis
+}
+
+function iso(ms: number | undefined): string | null {
+  return typeof ms === 'number' && Number.isFinite(ms) ? new Date(ms).toISOString() : null
+}
+
+export async function getDeploymentQueueDiagnostics(
+  deploymentId: string,
+): Promise<DeploymentQueueDiagnostics | null> {
+  if (!process.env.REDIS_URL) return null
+  try {
+    const job = await deploymentsQueue().getJob(deploymentId)
+    if (!job) {
+      return {
+        deploymentId,
+        state: 'missing',
+        attemptsMade: null,
+        attemptsMax: null,
+        failedReason: null,
+        timestamp: null,
+        processedOn: null,
+        finishedOn: null,
+        delay: null,
+        stalled: false,
+      }
+    }
+    const state = await job.getState().catch(() => 'unknown')
+    const rawState = state as DeploymentJobQueueState
+    return {
+      deploymentId,
+      state:
+        rawState === 'waiting' ||
+        rawState === 'delayed' ||
+        rawState === 'prioritized' ||
+        rawState === 'active' ||
+        rawState === 'waiting-children' ||
+        rawState === 'completed' ||
+        rawState === 'failed'
+          ? rawState
+          : 'unknown',
+      attemptsMade: typeof job.attemptsMade === 'number' ? job.attemptsMade : null,
+      attemptsMax: typeof job.opts.attempts === 'number' ? job.opts.attempts : null,
+      failedReason: typeof job.failedReason === 'string' && job.failedReason ? job.failedReason : null,
+      timestamp: iso(job.timestamp),
+      processedOn: iso(job.processedOn ?? undefined),
+      finishedOn: iso(job.finishedOn ?? undefined),
+      delay: typeof job.delay === 'number' ? job.delay : null,
+      stalled: rawState === 'active' && typeof job.processedOn === 'number' && Date.now() - job.processedOn > 60_000,
+    }
+  } catch {
+    return {
+      deploymentId,
+      state: 'unknown',
+      attemptsMade: null,
+      attemptsMax: null,
+      failedReason: null,
+      timestamp: null,
+      processedOn: null,
+      finishedOn: null,
+      delay: null,
+      stalled: false,
+    }
+  }
+}
+
+export async function getDeploymentQueueDiagnosticsBatch(
+  deploymentIds: string[],
+): Promise<Record<string, DeploymentQueueDiagnostics>> {
+  const entries = await Promise.all(
+    deploymentIds.map(async (id) => [id, await getDeploymentQueueDiagnostics(id)] as const),
+  )
+  const result: Record<string, DeploymentQueueDiagnostics> = {}
+  for (const [id, diagnostics] of entries) {
+    if (diagnostics) result[id] = diagnostics
+  }
+  return result
+}
+
+export async function acquireDeploymentLocks(
+  keys: string[],
+  ttlMs = 5 * 60_000,
+): Promise<{ acquired: boolean; release: () => Promise<void> }> {
+  const client = redisClient()
+  if (!client) return { acquired: true, release: async () => undefined }
+
+  const unique = Array.from(new Set(keys)).sort()
+  const token = `${process.pid}:${Date.now()}:${Math.random().toString(36).slice(2)}`
+  const acquiredKeys: string[] = []
+
+  const release = async () => {
+    if (acquiredKeys.length === 0) return
+    const script = `
+      if redis.call("get", KEYS[1]) == ARGV[1] then
+        return redis.call("del", KEYS[1])
+      else
+        return 0
+      end
+    `
+    await Promise.all(
+      acquiredKeys.map((key) => client.eval(script, 1, key, token).catch(() => 0)),
+    )
+  }
+
+  try {
+    for (const key of unique) {
+      const ok = await client.set(key, token, 'PX', ttlMs, 'NX')
+      if (ok !== 'OK') {
+        await release()
+        return { acquired: false, release: async () => undefined }
+      }
+      acquiredKeys.push(key)
+    }
+    return { acquired: true, release }
+  } catch {
+    await release()
+    // Redis indisponible : ne pas bloquer si on ne peut pas verrouiller, le garde-fou DB reste actif.
+    return { acquired: true, release: async () => undefined }
+  }
 }
 
 export async function enqueueDeployment(
