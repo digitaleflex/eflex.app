@@ -281,6 +281,16 @@ export function UsageView({ projects, quota }: { projects: UsageProject[]; quota
           <li><span className="font-medium text-foreground">Stockage</span> : aucune source de mesure disponible pour le moment — aucune valeur affichée.</li>
           <li><span className="font-medium text-foreground">Bande passante</span> : aucune source de mesure disponible pour le moment — aucune valeur affichée.</li>
         </ul>
+        <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
+          <h3 className="text-sm font-medium text-foreground">Limites d’exécution par plan</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Aucune limite CPU, mémoire ou disque par application n’est imposée par le plan dans la plateforme pour le moment.
+            L’exécution dépend des capacités et de la configuration de l’hébergement. Les profils de ressources par plan ne sont pas encore appliqués.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Source : configuration de la plateforme (aucune mesure ni quota d’exécution instrumenté).
+          </p>
+        </div>
         {sampledAt && (
           <p className="mt-3 text-xs text-muted-foreground tabular-nums">
             Dernier échantillon reçu : {new Date(sampledAt).toLocaleString('fr-FR')}.

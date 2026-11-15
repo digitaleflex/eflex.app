@@ -780,10 +780,15 @@ export interface InfrastructureSummary {
     queueWaiting: number
     certificatesExpiring: number
   }
+  /** Mode du limiteur de débit applicatif (observabilité #127) : partagé Redis, mémoire locale ou Redis dégradé. */
+  rateLimitMode: 'redis' | 'memory' | 'redis-degraded'
 }
 
 /** Résumé compact renvoyé par `POST /api/admin/infrastructure/check`. */
-export function summarizeInfrastructure(snapshot: InfrastructureSnapshot): InfrastructureSummary {
+export function summarizeInfrastructure(
+  snapshot: InfrastructureSnapshot,
+  rateLimitMode: InfrastructureSummary['rateLimitMode'] = 'memory',
+): InfrastructureSummary {
   return {
     collectedAt: snapshot.collectedAt,
     durationMs: snapshot.durationMs,
@@ -804,5 +809,6 @@ export function summarizeInfrastructure(snapshot: InfrastructureSnapshot): Infra
       queueWaiting: snapshot.queue.counts?.waiting ?? 0,
       certificatesExpiring: snapshot.certificates.critical + snapshot.certificates.warning,
     },
+    rateLimitMode,
   }
 }
