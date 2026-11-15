@@ -6,6 +6,7 @@ import { FolderKanban, LayoutGrid, List, Plus, Search, SearchX } from 'lucide-re
 import { ProjectCard } from '@/components/dashboard/project-card'
 import { ProjectsTable } from '@/components/dashboard/projects-table'
 import { EmptyPanel } from '@/components/dashboard/section'
+import { LinkButton } from '@/components/link-button'
 import {
   PROJECT_FILTERS,
   PROJECT_SORTS,
@@ -165,13 +166,10 @@ export function ProjectsExplorer({
           }
           action={
             canManage ? (
-              <Link
-                href="/dashboard/new"
-                className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
+              <LinkButton href="/dashboard/new" className="gap-2 text-sm font-semibold">
                 <Plus className="h-4 w-4" aria-hidden="true" />
                 Importer un dépôt
-              </Link>
+              </LinkButton>
             ) : undefined
           }
         />

@@ -51,8 +51,16 @@
     --surface-raised: 0 0% 100%;
     --surface-raised-foreground: 215 45% 11%;
 
-    --radius: 0.875rem; /* 14px — cartes 12–16px */
-    --radius-control: 0.625rem; /* 10px — boutons, champs, onglets */
+    /* Échelle des arrondis, monotone (sm < md < lg < xl < 2xl < 3xl), alignée aux tokens.
+       Utilisée par Tailwind (`rounded-sm` … `rounded-3xl`) pour éviter l’inversion où `xl` < `lg`. */
+    --radius-sm: 0.5rem; /* 8px */
+    --radius-md: 0.625rem; /* 10px */
+    --radius-lg: 0.75rem; /* 12px */
+    --radius-xl: 0.875rem; /* 14px */
+    --radius-2xl: 1rem; /* 16px */
+    --radius-3xl: 1.5rem; /* 24px */
+    --radius: var(--radius-xl); /* rayon de carte par défaut */
+    --radius-control: var(--radius-md); /* boutons, champs, onglets */
     --radius-pill: 999px;
 
     /* Échelle d'espacement documentée (Tailwind : gap-gutter, p-stack…). */

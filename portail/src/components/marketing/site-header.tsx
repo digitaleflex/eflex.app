@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Menu, X } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-switcher'
+import { LinkButton } from '@/components/link-button'
 import { cn } from '@/lib/utils'
 import { BrandLogo } from '@/components/brand-logo'
 
@@ -127,13 +128,10 @@ export function SiteHeader() {
           >
             Connexion
           </Link>
-          <Link
-            href="/register"
-            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors duration-200 ease-out-expo hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:px-4 [@media(pointer:coarse)]:h-11"
-          >
+          <LinkButton href="/register" size="md" className="px-3 sm:px-4">
             <span className="sm:hidden">Compte</span>
             <span className="hidden sm:inline">Créer un compte</span>
-          </Link>
+          </LinkButton>
 
           <button
             ref={buttonRef}

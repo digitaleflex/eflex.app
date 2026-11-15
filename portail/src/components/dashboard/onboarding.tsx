@@ -1,5 +1,5 @@
-import Link from 'next/link'
 import { ArrowRight, Database, FolderGit2, KeyRound, Plus, ShieldCheck } from 'lucide-react'
+import { LinkButton } from '@/components/link-button'
 
 const STEPS = [
   {
@@ -47,14 +47,11 @@ export function DashboardOnboarding({
 
           {canManage ? (
             <div className="mt-5 flex flex-wrap items-center gap-3">
-              <Link
-                href="/dashboard/new"
-                className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
+              <LinkButton href="/dashboard/new" className="gap-2 text-sm font-semibold">
                 <Plus className="h-4 w-4" aria-hidden="true" />
                 Importer un dépôt
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
+              </LinkButton>
             </div>
           ) : (
             <p className="mt-5 rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
