@@ -66,6 +66,27 @@ module.exports = {
         eflexroyalblue: 'hsl(var(--eflex-royalblue))',
         eflexblue: 'hsl(var(--eflex-blue))',
         eflexsky: 'hsl(var(--eflex-sky))',
+        terminal: {
+          DEFAULT: 'hsl(var(--terminal))',
+          foreground: 'hsl(var(--terminal-foreground))',
+          border: 'hsl(var(--terminal-border))',
+          muted: {
+            DEFAULT: 'hsl(var(--terminal-muted))',
+            foreground: 'hsl(var(--terminal-muted-foreground))',
+          },
+          'line-number': 'hsl(var(--terminal-line-number))',
+          live: 'hsl(var(--terminal-live))',
+          done: 'hsl(var(--terminal-done))',
+          accent: 'hsl(var(--terminal-accent))',
+          warn: {
+            DEFAULT: 'hsl(var(--terminal-warn))',
+            surface: 'hsl(var(--terminal-warn-surface))',
+          },
+          error: {
+            DEFAULT: 'hsl(var(--terminal-error))',
+            surface: 'hsl(var(--terminal-error-surface))',
+          },
+        },
       },
       borderRadius: {
         sm: 'var(--radius-sm)',

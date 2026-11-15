@@ -75,6 +75,21 @@
     --shadow-lg: 0 12px 24px -8px hsl(var(--shadow-color) / 0.14), 0 24px 48px -12px hsl(var(--shadow-color) / 0.12);
 
     --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    /* Terminal (journal) : surface sombre intentionnelle dans les deux thèmes. */
+    --terminal: 218 47% 8%;
+    --terminal-foreground: 210 20% 94%;
+    --terminal-border: 215 25% 28%;
+    --terminal-muted: 215 30% 15%;
+    --terminal-muted-foreground: 215 16% 65%;
+    --terminal-line-number: 215 14% 52%;
+    --terminal-live: 142 69% 58%;
+    --terminal-done: 215 16% 65%;
+    --terminal-accent: 199 89% 68%;
+    --terminal-warn: 45 93% 72%;
+    --terminal-warn-surface: 45 80% 16%;
+    --terminal-error: 0 91% 76%;
+    --terminal-error-surface: 0 60% 16%;
+
     color-scheme: light;
     scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
   }
@@ -114,6 +129,21 @@
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.25);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 10px 24px -6px rgb(0 0 0 / 0.45);
     --shadow-lg: 0 12px 24px -8px rgb(0 0 0 / 0.55), 0 24px 48px -12px rgb(0 0 0 / 0.5);
+
+    /* Terminal (journal) : surface sombre intentionnelle dans les deux thèmes. */
+    --terminal: 218 47% 7%;
+    --terminal-foreground: 210 20% 94%;
+    --terminal-border: 215 22% 24%;
+    --terminal-muted: 215 28% 13%;
+    --terminal-muted-foreground: 215 15% 68%;
+    --terminal-line-number: 215 14% 56%;
+    --terminal-live: 142 60% 55%;
+    --terminal-done: 215 15% 66%;
+    --terminal-accent: 199 89% 70%;
+    --terminal-warn: 45 93% 74%;
+    --terminal-warn-surface: 45 70% 14%;
+    --terminal-error: 0 85% 74%;
+    --terminal-error-surface: 0 55% 14%;
 
     color-scheme: dark;
     scrollbar-color: hsl(var(--muted-foreground) / 0.45) transparent;

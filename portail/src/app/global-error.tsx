@@ -6,6 +6,11 @@ import { useEffect } from 'react'
  * Dernier filet de sécurité : rendu quand la racine de l'application elle-même échoue.
  * Il doit rester lisible sans `globals.css`, sans thème résolu et sans données serveur :
  * tous les styles sont donc embarqués et les couleurs ont un contraste AA vérifié.
+ *
+ * Exception documentée (PUB-12 / #100) : cette page de secours ne dépend pas des tokens
+ * CSS globaux ni de Tailwind, car elle s'affiche même si la feuille de styles échoue.
+ * Les valeurs hexadécimales embarquées sont donc intentionnelles et ne doivent pas être
+ * remplacées par des classes utilitaires ou des variables de thème.
  */
 const CRITICAL_STYLES = `
   :root { color-scheme: light dark; }
