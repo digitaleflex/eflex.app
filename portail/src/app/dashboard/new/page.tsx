@@ -13,6 +13,7 @@ import { DetectionCard } from '@/components/new-project/detection-card'
 import { ApplicationPicker } from '@/components/new-project/application-picker'
 import { ApplicationMultiSelect } from '@/components/new-project/application-multi-select'
 import { GitHubPicker } from '@/components/new-project/github-picker'
+import { VercelImport } from '@/components/new-project/vercel-import'
 import { EnvEditor } from '@/components/env/env-editor'
 import { rowsToVars } from '@/lib/env-parse'
 import { frameworkLabel, runtimeLabel } from '@/lib/frameworks'
@@ -35,6 +36,7 @@ export default function NewProjectPage() {
   const [name, setName] = useState('')
   const [nameEdited, setNameEdited] = useState(false)
   const [envVars, setEnvVars] = useState<EnvVar[]>([{ key: '', value: '' }])
+  const [importHints, setImportHints] = useState<string[]>([])
 
   const [analysis, setAnalysis] = useState<RepoAnalysis | null>(null)
   const [appOptions, setAppOptions] = useState<string[]>([])
@@ -92,6 +94,7 @@ export default function NewProjectPage() {
     setChosen(null)
     setAnalyzeError('')
     setSubmitError('')
+    setImportHints([])
   }
 
   async function analyze(app?: string) {
@@ -214,6 +217,29 @@ export default function NewProjectPage() {
                 resetAnalysis()
               }}
             />
+            <VercelImport
+              disabled={analyzing}
+              onPrefill={(prefill) => {
+                resetAnalysis()
+                if (prefill.repoUrl) setRepoUrl(prefill.repoUrl)
+                if (prefill.branch) setBranch(prefill.branch)
+                if (!nameEdited && prefill.name) setName(prefill.name)
+                setInstallationId('')
+                setUsePat(false)
+                const hints = [...prefill.warnings]
+                if (prefill.root) {
+                  hints.unshift(
+                    `Dossier racine indiqué sur Vercel : « ${prefill.root} ». Vérifiez et sélectionnez le bon dossier après l'analyse si nécessaire.`,
+                  )
+                }
+                if (prefill.framework) {
+                  hints.push(
+                    `Framework déclaré sur Vercel : ${prefill.framework}. EFLEX le détectera depuis le dépôt lors de l'analyse.`,
+                  )
+                }
+                setImportHints(hints)
+              }}
+            />
             <Input
               id="repo"
               label="Adresse du dépôt GitHub"
@@ -243,6 +269,19 @@ export default function NewProjectPage() {
                 resetAnalysis()
               }}
             />
+            {importHints.length > 0 && (
+              <div role="status" className="rounded-lg border border-border bg-background p-3 text-sm">
+                <p className="font-medium">À vérifier avant l&apos;import</p>
+                <ul className="mt-1 list-disc space-y-1 pl-4 text-muted-foreground">
+                  {importHints.map((hint) => (
+                    <li key={hint}>{hint}</li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Les variables d&apos;environnement ne sont pas importées : ressaisissez les valeurs nécessaires ci-dessous. Les secrets Vercel sensibles ne sont pas relisibles et ne seront jamais devinés.
+                </p>
+              </div>
+            )}
             {analyzeError && (
               <div role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
                 {analyzeError}
