@@ -397,7 +397,7 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
               </div>
 
               <Notice tone="info" title="Métriques disponibles">
-                Ce tableau de bord affiche uniquement les indicateurs issus des données réelles collectées : pages vues agrégées, évolution quotidienne, chemins les plus consultés et événements nommés comptabilisés. Les visiteurs uniques, sessions, durée de visite, taux de rebond et propriétés d’événement ne sont pas mesurés et ne sont donc pas affichés.
+                Ce tableau de bord affiche uniquement les indicateurs issus des données réelles collectées : pages vues agrégées, évolution quotidienne, chemins les plus consultés et événements nommés comptabilisés. Les visiteurs uniques, sessions, durée de visite, taux de rebond et propriétés d’événement ne sont pas mesurés et ne sont donc pas affichés. Les sources de trafic, référents, paramètres UTM, types d’appareils/navigateurs et la géographie ne sont pas collectés ni disponibles ; ces dimensions ne seront présentées que si une collecte compatible avec les principes de confidentialité (minimisation, activation explicite, fiabilité, sans ré-identification ni profilage) est mise en place.
               </Notice>
 
               <div className="grid gap-6 lg:grid-cols-2">
