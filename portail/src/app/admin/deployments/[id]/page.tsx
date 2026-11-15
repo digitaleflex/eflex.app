@@ -7,10 +7,11 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { StatusPill } from '@/components/dashboard/status-pill'
 import { AdminDeploymentActions } from '@/components/admin/deployment-actions'
+import { QueueRetryButton } from '@/components/admin/queue-retry-button'
 import { AdminDeploymentLogs } from '@/components/admin/deployment-logs-panel'
 import { maskProjectLogs } from '@/lib/admin-deployment-logs'
 import { frameworkLabel, runtimeLabel } from '@/lib/frameworks'
-import { STATUS_LABELS, isDeploymentStatus } from '@/lib/deployment-state'
+import { STATUS_LABELS, isDeploymentStatus, isTerminal } from '@/lib/deployment-state'
 import { relativeTime } from '@/lib/relative-time'
 import { getPrimaryApp } from '@/lib/project-apps'
 import { getDeploymentQueueDiagnostics } from '@/lib/queue'
@@ -186,34 +187,52 @@ export default async function AdminDeploymentPage({ params }: { params: Promise<
             Diagnostic de la file de déploiement (idempotence, reprises, jobs bloqués ou absents).
           </p>
           {queue ? (
-            <dl className="mt-3 space-y-2 text-sm">
-              <div className="flex flex-wrap justify-between gap-2">
-                <dt className="text-muted-foreground">État du job</dt>
-                <dd>{queueStateLabel[queue.state] ?? queue.state}</dd>
-              </div>
-              <div className="flex flex-wrap justify-between gap-2">
-                <dt className="text-muted-foreground">Tentatives</dt>
-                <dd className="tabular-nums">
-                  {queue.attemptsMade != null && queue.attemptsMax != null
-                    ? `${queue.attemptsMade} / ${queue.attemptsMax}`
-                    : '—'}
-                </dd>
-              </div>
-              <div className="flex flex-wrap justify-between gap-2">
-                <dt className="text-muted-foreground">Pris en charge</dt>
-                <dd className="tabular-nums">{queue.processedOn ? dateTime.format(new Date(queue.processedOn)) : '—'}</dd>
-              </div>
-              <div className="flex flex-wrap justify-between gap-2">
-                <dt className="text-muted-foreground">Terminé (BullMQ)</dt>
-                <dd className="tabular-nums">{queue.finishedOn ? dateTime.format(new Date(queue.finishedOn)) : '—'}</dd>
-              </div>
-              {queue.failedReason && (
-                <div className="space-y-1 sm:col-span-2">
-                  <dt className="text-muted-foreground">Raison d’échec BullMQ</dt>
-                  <dd className="break-words text-destructive">{queue.failedReason}</dd>
+            <>
+              <dl className="mt-3 space-y-2 text-sm">
+                <div className="flex flex-wrap justify-between gap-2">
+                  <dt className="text-muted-foreground">État du job</dt>
+                  <dd>
+                    {queueStateLabel[queue.state] ?? queue.state}
+                    {queue.stalled ? ' (bloqué)' : ''}
+                  </dd>
+                </div>
+                <div className="flex flex-wrap justify-between gap-2">
+                  <dt className="text-muted-foreground">Tentatives</dt>
+                  <dd className="tabular-nums">
+                    {queue.attemptsMade != null && queue.attemptsMax != null
+                      ? `${queue.attemptsMade} / ${queue.attemptsMax}`
+                      : '—'}
+                  </dd>
+                </div>
+                <div className="flex flex-wrap justify-between gap-2">
+                  <dt className="text-muted-foreground">Pris en charge</dt>
+                  <dd className="tabular-nums">{queue.processedOn ? dateTime.format(new Date(queue.processedOn)) : '—'}</dd>
+                </div>
+                <div className="flex flex-wrap justify-between gap-2">
+                  <dt className="text-muted-foreground">Terminé (BullMQ)</dt>
+                  <dd className="tabular-nums">{queue.finishedOn ? dateTime.format(new Date(queue.finishedOn)) : '—'}</dd>
+                </div>
+                {queue.failedReason && (
+                  <div className="space-y-1 sm:col-span-2">
+                    <dt className="text-muted-foreground">Raison d’échec BullMQ</dt>
+                    <dd className="break-words text-destructive">{queue.failedReason}</dd>
+                  </div>
+                )}
+              </dl>
+              {!isTerminal(deployment.status) && (
+                <div className="mt-4 space-y-2 border-t border-border pt-3">
+                  <p className="text-xs text-muted-foreground">
+                    Si le job est absent, en échec côté file ou bloqué alors que le déploiement n’est pas terminé, vous
+                    pouvez relancer le traitement BullMQ en toute sécurité (retry/ré-enfilement idempotent).
+                  </p>
+                  <QueueRetryButton
+                    projectId={deployment.project.id}
+                    deploymentId={deployment.id}
+                    projectName={deployment.project.name}
+                  />
                 </div>
               )}
-            </dl>
+            </>
           ) : (
             <p className="mt-2 text-sm text-muted-foreground">
               Diagnostic indisponible (Redis non configuré ou injoignable).

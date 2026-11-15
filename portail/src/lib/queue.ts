@@ -109,6 +109,7 @@ export async function getDeploymentQueueDiagnostics(
     }
     const state = await job.getState().catch(() => 'unknown')
     const rawState = state as DeploymentJobQueueState
+    const processedOnMs = typeof job.processedOn === 'number' ? job.processedOn : undefined
     return {
       deploymentId,
       state:
@@ -125,10 +126,13 @@ export async function getDeploymentQueueDiagnostics(
       attemptsMax: typeof job.opts.attempts === 'number' ? job.opts.attempts : null,
       failedReason: typeof job.failedReason === 'string' && job.failedReason ? job.failedReason : null,
       timestamp: iso(job.timestamp),
-      processedOn: iso(job.processedOn ?? undefined),
+      processedOn: iso(processedOnMs),
       finishedOn: iso(job.finishedOn ?? undefined),
       delay: typeof job.delay === 'number' ? job.delay : null,
-      stalled: rawState === 'active' && typeof job.processedOn === 'number' && Date.now() - job.processedOn > 60_000,
+      stalled:
+        rawState === 'active' &&
+        typeof processedOnMs === 'number' &&
+        Date.now() - processedOnMs > 60_000,
     }
   } catch {
     return {
@@ -142,6 +146,59 @@ export async function getDeploymentQueueDiagnostics(
       finishedOn: null,
       delay: null,
       stalled: false,
+    }
+  }
+}
+
+/**
+ * Action admin sûre : relance le job BullMQ d'un déploiement non terminal.
+ * - failed/completed (résiduel côté queue) : tentative de retry BullMQ quand possible, sinon ré-enfilement contrôlé.
+ * - missing : ré-enfilement.
+ * - waiting/delayed/prioritized/active/waiting-children : aucune action (déjà pris en charge).
+ */
+export async function recoverDeploymentQueueJob(
+  deploymentId: string,
+  options: { rollback?: boolean } = {},
+): Promise<
+  | { ok: true; action: 'retried' | 'reenqueued' | 'noop'; state: DeploymentJobQueueState }
+  | { ok: false; error: string; state?: DeploymentJobQueueState }
+> {
+  if (!process.env.REDIS_URL) return { ok: false, error: 'Redis non configuré.' }
+  try {
+    const q = deploymentsQueue()
+    const job = await q.getJob(deploymentId)
+    if (!job) {
+      await enqueueDeployment(deploymentId, options)
+      return { ok: true, action: 'reenqueued', state: 'missing' }
+    }
+    const state = (await job.getState().catch(() => 'unknown')) as DeploymentJobQueueState
+    if (
+      state === 'waiting' ||
+      state === 'delayed' ||
+      state === 'prioritized' ||
+      state === 'active' ||
+      state === 'waiting-children'
+    ) {
+      return { ok: true, action: 'noop', state }
+    }
+    if (state === 'failed') {
+      try {
+        await job.retry('failed')
+        return { ok: true, action: 'retried', state }
+      } catch {
+        await job.remove().catch(() => undefined)
+        await enqueueDeployment(deploymentId, options)
+        return { ok: true, action: 'reenqueued', state }
+      }
+    }
+    // completed ou état résiduel : retrait puis ré-enfilement explicite (admin).
+    await job.remove().catch(() => undefined)
+    await enqueueDeployment(deploymentId, options)
+    return { ok: true, action: 'reenqueued', state }
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Impossible de relancer le job de déploiement.',
     }
   }
 }

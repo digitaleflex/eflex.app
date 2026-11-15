@@ -3,6 +3,7 @@ import {
   DEPLOYMENT_QUEUE,
   acquireDeploymentLocks,
   getDeploymentQueueDiagnostics,
+  recoverDeploymentQueueJob,
   redisConnection,
 } from './queue'
 
@@ -54,5 +55,13 @@ describe('diagnostics et verrous sans Redis', () => {
     const lock = await acquireDeploymentLocks(['eflex:deploy-lock:projet'])
     expect(lock.acquired).toBe(true)
     await expect(lock.release()).resolves.toBeUndefined()
+  })
+
+  it('refuse la relance de file sans Redis', async () => {
+    delete process.env.REDIS_URL
+    await expect(recoverDeploymentQueueJob('dep-1')).resolves.toEqual({
+      ok: false,
+      error: 'Redis non configuré.',
+    })
   })
 })

@@ -117,17 +117,25 @@ export async function enqueueProjectDeployment(
     return { error: billing.error, code: billing.code, status: billing.status }
   }
 
-  const lock = await acquireDeploymentLocks([`eflex:deploy-lock:${project.id}`])
+  const requestedApps = options.apps
+  const lockKeys =
+    requestedApps === undefined
+      ? [`eflex:deploy-lock:project:${project.id}`]
+      : requestedApps.length === 0
+        ? [`eflex:deploy-lock:project:${project.id}:scope:project`]
+        : requestedApps.map((app) => `eflex:deploy-lock:project:${project.id}:app:${app.id}`)
+
+  const lock = await acquireDeploymentLocks(lockKeys)
   if (!lock.acquired) {
     return {
-      error: 'Un déploiement est déjà en cours de préparation pour ce projet. Réessayez dans un instant.',
+      error: 'Un déploiement est déjà en cours de préparation pour cette cible. Réessayez dans un instant.',
       code: 'deployment_in_progress',
     }
   }
 
   try {
     let targetApps: DeploymentAppRef[] =
-      options.apps ??
+      requestedApps ??
       (multiAppEnabled()
         ? await prisma.projectApp.findMany({
             where: { projectId: project.id },
