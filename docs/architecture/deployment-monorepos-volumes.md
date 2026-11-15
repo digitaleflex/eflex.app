@@ -52,17 +52,18 @@ Coolify 4.7.3). Le portail applique donc les règles suivantes
 | Cas | `base_directory` | `install` | `build` | `start` |
 | --- | --- | --- | --- | --- |
 | `root === ""` | non envoyé (défaut `/`) | inchangé | inchangé | inchangé |
-| `root` dans un workspace | `/` (racine du dépôt) | inchangé (depuis la racine) | `<gestionnaire> --filter '<nom>'... run '<script>'` (pnpm, bun) ou `cd '<root>' && <build>` (yarn, npm) | `cd '<root>' && <start>` |
+| `root` dans un workspace | `/` (racine du dépôt) | inchangé (depuis la racine) | filtre/commande workspace depuis la racine quand nom+script connus (pnpm/bun/npm/yarn), sinon `cd '<root>' && <build>` | `cd '<root>' && <start>` |
 | `root` autonome (hors workspace) | `/<root>` | inchangé | inchangé | inchangé |
 | framework `docker` | `/<root>` ou `/` | ignoré | ignoré | ignoré |
 
 Pour pnpm et bun, le filtre construit l'application **et ses dépendances internes**
-dans l'ordre topologique (`--filter '<nom>'...`). Les autres gestionnaires
-(yarn, npm) utilisent `cd '<root>' && <build>` : ils bénéficient du
-`node_modules` installé à la racine, mais pas d'un ordonnancement automatique
-des dépendances internes du workspace. `coolifyApplicationSettings` n'applique
-le filtre pnpm/bun que lorsque le nom du paquet et le script de build sont
-connus ; sinon la commande de build reste préfixée par `cd '<root>' && ...`.
+dans l'ordre topologique (`--filter '<nom>'...`). npm et yarn ciblent le paquet du
+workspace depuis la racine (`npm run <script> --workspace=<nom>` /
+`yarn workspace <nom> run <script>`) lorsque le nom du paquet et le script de build
+sont connus : lockfile et dépendances internes du workspace restent visibles sans
+`cd` dans le sous-dossier. `coolifyApplicationSettings` n'applique ces commandes
+ciblées que lorsque le nom du paquet et le script de build sont connus ; sinon la
+commande de build reste préfixée par `cd '<root>' && ...`.
 
 ### `publish_directory`
 

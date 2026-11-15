@@ -32,17 +32,22 @@ export function DeployDemo() {
   const [paused, setPaused] = useState(false)
 
   return (
-    <figure className="mx-auto mt-16 w-full max-w-5xl text-left">
-      <div className="deploy-demo surface-navy relative overflow-hidden rounded-3xl bg-eflexnavy text-white shadow-2xl shadow-eflexnavy/25" data-paused={paused}>
+    <figure className="mx-auto mt-14 w-full max-w-5xl text-left md:mt-16">
+      <div
+        className="deploy-demo surface-navy relative overflow-hidden rounded-3xl bg-eflexnavy text-white shadow-2xl shadow-eflexnavy/25"
+        data-paused={paused}
+      >
         <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
-          <span aria-hidden="true" className="flex gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-white/25" />
-            <span className="h-2.5 w-2.5 rounded-full bg-white/25" />
-            <span className="h-2.5 w-2.5 rounded-full bg-white/25" />
-          </span>
-          <span aria-hidden="true" className="truncate font-mono text-xs text-white/75 sm:text-sm">
-            mon-equipe/boutique · main
-          </span>
+          <div className="flex min-w-0 items-center gap-3">
+            <span aria-hidden="true" className="flex gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-white/25" />
+              <span className="h-2.5 w-2.5 rounded-full bg-white/25" />
+              <span className="h-2.5 w-2.5 rounded-full bg-white/25" />
+            </span>
+            <span aria-hidden="true" className="truncate font-mono text-xs text-white/80 sm:text-sm">
+              Déploiement · mon-equipe/boutique · main
+            </span>
+          </div>
           <button
             type="button"
             onClick={() => setPaused((value) => !value)}
@@ -59,32 +64,40 @@ export function DeployDemo() {
 
         <div
           role="img"
-          aria-label="Illustration : un dépôt GitHub est déployé par EFLEX, étape par étape, jusqu’à une adresse HTTPS en ligne."
+          aria-label="Illustration : dans la console EFLEX, un dépôt GitHub est analysé, construit puis mis en ligne avec HTTPS, avec le journal de déploiement."
           className="grid grid-cols-1 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
         >
-          <ol aria-hidden="true" className="space-y-4 border-b border-white/10 p-6 md:border-b-0 md:border-r md:p-7">
-            {steps.map((step, i) => (
-              <li key={step.title} className={`dd-step dd-${i + 1} flex items-center gap-3.5`}>
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-eflexblue/20">
-                  <Check className="h-4 w-4 text-eflexsky" strokeWidth={2.6} />
-                </span>
-                <span>
-                  <span className="block text-sm font-semibold sm:text-base">{step.title}</span>
-                  <span className="block text-xs text-white/75 sm:text-sm">{step.detail}</span>
-                </span>
-              </li>
-            ))}
-          </ol>
+          <div className="border-b border-white/10 md:border-b-0 md:border-r">
+            <p aria-hidden="true" className="px-6 pt-6 text-xs font-semibold uppercase tracking-wide text-white/60 md:px-7 md:pt-7">
+              Étapes du déploiement
+            </p>
+            <ol aria-hidden="true" className="space-y-4 p-6 pt-4 md:p-7 md:pt-4">
+              {steps.map((step, i) => (
+                <li key={step.title} className={`dd-step dd-${i + 1} flex items-center gap-3.5`}>
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-eflexblue/20">
+                    <Check className="h-4 w-4 text-eflexsky" strokeWidth={2.6} />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold sm:text-base">{step.title}</span>
+                    <span className="block text-xs text-white/75 sm:text-sm">{step.detail}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
 
-          <div aria-hidden="true" className="flex min-w-0 flex-col gap-2 p-6 font-mono text-xs leading-relaxed text-white/80 sm:text-sm md:p-7">
-            {logs.map((line) => (
-              <div key={line.time} className={`dd-step dd-${line.step} truncate`}>
-                <span className="text-eflexsky">{line.time}</span>
-                {'  '}
-                {line.text}
-              </div>
-            ))}
-            <div className="dd-url mt-auto pt-4">
+          <div aria-hidden="true" className="flex min-w-0 flex-col p-6 md:p-7">
+            <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Journal de déploiement</p>
+            <div className="mt-4 flex min-w-0 flex-col gap-2 font-mono text-xs leading-relaxed text-white/80 sm:text-sm">
+              {logs.map((line) => (
+                <div key={line.time} className={`dd-step dd-${line.step} truncate`}>
+                  <span className="text-eflexsky tabular-nums">{line.time}</span>
+                  {'  '}
+                  {line.text}
+                </div>
+              ))}
+            </div>
+            <div className="dd-url mt-auto pt-5">
               <span className="inline-flex max-w-full items-center gap-3 rounded-xl border border-success/40 bg-success/10 px-4 py-3 font-sans">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-success" />
                 <span className="text-sm font-bold sm:text-base">En ligne</span>
@@ -95,7 +108,7 @@ export function DeployDemo() {
         </div>
       </div>
       <figcaption className="mt-3 text-center text-xs text-muted-foreground">
-        Illustration : dépôt et adresse fictifs.
+        Illustration de la console EFLEX : dépôt et adresse fictifs, parcours réel.
       </figcaption>
     </figure>
   )

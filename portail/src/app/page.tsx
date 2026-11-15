@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react'
 import Link from 'next/link'
 import type { LucideIcon } from 'lucide-react'
-import { ArrowRight, Check, Database, GitBranch, KeyRound, Lock, ScrollText, Users } from 'lucide-react'
+import { ArrowRight, Check, Database, GitBranch, Lock, ScrollText, ShieldCheck } from 'lucide-react'
 import { FrameworkIcon } from '@/components/framework-icon'
 import { SiteHeader } from '@/components/marketing/site-header'
 import { SiteFooter } from '@/components/marketing/site-footer'
@@ -10,6 +10,7 @@ import { TechMarquee } from '@/components/marketing/tech-marquee'
 import { MigrationTeaser } from '@/components/marketing/migration-teaser'
 import { GithubMark } from '@/components/icons/github-mark'
 import { getLegalCompanyInfo } from '@/lib/legal-info'
+import { LinkButton } from '@/components/link-button'
 
 const faqs = [
   {
@@ -21,20 +22,12 @@ const faqs = [
     a: "Non. EFLEX déduit la configuration de votre dépôt. Si vous en avez déjà un, il est utilisé tel quel : c'est vous qui gardez la main.",
   },
   {
-    q: "Que se passe-t-il si EFLEX se trompe de stack ?",
-    a: "Vous pouvez choisir une autre stack parmi celles qu'EFLEX a détectées à la création du projet, ou ajouter un fichier eflex.json à la racine du dépôt. Ce fichier a toujours priorité sur la détection automatique.",
-  },
-  {
     q: "Où sont stockées mes variables d'environnement ?",
     a: "Dans EFLEX, jamais dans votre dépôt. Elles sont chiffrées en base (AES-256-GCM), transmises à l'application au démarrage et ne s'affichent plus une fois enregistrées.",
   },
   {
     q: 'Mes dépôts privés sont-ils compatibles ?',
     a: "Oui. Connectez la GitHub App (recommandée) ou ajoutez un jeton personnel dans Paramètres → Connexion GitHub. EFLEX lit le dépôt avec un accès à durée limitée et crée une clé de déploiement en lecture seule.",
-  },
-  {
-    q: 'Mon dépôt contient plusieurs applications. Ça marche ?',
-    a: "Oui, pour en publier une. EFLEX reconnaît les monorepos (pnpm, Turborepo, Nx, Lerna…) et vous demande laquelle déployer. Aujourd'hui, un seul service est publié par projet : les dépendances partagées et les applications annexes ne sont pas déployées automatiquement.",
   },
   {
     q: "Qu'est-ce qui n'est pas encore pris en charge ?",
@@ -104,6 +97,13 @@ function DetectedRow({ label, value }: { label: string; value: string }) {
   )
 }
 
+const proofPoints = [
+  'HTTPS et certificats automatiques',
+  'Journaux de build et d’exécution en direct',
+  'Variables chiffrées (AES-256-GCM)',
+  'PostgreSQL et Redis en un clic',
+]
+
 const features: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: GitBranch,
@@ -113,12 +113,7 @@ const features: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: Lock,
     title: 'HTTPS et domaines',
-    text: 'Une adresse offerte pour chaque projet, vos propres domaines et des certificats émis automatiquement.',
-  },
-  {
-    icon: Database,
-    title: 'Bases de données',
-    text: 'Une base PostgreSQL ou Redis par projet, créée en un clic et déjà branchée à votre application.',
+    text: 'Une adresse offerte par projet, vos domaines et des certificats émis automatiquement.',
   },
   {
     icon: ScrollText,
@@ -126,14 +121,9 @@ const features: { icon: LucideIcon; title: string; text: string }[] = [
     text: 'Suivez le build et l’exécution en temps réel, avec les secrets masqués.',
   },
   {
-    icon: KeyRound,
-    title: 'Variables chiffrées',
-    text: 'Vos clés sont chiffrées (AES-256-GCM), injectées au démarrage et jamais réaffichées.',
-  },
-  {
-    icon: Users,
-    title: 'Équipe et rôles',
-    text: 'Invitez vos collègues dans votre organisation, chacun avec les bons droits.',
+    icon: Database,
+    title: 'Bases de données',
+    text: 'Une base PostgreSQL ou Redis par projet, créée et branchée à votre application.',
   },
 ]
 
@@ -145,37 +135,46 @@ export default function HomePage() {
       <SiteHeader />
 
       <main id="contenu" tabIndex={-1} className="flex-1">
-        {/* ─── Hero : une promesse, deux boutons, puis la démonstration animée ─── */}
-        <section className="container pb-16 pt-16 text-center md:pb-24 md:pt-24">
+        {/* ─── Hero : promesse forte, preuves concrètes, démonstration de la console ─── */}
+        <section className="container pb-16 pt-14 text-center md:pb-24 md:pt-20">
           <h1 className="mx-auto max-w-4xl animate-reveal text-display font-extrabold tracking-tight text-balance">
-            Votre code en ligne, en quelques minutes.
+            Déployez votre application depuis GitHub, sans gérer de serveur.
           </h1>
           <p
             className="mx-auto mt-6 max-w-2xl animate-reveal text-lead-lg text-muted-foreground text-pretty"
             style={{ '--d': '80ms' } as CSSProperties}
           >
-            Connectez GitHub. EFLEX reconnaît votre stack, construit l’application et la met en ligne avec HTTPS. Sans
-            serveur à gérer.
+            EFLEX détecte votre stack, construit votre projet et le met en ligne avec HTTPS. Vous suivez le build
+            et l’exécution depuis la console.
           </p>
           <div
             className="mt-9 flex animate-reveal flex-col justify-center gap-3 sm:flex-row"
             style={{ '--d': '160ms' } as CSSProperties}
           >
-            <Link
-              href="/register"
-              className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-semibold text-primary-foreground shadow-primary transition-[background-color,transform] duration-200 ease-out-expo hover:bg-primary/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
+            <LinkButton href="/register" size="lg" className="group gap-2 px-6 text-base font-semibold shadow-primary">
               Commencer gratuitement
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-            </Link>
+            </LinkButton>
             <Link
               href="#fonctionnement"
               className="inline-flex h-12 items-center justify-center rounded-xl border border-border bg-card px-6 text-base font-semibold transition-[background-color,transform] duration-200 ease-out-expo hover:bg-secondary active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              Voir comment ça marche
+              Voir un déploiement
             </Link>
           </div>
-          <p className="mt-5 animate-reveal text-sm text-muted-foreground" style={{ '--d': '240ms' } as CSSProperties}>
+          <ul
+            className="mx-auto mt-7 flex max-w-4xl animate-reveal flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-muted-foreground"
+            style={{ '--d': '220ms' } as CSSProperties}
+            aria-label="Ce qu’EFLEX prend en charge"
+          >
+            {proofPoints.map((point) => (
+              <li key={point} className="inline-flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 animate-reveal text-sm text-muted-foreground" style={{ '--d': '260ms' } as CSSProperties}>
             Gratuit pour commencer · Aucune carte demandée
           </p>
 
@@ -255,30 +254,32 @@ export default function HomePage() {
           </ol>
         </section>
 
-        {/* ─── Fonctionnalités : six cartes, rien de plus ─── */}
+        {/* ─── Fonctionnalités : points clés, visuellement plus légers que le parcours ─── */}
         <section
           id="fonctionnalites"
           aria-labelledby="fonctionnalites-titre"
           className="scroll-mt-20 border-y border-border bg-muted/50"
         >
-          <div className="container py-20 md:py-28">
+          <div className="container py-16 md:py-24">
             <SectionHeading
               id="fonctionnalites-titre"
-              title="Tout ce qu’il faut pour la production"
-              lead="Ce que vous auriez configuré à la main sur un serveur, EFLEX le fait pour chaque projet."
+              title="L’essentiel pour la mise en production"
+              lead="Le parcours de déploiement reste au centre ; ces capacités sont prêtes pour chaque projet."
             />
-            <ul className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-4 sm:grid-cols-2">
               {features.map((item, i) => (
                 <li
                   key={item.title}
-                  className="reveal-on-view rounded-2xl border border-border bg-card p-6 transition-[transform,box-shadow,border-color] duration-300 ease-out-expo hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg"
-                  style={{ '--i': i % 3 } as CSSProperties}
+                  className="reveal-on-view flex gap-4 rounded-2xl border border-border bg-card p-5"
+                  style={{ '--i': i % 2 } as CSSProperties}
                 >
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     <item.icon className="h-5 w-5" aria-hidden="true" />
                   </span>
-                  <h3 className="mt-5 text-lg font-bold">{item.title}</h3>
-                  <p className="mt-2 leading-relaxed text-muted-foreground">{item.text}</p>
+                  <div>
+                    <h3 className="text-base font-semibold">{item.title}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.text}</p>
+                  </div>
                 </li>
               ))}
             </ul>

@@ -83,14 +83,18 @@ export function coolifyApplicationSettings(plan: BuildPlan): CoolifyApplicationS
     // `pnpm install` depuis la racine installe tout le workspace (lockfile inclus).
     // Le filtre construit le paquet et ses dépendances internes, dans l'ordre.
     // Bun reprend la même sémantique de filtre (`--filter <paquet>...`) que pnpm.
-    if (
-      buildCommand &&
-      (workspace.manager === 'pnpm' || workspace.manager === 'bun') &&
-      workspace.name &&
-      workspace.buildScript
-    ) {
-      const runner = workspace.manager === 'pnpm' ? 'pnpm' : 'bun'
-      buildCommand = `${runner} --filter ${shellQuote(workspace.name)}... run ${shellQuote(workspace.buildScript)}`
+    // npm/yarn workspaces : la commande ciblée par nom exécute le script du paquet
+    // depuis la racine (lockfile et dépendances internes du workspace visibles),
+    // ce qui évite un `cd` fragile quand des paquets voisins doivent être liés.
+    if (buildCommand && workspace.name && workspace.buildScript) {
+      if (workspace.manager === 'pnpm' || workspace.manager === 'bun') {
+        const runner = workspace.manager === 'pnpm' ? 'pnpm' : 'bun'
+        buildCommand = `${runner} --filter ${shellQuote(workspace.name)}... run ${shellQuote(workspace.buildScript)}`
+      } else if (workspace.manager === 'npm') {
+        buildCommand = `npm run ${shellQuote(workspace.buildScript)} --workspace=${shellQuote(workspace.name)}`
+      } else {
+        buildCommand = `yarn workspace ${shellQuote(workspace.name)} run ${shellQuote(workspace.buildScript)}`
+      }
     } else if (buildCommand) {
       buildCommand = inApplication(plan, buildCommand)
     }
