@@ -46,14 +46,43 @@ export async function enqueueDeployment(
   deploymentId: string,
   options: { rollback?: boolean } = {},
 ): Promise<void> {
+  const q = deploymentsQueue()
+  const existing = await q.getJob(deploymentId)
+  if (existing) {
+    const state = await existing.getState()
+    // Idempotence : un job déjà présent (en attente, actif, retardé, terminé ou
+    // en échec côté BullMQ) ne doit pas provoquer un double traitement ni faire
+    // échouer l'enfilement. L'état métier reste la source de vérité.
+    if (
+      state === 'waiting' ||
+      state === 'delayed' ||
+      state === 'prioritized' ||
+      state === 'active' ||
+      state === 'waiting-children' ||
+      state === 'completed' ||
+      state === 'failed'
+    ) {
+      return
+    }
+    // Job dans un état résiduel : on le retire avant de ré-enfiler proprement.
+  await existing.remove().catch(() => undefined)
+  }
   // L'intention « retour arrière » voyage avec le job : BullMQ conserve les
   // données du job à travers les reprises, et le worker choisit l'endpoint
   // Coolify en conséquence (voir `worker.ts` et `lib/deployment-rollback.ts`).
-  await deploymentsQueue().add(
-    'deploy',
-    { deploymentId, ...(options.rollback ? { rollback: true } : {}) },
-    { jobId: deploymentId },
-  )
+  try {
+    await q.add(
+      'deploy',
+      { deploymentId, ...(options.rollback ? { rollback: true } : {}) },
+      { jobId: deploymentId },
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    // Course entre deux enfilements simultanés : le job existe déjà, ce qui est
+    // exactement l'idempotence recherchée.
+    if (/already exists|Job .* exists/i.test(message)) return
+    throw error
+  }
 }
 
 /**

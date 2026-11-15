@@ -4,8 +4,10 @@ import {
   aggregateDeploymentGroup,
   assertTransition,
   canTransition,
+  compareProgressStatus,
   isDeploymentStatus,
   isTerminal,
+  planStep,
 } from './deployment-state'
 
 describe('machine à états des déploiements', () => {
@@ -43,6 +45,21 @@ describe('machine à états des déploiements', () => {
   it('assertTransition lève une erreur sur une transition interdite', () => {
     expect(() => assertTransition('queued', 'analyzing')).not.toThrow()
     expect(() => assertTransition('queued', 'live')).toThrow(/interdite/)
+  })
+
+  it('compare la progression nominale', () => {
+    expect(compareProgressStatus('queued', 'analyzing')).toBe(-1)
+    expect(compareProgressStatus('building', 'building')).toBe(0)
+    expect(compareProgressStatus('deploying', 'building')).toBe(1)
+    expect(compareProgressStatus('live', 'building')).toBeNull()
+  })
+
+  it('planStep autorise la reprise sans régression (idempotence)', () => {
+    expect(planStep('queued', 'analyzing')).toBe('advance')
+    expect(planStep('analyzing', 'analyzing')).toBe('noop')
+    expect(planStep('building', 'analyzing')).toBe('noop')
+    expect(planStep('cancelled', 'analyzing')).toBe('blocked')
+    expect(planStep('queued', 'live')).toBe('blocked')
   })
 
   it('tous les états ont un libellé français', () => {

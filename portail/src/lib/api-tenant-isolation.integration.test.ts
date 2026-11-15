@@ -318,6 +318,7 @@ run('isolation cross-tenant des routes projet/déploiement (#22)', () => {
     { name: 'GET /api/projects/[id]/logs', method: 'GET', path: '...', importPath: '@/app/api/projects/[id]/logs/route', params: { id: 'PROJECT' } },
     { name: 'GET /api/projects/[id]/logs/stream', method: 'GET', path: '...', importPath: '@/app/api/projects/[id]/logs/stream/route', params: { id: 'PROJECT' } },
     { name: 'GET /api/projects/[id]/metrics', method: 'GET', path: '...', importPath: '@/app/api/projects/[id]/metrics/route', params: { id: 'PROJECT' } },
+    { name: 'GET /api/projects/[id]/diagnostic', method: 'GET', path: '...', importPath: '@/app/api/projects/[id]/diagnostic/route', params: { id: 'PROJECT' } },
     { name: 'POST /api/projects/[id]/redeploy', method: 'POST', path: '...', importPath: '@/app/api/projects/[id]/redeploy/route', params: { id: 'PROJECT' } },
     { name: 'GET /api/projects/[id]/runtime', method: 'GET', path: '...', importPath: '@/app/api/projects/[id]/runtime/route', params: { id: 'PROJECT' } },
     { name: 'POST /api/projects/[id]/runtime', method: 'POST', path: '...', importPath: '@/app/api/projects/[id]/runtime/route', params: { id: 'PROJECT' }, body: { action: 'restart' } },

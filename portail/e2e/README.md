@@ -35,6 +35,11 @@ parcours authentifiés/administration :
 - absence de débordement horizontal ;
 - navigation clavier de base (lien d'évitement, focus visible, formulaire).
 
+Pages couvertes (réalistes sans dépendance externe) :
+- **Publiques** : `/`, `/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email`, `/status`, `/tarifs`, `/conditions`, `/confidentialite`, `/mentions-legales`, `/maintenance`, 404.
+- **Console (authentifiée)** : tableau de bord, nouveau projet, équipe, notifications, paramètres, activité, support, usage et pages projet (vue d'ensemble, déploiements, variables, journaux, paramètres).
+- **Administration** : accueil, utilisateurs, projets, déploiements, organisations, paiements, audit, infrastructure, live, support.
+
 ```bash
 # Public uniquement
 npm run test:a11y
@@ -51,7 +56,7 @@ clés aux largeurs **360, 768 et 1440 px** en thèmes **clair et sombre**.
 Dossier de sortie (stable) : `portail/e2e/screenshots/<thème>/<largeur>/`
 (par ex. `e2e/screenshots/light/1440/accueil.png`).
 
-- **Pages publiques** : accueil et pages clés (`/`, auth, statut, maintenance, 404, etc.).
+- **Pages publiques** : accueil, authentification, statut, tarifs, pages légales, maintenance, 404.
 - **Console (authentifié)** : pages du tableau de bord et de projet ; l’**accueil du tableau de bord** (`/dashboard`) est capturé avec la **barre latérale dépliée** et **repliée** aux largeurs ≥ 768 px (`dashboard_sidebar-depliee.png`, `dashboard_sidebar-repliee.png`, issue #80).
 
 Ces captures sont des artefacts locaux : `portail/e2e/screenshots/` est ignoré par Git. Les **références validées et versionnées** sont conservées dans `portail/e2e/visual-references/` (voir section ci-dessous).
@@ -66,7 +71,10 @@ PLAYWRIGHT_AUTH=1 PLAYWRIGHT_ADMIN=1 npm run test:screenshots
 
 Les parcours authentifiés reprennent les mêmes pages clés que l'audit
 (tableau de bord, nouveau projet, équipe, notifications, paramètres, activité,
-pages projet et, avec `PLAYWRIGHT_ADMIN=1`, administration).
+support, usage, pages projet et, avec `PLAYWRIGHT_ADMIN=1`, administration incluant
+infrastructure, live et support). Les captures publiques servent aussi de base
+visuelle reproductible ; pour régénérer uniquement ce sous-ensemble :
+`npx playwright test e2e/screenshots.spec.ts -g "captures publiques"`.
 
 ## Captures de référence et procédure de mise à jour (#80)
 

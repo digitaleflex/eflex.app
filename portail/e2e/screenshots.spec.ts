@@ -32,6 +32,10 @@ const PUBLIC_PAGES = [
   '/reset-password',
   '/verify-email',
   '/status',
+  '/tarifs',
+  '/conditions',
+  '/confidentialite',
+  '/mentions-legales',
   '/maintenance',
   '/cette-page-nexiste-pas',
 ]
@@ -48,6 +52,8 @@ const DASHBOARD_PAGES = [
   '/dashboard/notifications',
   '/dashboard/settings',
   '/dashboard/activity',
+  '/dashboard/support',
+  '/dashboard/usage',
 ]
 
 const ADMIN_PAGES = [
@@ -58,6 +64,9 @@ const ADMIN_PAGES = [
   '/admin/organizations',
   '/admin/payments',
   '/admin/audit',
+  '/admin/infrastructure',
+  '/admin/live',
+  '/admin/support',
 ]
 
 function safeName(route: string) {

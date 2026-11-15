@@ -39,7 +39,19 @@ export const ACTIVE_DEPLOYMENT_STATUSES = [
   'deploying',
 ] as const
 
+/** Ordre de progression nominal (sans les états terminaux). */
+export const PROGRESS_STATUSES = [
+  'queued',
+  'analyzing',
+  'provisioning',
+  'building',
+  'deploying',
+] as const
+
 const TERMINAL: ReadonlySet<DeploymentStatus> = new Set(TERMINAL_STATUSES)
+const PROGRESS_INDEX: Readonly<Record<string, number>> = Object.fromEntries(
+  PROGRESS_STATUSES.map((status, index) => [status, index]),
+)
 
 export const STATUS_LABELS: Record<DeploymentStatus, string> = {
   queued: 'En file d’attente',
@@ -110,4 +122,37 @@ export function assertTransition(from: string, to: DeploymentStatus): void {
   if (!canTransition(from, to)) {
     throw new Error(`Transition de déploiement interdite : "${from}" → "${to}".`)
   }
+}
+
+/** Vrai si `status` appartient à la chaîne de progression active. */
+export function isActiveStatus(status: string): boolean {
+  return (ACTIVE_DEPLOYMENT_STATUSES as readonly string[]).includes(status)
+}
+
+/**
+ * Compare deux états de progression (`queued` … `deploying`).
+ * Retourne -1/0/1, ou `null` si l'un des états n'est pas dans la chaîne.
+ */
+export function compareProgressStatus(from: string, to: string): -1 | 0 | 1 | null {
+  const a = PROGRESS_INDEX[from]
+  const b = PROGRESS_INDEX[to]
+  if (a === undefined || b === undefined) return null
+  if (a === b) return 0
+  return a < b ? -1 : 1
+}
+
+/**
+ * Décide si le worker doit exécuter l'étape menant à `target` en partant de
+ * `current` (idempotence/reprise) :
+ * - `advance` : transition normale vers `target` ;
+ * - `noop`    : étape déjà atteinte ou dépassée (reprise) ;
+ * - `blocked` : état terminal ou incohérent.
+ */
+export function planStep(current: string, target: DeploymentStatus): 'advance' | 'noop' | 'blocked' {
+  if (isTerminal(current)) return 'blocked'
+  if (current === target) return 'noop'
+  if (canTransition(current, target)) return 'advance'
+  const cmp = compareProgressStatus(current, target)
+  if (cmp === 1) return 'noop' // déjà plus avancé : reprise sûre, ne pas régresser
+  return 'blocked'
 }

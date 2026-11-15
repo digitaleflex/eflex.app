@@ -22,7 +22,7 @@ import {
 } from '@/lib/deploy-plan'
 import { inspectCompose, type ComposeInspection } from '@/lib/compose-safety'
 import { fetchRepositoryFile } from '@/lib/repo-file'
-import { assertTransition, isTerminal, TERMINAL_STATUSES, type DeploymentStatus } from '@/lib/deployment-state'
+import { isTerminal, planStep, TERMINAL_STATUSES, type DeploymentStatus } from '@/lib/deployment-state'
 import { expireStaleDeployments, WATCHDOG_INTERVAL_MS } from '@/lib/deployment-watchdog'
 import { startBillingMaintenance } from '@/lib/billing-renewal'
 import { DEPLOYMENT_QUEUE, redisConnection } from '@/lib/queue'
@@ -87,8 +87,14 @@ async function announce(deploymentId: string, status: string): Promise<void> {
 
 async function setStatus(id: string, next: DeploymentStatus): Promise<boolean> {
   const current = await prisma.deployment.findUnique({ where: { id }, select: { status: true } })
-  if (!current || isTerminal(current.status)) return false
-  assertTransition(current.status, next)
+  if (!current) return false
+  const plan = planStep(current.status, next)
+  if (plan === 'blocked') return false
+  if (plan === 'noop') {
+    // Idempotence/reprise : l'étape est déjà atteinte (ou dépassée). On ne
+    // régresse jamais et on ne ré-émet pas d'événement.
+    return true
+  }
   // Mise à jour conditionnelle : une annulation concurrente gagne et la
   // transition du worker est abandonnée (jamais d'écrasement de `cancelled`).
   const updated = await prisma.deployment.updateMany({
@@ -168,6 +174,14 @@ export async function processDeployment(
   if (!deployment) return
   if (isTerminal(deployment.status)) return // idempotence
 
+  if (deployment.status !== 'queued') {
+    // Reprise/retraitement (redémarrage, livraison dupliquée ou tentative
+    // BullMQ) : on poursuit depuis l'état courant sans régresser.
+    console.info(
+      `[eflex/worker] reprise du déploiement ${deploymentId} depuis l’état « ${deployment.status} ».`,
+    )
+  }
+
   const project = deployment.project
   const app = deployment.app
   const effectiveApp = app ?? project.apps[0] ?? null
@@ -185,7 +199,15 @@ export async function processDeployment(
   }
 
   // Annulé avant même le démarrage (job encore en file) : rien à faire.
-  if (!(await setStatus(deploymentId, 'analyzing'))) return
+  if (!(await setStatus(deploymentId, 'analyzing'))) {
+    const status = await currentStatus(deploymentId)
+    if (status && !isTerminal(status)) {
+      console.warn(
+        `[eflex/worker] déploiement ${deploymentId} non démarrable depuis « ${status} » (verrou ou état incohérent).`,
+      )
+    }
+    return
+  }
 
   // Résolution du contexte : source ProjectApp (Lot G) avec repli miroirs Project.*.
   const resolved = resolveDeploymentContext({
