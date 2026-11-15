@@ -408,7 +408,10 @@ export default function LoginPage() {
                       />
 
                       <div className="flex justify-end">
-                        <Link href="/forgot-password" className="text-sm font-medium text-primary hover:underline">
+                        <Link
+                          href="/forgot-password"
+                          className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md"
+                        >
                           Mot de passe oublié ?
                         </Link>
                       </div>

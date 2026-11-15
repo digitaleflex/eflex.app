@@ -2,10 +2,17 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Copy, LogOut, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react'
+import { Activity, Copy, LogOut, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react'
 import { authClient, authErrorMessage } from '@/lib/auth-client'
 import { slugify } from '@/lib/slug'
-import { canManageBilling } from '@/lib/organizations'
+import {
+  ORGANIZATION_ROLE_DESCRIPTION,
+  ORGANIZATION_ROLES,
+  canManageBilling,
+  canManageMembers,
+  organizationActionImpact,
+  organizationRoleLabel,
+} from '@/lib/organizations'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -15,33 +22,61 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PageHeader } from '@/components/page-header'
 import { BillingCard } from '@/components/organization/billing-card'
 
-const ROLE_LABEL: Record<string, string> = {
-  owner: 'Propriétaire',
-  admin: 'Administrateur',
-  billing: 'Facturation',
-  member: 'Membre',
-}
-const roleLabel = (role: string) => ROLE_LABEL[role] ?? role
-
-/** Capacités réelles de chaque rôle Better Auth. Aucune permission n'est modifiée ici. */
-const ROLE_DESCRIPTION: Record<string, string> = {
-  owner: 'Gère l’organisation, les membres, les projets et la facturation. Seul rôle autorisé à supprimer l’organisation.',
-  admin: 'Gère les membres et les projets, et accède à la facturation.',
-  billing: 'Gère l’abonnement et les paiements, sans accès aux projets ni aux journaux.',
-  member: 'Consulte les projets de l’organisation. Ne peut ni créer, ni relancer, ni gérer la facturation.',
-}
-
-const ROLES = ['owner', 'admin', 'billing', 'member'] as const
-
 const invitationDate = new Intl.DateTimeFormat('fr-FR', {
   dateStyle: 'medium',
+  timeZone: 'Europe/Paris',
+})
+const activityDate = new Intl.DateTimeFormat('fr-FR', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
   timeZone: 'Europe/Paris',
 })
 
 type InviteRole = 'admin' | 'billing' | 'member'
 type PendingRole = { memberId: string; name: string; currentRole: string; nextRole: string }
 
-export function OrganizationPanel({ currentUserId }: { currentUserId: string }) {
+export type TeamActivity = {
+  id: string
+  type: string
+  createdAt: string
+  payload: {
+    role: string | null
+    status: string | null
+    userName: string | null
+    userEmail: string | null
+  }
+}
+
+function teamActivityLabel(item: TeamActivity): string {
+  const who = item.payload.userName || item.payload.userEmail || 'Un membre'
+  switch (item.type) {
+    case 'member.added':
+      return `${who} a rejoint l’organisation.`
+    case 'member.removed':
+      return `${who} a été retiré de l’organisation.`
+    case 'member.updated':
+      return item.payload.role
+        ? `Le rôle de ${who} a été changé en « ${organizationRoleLabel(item.payload.role)} ».`
+        : `Le rôle de ${who} a été modifié.`
+    case 'invitation.created':
+      return 'Une invitation a été envoyée.'
+    case 'invitation.updated':
+      if (item.payload.status === 'accepted') return 'Une invitation a été acceptée.'
+      if (item.payload.status === 'rejected') return 'Une invitation a été refusée.'
+      if (item.payload.status === 'canceled') return 'Une invitation a été annulée.'
+      return "Le statut d'une invitation a été mis à jour."
+    default:
+      return 'Activité d’équipe mise à jour.'
+  }
+}
+
+export function OrganizationPanel({
+  currentUserId,
+  teamActivity = [],
+}: {
+  currentUserId: string
+  teamActivity?: TeamActivity[]
+}) {
   const router = useRouter()
   const { data: org, isPending, refetch } = authClient.useActiveOrganization()
   // Temps réel : un autre onglet ou une autre personne modifie l'équipe ou les invitations.
@@ -99,7 +134,7 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
 
   const me = org.members.find((member) => member.userId === currentUserId)
   const myRole = me?.role ?? 'member'
-  const canInvite = myRole === 'owner' || myRole === 'admin'
+  const canManageTeam = canManageMembers(myRole)
   const isOwner = myRole === 'owner'
   const origin = typeof window === 'undefined' ? '' : window.location.origin
   const pendingInvitations = org.invitations.filter((invitation) => invitation.status === 'pending')
@@ -108,8 +143,8 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
     <div className="max-w-4xl space-y-8">
       <PageHeader
         title="Équipe"
-        description="Les projets appartiennent à une organisation : tous ses membres les voient, selon leur rôle. Invitez des personnes, changez leur rôle ou retirez leur accès."
-        actions={<Badge variant="outline">Votre rôle : {roleLabel(myRole)}</Badge>}
+        description="Les projets appartiennent à une organisation : tous ses membres les voient selon leur rôle. Les actions sensibles (invitation, changement de rôle, retrait, suppression) demandent une confirmation et sont contrôlées côté serveur."
+        actions={<Badge variant="outline">Votre rôle : {organizationRoleLabel(myRole)}</Badge>}
       />
 
       {message ? <Message kind={message.kind} text={message.text} /> : null}
@@ -122,7 +157,7 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
           </p>
         </CardHeader>
         <CardContent>
-          {canInvite ? (
+          {canManageTeam ? (
             <RenameForm
               key={org.id}
               orgId={org.id}
@@ -136,7 +171,7 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
             />
           ) : (
             <p className="text-sm text-muted-foreground">
-              Seuls les propriétaires et administrateurs peuvent modifier l’organisation.
+              Seuls les propriétaires et les administrateurs peuvent modifier le nom de l’organisation.
             </p>
           )}
         </CardContent>
@@ -154,10 +189,10 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
         </CardHeader>
         <CardContent>
           <dl className="divide-y divide-border">
-            {ROLES.map((role) => (
+            {ORGANIZATION_ROLES.map((role) => (
               <div key={role} className="grid gap-1 py-3 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-4">
-                <dt className="text-sm font-medium">{roleLabel(role)}</dt>
-                <dd className="text-sm text-muted-foreground">{ROLE_DESCRIPTION[role]}</dd>
+                <dt className="text-sm font-medium">{organizationRoleLabel(role)}</dt>
+                <dd className="text-sm text-muted-foreground">{ORGANIZATION_ROLE_DESCRIPTION[role]}</dd>
               </div>
             ))}
           </dl>
@@ -185,16 +220,16 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
             Membres ({org.members.length})
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {canInvite
-              ? 'Changez un rôle pour ajuster les accès. Le retrait d’un membre demande une confirmation.'
-              : 'Seuls les propriétaires et administrateurs peuvent modifier les rôles et retirer des membres.'}
+            {canManageTeam
+              ? 'Changez un rôle pour ajuster les accès. Le changement de rôle et le retrait sont des actions sensibles : leur impact est rappelé avant confirmation.'
+              : 'Seuls les propriétaires et les administrateurs peuvent modifier les rôles et retirer des membres.'}
           </p>
         </CardHeader>
         <CardContent>
           <ul className="divide-y divide-border">
             {org.members.map((member) => {
               const self = member.userId === currentUserId
-              const editable = canInvite && !self && (isOwner || member.role === 'member')
+              const editable = canManageTeam && !self && (isOwner || member.role === 'member')
               return (
                 <li
                   key={member.id}
@@ -208,7 +243,7 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
                     <p className="truncate text-xs text-muted-foreground">{member.user.email}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">{roleLabel(member.role)}</Badge>
+                    <Badge variant="outline">{organizationRoleLabel(member.role)}</Badge>
                     {editable ? (
                       <>
                         <label className="sr-only" htmlFor={`role-${member.id}`}>
@@ -254,7 +289,7 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
         </CardContent>
       </Card>
 
-      {canInvite ? (
+      {canManageTeam ? (
         <Card>
           <CardHeader>
             <h2 className="flex items-center gap-2 font-semibold">
@@ -263,7 +298,7 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               L’envoi automatique par e-mail n’est pas encore actif : copiez le lien et transmettez-le à la
-              personne invitée. Elle doit se connecter avec l’adresse invitée.
+              personne invitée. Elle doit se connecter avec l’adresse invitée. {organizationActionImpact.invite}
             </p>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -297,10 +332,13 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{invitation.email}</p>
                         <p className="text-xs text-muted-foreground">
-                          Rôle : {roleLabel(invitation.role ?? 'member')} · en attente
+                          Rôle proposé : {organizationRoleLabel(invitation.role ?? 'member')} · en attente
                           {invitation.expiresAt
                             ? ` · expire le ${invitationDate.format(new Date(invitation.expiresAt))}`
                             : ''}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {ORGANIZATION_ROLE_DESCRIPTION[(invitation.role ?? 'member') as 'owner' | 'admin' | 'billing' | 'member'] ?? ''}
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -347,10 +385,39 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
 
       <Card>
         <CardHeader>
+          <h2 className="flex items-center gap-2 font-semibold">
+            <Activity className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            Activité récente de l’équipe
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Derniers changements visibles par les membres de l’organisation (arrivées, départs, rôles, invitations).
+          </p>
+        </CardHeader>
+        <CardContent>
+          {teamActivity.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Aucun changement d’équipe récent. Les nouvelles actions apparaîtront ici.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {teamActivity.map((item) => (
+                <li key={item.id} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm">{teamActivityLabel(item)}</p>
+                  <time className="text-xs text-muted-foreground" dateTime={item.createdAt}>
+                    {activityDate.format(new Date(item.createdAt))}
+                  </time>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <h2 className="font-semibold">Zone sensible</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Quitter l’organisation vous retire l’accès à ses projets. La suppression est réservée au
-            propriétaire et demande la saisie du nom.
+            {organizationActionImpact.leave} {organizationActionImpact.deleteOrganization}
           </p>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
@@ -379,7 +446,7 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
           open
           destructive
           title={`Retirer ${confirm.name} ?`}
-          description={`${confirm.name} perdra immédiatement l’accès aux projets de « ${org.name} ». Ses propres organisations ne sont pas touchées.`}
+          description={`${confirm.name} sera retiré de « ${org.name} ». ${organizationActionImpact.removeMember}`}
           confirmLabel="Retirer le membre"
           onCancel={() => setConfirm(null)}
           onConfirm={async () => {
@@ -402,7 +469,7 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
           open
           destructive
           title={`Quitter « ${org.name} » ?`}
-          description="Vous n’aurez plus accès à ses projets. Un propriétaire pourra vous réinviter."
+          description={organizationActionImpact.leave}
           confirmLabel="Quitter l’organisation"
           onCancel={() => setConfirm(null)}
           onConfirm={async () => {
@@ -423,10 +490,13 @@ export function OrganizationPanel({ currentUserId }: { currentUserId: string }) 
           description={
             <>
               <span className="block">
-                {pendingRole.name} passera de « {roleLabel(pendingRole.currentRole)} » à «{' '}
-                {roleLabel(pendingRole.nextRole)} ».
+                {pendingRole.name} passera de « {organizationRoleLabel(pendingRole.currentRole)} » à «{' '}
+                {organizationRoleLabel(pendingRole.nextRole)} ».
               </span>
-              <span className="mt-2 block">{ROLE_DESCRIPTION[pendingRole.nextRole]}</span>
+              <span className="mt-2 block">{organizationActionImpact.changeRole}</span>
+              <span className="mt-2 block">
+                {ORGANIZATION_ROLE_DESCRIPTION[pendingRole.nextRole as 'owner' | 'admin' | 'billing' | 'member'] ?? ''}
+              </span>
             </>
           }
           confirmLabel="Changer le rôle"

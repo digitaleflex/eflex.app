@@ -89,6 +89,9 @@ const MESSAGES: Record<string, string> = {
   ACCOUNT_NOT_FOUND: 'Compte introuvable.',
 }
 
+/** Erreurs métier dont le serveur fournit déjà un message utilisateur en français. */
+const SERVER_MESSAGE_CODES = new Set(['MEMBER_LIMIT_REACHED'])
+
 /** Traduit une erreur Better Auth en message français affichable. */
 export function authErrorMessage(
   error: { code?: string; status?: number; message?: string } | null | undefined,
@@ -97,5 +100,6 @@ export function authErrorMessage(
   if (!error) return fallback
   if (error.status === 429) return 'Trop de tentatives. Patientez quelques instants avant de réessayer.'
   if (error.code && MESSAGES[error.code]) return MESSAGES[error.code]
+  if (error.code && SERVER_MESSAGE_CODES.has(error.code) && error.message) return error.message
   return fallback
 }
