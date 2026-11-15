@@ -12,12 +12,27 @@ export type UsageProject = {
   apps: Array<{ id: string; name: string; deployed: boolean }>
 }
 
+export type ExecutionResourceProfileView = {
+  id: string
+  label: string
+  cpuLimit: string | null
+  memoryLimit: string | null
+  diskLimit: string | null
+  enforcement: 'not_enforced' | 'configured' | 'unknown'
+  summary: string
+  details: string[]
+  overageBehavior: string[]
+  remainingWork: string[]
+}
+
 export type UsageQuotaSummary = {
   planLabel: string
   phase: string
   apps: { used: number; limit: number }
   members: { used: number; limit: number }
   customDomains: { used: number; maxPerProject: number; limitPerProject: number }
+  executionResources?: ExecutionResourceProfileView
+  perPlanExecutionEnforced?: boolean
 }
 
 type MetricsPayload = {
@@ -282,13 +297,64 @@ export function UsageView({ projects, quota }: { projects: UsageProject[]; quota
           <li><span className="font-medium text-foreground">Bande passante</span> : aucune source de mesure disponible pour le moment — aucune valeur affichée.</li>
         </ul>
         <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
-          <h3 className="text-sm font-medium text-foreground">Limites d’exécution par plan</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Aucune limite CPU, mémoire ou disque par application n’est imposée par le plan dans la plateforme pour le moment.
-            L’exécution dépend des capacités et de la configuration de l’hébergement. Les profils de ressources par plan ne sont pas encore appliqués.
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Source : configuration de la plateforme (aucune mesure ni quota d’exécution instrumenté).
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-medium text-foreground">Ressources d’exécution (CPU, mémoire, disque)</h3>
+            <span className="inline-flex rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              {quota?.perPlanExecutionEnforced ? 'Limites appliquées par plan' : 'Profil commun · non imposé par le plan'}
+            </span>
+          </div>
+          {quota?.executionResources ? (
+            <div className="mt-2 space-y-3 text-sm text-muted-foreground">
+              <p>
+                Plan <span className="font-medium text-foreground">{quota.planLabel}</span> — profil « {quota.executionResources.label} ».{' '}
+                {quota.executionResources.summary}
+              </p>
+              <dl className="grid gap-2 sm:grid-cols-3">
+                <div className="rounded-md border border-border bg-background p-2">
+                  <dt className="text-xs font-medium text-foreground">CPU par application</dt>
+                  <dd className="mt-0.5 text-xs">{quota.executionResources.cpuLimit ?? 'Non imposé par la plateforme'}</dd>
+                </div>
+                <div className="rounded-md border border-border bg-background p-2">
+                  <dt className="text-xs font-medium text-foreground">Mémoire par application</dt>
+                  <dd className="mt-0.5 text-xs">{quota.executionResources.memoryLimit ?? 'Non imposée par la plateforme'}</dd>
+                </div>
+                <div className="rounded-md border border-border bg-background p-2">
+                  <dt className="text-xs font-medium text-foreground">Disque par application</dt>
+                  <dd className="mt-0.5 text-xs">{quota.executionResources.diskLimit ?? 'Non imposé par la plateforme'}</dd>
+                </div>
+              </dl>
+              <div>
+                <p className="text-xs font-medium text-foreground">Ce qui est connu / configuré</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs">
+                  {quota.executionResources.details.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-foreground">Comportement en cas de dépassement (selon l’hébergement)</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs">
+                  {quota.executionResources.overageBehavior.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+              {!quota.perPlanExecutionEnforced && (
+                <p className="text-xs">
+                  Les profils de ressources différenciés par plan ne sont pas encore appliqués. L’application réelle des limites dépend de la configuration de l’hébergement (Coolify/infra).
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+              <p>
+                Aucune limite CPU, mémoire ou disque par application n’est imposée par le plan dans la plateforme pour le moment.
+                L’exécution dépend des capacités et de la configuration de l’hébergement.
+              </p>
+            </div>
+          )}
+          <p className="mt-2 text-xs text-muted-foreground">
+            Source : configuration connue de la plateforme et du plan (aucune limite d’exécution appliquée par le portail).
           </p>
         </div>
         {sampledAt && (

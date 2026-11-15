@@ -3,6 +3,7 @@ import { getSession } from '@/lib/session'
 import { resolveOrganization } from '@/lib/organizations'
 import { prisma } from '@/lib/prisma'
 import { loadBillingState } from '@/lib/billing'
+import { executionResourcesForPlan, hasPerPlanExecutionEnforcement } from '@/lib/execution-resources'
 import { UsageView, type UsageProject, type UsageQuotaSummary } from '@/components/dashboard/usage-view'
 
 export const metadata = { title: 'Utilisation — EFLEX' }
@@ -67,6 +68,8 @@ export default async function UsagePage() {
       maxPerProject: maxDomainsInProject,
       limitPerProject: billing.limits.customDomains,
     },
+    executionResources: executionResourcesForPlan(billing.plan.id),
+    perPlanExecutionEnforced: hasPerPlanExecutionEnforcement(),
   }
 
   return <UsageView projects={items} quota={quota} />

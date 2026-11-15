@@ -9,6 +9,19 @@ import { useEvents } from '@/hooks/events-provider'
 import { formatPrice, planById, type Plan } from '@/lib/plans'
 import { cn } from '@/lib/utils'
 
+interface ExecutionResourceProfileView {
+  id: string
+  label: string
+  cpuLimit: string | null
+  memoryLimit: string | null
+  diskLimit: string | null
+  enforcement: 'not_enforced' | 'configured' | 'unknown'
+  summary: string
+  details: string[]
+  overageBehavior: string[]
+  remainingWork: string[]
+}
+
 interface BillingSummary {
   plan: Plan
   subscribedPlan: Plan
@@ -27,6 +40,8 @@ interface BillingSummary {
   manualOverride: boolean
   usage: { projects: number; members: number; apps: number }
   limits: { projects: number; members: number; customDomains: number }
+  executionResources?: ExecutionResourceProfileView
+  perPlanExecutionEnforced?: boolean
   canManage: boolean
   providers: { kkiapay: boolean; fedapay: boolean }
   plans: Plan[]
@@ -358,6 +373,17 @@ export function BillingCard() {
             <p className="text-xs text-muted-foreground">
               Projets réels : <span className="font-medium tabular-nums">{data.usage.projects}</span>.
             </p>
+            {data.executionResources && (
+              <div className="rounded-md border border-border bg-background p-2 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">Ressources d’exécution</p>
+                <p className="mt-0.5">{data.executionResources.summary}</p>
+                <p className="mt-1">
+                  CPU / mémoire / disque par application : non imposés par le plan pour le moment (profil commun). En cas de
+                  dépassement des ressources de l’hébergement, ralentissements, arrêt OOM ou erreurs disque sont possibles selon
+                  la configuration de l’infra.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

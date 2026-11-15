@@ -7,6 +7,11 @@ import {
   type Plan,
   type PlanId,
 } from '@/lib/plans'
+import {
+  executionResourcesForPlan,
+  hasPerPlanExecutionEnforcement,
+  type ExecutionResourceProfile,
+} from '@/lib/execution-resources'
 
 export { GRACE_PERIOD_DAYS, PERIOD_DAYS }
 
@@ -282,6 +287,10 @@ export interface BillingSummary {
     apps: number
   }
   limits: BillingLimits
+  /** Profil de ressources d’exécution (CPU/mémoire/disque) connu pour le plan effectif. */
+  executionResources: ExecutionResourceProfile
+  /** Vrai uniquement si des limites d’exécution différenciées par plan sont réellement appliquées. */
+  perPlanExecutionEnforced: boolean
 }
 
 /** Résumé complet pour l'interface (plan, statut, consommation). */
@@ -313,6 +322,8 @@ export async function billingSummary(organizationId: string): Promise<BillingSum
     manualOverride: state.manualOverride,
     usage: { projects, members, apps: apps + implicitProjects },
     limits: state.limits,
+    executionResources: executionResourcesForPlan(state.plan.id),
+    perPlanExecutionEnforced: hasPerPlanExecutionEnforcement(),
   }
 }
 
