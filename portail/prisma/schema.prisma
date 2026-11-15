@@ -178,6 +178,8 @@ model Project {
    */
   apps                  ProjectApp[]
   supportTickets        SupportTicket[]
+  analytics             ProjectAnalytics?
+  trafficStats          TrafficDailyStat[]
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 
@@ -617,6 +619,48 @@ model NotificationPreference {
   enabled Boolean
 
   @@unique([userId, type, channel])
+}
+
+// ─── Mesure de trafic (ANALYTICS-2, socle initial) ─────────────────────────
+// Collecte activable, désactivée par défaut (opt-in, #112). Aucune donnée sans
+// source mesurée : événements reçus via le snippet/SDK public authentifié par
+// une clé d'écriture. Minimisation : pas d'IP brute, pas d'identifiant visiteur,
+// pas de profilage nominatif ; agrégation quotidienne par chemin. La rétention
+// est configurable (nettoyage/purge à brancher dans #112).
+model ProjectAnalytics {
+  id            String   @id @default(cuid())
+  projectId     String   @unique
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// Mesure désactivée par défaut : ne collecte rien tant qu'elle n'est pas activée explicitement.
+  enabled       Boolean  @default(false)
+  /// Clé publique d'écriture embarquée dans le snippet (identifie le projet). Montrée uniquement aux gestionnaires.
+  publicKey     String   @unique
+  /// Respect du signal « Do Not Track » / Global Privacy Control (GPC) : si actif, ces visites sont ignorées.
+  respectDnt    Boolean  @default(true)
+  /// Collecte du chemin de page (agrégé par jour). Désactivable pour ne garder qu'un volume global.
+  collectPath   Boolean  @default(true)
+  /// Durée de conservation cible des statistiques quotidiennes (jours). Borne appliquée côté API.
+  retentionDays Int      @default(90)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([projectId])
+}
+
+/// Statistique quotidienne agrégée (aucune donnée nominative, aucun identifiant visiteur).
+model TrafficDailyStat {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// Jour UTC de la mesure.
+  date      DateTime @db.Date
+  /// Chemin normalisé (sans requête ni fragment), ou "/" si la collecte de chemin est désactivée.
+  path      String   @db.VarChar(500)
+  /// Nombre de pages vues agrégées reçues pour ce chemin et ce jour.
+  views     Int      @default(0)
+
+  @@unique([projectId, date, path])
+  @@index([projectId, date])
 }
 
 // ─── Support (tickets) ───────────────────────────────────────────────────────

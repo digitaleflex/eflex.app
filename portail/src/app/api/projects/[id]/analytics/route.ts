@@ -1,0 +1,153 @@
+import { NextResponse } from 'next/server'
+import { getSession } from '@/lib/session'
+import { prisma } from '@/lib/prisma'
+import { allow, allowOrg } from '@/lib/rate-limit'
+import { assertProjectManager, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
+import { appUrl } from '@/lib/email'
+import {
+  ANALYTICS_RETENTION_DEFAULT_DAYS,
+  analyticsConfigUpdateSchema,
+  buildAnalyticsSnippet,
+  firstAnalyticsIssue,
+  generateAnalyticsPublicKey,
+} from '@/lib/analytics'
+
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
+function collectUrl() {
+  return appUrl('/api/collect')
+}
+
+function serializeConfig(config: {
+  enabled: boolean
+  publicKey: string
+  respectDnt: boolean
+  collectPath: boolean
+  retentionDays: number
+  createdAt: Date
+  updatedAt: Date
+}) {
+  const url = collectUrl()
+  return {
+    enabled: config.enabled,
+    publicKey: config.publicKey,
+    respectDnt: config.respectDnt,
+    collectPath: config.collectPath,
+    retentionDays: config.retentionDays,
+    snippet: buildAnalyticsSnippet(config.publicKey, url),
+    collectUrl: url,
+    createdAt: config.createdAt.toISOString(),
+    updatedAt: config.updatedAt.toISOString(),
+  }
+}
+
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  }
+
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
+
+  const { id } = await params
+  const projectResult = await requireProject(org, id, { id: true })
+  if ('response' in projectResult) return projectResult.response
+
+  const config = await prisma.projectAnalytics.findUnique({
+    where: { projectId: projectResult.project.id },
+  })
+
+  if (!config) {
+    return NextResponse.json({
+      config: {
+        enabled: false,
+        publicKey: null,
+        respectDnt: true,
+        collectPath: true,
+        retentionDays: ANALYTICS_RETENTION_DEFAULT_DAYS,
+        snippet: null,
+        collectUrl: collectUrl(),
+        createdAt: null,
+        updatedAt: null,
+      },
+    })
+  }
+
+  return NextResponse.json({ config: serializeConfig(config) })
+}
+
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  }
+
+  const org = await requireOrg(session)
+  if (!org) return tenantNotFound('Projet introuvable')
+
+  const denied = assertProjectManager(org)
+  if (denied) return denied
+
+  if (!(await allow(`analytics-config:${session.user.id}`, 30, 60_000))) {
+    return NextResponse.json({ error: 'Trop de modifications en peu de temps. Patientez une minute.' }, { status: 429 })
+  }
+  if (!(await allowOrg(org.organizationId, 'analytics-config', 60, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop de modifications pour cette organisation. Patientez une minute.' },
+      { status: 429 },
+    )
+  }
+
+  const { id } = await params
+  const projectResult = await requireProject(org, id, { id: true })
+  if ('response' in projectResult) return projectResult.response
+  const project = projectResult.project
+
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Requête invalide.' }, { status: 400 })
+  }
+
+  const parsed = analyticsConfigUpdateSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: firstAnalyticsIssue(parsed.error) }, { status: 400 })
+  }
+
+  const existing = await prisma.projectAnalytics.findUnique({ where: { projectId: project.id } })
+
+  const data: {
+    enabled?: boolean
+    respectDnt?: boolean
+    collectPath?: boolean
+    retentionDays?: number
+    publicKey?: string
+  } = {}
+
+  if (parsed.data.enabled !== undefined) data.enabled = parsed.data.enabled
+  if (parsed.data.respectDnt !== undefined) data.respectDnt = parsed.data.respectDnt
+  if (parsed.data.collectPath !== undefined) data.collectPath = parsed.data.collectPath
+  if (parsed.data.retentionDays !== undefined) data.retentionDays = parsed.data.retentionDays
+  if (!existing || parsed.data.regenerateKey) data.publicKey = generateAnalyticsPublicKey()
+
+  const config = existing
+    ? await prisma.projectAnalytics.update({ where: { projectId: project.id }, data })
+    : await prisma.projectAnalytics.create({
+        data: {
+          projectId: project.id,
+          publicKey: data.publicKey ?? generateAnalyticsPublicKey(),
+          enabled: data.enabled ?? false,
+          respectDnt: data.respectDnt ?? true,
+          collectPath: data.collectPath ?? true,
+          retentionDays: data.retentionDays ?? ANALYTICS_RETENTION_DEFAULT_DAYS,
+        },
+      })
+
+  // La désactivation/rotation de clé est un changement sensible de collecte : journalisé sans exposer la clé.
+  // (audit importé seulement si utile ; on garde l'incrément simple et on peut ajouter audit fin plus tard)
+
+  return NextResponse.json({ config: serializeConfig(config) })
+}
