@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { audit } from '@/lib/audit'
+import { allow, allowOrg } from '@/lib/rate-limit'
 import { assertProjectManager, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 import { purgeTrafficStatsForProject } from '@/lib/analytics'
 
@@ -23,6 +25,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const denied = assertProjectManager(org)
   if (denied) return denied
+
+  if (!(await allow(`analytics-export:${session.user.id}`, 20, 60_000))) {
+    return NextResponse.json({ error: 'Trop d’exports en peu de temps. Patientez une minute.' }, { status: 429 })
+  }
+  if (!(await allowOrg(org.organizationId, 'analytics-export', 40, 60_000))) {
+    return NextResponse.json(
+      { error: 'Trop d’exports pour cette organisation. Patientez une minute.' },
+      { status: 429 },
+    )
+  }
 
   const { id } = await params
   const projectResult = await requireProject(org, id, { id: true })
@@ -60,7 +72,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }))
 
   const url = new URL(request.url)
-  const format = url.searchParams.get('format')
+  const format = url.searchParams.get('format') === 'csv' ? 'csv' : 'json'
+
+  await audit({
+    actor: { id: session.user.id, email: session.user.email ?? '' },
+    action: 'project.analytics.export',
+    target: { type: 'project', id: projectId },
+    organizationId: org.organizationId,
+    details: { format, pageviewRows: data.length, eventRows: eventData.length },
+    request,
+  })
+
   if (format === 'csv') {
     const header = 'type,date,key,count,goal'
     const trafficLines = data.map(

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { allowOrg } from '@/lib/rate-limit'
+import { audit } from '@/lib/audit'
+import { allow, allowOrg } from '@/lib/rate-limit'
 import { assertProjectManager, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 import { deleteAllTrafficStatsForProject, purgeTrafficStatsForProject } from '@/lib/analytics'
 
@@ -89,7 +90,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   return NextResponse.json({ rangeDays: days, total, days: daysSeries, paths, events, goalEvents: config?.goalEvents ?? [] })
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
@@ -101,6 +102,9 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const denied = assertProjectManager(org)
   if (denied) return denied
 
+  if (!(await allow(`analytics-delete:${session.user.id}`, 10, 60_000))) {
+    return NextResponse.json({ error: 'Trop de suppressions en peu de temps. Patientez une minute.' }, { status: 429 })
+  }
   if (!(await allowOrg(org.organizationId, 'analytics-delete', 20, 60_000))) {
     return NextResponse.json(
       { error: 'Trop de suppressions pour cette organisation. Patientez une minute.' },
@@ -113,5 +117,15 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if ('response' in projectResult) return projectResult.response
 
   const deleted = await deleteAllTrafficStatsForProject(prisma, projectResult.project.id)
+
+  await audit({
+    actor: { id: session.user.id, email: session.user.email ?? '' },
+    action: 'project.analytics.stats.delete',
+    target: { type: 'project', id: projectResult.project.id },
+    organizationId: org.organizationId,
+    details: { deleted },
+    request,
+  })
+
   return NextResponse.json({ deleted })
 }

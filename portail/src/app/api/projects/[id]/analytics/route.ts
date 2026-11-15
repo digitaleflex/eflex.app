@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { allow, allowOrg } from '@/lib/rate-limit'
+import { audit } from '@/lib/audit'
 import { assertProjectManager, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 import { appUrl } from '@/lib/email'
 import {
@@ -164,6 +165,23 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   // Après modification (activation, rétention, rotation de clé), on applique la rétention en vigueur.
   await purgeTrafficStatsForProject(prisma, project.id)
+
+  const changes: Record<string, unknown> = { created: !existing }
+  if (parsed.data.enabled !== undefined) changes.enabled = config.enabled
+  if (parsed.data.respectDnt !== undefined) changes.respectDnt = config.respectDnt
+  if (parsed.data.collectPath !== undefined) changes.collectPath = config.collectPath
+  if (parsed.data.retentionDays !== undefined) changes.retentionDays = config.retentionDays
+  if (parsed.data.goalEvents !== undefined) changes.goalEventsCount = config.goalEvents.length
+  if (parsed.data.regenerateKey) changes.keyRotated = true
+
+  await audit({
+    actor: { id: session.user.id, email: session.user.email ?? '' },
+    action: 'project.analytics.config.update',
+    target: { type: 'project', id: project.id },
+    organizationId: org.organizationId,
+    details: changes,
+    request,
+  })
 
   return NextResponse.json({ config: serializeConfig(config) })
 }
