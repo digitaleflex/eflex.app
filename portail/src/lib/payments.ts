@@ -488,7 +488,8 @@ export function verifyFedapaySignature(
   const timestamp = Number(parts.get('t'))
   const signature = parts.get('s')
   if (!Number.isFinite(timestamp) || !signature) return false
-  if (Math.floor(Date.now() / 1000) - timestamp > toleranceSeconds) return false
+  // Fenêtre dans les deux sens : un horodatage futur ne doit pas rendre une signature rejouable.
+  if (Math.abs(Math.floor(Date.now() / 1000) - timestamp) > toleranceSeconds) return false
   const expected = createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex')
   const provided = Buffer.from(signature)
   const wanted = Buffer.from(expected)

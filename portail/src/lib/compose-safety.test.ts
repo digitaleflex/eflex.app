@@ -141,3 +141,67 @@ describe('inspectCompose', () => {
     expect(result.error).toContain('aucun service')
   })
 })
+
+describe('inspectCompose : contournements bloqués (audit de sécurité 2026-11)', () => {
+  const refused = (yaml: string, hosts?: string[]) => {
+    const result = inspectCompose(yaml, hosts)
+    expect(result.ok).toBe(false)
+    return result.ok ? '' : result.error
+  }
+
+  it('refuse un volume dont le pilote monte la racine de l’hôte', () => {
+    const error = refused(`services:
+  web:
+    image: nginx
+    volumes: ['racine:/host']
+volumes:
+  racine:
+    driver: local
+    driver_opts: { type: none, o: bind, device: / }
+`)
+    expect(error).toContain('driver_opts')
+  })
+
+  it.each([
+    ['cap_add', 'cap_add: [SYS_ADMIN]'],
+    ['devices', 'devices: ["/dev/sda:/dev/sda"]'],
+    ['security_opt', 'security_opt: ["apparmor:unconfined"]'],
+    ['volumes_from', 'volumes_from: ["autre-conteneur"]'],
+    ['pid', 'pid: host'],
+    ['ipc', 'ipc: "container:base-d-un-autre-client"'],
+    ['userns_mode', 'userns_mode: host'],
+    ['network_mode', 'network_mode: "container:base-d-un-autre-client"'],
+  ])('refuse %s', (key, clause) => {
+    expect(refused(`services:\n  web:\n    image: nginx\n    ${clause}\n`)).toContain(key)
+  })
+
+  it('refuse les volumes et réseaux externes, sauf le réseau du proxy', () => {
+    expect(refused('services:\n  web:\n    image: nginx\nvolumes:\n  data:\n    external: true\n')).toContain('externe')
+    expect(refused('services:\n  web:\n    image: nginx\nvolumes:\n  data:\n    name: volume-d-un-autre-projet\n')).toContain('name')
+    expect(refused('services:\n  web:\n    image: nginx\nnetworks:\n  interne:\n    external: true\n    name: coolify\n')).toContain('coolify')
+    const ok = inspectCompose('services:\n  web:\n    image: nginx\n    networks: [proxy]\nnetworks:\n  proxy:\n    external: true\n')
+    expect(ok.ok).toBe(true)
+  })
+
+  it('refuse include et extends.file, qui chargeraient un fichier non vérifié', () => {
+    expect(refused('include:\n  - autre.yml\nservices:\n  web:\n    image: nginx\n')).toContain('include')
+    expect(refused('services:\n  web:\n    extends:\n      file: autre.yml\n      service: x\n')).toContain('extends')
+  })
+
+  it('borne les routeurs Traefik aux domaines du projet', () => {
+    const compose = (rule: string) => `services:\n  web:\n    image: nginx\n    labels:\n      - "traefik.http.routers.web.rule=${rule}"\n`
+    const hosts = ['boutique.eflex.app', 'boutique.fr']
+    expect(inspectCompose(compose('Host(`boutique.eflex.app`) || Host(`boutique.fr`)'), hosts).ok).toBe(true)
+    expect(refused(compose('Host(`eflex.app`)'), hosts)).toContain('eflex.app')
+    expect(refused(compose('Host(`blog-d-un-autre-client.eflex.app`)'), hosts)).toContain('n’appartient pas')
+    expect(refused(compose('PathPrefix(`/`)'), hosts)).toContain('Host(...)')
+    expect(refused(compose('HostRegexp(`.+`)'), hosts)).toContain('Host(...)')
+  })
+
+  it('refuse les labels Traefik TCP/UDP, les plugins et les labels réservés à Coolify', () => {
+    const compose = (label: string) => `services:\n  web:\n    image: nginx\n    labels:\n      ${label}\n`
+    expect(refused(compose('traefik.tcp.routers.x.rule: "HostSNI(`*`)"'), [])).toContain('TCP/UDP')
+    expect(refused(compose('traefik.http.middlewares.x.plugin.evil.a: "1"'), [])).toContain('plugin')
+    expect(refused(compose('coolify.applicationId: "42"'), [])).toContain('réservé')
+  })
+})
