@@ -1,8 +1,25 @@
 # AGENTS.md
 
+## Source de vérité — E-FLEX App (prioritaire)
+
+Avant toute modification d'architecture ou de produit, lire **[docs/architecture/eflex/README.md](docs/architecture/eflex/README.md)** et les ADR associés.
+
+Le chemin de production actuel est : **portail Next.js → API/Prisma → BullMQ/Redis → worker portail → detector/renderer TypeScript → Coolify**. Le portail ne délègue pas ses déploiements au moteur Axiom Go.
+
+**Décision en vigueur :** [ADR-0012](docs/adr/0012-eflex-production-coolify-axiom-paused.md). Coolify reste l'unique backend de déploiement/runtime utilisé en production par le portail. Les composants Axiom sous `services/engine`, `services/agent` et `services/orchestrator` sont conservés mais gelés : ne pas les étendre, les connecter au portail ou les considérer comme des composants actifs de production sans nouvelle décision ADR explicite.
+
+Les documentations historiques Axiom (`docs/product/*`, `docs/architecture/overview.md`, `docs/architecture/api-contract.md`, `schemas/*`) décrivent le sous-système Axiom, pas le chemin produit E-FLEX actuellement déployé. Les consulter uniquement lorsqu'un travail Axiom a été explicitement réouvert.
+
+Pour le travail produit courant :
+- sauvegardes et restauration : [Layer 11](docs/architecture/eflex/layers/11-backup-recovery.md), issue #130 ;
+- Build Plane : [Layer 06](docs/architecture/eflex/layers/06-build-plane.md) ;
+- monitoring : [Layer 12](docs/architecture/eflex/layers/12-observability.md) ;
+- agence et clients : [Layer 02](docs/architecture/eflex/layers/02-tenant-organization.md) et [Layer 13](docs/architecture/eflex/layers/13-operations-business.md) ;
+- ordre de réalisation : [Roadmap E-FLEX](docs/architecture/eflex/19-roadmap.md).
+
 ## Repo map
 
-Ce dépôt fusionne `digitaleflex/eflex.app` (produit EFLEX, TypeScript) et `digitaleflex/axiom` (moteur Go). Cible : console EFLEX → API du moteur Axiom → agent sur les VPS. Voir `README.md` (« Feuille de route de l'unification »).
+Ce dépôt conserve deux sous-systèmes historiques : le produit E-FLEX (TypeScript) et Axiom (Go). Le produit en production utilise le portail et Coolify ; Axiom est gelé selon ADR-0012. Voir le référentiel courant dans `docs/architecture/eflex/`.
 
 - `services/engine` — moteur Go (API, analyse, plan, build, exécution, GitHub, secrets, auth, migrations SQL). `cd services/engine && go test ./...` ; les tests d'intégration exigent `AXIOM_TEST_DATABASE_URL`.
 - `services/agent`, `services/orchestrator` — modules Go séparés (chacun son `go.mod`).
