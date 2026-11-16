@@ -37,21 +37,31 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const since = new Date()
   since.setUTCHours(0, 0, 0, 0)
   since.setUTCDate(since.getUTCDate() - (days - 1))
+  const previousSince = new Date(since)
+  previousSince.setUTCDate(previousSince.getUTCDate() - days)
 
-  const [stats, eventStats, config] = await Promise.all([
+  const [stats, prevStats, eventStats, prevEventStats, config] = await Promise.all([
     prisma.trafficDailyStat.findMany({
       where: { projectId, date: { gte: since } },
       orderBy: [{ date: 'asc' }, { views: 'desc' }],
       select: { date: true, path: true, views: true },
+    }),
+    prisma.trafficDailyStat.findMany({
+      where: { projectId, date: { gte: previousSince, lt: since } },
+      select: { date: true, views: true },
     }),
     prisma.analyticsEventDaily.findMany({
       where: { projectId, date: { gte: since } },
       orderBy: [{ date: 'asc' }, { count: 'desc' }],
       select: { date: true, name: true, count: true },
     }),
+    prisma.analyticsEventDaily.findMany({
+      where: { projectId, date: { gte: previousSince, lt: since } },
+      select: { count: true },
+    }),
     prisma.projectAnalytics.findUnique({
       where: { projectId },
-      select: { goalEvents: true },
+      select: { goalEvents: true, lastReceivedAt: true, enabled: true },
     }),
   ])
 
@@ -84,7 +94,36 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     .slice(0, 50)
     .map(([name, count]) => ({ name, count, goal: goalSet.has(name) }))
 
-  return NextResponse.json({ rangeDays: days, total, days: daysSeries, paths, events, goalEvents: config?.goalEvents ?? [] })
+  let previousTotal = 0
+  const prevDays = new Set<string>()
+  for (const row of prevStats) {
+    previousTotal += row.views
+    prevDays.add(row.date.toISOString().slice(0, 10))
+  }
+  let previousEvents = 0
+  for (const row of prevEventStats) previousEvents += row.count
+
+  const changePct =
+    previousTotal > 0 ? Math.round(((total - previousTotal) / previousTotal) * 100) : total > 0 ? 100 : 0
+
+  return NextResponse.json({
+    rangeDays: days,
+    total,
+    days: daysSeries,
+    paths,
+    events,
+    goalEvents: config?.goalEvents ?? [],
+    comparison: {
+      previousTotal,
+      previousActiveDays: prevDays.size,
+      changePct,
+      previousEvents,
+    },
+    installation: {
+      enabled: config?.enabled ?? false,
+      lastReceivedAt: config?.lastReceivedAt ? config.lastReceivedAt.toISOString() : null,
+    },
+  })
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {

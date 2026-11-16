@@ -629,23 +629,27 @@ model NotificationPreference {
 // pas de profilage nominatif ; agrégation quotidienne par chemin. La rétention
 // est configurable (nettoyage/purge à brancher dans #112).
 model ProjectAnalytics {
-  id            String   @id @default(cuid())
-  projectId     String   @unique
-  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id             String    @id @default(cuid())
+  projectId      String    @unique
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   /// Mesure désactivée par défaut : ne collecte rien tant qu'elle n'est pas activée explicitement.
-  enabled       Boolean  @default(false)
+  enabled        Boolean   @default(false)
   /// Clé publique d'écriture embarquée dans le snippet (identifie le projet). Montrée uniquement aux gestionnaires.
-  publicKey     String   @unique
+  publicKey      String    @unique
   /// Respect du signal « Do Not Track » / Global Privacy Control (GPC) : si actif, ces visites sont ignorées.
-  respectDnt    Boolean  @default(true)
+  respectDnt     Boolean   @default(true)
   /// Collecte du chemin de page (agrégé par jour). Désactivable pour ne garder qu'un volume global.
-  collectPath   Boolean  @default(true)
+  collectPath    Boolean   @default(true)
   /// Durée de conservation cible des statistiques quotidiennes (jours). Borne appliquée côté API.
-  retentionDays Int      @default(90)
+  retentionDays  Int       @default(90)
   /// Noms d'événements considérés comme objectifs de conversion (#111). Liste bornée, sans propriétés ni données nominatives.
-  goalEvents    String[] @default([])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  goalEvents     String[]  @default([])
+  /// Dernière mesure réellement reçue et comptabilisée (page vue ou événement). Sert à vérifier l'installation.
+  lastReceivedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  alerts         AnalyticsAlert[]
 
   @@index([projectId])
 }
@@ -681,6 +685,32 @@ model AnalyticsEventDaily {
 
   @@unique([projectId, date, name])
   @@index([projectId, date])
+}
+
+/// Alerte de trafic configurée sur les statistiques agrégées (#113). Seuils explicites,
+/// évaluation planifiée sur des données réelles (pas de détection sur le chemin d'ingestion).
+model AnalyticsAlert {
+  id            String           @id @default(cuid())
+  analyticsId   String
+  analytics     ProjectAnalytics @relation(fields: [analyticsId], references: [id], onDelete: Cascade)
+  /// Type d'alerte : hausse ou baisse de trafic.
+  type          String
+  /// Seuil de variation relative en pourcentage (ex. 50 = +50% ou -50%).
+  thresholdPct  Int
+  /// Volume minimal de référence (fenêtre précédente) pour éviter les faux positifs.
+  minBaseline   Int              @default(20)
+  /// Taille de la fenêtre évaluée en jours (comparée à la fenêtre précédente de même taille).
+  windowDays    Int              @default(1)
+  enabled       Boolean          @default(true)
+  /// Délai minimal entre deux déclenchements (heures) pour éviter le spam.
+  cooldownHours Int              @default(24)
+  lastTriggeredAt DateTime?
+  lastEvaluatedAt DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([analyticsId, type])
+  @@index([analyticsId, enabled])
 }
 
 // ─── Support (tickets) ───────────────────────────────────────────────────────

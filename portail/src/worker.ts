@@ -25,6 +25,7 @@ import { fetchRepositoryFile } from '@/lib/repo-file'
 import { isTerminal, planStep, TERMINAL_STATUSES, type DeploymentStatus } from '@/lib/deployment-state'
 import { expireStaleDeployments, WATCHDOG_INTERVAL_MS } from '@/lib/deployment-watchdog'
 import { startBillingMaintenance } from '@/lib/billing-renewal'
+import { startAnalyticsAlertsMaintenance } from '@/lib/analytics-alerts'
 import { DEPLOYMENT_QUEUE, redisConnection } from '@/lib/queue'
 import { COOLIFY_FAILED, COOLIFY_LIVE } from '@/lib/coolify-status'
 import { announceDeploymentStatus } from '@/lib/deployment-events'
@@ -825,6 +826,7 @@ export function startDeploymentWorker(): Worker {
   // les 6 h. Aucun paiement n'est déclenché, seules les échéances sont
   // constatées. Voir `docs/operations/billing.md`.
   startBillingMaintenance()
+  startAnalyticsAlertsMaintenance()
 
   worker.on('completed', (job) => {
     console.info(`[eflex/worker] déploiement ${job.id} traité`)

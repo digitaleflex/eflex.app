@@ -30,6 +30,7 @@ function serializeConfig(config: {
   collectPath: boolean
   retentionDays: number
   goalEvents: string[]
+  lastReceivedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }) {
@@ -41,6 +42,7 @@ function serializeConfig(config: {
     collectPath: config.collectPath,
     retentionDays: config.retentionDays,
     goalEvents: config.goalEvents ?? [],
+    lastReceivedAt: config.lastReceivedAt ? config.lastReceivedAt.toISOString() : null,
     snippet: buildAnalyticsSnippet(config.publicKey, url),
     snippetConsent: buildAnalyticsSnippet(config.publicKey, url, { requireConsent: true }),
     eventSnippet: buildAnalyticsEventSnippet(config.publicKey, url),
@@ -73,6 +75,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         collectPath: true,
         retentionDays: ANALYTICS_RETENTION_DEFAULT_DAYS,
         goalEvents: [],
+        lastReceivedAt: null,
         snippet: null,
         snippetConsent: null,
         eventSnippet: null,

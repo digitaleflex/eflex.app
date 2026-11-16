@@ -64,7 +64,7 @@ export async function POST(request: Request) {
 
   const config = await prisma.projectAnalytics.findUnique({
     where: { publicKey },
-    select: { projectId: true, enabled: true, respectDnt: true, collectPath: true },
+    select: { id: true, projectId: true, enabled: true, respectDnt: true, collectPath: true, lastReceivedAt: true },
   })
 
   // Réponse muette pour ne pas révéler l'existence ou l'état d'une clé.
@@ -74,7 +74,15 @@ export async function POST(request: Request) {
     return noContent(204)
   }
 
+  // Quota journalier par clé/projet (#111/#113) : évite qu'un seul site ne sature le stockage.
+  const dayKey = `analytics-day:${publicKey}:${utcDay().toISOString().slice(0, 10)}`
+  const dailyLimit = await check(dayKey, 50_000, 86_400_000, { action: 'analytics-collect-day', scope: 'key' })
+  if (!dailyLimit.allowed) {
+    return noContent(204)
+  }
+
   const date = utcDay()
+  let counted = false
 
   try {
     if (t === 'event') {
@@ -87,6 +95,7 @@ export async function POST(request: Request) {
         create: { projectId: config.projectId, date, name, count: 1 },
         update: { count: { increment: 1 } },
       })
+      counted = true
     } else {
       const path = config.collectPath ? normalizeAnalyticsPath(p) : '/'
       await prisma.trafficDailyStat.upsert({
@@ -94,10 +103,22 @@ export async function POST(request: Request) {
         create: { projectId: config.projectId, date, path, views: 1 },
         update: { views: { increment: 1 } },
       })
+      counted = true
     }
   } catch {
     // Ne jamais exposer d'erreur interne sur un endpoint public de collecte.
     return noContent(204)
+  }
+
+  // Vérification d'installation (#109) : horodatage de la dernière mesure reçue, limité
+  // à une écriture toutes les 5 minutes pour ne pas charger le chemin d'ingestion.
+  if (counted) {
+    const now = Date.now()
+    if (!config.lastReceivedAt || now - config.lastReceivedAt.getTime() > 5 * 60_000) {
+      prisma.projectAnalytics
+        .update({ where: { id: config.id }, data: { lastReceivedAt: new Date(now) } })
+        .catch(() => {})
+    }
   }
 
   return noContent(204)
