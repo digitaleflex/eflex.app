@@ -226,21 +226,11 @@ run('fan-out des déploiements par application (D2, lot C)', () => {
     }
   })
 
-  it('compte les applications (pas les projets) dans le quota', async () => {
+  it('compte les applications sans bloquer quand le plan est illimité', async () => {
     const { assertProjectQuota } = await import('@/lib/billing')
     const { organization } = await createFixture(4)
 
-    const refused = await assertProjectQuota(organization.id, 2)
-    expect('error' in refused).toBe(true)
-    if ('error' in refused) {
-      expect(refused.required).toBe(2)
-      expect(refused.limit).toBe(5)
-      expect(refused.used).toBe(4)
-      expect(refused.error).toContain('2 applications')
-      expect(refused.error).toContain('5')
-    }
-
-    // Une seule application supplémentaire tient encore dans le plan gratuit.
-    expect((await assertProjectQuota(organization.id, 1)).ok).toBe(true)
+    expect(await assertProjectQuota(organization.id, 2)).toEqual({ ok: true })
+    expect(await assertProjectQuota(organization.id, 1)).toEqual({ ok: true })
   })
 })

@@ -238,16 +238,15 @@ run('POST /api/projects/[id]/transfer', () => {
     ).toBe(source.id)
   })
 
-  it('refuse quand le quota de projets de la cible est atteint (403 plan_limit)', async () => {
+  it('autorise le transfert même avec beaucoup d’applications dans la cible quand le quota est illimité', async () => {
     asUser(quotaOwner, quotaSource.id)
     const response = await transfer(quotaProject.id, { organizationId: quotaTarget.id })
-    expect(response.status).toBe(403)
+    expect(response.status).toBe(200)
     const body = await response.json()
-    expect(body.code).toBe('plan_limit')
-    expect(body.error).toContain('Découverte')
+    expect(body.to).toMatchObject({ id: quotaTarget.id })
     expect(
       (await prisma.project.findUniqueOrThrow({ where: { id: quotaProject.id } })).organizationId,
-    ).toBe(quotaSource.id)
+    ).toBe(quotaTarget.id)
   })
 
   it('transfère pour un propriétaire de la source et administrateur de la cible', async () => {
