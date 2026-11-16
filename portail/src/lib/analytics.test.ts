@@ -12,9 +12,11 @@ import {
   generateAnalyticsPublicKey,
   hasDoNotTrackSignal,
   isAnalyticsPublicKey,
+  normalizeAnalyticsCountry,
   normalizeAnalyticsEventName,
   normalizeAnalyticsPath,
   normalizeAnalyticsReferrer,
+  normalizeAnalyticsUtmValue,
   normalizeGoalEvents,
   parseAnalyticsUserAgent,
   utcDay,
@@ -135,6 +137,18 @@ describe('collectPayloadSchema', () => {
     if (parsed.success) expect(parsed.data.r).toContain('google')
   })
 
+  it('accepte des paramètres UTM sur une page vue', () => {
+    const parsed = collectPayloadSchema.safeParse({
+      k: 'efx_pub_abcdefghijklmnopqrstuvwxyz',
+      p: '/landing',
+      us: 'google',
+      um: 'cpc',
+      uc: 'spring_sale',
+    })
+    expect(parsed.success).toBe(true)
+    if (parsed.success) expect(parsed.data.us).toBe('google')
+  })
+
   it('accepte un événement nommé sans propriété', () => {
     const parsed = collectPayloadSchema.safeParse({ k: 'efx_pub_abcdefghijklmnopqrstuvwxyz', t: 'event', n: 'signup' })
     expect(parsed.success).toBe(true)
@@ -168,9 +182,11 @@ describe('analyticsConfigUpdateSchema', () => {
     expect(analyticsConfigUpdateSchema.safeParse({ retentionDays: 9999 }).success).toBe(false)
   })
 
-  it('accepte les réglages de collecte référent et appareil', () => {
+  it('accepte les réglages de collecte référent, appareil, pays et UTM', () => {
     expect(analyticsConfigUpdateSchema.safeParse({ collectReferrer: false }).success).toBe(true)
     expect(analyticsConfigUpdateSchema.safeParse({ collectDevice: true }).success).toBe(true)
+    expect(analyticsConfigUpdateSchema.safeParse({ collectCountry: false }).success).toBe(true)
+    expect(analyticsConfigUpdateSchema.safeParse({ collectUtm: false }).success).toBe(true)
   })
 
   it('accepte des objectifs de conversion bornés et validés', () => {
@@ -182,13 +198,14 @@ describe('analyticsConfigUpdateSchema', () => {
 })
 
 describe('buildAnalyticsSnippet', () => {
-  it('inclut la clé, le point de collecte, le référent et un envoi non bloquant', () => {
+  it('inclut la clé, le point de collecte, le référent, les UTM et un envoi non bloquant', () => {
     const snippet = buildAnalyticsSnippet('efx_pub_testkey123456789012', 'https://eflex.app/api/collect')
     expect(snippet).toContain('<script')
     expect(snippet).toContain('data-eflex-analytics')
     expect(snippet).toContain('efx_pub_testkey123456789012')
     expect(snippet).toContain('https://eflex.app/api/collect')
     expect(snippet).toContain('document.referrer')
+    expect(snippet).toContain('utm_source')
     expect(snippet).toContain('sendBeacon')
     expect(snippet).toContain('keepalive')
     expect(snippet).toContain('pageview')
@@ -318,5 +335,33 @@ describe('parseAnalyticsUserAgent', () => {
     expect(['desktop', 'mobile', 'tablet', 'other']).toContain(r.device)
     expect(typeof r.browser).toBe('string')
     expect(typeof r.os).toBe('string')
+  })
+})
+
+describe('normalizeAnalyticsCountry', () => {
+  it('normalise un code ISO en majuscules', () => {
+    expect(normalizeAnalyticsCountry('fr')).toBe('FR')
+    expect(normalizeAnalyticsCountry('US')).toBe('US')
+  })
+
+  it('retombe sur Inconnu si invalide ou absent', () => {
+    expect(normalizeAnalyticsCountry('')).toBe('Inconnu')
+    expect(normalizeAnalyticsCountry('fra')).toBe('Inconnu')
+    expect(normalizeAnalyticsCountry(null)).toBe('Inconnu')
+    expect(normalizeAnalyticsCountry(undefined)).toBe('Inconnu')
+  })
+})
+
+describe('normalizeAnalyticsUtmValue', () => {
+  it('normalise et borne une valeur UTM', () => {
+    expect(normalizeAnalyticsUtmValue('  Google Ads ')).toBe('google-ads')
+    expect(normalizeAnalyticsUtmValue('cpc')).toBe('cpc')
+  })
+
+  it('retourne null si vide ou invalide', () => {
+    expect(normalizeAnalyticsUtmValue('')).toBeNull()
+    expect(normalizeAnalyticsUtmValue('   ')).toBeNull()
+    expect(normalizeAnalyticsUtmValue('***')).toBeNull()
+    expect(normalizeAnalyticsUtmValue(undefined)).toBeNull()
   })
 })

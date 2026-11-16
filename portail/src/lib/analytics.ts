@@ -36,10 +36,11 @@ export const ANALYTICS_GOAL_EVENTS_MAX = 20
 /** Plafond explicite du nombre de noms d’événements distincts stockés par projet (toutes périodes). */
 export const ANALYTICS_DISTINCT_EVENT_NAMES_MAX = 200
 
-export const ANALYTICS_DIMENSIONS = ['referrer', 'device', 'browser', 'os'] as const
+export const ANALYTICS_DIMENSIONS = ['referrer', 'device', 'browser', 'os', 'country'] as const
 export type AnalyticsDimension = (typeof ANALYTICS_DIMENSIONS)[number]
 
 const REFERRER_DIRECT = 'direct'
+const COUNTRY_UNKNOWN = 'Inconnu'
 
 export function normalizeAnalyticsReferrer(input: unknown): string {
   if (typeof input !== 'string') return REFERRER_DIRECT
@@ -87,6 +88,87 @@ export function parseAnalyticsUserAgent(ua: string): AnalyticsUaInfo {
   else if (/safari/i.test(s)) browser = 'Safari'
 
   return { device, browser, os }
+}
+
+export function normalizeAnalyticsCountry(code: string | null | undefined): string {
+  if (typeof code !== 'string') return COUNTRY_UNKNOWN
+  const value = code.trim().toUpperCase()
+  if (!/^[A-Z]{2}$/.test(value)) return COUNTRY_UNKNOWN
+  return value
+}
+
+const UTM_VALUE_MAX = 100
+
+export function normalizeAnalyticsUtmValue(input: unknown): string | null {
+  if (typeof input !== 'string') return null
+  let value = input.trim().toLowerCase()
+  if (!value) return null
+  value = value.replace(/\s+/g, '-').replace(/[^a-z0-9._:-]/g, '')
+  if (!value) return null
+  if (value.length > UTM_VALUE_MAX) value = value.slice(0, UTM_VALUE_MAX)
+  return value
+}
+
+type GeoipReader = { get(ip: string): { country?: { iso_code?: string } } | null }
+
+let geoipReaderPromise: Promise<GeoipReader | null> | null = null
+let geoipReaderFailedAt = 0
+const GEOIP_RETRY_MS = 60_000
+
+export function analyticsGeoipPath(): string | null {
+  const path = process.env.GEOIP_DB_PATH?.trim()
+  return path ? path : null
+}
+
+async function openAnalyticsGeoipReader(): Promise<GeoipReader | null> {
+  const path = analyticsGeoipPath()
+  if (!path) return null
+  try {
+    const mod = (await import('maxmind')) as typeof import('maxmind') & { default?: { open?: typeof import('maxmind').open } }
+    const open = mod.open ?? mod.default?.open
+    if (!open) return null
+    const reader = (await open(path)) as unknown as GeoipReader
+    return reader
+  } catch {
+    return null
+  }
+}
+
+async function getAnalyticsGeoipReader(): Promise<GeoipReader | null> {
+  const now = Date.now()
+  if (geoipReaderPromise) {
+    const reader = await geoipReaderPromise
+    if (reader) return reader
+    if (now - geoipReaderFailedAt < GEOIP_RETRY_MS) return null
+    geoipReaderPromise = null
+  }
+  geoipReaderPromise = openAnalyticsGeoipReader()
+  const reader = await geoipReaderPromise
+  if (!reader) {
+    geoipReaderFailedAt = Date.now()
+  }
+  return reader
+}
+
+export async function isAnalyticsCountryAvailable(): Promise<boolean> {
+  return (await getAnalyticsGeoipReader()) !== null
+}
+
+export async function resolveAnalyticsCountry(ip: string): Promise<string | null> {
+  try {
+    const reader = await getAnalyticsGeoipReader()
+    if (!reader) return null
+    const result = reader.get(ip)
+    return normalizeAnalyticsCountry(result?.country?.iso_code ?? null)
+  } catch {
+    return null
+  }
+}
+
+/** Réinitialise le cache du lecteur GeoIP (tests uniquement). */
+export function __resetAnalyticsGeoipForTests(): void {
+  geoipReaderPromise = null
+  geoipReaderFailedAt = 0
 }
 
 export function generateAnalyticsPublicKey(): string {
@@ -203,6 +285,8 @@ export const analyticsConfigUpdateSchema = z
     collectPath: z.boolean().optional(),
     collectReferrer: z.boolean().optional(),
     collectDevice: z.boolean().optional(),
+    collectCountry: z.boolean().optional(),
+    collectUtm: z.boolean().optional(),
     retentionDays: z
       .number()
       .int()
@@ -223,6 +307,8 @@ export const analyticsConfigUpdateSchema = z
       value.collectPath !== undefined ||
       value.collectReferrer !== undefined ||
       value.collectDevice !== undefined ||
+      value.collectCountry !== undefined ||
+      value.collectUtm !== undefined ||
       value.retentionDays !== undefined ||
       value.regenerateKey === true ||
       value.goalEvents !== undefined,
@@ -243,6 +329,12 @@ export const collectPayloadSchema = z
     n: z.string().max(ANALYTICS_EVENT_NAME_MAX).optional(),
     /** Référent de la page vue (URL ou vide). Ignoré côté serveur pour les événements. */
     r: z.string().max(2048).optional(),
+    /** Paramètres UTM de campagne (page vue). */
+    us: z.string().max(200).optional(),
+    um: z.string().max(200).optional(),
+    uc: z.string().max(200).optional(),
+    ut: z.string().max(200).optional(),
+    uo: z.string().max(200).optional(),
   })
   .superRefine((value, ctx) => {
     if (value.t === 'event' && normalizeAnalyticsEventName(value.n) === null) {
@@ -289,7 +381,8 @@ export function buildAnalyticsSnippet(
   const safeUrl = JSON.stringify(collectUrl)
   const send =
     `var r="";try{r=document.referrer||""}catch(_){};` +
-    `var d={k:${safeKey},p:location.pathname,t:"pageview",r:r};` +
+    `var us="",um="",uc="",ut="",uo="";try{var q=new URLSearchParams(location.search);us=q.get("utm_source")||"";um=q.get("utm_medium")||"";uc=q.get("utm_campaign")||"";ut=q.get("utm_term")||"";uo=q.get("utm_content")||""}catch(_){};` +
+    `var d={k:${safeKey},p:location.pathname,t:"pageview",r:r,us:us,um:um,uc:uc,ut:ut,uo:uo};` +
     `var b=JSON.stringify(d);` +
     `(navigator.sendBeacon&&navigator.sendBeacon(${safeUrl},new Blob([b],{type:"application/json"})))||` +
     `fetch(${safeUrl},{method:"POST",headers:{"content-type":"application/json"},body:b,keepalive:true,mode:"cors"})`

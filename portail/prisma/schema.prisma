@@ -652,6 +652,10 @@ model ProjectAnalytics {
   collectReferrer Boolean  @default(true)
   /// Collecte agrégée appareil/navigateur/OS (dérivés du User-Agent) sur les pages vues.
   collectDevice   Boolean  @default(true)
+  /// Collecte agrégée du pays (GeoIP locale, IP jamais stockée). Ignorée si la base GeoIP est indisponible.
+  collectCountry  Boolean  @default(true)
+  /// Collecte agrégée des paramètres de campagne UTM (source, medium, campaign) sur les pages vues.
+  collectUtm      Boolean  @default(true)
   /// Durée de conservation cible des statistiques quotidiennes (jours). Borne appliquée côté API.
   retentionDays  Int       @default(90)
   /// Noms d'événements considérés comme objectifs de conversion (#111). Liste bornée, sans propriétés ni données nominatives.
