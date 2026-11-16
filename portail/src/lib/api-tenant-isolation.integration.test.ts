@@ -83,6 +83,7 @@ const ROUTE_MANIFEST: Record<string, RouteClass> = {
   '/projects/analyze': 'org', // action authentifiée, limitée au locataire actif (quota/rate-limit org) — #22
   '/projects/[id]': 'org-project',
   '/projects/[id]/analytics': 'org-project',
+  '/projects/[id]/analytics/alerts': 'org-project',
   '/projects/[id]/analytics/export': 'org-project',
   '/projects/[id]/analytics/stats': 'org-project',
   '/projects/[id]/apps': 'org-project',
