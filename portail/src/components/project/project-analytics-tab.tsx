@@ -5,6 +5,7 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   BarChart3,
+  Bell,
   Download,
   ExternalLink,
   Flag,
@@ -46,6 +47,41 @@ type AnalyticsConfig = {
 
 type EventStat = { name: string; count: number; goal: boolean }
 type DimensionStat = { value: string; views: number; visitors: number }
+
+type AlertType = 'traffic_spike' | 'traffic_drop'
+type AlertConfig = {
+  type: AlertType
+  enabled: boolean
+  thresholdPct: number
+  minBaseline: number
+  windowDays: number
+  cooldownHours: number
+  lastTriggeredAt?: string | null
+  lastEvaluatedAt?: string | null
+}
+
+const ALERT_DEFAULTS: Record<AlertType, Omit<AlertConfig, 'type'>> = {
+  traffic_spike: { enabled: false, thresholdPct: 100, minBaseline: 20, windowDays: 1, cooldownHours: 24 },
+  traffic_drop: { enabled: false, thresholdPct: 50, minBaseline: 20, windowDays: 1, cooldownHours: 24 },
+}
+
+function normalizeAlerts(items: unknown): AlertConfig[] {
+  const list = Array.isArray(items) ? (items as Partial<AlertConfig>[]) : []
+  return (['traffic_spike', 'traffic_drop'] as AlertType[]).map((type) => {
+    const found = list.find((a) => a?.type === type)
+    const d = ALERT_DEFAULTS[type]
+    return {
+      type,
+      enabled: found?.enabled ?? d.enabled,
+      thresholdPct: typeof found?.thresholdPct === 'number' ? found.thresholdPct : d.thresholdPct,
+      minBaseline: typeof found?.minBaseline === 'number' ? found.minBaseline : d.minBaseline,
+      windowDays: typeof found?.windowDays === 'number' ? found.windowDays : d.windowDays,
+      cooldownHours: typeof found?.cooldownHours === 'number' ? found.cooldownHours : d.cooldownHours,
+      lastTriggeredAt: (found?.lastTriggeredAt as string | null | undefined) ?? null,
+      lastEvaluatedAt: (found?.lastEvaluatedAt as string | null | undefined) ?? null,
+    }
+  })
+}
 
 type StatsPayload = {
   rangeDays: number
@@ -116,6 +152,9 @@ function Trend({ value }: { value: number }) {
 export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: string; canManage: boolean }) {
   const [config, setConfig] = useState<AnalyticsConfig | null>(null)
   const [stats, setStats] = useState<StatsPayload | null>(null)
+  const [alerts, setAlerts] = useState<AlertConfig[]>(normalizeAlerts([]))
+  const [alertsDirty, setAlertsDirty] = useState(false)
+  const [savingAlerts, setSavingAlerts] = useState(false)
   const [days, setDays] = useState<number>(30)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -138,12 +177,14 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
       else setLoading(true)
       setError('')
       try {
-        const [configRes, statsRes] = await Promise.all([
+        const [configRes, statsRes, alertsRes] = await Promise.all([
           fetch(`/api/projects/${projectId}/analytics`, { cache: 'no-store' }),
           fetch(`/api/projects/${projectId}/analytics/stats?days=${days}`, { cache: 'no-store' }),
+          fetch(`/api/projects/${projectId}/analytics/alerts`, { cache: 'no-store' }),
         ])
         const configData = await configRes.json().catch(() => ({}))
         const statsData = await statsRes.json().catch(() => ({}))
+        const alertsData = await alertsRes.json().catch(() => ({}))
         if (!configRes.ok) throw new Error(configData.error ?? 'Impossible de charger la configuration analytique.')
         if (!statsRes.ok) throw new Error(statsData.error ?? 'Impossible de charger les statistiques.')
         const nextConfig = (configData.config ?? null) as AnalyticsConfig | null
@@ -151,6 +192,10 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
         setConfig(nextConfig)
         setStats(nextStats)
         setGoalDraft(nextConfig?.goalEvents ?? nextStats.goalEvents ?? [])
+        if (alertsRes.ok) {
+          setAlerts(normalizeAlerts(alertsData.alerts))
+          setAlertsDirty(false)
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Impossible de contacter le serveur.')
       } finally {
@@ -207,6 +252,27 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
       await load({ silent: true })
     } catch (e) { setError(e instanceof Error ? e.message : 'Impossible d’enregistrer les objectifs.') }
     finally { setSavingGoals(false) }
+  }
+
+  const updateAlert = (type: AlertType, patch: Partial<AlertConfig>) => {
+    setAlerts((prev) => prev.map((a) => (a.type === type ? { ...a, ...patch } : a)))
+    setAlertsDirty(true)
+  }
+
+  const saveAlerts = async () => {
+    if (!canManage) return
+    setSavingAlerts(true); setError(''); setNotice('')
+    try {
+      const res = await fetch(`/api/projects/${projectId}/analytics/alerts`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alerts }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? 'Impossible d’enregistrer les alertes.')
+      setAlerts(normalizeAlerts(data.alerts))
+      setAlertsDirty(false)
+      setNotice('Alertes de trafic mises à jour.')
+    } catch (e) { setError(e instanceof Error ? e.message : 'Impossible d’enregistrer les alertes.') }
+    finally { setSavingAlerts(false) }
   }
 
   const deleteStats = async () => {
@@ -588,6 +654,108 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
                 <p className="flex items-start gap-2 text-xs text-muted-foreground"><ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /><span>Point de collecte : <span className="font-mono">{config?.collectUrl}</span>. Agrégation côté serveur uniquement (pages vues et noms d’événements). Quota journalier par projet appliqué pour limiter les abus.</span></p>
                 <p className="text-xs text-muted-foreground">Référence : <a href="https://github.com/digitaleflex/eflex/blob/main/docs/operations/analytics.md" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-primary hover:underline">documentation de la mesure d’audience<ExternalLink className="h-3 w-3" aria-hidden="true" /><span className="sr-only"> (nouvel onglet)</span></a>.</p>
               </div>
+            </div>
+          )}
+
+          {canManage && (
+            <div className="rounded-lg border border-border bg-card p-4">
+              <div className="flex items-start gap-3">
+                <Bell className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-semibold">Alertes de trafic</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Notification optionnelle des propriétaires/administrateurs en cas de variation significative des pages vues, comparée à la période précédente (données agrégées réelles). Évaluation périodique (environ toutes les heures), avec délai de refroidissement pour éviter les répétitions.
+                  </p>
+                </div>
+              </div>
+              {!configured ? (
+                <p className="mt-4 text-sm text-muted-foreground">Activez d’abord la mesure d’audience pour configurer des alertes.</p>
+              ) : (
+                <div className="mt-4 space-y-4">
+                  {alerts.map((alert) => {
+                    const isDrop = alert.type === 'traffic_drop'
+                    const title = isDrop ? 'Chute de trafic' : 'Pic de trafic'
+                    const idBase = `alert-${alert.type}-${projectId}`
+                    return (
+                      <div key={alert.type} className="rounded-lg border border-border bg-muted/20 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">{title}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {isDrop ? 'Déclenchée si les pages vues baissent d’au moins le seuil sur la fenêtre.' : 'Déclenchée si les pages vues augmentent d’au moins le seuil sur la fenêtre.'}
+                              {alert.lastTriggeredAt ? <> Dernier déclenchement : <span className="text-foreground">{formatDateTime(alert.lastTriggeredAt)}</span>.</> : null}
+                            </p>
+                          </div>
+                          <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={alert.enabled}
+                              onChange={(e) => updateAlert(alert.type, { enabled: e.target.checked })}
+                              className="h-4 w-4 rounded border-input text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            />
+                            Activée
+                          </label>
+                        </div>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground" htmlFor={`${idBase}-threshold`}>
+                            Seuil (%)
+                            <input
+                              id={`${idBase}-threshold`}
+                              type="number"
+                              min={10}
+                              max={1000}
+                              value={alert.thresholdPct}
+                              onChange={(e) => updateAlert(alert.type, { thresholdPct: Number(e.target.value) })}
+                              className="min-h-11 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground" htmlFor={`${idBase}-baseline`}>
+                            Plancher période précédente (vues)
+                            <input
+                              id={`${idBase}-baseline`}
+                              type="number"
+                              min={0}
+                              max={100000}
+                              value={alert.minBaseline}
+                              onChange={(e) => updateAlert(alert.type, { minBaseline: Number(e.target.value) })}
+                              className="min-h-11 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground" htmlFor={`${idBase}-window`}>
+                            Fenêtre (jours)
+                            <input
+                              id={`${idBase}-window`}
+                              type="number"
+                              min={1}
+                              max={30}
+                              value={alert.windowDays}
+                              onChange={(e) => updateAlert(alert.type, { windowDays: Number(e.target.value) })}
+                              className="min-h-11 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground" htmlFor={`${idBase}-cooldown`}>
+                            Délai de refroidissement (h)
+                            <input
+                              id={`${idBase}-cooldown`}
+                              type="number"
+                              min={1}
+                              max={168}
+                              value={alert.cooldownHours}
+                              onChange={(e) => updateAlert(alert.type, { cooldownHours: Number(e.target.value) })}
+                              className="min-h-11 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <div className="flex justify-end">
+                    <Button type="button" size="sm" onClick={() => void saveAlerts()} loading={savingAlerts} disabled={!alertsDirty} disabledReason="Aucune modification à enregistrer">
+                      Enregistrer les alertes
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

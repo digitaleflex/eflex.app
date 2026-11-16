@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { check, checkIp, getClientIp, rateLimitHeaders } from '@/lib/rate-limit'
 import {
+  ANALYTICS_DISTINCT_EVENT_NAMES_MAX,
   analyticsVisitorHash,
   collectPayloadSchema,
   hasDoNotTrackSignal,
@@ -102,6 +103,18 @@ export async function POST(request: Request) {
       // propriété ni chemin, pour préserver la minimisation.
       const name = normalizeAnalyticsEventName(n)
       if (!name) return noContent(204)
+      // Plafond explicite : limite le nombre de noms distincts stockés par projet.
+      const existing = await prisma.analyticsEventDaily.findUnique({
+        where: { projectId_date_name: { projectId: config.projectId, date, name } },
+        select: { id: true },
+      })
+      if (!existing) {
+        const distinct = await prisma.analyticsEventDaily.groupBy({
+          by: ['name'],
+          where: { projectId: config.projectId },
+        })
+        if (distinct.length >= ANALYTICS_DISTINCT_EVENT_NAMES_MAX) return noContent(204)
+      }
       await prisma.analyticsEventDaily.upsert({
         where: { projectId_date_name: { projectId: config.projectId, date, name } },
         create: { projectId: config.projectId, date, name, count: 1 },

@@ -33,6 +33,8 @@ export const ANALYTICS_RETENTION_DEFAULT_DAYS = 90
 export const ANALYTICS_EVENT_NAME_MAX = 64
 export const ANALYTICS_EVENT_NAME_PATTERN = /^[a-z0-9][a-z0-9_.:-]{0,63}$/
 export const ANALYTICS_GOAL_EVENTS_MAX = 20
+/** Plafond explicite du nombre de noms d’événements distincts stockés par projet (toutes périodes). */
+export const ANALYTICS_DISTINCT_EVENT_NAMES_MAX = 200
 
 export const ANALYTICS_DIMENSIONS = ['referrer', 'device', 'browser', 'os'] as const
 export type AnalyticsDimension = (typeof ANALYTICS_DIMENSIONS)[number]
