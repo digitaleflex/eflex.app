@@ -134,43 +134,40 @@ export default async function UsersPage({
         />
       </section>
 
-      <form
-        role="search"
-        method="get"
-        action="/admin/users"
-        className="space-y-4 rounded-xl border border-border bg-card p-4"
-      >
-        <div className="flex items-center gap-2">
-          <SlidersHorizontal className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-          <h2 className="text-sm font-semibold">Rechercher et filtrer</h2>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="sm:col-span-2 xl:col-span-1">
-            <Input
-              id="q"
-              name="q"
-              type="search"
-              label="Nom ou adresse e-mail"
-              defaultValue={query.query}
-              placeholder="ex. awa ou awa@exemple.com"
-              hint="Recherche sans distinction de casse."
-            />
+      <Card>
+        <form role="search" method="get" action="/admin/users" className="space-y-4 p-4">
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <h2 className="text-sm font-semibold">Rechercher et filtrer</h2>
           </div>
-          <Select name="role" label="Rôle plateforme" defaultValue={query.role} options={roleOptions} />
-          <Select name="statut" label="Suspension" defaultValue={query.status} options={statusOptions} />
-          <Select name="email" label="Vérification de l’e-mail" defaultValue={query.verification} options={verificationOptions} />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit">
-            <Search className="h-4 w-4" aria-hidden="true" />
-            Appliquer les filtres
-          </Button>
-          {filtered ? <LinkButton href="/admin/users">Réinitialiser</LinkButton> : null}
-          <p aria-live="polite" className="text-xs text-muted-foreground">
-            {summary}
-          </p>
-        </div>
-      </form>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="sm:col-span-2 xl:col-span-1">
+              <Input
+                id="q"
+                name="q"
+                type="search"
+                label="Nom ou adresse e-mail"
+                defaultValue={query.query}
+                placeholder="ex. awa ou awa@exemple.com"
+                hint="Recherche sans distinction de casse."
+              />
+            </div>
+            <Select name="role" label="Rôle plateforme" defaultValue={query.role} options={roleOptions} />
+            <Select name="statut" label="Suspension" defaultValue={query.status} options={statusOptions} />
+            <Select name="email" label="Vérification de l’e-mail" defaultValue={query.verification} options={verificationOptions} />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="submit">
+              <Search className="h-4 w-4" aria-hidden="true" />
+              Appliquer les filtres
+            </Button>
+            {filtered ? <LinkButton href="/admin/users">Réinitialiser</LinkButton> : null}
+            <p aria-live="polite" className="text-xs text-muted-foreground">
+              {summary}
+            </p>
+          </div>
+        </form>
+      </Card>
 
       <Card>
         {users.length === 0 ? (

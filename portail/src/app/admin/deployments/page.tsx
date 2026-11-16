@@ -1,10 +1,14 @@
 import Link from 'next/link'
-import { ArrowLeft, ListOrdered, X } from 'lucide-react'
+import { History, ListOrdered, Server, TimerReset, X } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/admin'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { EmptyState } from '@/components/ui/empty-state'
+import { StatCard } from '@/components/ui/stat-card'
 import { StatusPill } from '@/components/dashboard/status-pill'
+import { PageHeader } from '@/components/page-header'
+import { LinkButton } from '@/components/link-button'
 import { UnblockDeploymentButton } from '@/components/admin/unblock-deployment-button'
 import { LiveRefresh } from '@/components/live-refresh'
 import { ACTIVE_DEPLOYMENT_STATUSES } from '@/lib/deployment-state'
@@ -12,6 +16,7 @@ import { deploymentTimeoutMs } from '@/lib/deployment-watchdog'
 import { relativeTime } from '@/lib/relative-time'
 import { deploymentsQueue, getDeploymentQueueDiagnosticsBatch } from '@/lib/queue'
 import { normalizeQueueCounts } from '@/lib/infrastructure-health'
+import { formatInteger } from '@/lib/table'
 import {
   deploymentDuration,
   formatDuration,
@@ -91,68 +96,116 @@ export default async function AdminDeploymentsPage({
   }
 
   const stuckCount = active.filter((deployment) => deployment.createdAt.getTime() <= threshold.getTime()).length
+  const queueUnavailable = !queueCounts
 
   return (
     <div className="space-y-6">
       <LiveRefresh types={['deployment.created', 'deployment.status']} />
 
-      <Link href="/admin/projects" className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        Tous les projets
-      </Link>
+      <PageHeader
+        title="Déploiements"
+        description={`File d’attente temps réel et historique récent, toutes organisations. Un déploiement actif depuis plus de ${stuckMinutes} minutes est signalé comme bloqué.`}
+        actions={<LinkButton href="/admin/projects">Tous les projets</LinkButton>}
+      />
 
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Déploiements</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          File d’attente temps réel et historique récent, toutes organisations. Un déploiement actif depuis plus de{' '}
-          {stuckMinutes} minutes est signalé comme bloqué.
-        </p>
-      </div>
+      {projectId ? (
+        <Card className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1">
+              <h2 className="text-sm font-semibold">Contexte du filtre</h2>
+              <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <span>Historique limité au projet</span>
+                <Badge variant="outline">{project?.name ?? 'Projet inconnu'}</Badge>
+              </p>
+            </div>
+            <LinkButton href="/admin/deployments">
+              <X className="h-4 w-4" aria-hidden="true" />
+              Retirer le filtre
+            </LinkButton>
+          </div>
+        </Card>
+      ) : null}
 
-      {projectId && (
-        <p className="flex flex-wrap items-center gap-2 text-sm">
-          <Badge variant="outline">Filtré sur {project?.name ?? 'un projet inconnu'}</Badge>
-          <Link href="/admin/deployments" className="inline-flex min-h-11 items-center gap-1 text-muted-foreground hover:text-foreground">
-            <X className="h-3.5 w-3.5" aria-hidden="true" />
-            Retirer le filtre
-          </Link>
-        </p>
-      )}
+      <section aria-label="Indicateurs des déploiements" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Déploiements actifs"
+          value={formatInteger(active.length)}
+          hint="File d’attente enregistrée en base (100 premiers affichés)."
+          icon={ListOrdered}
+          tone={active.length === 0 ? 'success' : 'warning'}
+        />
+        <StatCard
+          label="Déploiements bloqués"
+          value={formatInteger(stuckCount)}
+          hint={`Actifs depuis plus de ${stuckMinutes} minutes.`}
+          icon={TimerReset}
+          tone={stuckCount > 0 ? 'critical' : 'neutral'}
+        />
+        <StatCard
+          label="Jobs en attente (BullMQ)"
+          value={queueCounts ? formatInteger(queueCounts.waiting) : '—'}
+          hint={queueCounts ? 'Indicateur interne du worker au chargement.' : 'Redis/BullMQ indisponible.'}
+          icon={Server}
+          tone={queueUnavailable ? 'neutral' : queueCounts.waiting > 0 ? 'warning' : 'success'}
+        />
+        <StatCard
+          label="Historique affiché"
+          value={formatInteger(recent.length)}
+          hint={projectId ? '50 derniers déploiements du projet filtré.' : '50 derniers déploiements, toutes organisations.'}
+          icon={History}
+          tone="info"
+        />
+      </section>
 
       <Card>
-        <div className="p-4 pb-2">
+        <div className="space-y-1 p-4 pb-2">
           <h2 className="text-sm font-semibold">État de la file (BullMQ / Redis)</h2>
           <p className="text-xs text-muted-foreground">Indicateurs internes du worker, factuels au moment du chargement.</p>
         </div>
         {queueCounts ? (
-          <div className="space-y-2 p-4 pt-0 text-sm">
-            <p className="text-muted-foreground tabular-nums">
-              En attente {number.format(queueCounts.waiting)} · En cours {number.format(queueCounts.active)} · Différés {number.format(queueCounts.delayed)} · Échoués {number.format(queueCounts.failed)} · Terminés {number.format(queueCounts.completed)} · En pause {number.format(queueCounts.paused)}
-            </p>
-            {(queueCounts.delayed > 0 || queueCounts.failed > 0) && (
+          <div className="space-y-3 p-4 pt-0 text-sm">
+            <dl className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-3">
+              <div><dt className="inline">En attente :</dt> <dd className="inline font-medium tabular-nums text-foreground">{number.format(queueCounts.waiting)}</dd></div>
+              <div><dt className="inline">En cours :</dt> <dd className="inline font-medium tabular-nums text-foreground">{number.format(queueCounts.active)}</dd></div>
+              <div><dt className="inline">Différés :</dt> <dd className="inline font-medium tabular-nums text-foreground">{number.format(queueCounts.delayed)}</dd></div>
+              <div><dt className="inline">Échoués :</dt> <dd className="inline font-medium tabular-nums text-foreground">{number.format(queueCounts.failed)}</dd></div>
+              <div><dt className="inline">Terminés :</dt> <dd className="inline font-medium tabular-nums text-foreground">{number.format(queueCounts.completed)}</dd></div>
+              <div><dt className="inline">En pause :</dt> <dd className="inline font-medium tabular-nums text-foreground">{number.format(queueCounts.paused)}</dd></div>
+            </dl>
+            {(queueCounts.delayed > 0 || queueCounts.failed > 0) ? (
               <p className="text-xs text-muted-foreground">
                 {queueCounts.delayed > 0 ? `${number.format(queueCounts.delayed)} job${queueCounts.delayed > 1 ? 's' : ''} différé${queueCounts.delayed > 1 ? 's' : ''} (nouvelle tentative ou délai programmé). ` : ''}
                 {queueCounts.failed > 0 ? `${number.format(queueCounts.failed)} job${queueCounts.failed > 1 ? 's' : ''} en échec côté BullMQ après tentatives.` : ''}
               </p>
-            )}
+            ) : null}
           </div>
         ) : (
-          <p className="p-4 pt-0 text-sm text-muted-foreground">
-            Indisponible : Redis/BullMQ non configuré ou injoignable. Les statuts ci-dessous restent ceux enregistrés en base.
-          </p>
+          <div className="p-4 pt-0">
+            <p className="text-sm text-muted-foreground">
+              Indisponible : Redis/BullMQ non configuré ou injoignable. Les statuts ci-dessous restent ceux enregistrés en base.
+            </p>
+          </div>
         )}
       </Card>
 
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-2 p-4 pb-2">
-          <h2 className="flex items-center gap-2 text-sm font-semibold">
-            <ListOrdered className="h-4 w-4 text-primary" aria-hidden="true" />
-            File d’attente
-          </h2>
-          <Badge variant={active.length === 0 ? 'success' : 'warning'}>{active.length}</Badge>
+          <div className="space-y-1">
+            <h2 className="flex items-center gap-2 text-sm font-semibold">
+              <ListOrdered className="h-4 w-4 text-primary" aria-hidden="true" />
+              File d’attente
+            </h2>
+            <p className="text-xs text-muted-foreground">Déploiements actifs, du plus ancien au plus récent (100 maximum).</p>
+          </div>
+          <Badge variant={active.length === 0 ? 'success' : 'warning'}>{formatInteger(active.length)}</Badge>
         </div>
         {active.length === 0 ? (
-          <p className="p-4 pt-0 text-sm text-muted-foreground">Aucun déploiement actif : la file est vide.</p>
+          <EmptyState
+            icon={ListOrdered}
+            title="Aucun déploiement actif"
+            description="La file d’attente est vide pour le moment."
+            className="py-8"
+          />
         ) : (
           <ul className="divide-y divide-border">
             {active.map((deployment) => {
@@ -163,17 +216,17 @@ export default async function AdminDeploymentsPage({
                 queue &&
                 (queue.state === 'missing' || queue.state === 'failed' || queue.state === 'delayed' || queue.stalled)
               return (
-                <li key={deployment.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
+                <li key={deployment.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-4">
                   <div className="min-w-0 space-y-1">
                     <p className="flex flex-wrap items-center gap-2 text-sm">
                       <Link href={`/admin/projects/${deployment.projectId}`} className="font-medium hover:underline">
                         {deployment.project.name}
                       </Link>
                       <StatusPill status={deployment.status} />
-                      {stuck && <Badge variant="destructive">Bloqué</Badge>}
-                      {queueLabel && (
+                      {stuck ? <Badge variant="destructive">Bloqué</Badge> : null}
+                      {queueLabel ? (
                         <Badge variant={queueAlert ? 'destructive' : 'outline'}>File : {queueLabel}</Badge>
-                      )}
+                      ) : null}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {deployment.project.organization.name} ·{' '}
@@ -183,9 +236,9 @@ export default async function AdminDeploymentsPage({
                         ? ` · tentative ${queue.attemptsMade}/${queue.attemptsMax}`
                         : ''}
                     </p>
-                    {queue?.failedReason && (
+                    {queue?.failedReason ? (
                       <p className="text-xs text-destructive">Raison BullMQ : {queue.failedReason}</p>
-                    )}
+                    ) : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Link
@@ -208,12 +261,19 @@ export default async function AdminDeploymentsPage({
       </Card>
 
       <Card>
-        <div className="p-4 pb-2">
+        <div className="space-y-1 p-4 pb-2">
           <h2 className="text-sm font-semibold">50 derniers déploiements</h2>
-          <p className="text-xs text-muted-foreground">Toutes issues confondues, du plus récent au plus ancien.</p>
+          <p className="text-xs text-muted-foreground">
+            {projectId ? 'Historique récent du projet filtré, du plus récent au plus ancien.' : 'Toutes issues confondues, du plus récent au plus ancien.'}
+          </p>
         </div>
         {recent.length === 0 ? (
-          <p className="p-4 pt-0 text-sm text-muted-foreground">Aucun déploiement enregistré.</p>
+          <EmptyState
+            icon={History}
+            title="Aucun déploiement enregistré"
+            description={projectId ? 'Ce projet n’a pas encore d’historique de déploiement.' : 'Aucun déploiement n’est encore enregistré.'}
+            className="py-8"
+          />
         ) : (
           <>
             <ul className="divide-y divide-border sm:hidden" aria-label="Derniers déploiements">
