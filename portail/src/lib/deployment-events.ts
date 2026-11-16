@@ -9,6 +9,8 @@ export type AnnounceDeploymentStatusInput = {
   projectName: string
   deploymentId: string
   status: string
+  /** État précédent connu (traçabilité des transitions). */
+  previousStatus?: string | null
   /** Présent pour les déploiements multi-applications partageant un lot. */
   groupId?: string | null
   appId?: string | null
@@ -23,7 +25,17 @@ export type AnnounceDeploymentStatusInput = {
  * clé de déduplication). Sans lot, le comportement historique par déploiement est conservé.
  */
 export async function announceDeploymentStatus(input: AnnounceDeploymentStatusInput): Promise<void> {
-  const { organizationId, projectId, projectName, deploymentId, status, groupId, appId, appName } = input
+  const {
+    organizationId,
+    projectId,
+    projectName,
+    deploymentId,
+    status,
+    previousStatus,
+    groupId,
+    appId,
+    appName,
+  } = input
   await publish({
     type: 'deployment.status',
     organizationId,
@@ -32,6 +44,7 @@ export async function announceDeploymentStatus(input: AnnounceDeploymentStatusIn
       deploymentId,
       status,
       name: projectName,
+      ...(previousStatus ? { previousStatus } : {}),
       ...(groupId ? { groupId } : {}),
       ...(appId ? { appId } : {}),
       ...(appName ? { appName } : {}),

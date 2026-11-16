@@ -58,7 +58,11 @@ function delay(ms: number): Promise<void> {
 }
 
 /** Temps réel et notifications : prévient les membres de l'organisation (jamais bloquant). */
-async function announce(deploymentId: string, status: string): Promise<void> {
+async function announce(
+  deploymentId: string,
+  status: string,
+  previousStatus?: string,
+): Promise<void> {
   try {
     const d = await prisma.deployment.findUnique({
       where: { id: deploymentId },
@@ -79,14 +83,18 @@ async function announce(deploymentId: string, status: string): Promise<void> {
       groupId: d.groupId,
       appId: d.appId,
       appName: d.app?.name ?? null,
-    })
+      previousStatus,
+    } as any)
   } catch (error) {
     console.error('[eflex/worker] annonce du statut impossible :', error instanceof Error ? error.message : error)
   }
 }
 
 async function setStatus(id: string, next: DeploymentStatus): Promise<boolean> {
-  const current = await prisma.deployment.findUnique({ where: { id }, select: { status: true } })
+  const current = await prisma.deployment.findUnique({
+    where: { id },
+    select: { status: true, logsSummary: true },
+  })
   if (!current) return false
   const plan = planStep(current.status, next)
   if (plan === 'blocked') return false
@@ -95,14 +103,19 @@ async function setStatus(id: string, next: DeploymentStatus): Promise<boolean> {
     // régresse jamais et on ne ré-émet pas d'événement.
     return true
   }
+  const transitionLine = `[transition] ${current.status} → ${next} (${new Date().toISOString()})`
+  const logsSummary = [current.logsSummary, transitionLine]
+    .filter((line): line is string => Boolean(line))
+    .join('\n')
+    .slice(-MAX_LOGS)
   // Mise à jour conditionnelle : une annulation concurrente gagne et la
   // transition du worker est abandonnée (jamais d'écrasement de `cancelled`).
   const updated = await prisma.deployment.updateMany({
     where: { id, status: current.status },
-    data: { status: next },
+    data: { status: next, logsSummary },
   })
   if (updated.count !== 1) return false
-  await announce(id, next)
+  await announce(id, next, current.status)
   return true
 }
 
@@ -753,7 +766,7 @@ export async function runDeploymentWatchdog(): Promise<void> {
       findExpired: (createdBefore) =>
         prisma.deployment.findMany({
           where: { createdAt: { lte: createdBefore }, status: { notIn: [...TERMINAL_STATUSES] } },
-          select: { id: true, status: true, createdAt: true },
+          select: { id: true, status: true, createdAt: true, coolifyBuildId: true },
         }),
       fail: async (id, message) => {
         const current = await prisma.deployment.findUnique({
@@ -772,9 +785,15 @@ export async function runDeploymentWatchdog(): Promise<void> {
           },
         })
         if (updated.count !== 1) return false
-        await announce(id, 'failed')
+        await announce(id, 'failed', current.status)
         console.error(`[eflex/worker] déploiement ${id} expiré : ${message}`)
         return true
+      },
+      cancelRemote: async (coolifyBuildId) => {
+        const cancelled = await cancelCoolifyDeployment(coolifyBuildId)
+        if ('error' in cancelled) {
+          console.warn(`[eflex/worker] annulation distante du build expiré impossible : ${cancelled.error}`)
+        }
       },
     })
     if (result.expired > 0) {

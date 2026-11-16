@@ -65,17 +65,23 @@ describe('expireStaleDeployments', () => {
   it('passe en échec les déploiements bloqués et compte les transitions réussies', async () => {
     const now = new Date('2026-11-10T12:00:00.000Z')
     const fail = vi.fn(async () => true)
+    const cancelRemote = vi.fn(async () => undefined)
     const findExpired = vi.fn(async () => [
-      { id: 'a', status: 'building', createdAt: new Date('2026-11-10T10:00:00.000Z') },
-      { id: 'b', status: 'queued', createdAt: new Date('2026-11-10T10:30:00.000Z') },
+      { id: 'a', status: 'building', createdAt: new Date('2026-11-10T10:00:00.000Z'), coolifyBuildId: 'build-a' },
+      { id: 'b', status: 'queued', createdAt: new Date('2026-11-10T10:30:00.000Z'), coolifyBuildId: null },
     ])
 
-    const result = await expireStaleDeployments({ findExpired, fail }, { now, timeoutMs: 30 * MINUTE })
+    const result = await expireStaleDeployments(
+      { findExpired, fail, cancelRemote },
+      { now, timeoutMs: 30 * MINUTE },
+    )
 
     expect(result.expired).toBe(2)
     expect(findExpired).toHaveBeenCalledWith(new Date('2026-11-10T11:30:00.000Z'))
     expect(fail).toHaveBeenCalledTimes(2)
     expect(fail.mock.calls[0]?.[1]).toMatch(/délai dépassé/i)
+    expect(cancelRemote).toHaveBeenCalledTimes(1)
+    expect(cancelRemote).toHaveBeenCalledWith('build-a')
   })
 
   it('ne compte pas une transition perdue face à une annulation concurrente', async () => {
