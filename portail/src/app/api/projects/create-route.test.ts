@@ -174,9 +174,8 @@ run('POST /api/projects — création multi-applications (D2, lot C)', () => {
     expect(await prisma.project.count({ where: { organizationId: organization.id } })).toBe(0)
   })
 
-  it('refuse en bloc une création qui dépasse le quota d’applications', async () => {
+  it('autorise une création multi-applications quand le quota d’applications est illimité', async () => {
     const { user, organization } = await createOrganization('quota')
-    // 4 applications déjà déployées sur 5 autorisées par le plan gratuit.
     for (let index = 0; index < 4; index += 1) {
       const project = await prisma.project.create({
         data: {
@@ -202,21 +201,17 @@ run('POST /api/projects — création multi-applications (D2, lot C)', () => {
     }
 
     const { response, payload } = await createProject({
-      ...baseBody(`Trop ${stamp}`),
+      ...baseBody(`Multi ${stamp}`),
       apps: [
         { root: 'apps/web', framework: 'nextjs', primary: true },
         { root: 'apps/api', framework: 'node' },
       ],
     })
 
-    expect(response.status).toBe(403)
-    expect(payload.code).toBe('plan_limit')
-    expect(payload.required).toBe(2)
-    expect(payload.limit).toBe(5)
-    expect(payload.used).toBe(4)
-    expect(payload.error).toContain('2 applications')
-    // Aucune écriture : ni projet, ni application, ni déploiement.
-    expect(await prisma.project.count({ where: { organizationId: organization.id } })).toBe(4)
+    expect(response.status).toBe(202)
+    expect(payload.code).toBeUndefined()
+    expect((payload.apps as unknown[]).length).toBe(2)
+    expect(await prisma.project.count({ where: { organizationId: organization.id } })).toBe(5)
   })
 
   it('renvoie 409 quand le framework demandé ne correspond plus au commit analysé', async () => {

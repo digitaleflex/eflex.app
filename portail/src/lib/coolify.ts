@@ -62,7 +62,7 @@ interface Target {
 
 let targetPromise: Promise<Target> | null = null
 
-async function coolifyFetch<T>(
+export async function coolifyFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<CoolifyResponse<T>> {

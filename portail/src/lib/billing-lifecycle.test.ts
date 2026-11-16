@@ -234,11 +234,11 @@ run('cycle de vie de la facturation', () => {
     expect(kept.domain).toBe('en-ligne.eflex.app')
   })
 
-  it('refuse un projet au-delà du quota du plan gratuit, avec un message d’incitation', async () => {
+  it('n’applique pas de quota d’applications lorsque le plan est illimité', async () => {
     const { prisma, user, organization } = await createUserWithOrganization('quota-projets')
     const { assertProjectQuota } = await import('@/lib/billing')
 
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index < 5; index += 1) {
       await prisma.project.create({
         data: {
           organizationId: organization.id,
@@ -250,26 +250,9 @@ run('cycle de vie de la facturation', () => {
         },
       })
     }
-    // 4 projets sur 5 : le suivant est encore autorisé.
-    expect((await assertProjectQuota(organization.id)).ok).toBe(true)
-    await prisma.project.create({
-      data: {
-        organizationId: organization.id,
-        userId: user.id,
-        name: 'Projet 5',
-        slug: `quota-5-${stamp}`,
-        repoUrl: 'https://github.com/exemple/quota',
-        framework: 'static',
-      },
-    })
+
     const quota = await assertProjectQuota(organization.id)
-    expect('error' in quota).toBe(true)
-    if ('error' in quota) {
-      // L'unité du quota est l'application (D2, lot C), pas le projet.
-      expect(quota.error).toContain('application')
-      expect(quota.error).toContain('5')
-      expect(quota.error).toContain('plan supérieur')
-    }
+    expect(quota).toEqual({ ok: true })
   })
 
   it('le rôle billing accède à la facturation mais pas aux journaux', async () => {

@@ -28,6 +28,13 @@ type RouteClass =
  */
 const ROUTE_MANIFEST: Record<string, RouteClass> = {
   '/account/password': 'user',
+  '/admin/coolify/audit': 'admin',
+  '/admin/coolify/deployments': 'admin',
+  '/admin/coolify/s3-storages': 'admin',
+  '/admin/coolify/s3-storages/[storageId]/validate': 'admin',
+  '/admin/coolify/servers': 'admin',
+  '/admin/coolify/servers/[uuid]': 'admin',
+  '/admin/coolify/vulnerabilities': 'admin',
   '/admin/impersonation/stop': 'admin',
   '/admin/infrastructure/check': 'admin',
   '/admin/infrastructure/settings': 'admin',
@@ -175,6 +182,7 @@ vi.mock('@/lib/coolify', async (importOriginal) => {
 vi.mock('@/lib/queue', () => ({
   enqueueDeployment: vi.fn(async () => undefined),
   removeQueuedDeployment: vi.fn(async () => 'removed' as const),
+  acquireDeploymentLocks: vi.fn(async () => ({ acquired: true, release: async () => undefined })),
 }))
 vi.mock('@/lib/project-deployments', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/project-deployments')>()
