@@ -90,11 +90,11 @@ export default async function AdminInfrastructurePage() {
             <span className="block pt-1 text-xs">
               Relevé du <time dateTime={snapshot.collectedAt}>{dateTime.format(new Date(snapshot.collectedAt))}</time>{' '}
               en {formatLatency(snapshot.durationMs)} ·{' '}
-              <a href="#reglages" className="underline underline-offset-2 hover:no-underline">
+              <a href="#reglages" className="font-medium text-foreground underline underline-offset-2 hover:text-primary">
                 Réglages de la plateforme
               </a>{' '}
               ·{' '}
-              <Link href="/admin/audit" className="underline underline-offset-2 hover:no-underline">
+              <Link href="/admin/audit" className="font-medium text-foreground underline underline-offset-2 hover:text-primary">
                 Journal d’audit
               </Link>
             </span>

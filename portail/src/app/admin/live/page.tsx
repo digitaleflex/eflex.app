@@ -33,7 +33,7 @@ export default async function LivePage() {
             Déploiements, inscriptions et actions d’administration de toutes les organisations, au fil de l’eau. Les
             charges utiles sont filtrées côté serveur : aucun secret ne remonte ici. Les actions d’administration sont
             aussi détaillées dans le{' '}
-            <Link href="/admin/audit" className="text-primary underline-offset-4 hover:underline">
+            <Link href="/admin/audit" className="font-medium text-foreground underline underline-offset-2 hover:text-primary">
               journal d’audit
             </Link>
             .

@@ -11,7 +11,7 @@ export const buttonVariants = {
   destructive:
     'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 disabled:bg-muted disabled:text-muted-foreground',
   accent: 'bg-accent text-accent-foreground shadow-sm hover:bg-accent/90 disabled:bg-muted disabled:text-muted-foreground',
-  link: 'text-primary underline-offset-4 hover:underline disabled:text-muted-foreground disabled:no-underline',
+  link: 'text-primary underline underline-offset-4 hover:decoration-2 disabled:text-muted-foreground disabled:no-underline',
   onNavy:
     'bg-white text-eflexnavy shadow-sm hover:bg-white/90 focus-visible:ring-white disabled:bg-white/40 disabled:text-eflexnavy/60',
 } as const
