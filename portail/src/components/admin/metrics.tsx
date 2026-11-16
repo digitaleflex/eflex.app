@@ -294,7 +294,12 @@ export function RecurringErrorsPanel({
           Aucun échec récurrent identifié sur la période, ou aucun déploiement en échec.
         </p>
       ) : (
-        <div className="mt-4 overflow-x-auto">
+        <div
+          className="mt-4 overflow-x-auto"
+          tabIndex={0}
+          role="region"
+          aria-label="Causes probables récurrentes des déploiements en échec"
+        >
           <table className="w-full text-sm">
             <caption className="sr-only">Causes probables récurrentes des déploiements en échec</caption>
             <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
