@@ -1,9 +1,9 @@
-# ADR-0011 — Coolify reste le moteur de déploiement, derrière une abstraction avant Axiom
+# ADR-0011 — Coolify reste le moteur de déploiement, derrière une abstraction avant Axiom\n\n> **Historique :** cette décision décrivait une transition envisagée vers Axiom. Elle est remplacée pour la stratégie produit courante par [ADR-0012](0012-eflex-production-coolify-axiom-paused.md). Conserver ce document pour l'historique ; ne pas l'utiliser comme instruction de roadmap actuelle.
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0012
 - **Date:** 2026-11-11
 - **Issue:** #14
-- **Supersedes:** —
+- **Supersedes:** —\n- **Superseded by:** [ADR-0012](0012-eflex-production-coolify-axiom-paused.md)
 
 ## Context
 
