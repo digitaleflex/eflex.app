@@ -32,6 +32,7 @@ export interface DeploymentQueueDiagnostics {
   processedOn: string | null
   finishedOn: string | null
   delay: number | null
+  /** Job actif depuis longtemps : peut être un build légitime ou un worker bloqué. */
   stalled: boolean
 }
 
@@ -153,14 +154,16 @@ export async function getDeploymentQueueDiagnostics(
 /**
  * Action admin sûre : relance le job BullMQ d'un déploiement non terminal.
  * - failed/completed (résiduel côté queue) : tentative de retry BullMQ quand possible, sinon ré-enfilement contrôlé.
+ * - delayed/waiting-children : promotion en attente (reprise d'un job différé/bloqué sur dépendances).
  * - missing : ré-enfilement.
- * - waiting/delayed/prioritized/active/waiting-children : aucune action (déjà pris en charge).
+ * - waiting/prioritized/active : aucune action (déjà pris en charge). `active` n'est jamais déplacé pour éviter
+ *   un double traitement si un worker exécute encore le job.
  */
 export async function recoverDeploymentQueueJob(
   deploymentId: string,
   options: { rollback?: boolean } = {},
 ): Promise<
-  | { ok: true; action: 'retried' | 'reenqueued' | 'noop'; state: DeploymentJobQueueState }
+  | { ok: true; action: 'retried' | 'reenqueued' | 'promoted' | 'noop'; state: DeploymentJobQueueState }
   | { ok: false; error: string; state?: DeploymentJobQueueState }
 > {
   if (!process.env.REDIS_URL) return { ok: false, error: 'Redis non configuré.' }
@@ -172,14 +175,18 @@ export async function recoverDeploymentQueueJob(
       return { ok: true, action: 'reenqueued', state: 'missing' }
     }
     const state = (await job.getState().catch(() => 'unknown')) as DeploymentJobQueueState
-    if (
-      state === 'waiting' ||
-      state === 'delayed' ||
-      state === 'prioritized' ||
-      state === 'active' ||
-      state === 'waiting-children'
-    ) {
+    if (state === 'waiting' || state === 'prioritized' || state === 'active') {
       return { ok: true, action: 'noop', state }
+    }
+    if (state === 'delayed' || state === 'waiting-children') {
+      try {
+        await job.promote()
+        return { ok: true, action: 'promoted', state }
+      } catch {
+        await job.remove().catch(() => undefined)
+        await enqueueDeployment(deploymentId, options)
+        return { ok: true, action: 'reenqueued', state }
+      }
     }
     if (state === 'failed') {
       try {
@@ -221,7 +228,10 @@ export async function acquireDeploymentLocks(
   ttlMs = 5 * 60_000,
 ): Promise<{ acquired: boolean; release: () => Promise<void> }> {
   const client = redisClient()
-  if (!client) return { acquired: true, release: async () => undefined }
+  if (!client) {
+    // Redis non configuré : pas de verrou distribué possible, les garde-fous DB restent actifs.
+    return { acquired: true, release: async () => undefined }
+  }
 
   const unique = Array.from(new Set(keys)).sort()
   const token = `${process.pid}:${Date.now()}:${Math.random().toString(36).slice(2)}`
@@ -253,8 +263,10 @@ export async function acquireDeploymentLocks(
     return { acquired: true, release }
   } catch {
     await release()
-    // Redis indisponible : ne pas bloquer si on ne peut pas verrouiller, le garde-fou DB reste actif.
-    return { acquired: true, release: async () => undefined }
+    // Redis configuré mais injoignable/en erreur : on refuse le verrouillage pour
+    // éviter un double déploiement en multi-instance. Les garde-fous DB ne suffisent
+    // pas à eux seuls à sérialiser deux processus concurrents.
+    return { acquired: false, release: async () => undefined }
   }
 }
 

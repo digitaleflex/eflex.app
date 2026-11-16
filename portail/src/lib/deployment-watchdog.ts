@@ -46,9 +46,11 @@ export interface WatchdogDeps {
   /** Déploiements non terminaux créés avant `createdBefore`. */
   findExpired: (
     createdBefore: Date,
-  ) => Promise<Array<{ id: string; status: string; createdAt: Date }>>
+  ) => Promise<Array<{ id: string; status: string; createdAt: Date; coolifyBuildId?: string | null }>>
   /** Passe le déploiement en échec ; `false` si une autre transition a gagné. */
   fail: (deploymentId: string, message: string) => Promise<boolean>
+  /** Annule au mieux le build distant d'un déploiement expiré (jamais bloquant). */
+  cancelRemote?: (coolifyBuildId: string) => Promise<void>
 }
 
 export interface WatchdogResult {
@@ -74,7 +76,12 @@ export async function expireStaleDeployments(
   const candidates = await deps.findExpired(createdBefore)
   for (const candidate of candidates) {
     if (!isDeploymentExpired(candidate, now, timeoutMs)) continue
-    if (await deps.fail(candidate.id, message)) expired += 1
+    if (await deps.fail(candidate.id, message)) {
+      expired += 1
+      if (candidate.coolifyBuildId && deps.cancelRemote) {
+        await deps.cancelRemote(candidate.coolifyBuildId).catch(() => undefined)
+      }
+    }
   }
   return { expired, message }
 }

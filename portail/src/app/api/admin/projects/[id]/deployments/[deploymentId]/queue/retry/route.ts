@@ -95,7 +95,9 @@ export async function POST(
       ? 'Le job est déjà pris en charge par la file (aucune action nécessaire).'
       : result.action === 'retried'
         ? 'Job BullMQ relancé.'
-        : 'Job ré-enfilé dans la file de déploiement.'
+        : result.action === 'promoted'
+          ? 'Job différé promu en attente de traitement.'
+          : 'Job ré-enfilé dans la file de déploiement.'
 
   return NextResponse.json({
     ok: true,

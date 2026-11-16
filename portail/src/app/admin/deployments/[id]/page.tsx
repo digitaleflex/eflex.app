@@ -193,7 +193,7 @@ export default async function AdminDeploymentPage({ params }: { params: Promise<
                   <dt className="text-muted-foreground">État du job</dt>
                   <dd>
                     {queueStateLabel[queue.state] ?? queue.state}
-                    {queue.stalled ? ' (bloqué)' : ''}
+                    {queue.stalled ? ' (actif depuis longtemps)' : ''}
                   </dd>
                 </div>
                 <div className="flex flex-wrap justify-between gap-2">
@@ -222,8 +222,9 @@ export default async function AdminDeploymentPage({ params }: { params: Promise<
               {!isTerminal(deployment.status) && (
                 <div className="mt-4 space-y-2 border-t border-border pt-3">
                   <p className="text-xs text-muted-foreground">
-                    Si le job est absent, en échec côté file ou bloqué alors que le déploiement n’est pas terminé, vous
-                    pouvez relancer le traitement BullMQ en toute sécurité (retry/ré-enfilement idempotent).
+                    Si le job est absent, en échec côté file, différé ou résiduel alors que le déploiement n’est pas
+                    terminé, vous pouvez relancer le traitement BullMQ en toute sécurité (retry, promotion ou
+                    ré-enfilement idempotent). Un job actif n’est jamais déplacé.
                   </p>
                   <QueueRetryButton
                     projectId={deployment.project.id}
