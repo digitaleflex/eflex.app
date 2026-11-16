@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Database, Play, Plus, RefreshCw, RotateCw, Square, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { DatabaseBackups } from '@/components/database-backups'
 import { cn } from '@/lib/utils'
 
 interface ManagedDatabase {
@@ -240,6 +241,7 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
                     </div>
                   )}
                 </div>
+                {database.kind === 'postgresql' && <DatabaseBackups projectId={projectId} databaseId={database.id} />}
               </li>
             )
           })}

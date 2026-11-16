@@ -6,6 +6,9 @@
 > et healthcheck de production. Aucune dépendance à un service payant : tout
 > tourne sur le VPS avec `pg_dump`, `openssl`, `curl` et systemd.
 >
+> Bases managées des **clients** (PostgreSQL des projets) : voir
+> `client-database-backups.md`.
+>
 > Scripts : `scripts/backup-db.sh`, `scripts/restore-test.sh`,
 > `scripts/healthcheck.sh`. Unités systemd d'exemple :
 > `docs/operations/systemd/`.

@@ -14,6 +14,7 @@ export const NOTIFICATION_TYPES = {
   'billing.grace_ended': { label: 'Fin de période de grâce', description: 'Quand la période de grâce d’un abonnement impayé se termine ; les applications restent en ligne, les nouveaux déploiements sont bloqués.' },
   'support.ticket_created': { label: 'Nouveau ticket de support', description: 'Quand un membre de votre organisation soumet un ticket de support (administrateurs).' },
   'support.ticket_updated': { label: 'Mise à jour d’un ticket', description: 'Quand le statut ou le suivi de votre ticket de support change.' },
+  'database.backup_failed': { label: 'Sauvegarde de base en défaut', description: 'Quand la sauvegarde d’une base managée échoue ou n’a pas réussi depuis trop longtemps (propriétaires et administrateurs).' },
   'analytics.traffic_spike': { label: 'Pic de trafic détecté', description: 'Quand le trafic mesuré d’une application dépasse le seuil configuré par rapport à la période précédente.' },
   'analytics.traffic_drop': { label: 'Chute de trafic détectée', description: 'Quand le trafic mesuré d’une application baisse sous le seuil configuré par rapport à la période précédente.' },
 } as const

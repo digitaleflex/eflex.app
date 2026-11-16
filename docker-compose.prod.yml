@@ -64,6 +64,12 @@ services:
       - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY:-}
       - COOLIFY_API_URL=${COOLIFY_API_URL}
       - COOLIFY_API_TOKEN=${COOLIFY_API_TOKEN}
+      # Sauvegardes des bases managées (docs/operations/client-database-backups.md).
+      - COOLIFY_BACKUP_S3_STORAGE_UUID=${COOLIFY_BACKUP_S3_STORAGE_UUID:-}
+      - DATABASE_BACKUP_FREQUENCY=${DATABASE_BACKUP_FREQUENCY:-}
+      - DATABASE_BACKUP_RETENTION_LOCAL=${DATABASE_BACKUP_RETENTION_LOCAL:-}
+      - DATABASE_BACKUP_RETENTION_S3=${DATABASE_BACKUP_RETENTION_S3:-}
+      - DATABASE_BACKUP_MAX_AGE_HOURS=${DATABASE_BACKUP_MAX_AGE_HOURS:-}
       - PORTAL_DOMAIN=${PORTAL_DOMAIN:?sourcer config/domains.sh}
       - PORTAL_URL=${PORTAL_URL:?sourcer config/domains.sh}
       # ─── Statut public et maintenance ─────────────────────────────────────
