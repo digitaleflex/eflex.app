@@ -1,6 +1,6 @@
 # ADR-0012 — E-FLEX production path: portail + Coolify ; Axiom en pause
 
-- **Status:** Accepted (proposition à ratifier dans la PR)
+- **Status:** Proposed
 - **Date:** 2026-11-16
 - **Issue:** À créer si l'équipe souhaite suivre l'exécution séparément.
 - **Supersedes:** ADR-0011 for the current product execution strategy; ADR-0011 remains historical.
