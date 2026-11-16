@@ -1,12 +1,25 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Select } from '@/components/ui/select'
 import { SUPPORT_PRIORITIES, SUPPORT_STATUSES } from '@/lib/support-tickets'
 
-export function AdminTicketActions({ ticketId, status, priority, adminNote }: { ticketId: string; status: string; priority: string; adminNote: string }) {
+export function AdminTicketActions({
+  ticketId,
+  status,
+  priority,
+  adminNote,
+}: {
+  ticketId: string
+  status: string
+  priority: string
+  adminNote: string
+}) {
   const router = useRouter()
+  const noteId = useId()
   const [nextStatus, setNextStatus] = useState(status)
   const [nextPriority, setNextPriority] = useState(priority)
   const [note, setNote] = useState(adminNote)
@@ -33,26 +46,41 @@ export function AdminTicketActions({ ticketId, status, priority, adminNote }: { 
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3 text-sm">
-      <h2 className="font-semibold">Traitement</h2>
-      {error && <p role="alert" className="text-destructive text-xs">{error}</p>}
-      <label className="space-y-1 block">
-        <span className="text-muted-foreground">Statut</span>
-        <select value={nextStatus} onChange={(e) => setNextStatus(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3">
-          {SUPPORT_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
-      </label>
-      <label className="space-y-1 block">
-        <span className="text-muted-foreground">Priorité</span>
-        <select value={nextPriority} onChange={(e) => setNextPriority(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3">
-          {SUPPORT_PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-        </select>
-      </label>
-      <label className="space-y-1 block">
-        <span className="text-muted-foreground">Note interne</span>
-        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={4} className="w-full rounded-md border border-input bg-background px-3 py-2" />
-      </label>
-      <Button onClick={save} disabled={saving} className="w-full">{saving ? 'Enregistrement…' : 'Mettre à jour'}</Button>
-    </div>
+    <Card className="space-y-4 p-4">
+      <h2 className="text-sm font-semibold">Traitement</h2>
+      {error && (
+        <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+          {error}
+        </p>
+      )}
+      <Select
+        label="Statut"
+        value={nextStatus}
+        onChange={(e) => setNextStatus(e.target.value)}
+        options={SUPPORT_STATUSES}
+      />
+      <Select
+        label="Priorité"
+        value={nextPriority}
+        onChange={(e) => setNextPriority(e.target.value)}
+        options={SUPPORT_PRIORITIES}
+      />
+      <div className="space-y-1.5">
+        <label htmlFor={noteId} className="block text-sm font-medium text-foreground">
+          Note interne
+        </label>
+        <textarea
+          id={noteId}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={5}
+          className="w-full rounded-control border border-input bg-background px-3 py-2 text-sm transition-[border-color,box-shadow] duration-200 ease-out-expo hover:border-foreground/60 focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        />
+        <p className="text-xs text-muted-foreground">Visible uniquement par l’équipe d’administration.</p>
+      </div>
+      <Button type="button" onClick={save} disabled={saving} className="w-full">
+        {saving ? 'Enregistrement…' : 'Mettre à jour'}
+      </Button>
+    </Card>
   )
 }
