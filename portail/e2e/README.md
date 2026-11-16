@@ -4,6 +4,13 @@ Ce dossier contient les tests automatisés d'accessibilité (axe-core) et la
 génération de captures visuelles reproductibles pour la console `portail/`
 (issue #80).
 
+**Interprétation « accueil » (#80)** : les critères couvrent l’**accueil public** (`/`)
+et l’**accueil de la console** (`/dashboard`). Les captures et l’audit axe les couvrent
+dans les deux thèmes (clair/sombre) aux largeurs **360, 768 et 1440 px**. Pour
+l’accueil console, la **barre latérale dépliée et repliée** est exercée aux largeurs
+≥ 768 px (à 360 px la console utilise la navigation en barre du bas, sans barre
+latérale).
+
 ## Prérequis
 
 - Node.js et dépendances du portail installées : `npm ci` (depuis `portail/`).
@@ -32,12 +39,14 @@ parcours authentifiés/administration :
 
 - largeurs **360, 768 et 1440 px**, thèmes **clair et sombre** ;
 - absence de violation axe `serious` ou `critical` (WCAG 2.1 A/AA) ;
+- **contraste AA** vérifié dans les deux thèmes via les règles WCAG 2.1 AA
+  d’axe-core (`wcag2aa`, dont `color-contrast`) ;
 - absence de débordement horizontal ;
 - navigation clavier de base (lien d'évitement, focus visible, formulaire).
 
 Pages couvertes (réalistes sans dépendance externe) :
-- **Publiques** : `/`, `/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email`, `/status`, `/tarifs`, `/conditions`, `/confidentialite`, `/mentions-legales`, `/maintenance`, 404.
-- **Console (authentifiée)** : tableau de bord, nouveau projet, équipe, notifications, paramètres, activité, support, usage et pages projet (vue d'ensemble, déploiements, variables, journaux, paramètres).
+- **Publiques** : `/` (accueil), `/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email`, `/status`, `/tarifs`, `/conditions`, `/confidentialite`, `/mentions-legales`, `/maintenance`, 404.
+- **Console (authentifiée)** : tableau de bord (accueil console, audité avec barre latérale **dépliée et repliée** à ≥ 768 px), nouveau projet, équipe, notifications, paramètres, activité, support, usage et pages projet (vue d'ensemble, déploiements, variables, journaux, paramètres).
 - **Administration** : accueil, utilisateurs, projets, déploiements, organisations, paiements, audit, infrastructure, live, support.
 
 ```bash
@@ -56,8 +65,8 @@ clés aux largeurs **360, 768 et 1440 px** en thèmes **clair et sombre**.
 Dossier de sortie (stable) : `portail/e2e/screenshots/<thème>/<largeur>/`
 (par ex. `e2e/screenshots/light/1440/accueil.png`).
 
-- **Pages publiques** : accueil, authentification, statut, tarifs, pages légales, maintenance, 404.
-- **Console (authentifié)** : pages du tableau de bord et de projet ; l’**accueil du tableau de bord** (`/dashboard`) est capturé avec la **barre latérale dépliée** et **repliée** aux largeurs ≥ 768 px (`dashboard_sidebar-depliee.png`, `dashboard_sidebar-repliee.png`, issue #80).
+- **Pages publiques** : accueil (`/`), authentification, statut, tarifs, pages légales, maintenance, 404.
+- **Console (authentifié)** : pages du tableau de bord et de projet ; l’**accueil du tableau de bord** (`/dashboard`) est capturé avec la **barre latérale dépliée** et **repliée** aux largeurs ≥ 768 px (`dashboard_sidebar-depliee.png`, `dashboard_sidebar-repliee.png`, issue #80). À 360 px, l’accueil console est capturé sans barre latérale (navigation en barre du bas).
 
 Ces captures sont des artefacts locaux : `portail/e2e/screenshots/` est ignoré par Git. Les **références validées et versionnées** sont conservées dans `portail/e2e/visual-references/` (voir section ci-dessous).
 
@@ -83,14 +92,15 @@ Les captures générées dans `e2e/screenshots/` servent de base de comparaison 
 Procédure :
 1. Générer les captures sur une base de test connue : `npm run test:screenshots` (et, si besoin, `PLAYWRIGHT_AUTH=1 PLAYWRIGHT_ADMIN=1 npm run test:screenshots`).
 2. Vérifier visuellement les différences (thème, viewport, état de la barre latérale repliée/dépliée).
-3. Copier les images validées dans `e2e/visual-references/` (nomenclature claire), puis committer avec une note décrivant le changement visuel.
+3. Copier les images validées dans `e2e/visual-references/` (nomenclature claire, ex. `public/<thème>/<largeur>/accueil.png`, `dashboard/<thème>/<largeur>/sidebar-expanded.png`), puis committer avec une note décrivant le changement visuel.
 4. En cas d’évolution UI intentionnelle, régénérer, mettre à jour les références dans la même PR et documenter la raison.
 
 > Le dossier de sortie brut `e2e/screenshots/` reste ignoré pour éviter de committer des artefacts non validés. Le workflow `.github/workflows/a11y.yml` exécute `test:a11y` (axe) en CI ; l’intégration de `test:screenshots` / comparaison avec les références peut être ajoutée dans un job dédié si le temps d’exécution reste raisonnable.
 
 ## Intégration CI
 
-Le workflow **`.github/workflows/a11y.yml`** exécute déjà les audits axe (`npm run test:a11y`) sur PR/push (portail/détecteur) avec base de test, seed et Playwright/Chromium, et publie les rapports en artefacts en cas d’échec.
+- **`.github/workflows/a11y.yml`** (garde-fou principal, #80) : exécute `npm run test:a11y` sur PR/push (`portail/**`, `packages/detector/**`) avec PostgreSQL, seed, build `next build` + `next start` et Playwright/Chromium, puis publie captures publiques non bloquantes et rapports en artefacts.
+- **`.github/workflows/ts.yml`** (porte principale TypeScript) : ne lance pas Playwright. **Décision** : l’intégration directe à `ts.yml` n’est **pas raisonnable** pour l’instant car `ts.yml` exécute déjà install/build/lint/typecheck/tests et un job Playwright complet (navigateur + build/serveur + base seedée, ~10 min et dépendances système) alourdirait fortement chaque PR. `a11y.yml` constitue le garde-fou dédié sur les mêmes chemins portail ; si le coût d’exécution diminue (par ex. cache navigateur/build ou suite ciblée), un appel réutilisable pourra être ajouté à `ts.yml`.
 
 Pour étendre à la comparaison visuelle (captures de référence), prévoir un job dédié (éventuellement non bloquant ou manuel) qui :
 
