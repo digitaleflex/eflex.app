@@ -1,3 +1,5 @@
+> **Important — périmètre de ce runbook :** ces scripts couvrent la base PostgreSQL du portail E-FLEX et son test de restauration. Ils ne constituent pas un système de sauvegarde des bases clientes ni des volumes/fichiers des applications hébergées. Voir [Layer 11 — Backup & Recovery](../architecture/eflex/layers/11-backup-recovery.md) et l'issue [#130](https://github.com/digitaleflex/eflex.app/issues/130) pour le chantier des données clientes.
+
 # Sauvegardes, restauration et surveillance — Eflex
 
 > Portée : base PostgreSQL du portail (`eflex-postgres`), test de restauration
