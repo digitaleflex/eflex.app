@@ -14,11 +14,11 @@ export default async function CoolifyAdminPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           Serveurs, stockages de sauvegarde, sécurité des images, déploiements et journal de Coolify, sans ouvrir son
           interface. Chaque action est inscrite au{' '}
-          <Link href="/admin/audit" className="underline underline-offset-2 hover:no-underline">
+          <Link href="/admin/audit" className="font-medium text-foreground underline underline-offset-2 hover:text-primary">
             journal d’audit
           </Link>
           . L’état général de la plateforme reste dans{' '}
-          <Link href="/admin/infrastructure" className="underline underline-offset-2 hover:no-underline">
+          <Link href="/admin/infrastructure" className="font-medium text-foreground underline underline-offset-2 hover:text-primary">
             Infrastructure
           </Link>
           .

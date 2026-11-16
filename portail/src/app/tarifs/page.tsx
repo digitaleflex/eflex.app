@@ -36,8 +36,8 @@ const billingFaq = [
 function LimitRow({ label, value }: { label: string; value: string }) {
   return (
     <li className="flex items-start justify-between gap-4 py-2 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium tabular-nums text-foreground text-right">{value}</span>
+      <span className="min-w-0 text-muted-foreground">{label}</span>
+      <span className="shrink-0 font-medium tabular-nums text-foreground text-right">{value}</span>
     </li>
   )
 }
@@ -73,7 +73,7 @@ export default function TarifsPage() {
               <Card
                 key={plan.id}
                 className={cn(
-                  'flex h-full flex-col',
+                  'flex h-full min-w-0 flex-col',
                   plan.highlighted && 'border-primary shadow-lg ring-1 ring-primary/20',
                 )}
               >
@@ -132,39 +132,46 @@ export default function TarifsPage() {
           </div>
 
           <div className="mt-10 grid gap-4 lg:grid-cols-2">
-            <Card>
+            <Card className="min-w-0">
               <CardHeader>
                 <h2 className="text-base font-semibold">Comparatif des limites</h2>
                 <p className="text-sm text-muted-foreground">Valeurs issues de la configuration des plans de la plateforme.</p>
               </CardHeader>
-              <CardContent className="overflow-x-auto">
-                <table className="w-full min-w-[520px] text-left text-sm">
-                  <caption className="sr-only">Comparatif des plans EFLEX</caption>
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Plan</th>
-                      <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Prix / {PERIOD_DAYS} jours</th>
-                      <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Applications</th>
-                      <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Membres</th>
-                      <th scope="col" className="py-2 font-medium text-muted-foreground">Domaines / projet</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {plans.map((plan) => (
-                      <tr key={plan.id} className={cn('border-b border-border last:border-0', plan.highlighted && 'bg-primary/5')}>
-                        <th scope="row" className="py-3 pr-3 font-medium">{plan.label}</th>
-                        <td className="py-3 pr-3 tabular-nums">{formatPrice(plan.priceFcfa)}</td>
-                        <td className="py-3 pr-3 tabular-nums">{Number.isFinite(plan.projectLimit) ? plan.projectLimit.toLocaleString('fr-FR') : 'Illimité'}</td>
-                        <td className="py-3 pr-3 tabular-nums">{plan.memberLimit.toLocaleString('fr-FR')}</td>
-                        <td className="py-3 tabular-nums">{plan.customDomainLimit.toLocaleString('fr-FR')}</td>
+              <CardContent>
+                <div
+                  className="w-full max-w-full overflow-x-auto"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Comparatif des plans EFLEX"
+                >
+                  <table className="w-full min-w-[520px] text-left text-sm">
+                    <caption className="sr-only">Comparatif des plans EFLEX</caption>
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Plan</th>
+                        <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Prix / {PERIOD_DAYS} jours</th>
+                        <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Applications</th>
+                        <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Membres</th>
+                        <th scope="col" className="py-2 font-medium text-muted-foreground">Domaines / projet</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {plans.map((plan) => (
+                        <tr key={plan.id} className={cn('border-b border-border last:border-0', plan.highlighted && 'bg-primary/5')}>
+                          <th scope="row" className="py-3 pr-3 font-medium">{plan.label}</th>
+                          <td className="py-3 pr-3 tabular-nums">{formatPrice(plan.priceFcfa)}</td>
+                          <td className="py-3 pr-3 tabular-nums">{Number.isFinite(plan.projectLimit) ? plan.projectLimit.toLocaleString('fr-FR') : 'Illimité'}</td>
+                          <td className="py-3 pr-3 tabular-nums">{plan.memberLimit.toLocaleString('fr-FR')}</td>
+                          <td className="py-3 tabular-nums">{plan.customDomainLimit.toLocaleString('fr-FR')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="min-w-0">
               <CardHeader>
                 <h2 className="text-base font-semibold">Moyens de paiement</h2>
                 <p className="text-sm text-muted-foreground">Paiements sécurisés pour activer ou renouveler un abonnement.</p>

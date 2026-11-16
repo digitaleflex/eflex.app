@@ -60,7 +60,7 @@ export function AlertsPanel({ alerts }: { alerts: AdminMetrics['alerts'] }) {
     <section
       aria-labelledby="admin-alerts-title"
       className={cn(
-        'rounded-xl border bg-card',
+        'min-w-0 rounded-xl border bg-card',
         hasIssues ? 'border-warning/40' : 'border-border',
       )}
     >
@@ -155,7 +155,7 @@ export function DeploymentChart({
   const height = (value: number) => `max(2px, ${(value / max) * 100}%)`
 
   return (
-    <section aria-labelledby="admin-deployments-title" className="rounded-xl border border-border bg-card p-5">
+    <section aria-labelledby="admin-deployments-title" className="min-w-0 rounded-xl border border-border bg-card p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 id="admin-deployments-title" className="font-semibold">
           Déploiements par jour
@@ -273,7 +273,7 @@ export function RecurringErrorsPanel({
   return (
     <section
       aria-labelledby="admin-recurring-errors-title"
-      className={cn('rounded-xl border bg-card p-5', hasErrors ? 'border-destructive/30' : 'border-border')}
+      className={cn('min-w-0 rounded-xl border bg-card p-5', hasErrors ? 'border-destructive/30' : 'border-border')}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -294,7 +294,12 @@ export function RecurringErrorsPanel({
           Aucun échec récurrent identifié sur la période, ou aucun déploiement en échec.
         </p>
       ) : (
-        <div className="mt-4 overflow-x-auto">
+        <div
+          className="mt-4 overflow-x-auto"
+          tabIndex={0}
+          role="region"
+          aria-label="Causes probables récurrentes des déploiements en échec"
+        >
           <table className="w-full text-sm">
             <caption className="sr-only">Causes probables récurrentes des déploiements en échec</caption>
             <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -340,7 +345,7 @@ export function RecurringErrorsPanel({
 
 export function StackTable({ stacks, days }: { stacks: AdminMetrics['deployments']['stacks']; days: PeriodDays }) {
   return (
-    <section aria-labelledby="admin-stacks-title" className="rounded-xl border border-border bg-card p-5">
+    <section aria-labelledby="admin-stacks-title" className="min-w-0 rounded-xl border border-border bg-card p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 id="admin-stacks-title" className="font-semibold">
           Taux de réussite par stack
