@@ -106,6 +106,18 @@ describe('buildProjectArtifacts', () => {
     expect(artifacts.compose).toBe('')
   })
 
+  it('propage les volumes persistants d’un plan Laravel (stockage)', () => {
+    const plan: BuildPlan = {
+      ...laravelMultiPlan,
+      volumes: ['storage'],
+    }
+    const artifacts = buildProjectArtifacts(plan, 'laravel-proj')
+    expect(artifacts.persistentVolumes).toContainEqual({
+      name: 'eflex-storage',
+      mountPath: '/app/storage',
+    })
+  })
+
   it('ne place jamais de secret dans les artefacts', () => {
     const artifacts = buildProjectArtifacts(pythonPlan, 'py-proj')
     expect(artifacts.compose).not.toMatch(/supersecret|API_KEY=/)
@@ -133,6 +145,26 @@ describe('coolifyApplicationSettings', () => {
     // Installation à la racine : le lockfile et les paquets voisins sont visibles.
     expect(settings.installCommand).toBe('pnpm install --frozen-lockfile')
     // Filtre pnpm : construit le paquet et ses dépendances internes.
+    expect(settings.buildCommand).toBe("pnpm --filter '@acme/web'... run 'build'")
+    expect(settings.startCommand).toBe("cd 'apps/web' && next start")
+  })
+
+  it('filtre un monorepo Turborepo/pnpm avec dépendance interne depuis la racine', () => {
+    const settings = coolifyApplicationSettings({
+      version: 1,
+      framework: 'nextjs',
+      runtime: 'node@22',
+      root: 'apps/web',
+      repoRoot: '../..',
+      workspace: { manager: 'pnpm', name: '@acme/web', buildScript: 'build' },
+      install: 'pnpm install --frozen-lockfile',
+      build: 'next build',
+      start: 'next start',
+      port: 3000,
+    })
+
+    expect(settings.baseDirectory).toBe('/')
+    expect(settings.installCommand).toBe('pnpm install --frozen-lockfile')
     expect(settings.buildCommand).toBe("pnpm --filter '@acme/web'... run 'build'")
     expect(settings.startCommand).toBe("cd 'apps/web' && next start")
   })
