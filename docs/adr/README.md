@@ -31,6 +31,6 @@ Context · Decision · Consequences · Alternatives considered (when relevant) �
 | [0009](0009-sse-for-realtime.md) | SSE for realtime Console updates | Accepted |
 | [0010](0010-deployment-engine-supersedes-orchestrator.md) | Deployment Engine supersedes generic orchestrator state machine | Accepted |
 | [0011](0011-coolify-then-axiom.md) | Coolify remains the deployment backend, behind an abstraction before Axiom | Superseded by ADR-0012 |
-| [0012](0012-eflex-production-coolify-axiom-paused.md) | E-FLEX production path: portail + Coolify ; Axiom en pause | Accepted (proposition à ratifier dans la PR) |
+| [0012](0012-eflex-production-coolify-axiom-paused.md) | E-FLEX production path: portail + Coolify ; Axiom en pause | Proposed |
 
 Note: the initial plan named "OpenTelemetry-based observability" for ADR-0006. The accepted ADR-0006 records structured logs + Prometheus-compatible metrics for V0.1, with OpenTelemetry tracing deferred (see ADR text).
