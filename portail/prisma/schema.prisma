@@ -271,16 +271,20 @@ model ProjectDomain {
  * n'est jamais renvoyée à l'interface.
  */
 model ProjectDatabase {
-  id          String   @id @default(cuid())
-  projectId   String
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  kind        String // postgresql | redis
-  coolifyId   String   @unique
-  name        String
-  status      String?
-  internalUrl String   @db.Text // AES-256-GCM, AAD project-db:<projectId>:<kind>
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String   @id @default(cuid())
+  projectId         String
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind              String // postgresql | redis
+  coolifyId         String   @unique
+  name              String
+  status            String?
+  internalUrl       String   @db.Text // AES-256-GCM, AAD project-db:<projectId>:<kind>
+  /// Planification de sauvegarde Coolify (PostgreSQL uniquement ; null = pas encore planifiée).
+  backupId          String?
+  /// Date de la planification (sert à ne pas alerter avant la première sauvegarde attendue).
+  backupScheduledAt DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@unique([projectId, kind])
   @@index([projectId])

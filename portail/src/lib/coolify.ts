@@ -787,6 +787,114 @@ export async function deleteManagedDatabase(id: string): Promise<{ ok: true } | 
   return { ok: true }
 }
 
+/** Une exécution de sauvegarde Coolify (le message, qui peut contenir des détails internes, n'est pas gardé). */
+export interface DatabaseBackupExecution {
+  id: string
+  status: 'success' | 'failed' | 'running' | 'unknown'
+  /** Taille du fichier en octets, si connue. */
+  size: number | null
+  createdAt: string
+}
+
+/** Une planification de sauvegarde Coolify et ses exécutions (plus récentes d'abord). */
+export interface DatabaseBackupSchedule {
+  id: string
+  frequency: string
+  enabled: boolean
+  saveS3: boolean
+  executions: DatabaseBackupExecution[]
+}
+
+export interface DatabaseBackupOptions {
+  frequency: string
+  /** Stockage S3 déclaré dans Coolify ; absent = copies locales au serveur uniquement. */
+  s3StorageUuid?: string
+  retentionLocal: number
+  retentionS3: number
+}
+
+function parseExecution(raw: unknown): DatabaseBackupExecution | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as Record<string, unknown>
+  const id = typeof row.uuid === 'string' ? row.uuid : null
+  if (!id) return null
+  const status = row.status === 'success' || row.status === 'failed' || row.status === 'running' ? row.status : 'unknown'
+  const size = typeof row.size === 'number' ? row.size : typeof row.size === 'string' && /^\d+$/.test(row.size) ? Number(row.size) : null
+  const createdAt = typeof row.created_at === 'string' ? row.created_at : ''
+  return { id, status, size, createdAt }
+}
+
+function parseBackupSchedule(raw: unknown): DatabaseBackupSchedule | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as Record<string, unknown>
+  const id = typeof row.uuid === 'string' ? row.uuid : null
+  if (!id) return null
+  const executions = (Array.isArray(row.executions) ? row.executions : [])
+    .map(parseExecution)
+    .filter((item): item is DatabaseBackupExecution => item !== null)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  return {
+    id,
+    frequency: typeof row.frequency === 'string' ? row.frequency : '',
+    enabled: row.enabled === true || row.enabled === 1,
+    saveS3: row.save_s3 === true || row.save_s3 === 1,
+    executions,
+  }
+}
+
+/**
+ * Planifie la sauvegarde d'une base managée (`POST /databases/{uuid}/backups`). Avec un stockage S3,
+ * chaque sauvegarde est aussi copiée hors du serveur. Renvoie l'identifiant de la planification.
+ */
+export async function createDatabaseBackup(
+  databaseId: string,
+  options: DatabaseBackupOptions,
+): Promise<{ id: string } | { error: string }> {
+  const res = await coolifyFetch<{ uuid?: unknown }>(`/databases/${encodeURIComponent(databaseId)}/backups`, {
+    method: 'POST',
+    body: JSON.stringify({
+      frequency: options.frequency,
+      enabled: true,
+      dump_all: false,
+      save_s3: Boolean(options.s3StorageUuid),
+      ...(options.s3StorageUuid
+        ? { s3_storage_uuid: options.s3StorageUuid, database_backup_retention_amount_s3: options.retentionS3 }
+        : {}),
+      database_backup_retention_amount_locally: options.retentionLocal,
+    }),
+  })
+  if (res.error) return { error: res.error }
+  const id = typeof res.data?.uuid === 'string' ? res.data.uuid : null
+  if (!id) return { error: "L'hébergement n'a pas renvoyé l'identifiant de la sauvegarde." }
+  return { id }
+}
+
+/** Planifications de sauvegarde d'une base, avec leurs exécutions. */
+export async function listDatabaseBackups(
+  databaseId: string,
+  timeoutMs = 8_000,
+): Promise<DatabaseBackupSchedule[] | { error: string }> {
+  const res = await coolifyFetch<unknown>(`/databases/${encodeURIComponent(databaseId)}/backups`, {
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  if (res.error) return { error: res.error }
+  if (!Array.isArray(res.data)) return []
+  return res.data.map(parseBackupSchedule).filter((item): item is DatabaseBackupSchedule => item !== null)
+}
+
+/** Lance immédiatement une sauvegarde (le jeton doit avoir la permission `deploy`). */
+export async function runDatabaseBackup(
+  databaseId: string,
+  scheduleId: string,
+): Promise<{ ok: true } | { error: string }> {
+  const res = await coolifyFetch(
+    `/databases/${encodeURIComponent(databaseId)}/backups/${encodeURIComponent(scheduleId)}`,
+    { method: 'PATCH', body: JSON.stringify({ backup_now: true }) },
+  )
+  if (res.error) return { error: res.error }
+  return { ok: true }
+}
+
 /** Démarre, arrête ou redémarre une base managée. */
 export async function managedDatabaseAction(
   id: string,

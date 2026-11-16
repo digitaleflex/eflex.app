@@ -8,6 +8,7 @@ import {
   managedDatabaseAction,
   type ManagedDatabaseKind,
 } from '@/lib/coolify'
+import { backupSupported, ensureDatabaseBackup } from '@/lib/database-backups'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
 import { isAppDeployed } from '@/lib/project-primary'
 
@@ -107,6 +108,15 @@ export async function createProjectDatabase(
       })
       return row
     })
+
+    // Sauvegardes planifiées dès la création (PostgreSQL). Un échec ne bloque pas la création :
+    // la passe de surveillance (`evaluateDatabaseBackups`) retentera.
+    if (backupSupported(kind)) {
+      const backup = await ensureDatabaseBackup(database).catch((error: unknown) => ({
+        error: error instanceof Error ? error.message : String(error),
+      }))
+      if ('error' in backup) console.error('[databases] sauvegarde non planifiée', database.id, backup.error)
+    }
 
     let deploymentId: string | null = null
     if (isAppDeployed(project) && ready) {

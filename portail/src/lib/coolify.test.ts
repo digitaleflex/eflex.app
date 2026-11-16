@@ -703,3 +703,86 @@ describe('checkConnection', () => {
     await expect(checkConnection()).resolves.toBe(false)
   })
 })
+
+describe('sauvegardes de bases', () => {
+  it('planifie une sauvegarde avec copie S3 et rétentions', async () => {
+    const calls = mockFetch(() => json({ uuid: 'backup-1', message: 'ok' }, 201))
+    const { createDatabaseBackup } = await loadModule()
+    const result = await createDatabaseBackup('db-1', {
+      frequency: '0 2 * * *',
+      s3StorageUuid: 's3-1',
+      retentionLocal: 3,
+      retentionS3: 14,
+    })
+    expect(result).toEqual({ id: 'backup-1' })
+    expect(calls[0]?.url).toBe('https://coolify.test/api/v1/databases/db-1/backups')
+    expect(calls[0]?.init?.method).toBe('POST')
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      frequency: '0 2 * * *',
+      enabled: true,
+      dump_all: false,
+      save_s3: true,
+      s3_storage_uuid: 's3-1',
+      database_backup_retention_amount_s3: 14,
+      database_backup_retention_amount_locally: 3,
+    })
+  })
+
+  it('sans stockage S3, ne demande pas de copie hors serveur', async () => {
+    const calls = mockFetch(() => json({ uuid: 'backup-2' }, 201))
+    const { createDatabaseBackup } = await loadModule()
+    await createDatabaseBackup('db-1', { frequency: 'daily', retentionLocal: 7, retentionS3: 14 })
+    const body = JSON.parse(String(calls[0]?.init?.body))
+    expect(body.save_s3).toBe(false)
+    expect(body).not.toHaveProperty('s3_storage_uuid')
+  })
+
+  it('remonte une erreur lisible quand l’API refuse', async () => {
+    mockFetch(() => json({ message: 'Validation failed.', errors: { frequency: ['Invalid cron'] } }, 422))
+    const { createDatabaseBackup } = await loadModule()
+    const result = await createDatabaseBackup('db-1', { frequency: 'x', retentionLocal: 1, retentionS3: 1 })
+    expect('error' in result && result.error).toContain('Invalid cron')
+  })
+
+  it('lit les planifications et leurs exécutions, sans garder les messages internes', async () => {
+    mockFetch(() =>
+      json([
+        {
+          uuid: 'backup-1',
+          frequency: '0 2 * * *',
+          enabled: true,
+          save_s3: 1,
+          executions: [
+            { uuid: 'e1', status: 'success', size: '2048', created_at: '2026-11-15T02:00:00Z', message: 'secret' },
+            { uuid: 'e2', status: 'failed', size: null, created_at: '2026-11-16T02:00:00Z' },
+            { status: 'success' },
+          ],
+        },
+        'invalide',
+      ]),
+    )
+    const { listDatabaseBackups } = await loadModule()
+    const result = await listDatabaseBackups('db-1')
+    expect(result).toEqual([
+      {
+        id: 'backup-1',
+        frequency: '0 2 * * *',
+        enabled: true,
+        saveS3: true,
+        executions: [
+          { id: 'e2', status: 'failed', size: null, createdAt: '2026-11-16T02:00:00Z' },
+          { id: 'e1', status: 'success', size: 2048, createdAt: '2026-11-15T02:00:00Z' },
+        ],
+      },
+    ])
+  })
+
+  it('lance une sauvegarde immédiate par PATCH backup_now', async () => {
+    const calls = mockFetch(() => json({ message: 'updated' }))
+    const { runDatabaseBackup } = await loadModule()
+    expect(await runDatabaseBackup('db-1', 'backup-1')).toEqual({ ok: true })
+    expect(calls[0]?.url).toBe('https://coolify.test/api/v1/databases/db-1/backups/backup-1')
+    expect(calls[0]?.init?.method).toBe('PATCH')
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({ backup_now: true })
+  })
+})
