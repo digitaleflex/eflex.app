@@ -1,3 +1,5 @@
+> **Vision historique du sous-système Axiom.** Cette vision ne décrit pas le positionnement produit courant d'E-FLEX App. Axiom est gelé selon [ADR-0012](../adr/0012-eflex-production-coolify-axiom-paused.md). Lire la [vision E-FLEX courante](../architecture/eflex/00-product-and-scope.md).
+
 # Axiom Vision
 
 ## Product definition

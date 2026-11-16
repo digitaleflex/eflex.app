@@ -16,7 +16,7 @@ A change is "significant" when it alters a component boundary, a runtime technol
 
 Context · Decision · Consequences · Alternatives considered (when relevant) · Status · Date · Supersedes / Superseded by.
 
-## Index
+## Current E-FLEX product decision\n\nFor the current production path, read [ADR-0012](0012-eflex-production-coolify-axiom-paused.md) and the [E-FLEX architecture reference](../architecture/eflex/README.md). ADRs 0001–0011 remain part of the Axiom and platform decision history unless explicitly superseded.\n\n## Index
 
 | ADR | Title | Status |
 |---|---|---|
@@ -30,6 +30,7 @@ Context · Decision · Consequences · Alternatives considered (when relevant) �
 | [0008](0008-agent-engine-communication.md) | Agent ↔ Engine communication model | Proposed |
 | [0009](0009-sse-for-realtime.md) | SSE for realtime Console updates | Accepted |
 | [0010](0010-deployment-engine-supersedes-orchestrator.md) | Deployment Engine supersedes generic orchestrator state machine | Accepted |
-| [0011](0011-coolify-then-axiom.md) | Coolify remains the deployment backend, behind an abstraction before Axiom | Accepted |
+| [0011](0011-coolify-then-axiom.md) | Coolify remains the deployment backend, behind an abstraction before Axiom | Superseded by ADR-0012 |
+| [0012](0012-eflex-production-coolify-axiom-paused.md) | E-FLEX production path: portail + Coolify ; Axiom en pause | Proposed |
 
 Note: the initial plan named "OpenTelemetry-based observability" for ADR-0006. The accepted ADR-0006 records structured logs + Prometheus-compatible metrics for V0.1, with OpenTelemetry tracing deferred (see ADR text).

@@ -1,3 +1,6 @@
+> **Document historique Axiom — pas l'architecture de production E-FLEX actuelle.**  
+> Depuis ADR-0012, le portail E-FLEX utilise Coolify directement via `portail/src/lib/coolify.ts`. Le moteur et l'agent Go décrits ci-dessous sont gelés et ne sont pas dans le chemin de production du portail. Pour l'architecture produit courante, lire [EAOA v1.0](eflex/README.md).
+
 # Axiom Architecture Overview
 
 > Issue #29. Boundaries: [`boundaries.md`](boundaries.md). API: [`api-contract.md`](api-contract.md). Decisions: [`../adr/`](../adr/README.md).
