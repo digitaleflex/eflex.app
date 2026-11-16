@@ -164,7 +164,7 @@ describe('quotaOverruns', () => {
     { id: 'ok', name: 'Dans les clous', subscription: { plan: 'starter', status: 'active' } },
   ]
 
-  it('applique le plan effectif et signale projets et membres au-delà de la limite', () => {
+  it('applique le plan effectif et signale les quotas dépassés (membres ; projets illimités)', () => {
     const overruns = quotaOverruns(
       organizations,
       [
@@ -175,15 +175,16 @@ describe('quotaOverruns', () => {
       ],
       [{ organizationId: 'ok', count: 11 }],
     )
-    expect(overruns).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ organizationId: 'pro', kind: 'projects', limit: 30, plan: 'Pro' }),
-        expect.objectContaining({ organizationId: 'free', kind: 'projects', limit: 5, plan: 'Découverte' }),
-        expect.objectContaining({ organizationId: 'inactive', kind: 'projects', limit: 5, plan: 'Découverte' }),
-        expect.objectContaining({ organizationId: 'ok', kind: 'members', used: 11, limit: 10 }),
-      ]),
-    )
-    expect(overruns).toHaveLength(4)
+    // Les projets sont illimités sur tous les plans : seuls les dépassements de membres sont signalés.
+    expect(overruns).toEqual([
+      expect.objectContaining({
+        organizationId: 'ok',
+        kind: 'members',
+        used: 11,
+        limit: 10,
+        plan: 'Starter',
+      }),
+    ])
   })
 
   it('ne signale rien à la limite exacte (le quota bloque la création suivante, sans dépassement)', () => {

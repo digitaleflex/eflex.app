@@ -7,7 +7,14 @@ vi.mock('@/lib/session', () => ({
     session: { activeOrganizationId: 'org-test' },
   }),
 }))
-vi.mock('@/lib/rate-limit', () => ({ allow: async () => true, allowOrg: async () => true }))
+vi.mock('@/lib/rate-limit', () => ({
+  allow: async () => true,
+  allowOrg: async () => true,
+  check: async () => ({ allowed: true, limit: 10, remaining: 9, retryAfterSec: 0, resetAt: Date.now() + 60_000, mode: 'memory' as const }),
+  checkOrg: async () => ({ allowed: true, limit: 30, remaining: 29, retryAfterSec: 0, resetAt: Date.now() + 60_000, mode: 'memory' as const }),
+  rateLimitedResponse: (result: { allowed: boolean; limit: number; remaining: number; retryAfterSec: number; resetAt: number }, error?: string) =>
+    new Response(JSON.stringify({ error: error ?? 'Trop de requêtes.' }), { status: 429 }),
+}))
 vi.mock('@/lib/organizations', () => ({
   resolveOrganization: async () => ({ organizationId: 'org-test', role: 'owner' }),
 }))
