@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Ban, CalendarPlus, Gauge, RotateCcw, ShieldCheck, Sparkles, Unlock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { PLANS, PLAN_IDS } from '@/lib/plans'
 
 type Feedback = { tone: 'success' | 'error'; text: string } | null
@@ -164,26 +165,22 @@ export function OrganizationAdminActions({
           un autre plan. Un changement de plan en cours de période crédite la valeur restante au prorata (jours / 30).
         </p>
         <div className="flex flex-wrap items-end gap-3">
-          <label className="space-y-1 text-sm">
-            <span className="block text-muted-foreground">Plan</span>
-            <select
+          <div className="min-w-[11rem]">
+            <Select
+              label="Plan"
               value={planValue}
               onChange={(e) => setPlanValue(e.target.value)}
-              className="h-11 rounded-lg border border-input bg-background px-3 text-sm"
-            >
-              {PLAN_IDS.map((id) => <option key={id} value={id}>{PLANS[id].label}</option>)}
-            </select>
-          </label>
-          <label className="space-y-1 text-sm">
-            <span className="block text-muted-foreground">Statut</span>
-            <select
+              options={PLAN_IDS.map((id) => ({ value: id, label: PLANS[id].label }))}
+            />
+          </div>
+          <div className="min-w-[11rem]">
+            <Select
+              label="Statut"
               value={statusValue}
               onChange={(e) => setStatusValue(e.target.value as Status)}
-              className="h-11 rounded-lg border border-input bg-background px-3 text-sm"
-            >
-              {STATUS_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-            </select>
-          </label>
+              options={STATUS_OPTIONS}
+            />
+          </div>
           <div className="min-w-[16rem] flex-1">
             <Input
               id="plan-reason"

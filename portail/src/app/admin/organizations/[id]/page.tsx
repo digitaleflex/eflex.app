@@ -1,14 +1,19 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Building2, CreditCard, FileText, Mail, ShieldAlert, Users } from 'lucide-react'
+import { ArrowLeft, Building2, CreditCard, FileText, Gauge, Mail, ShieldAlert, Users, Wallet } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/admin'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { PageHeader } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { EmptyState } from '@/components/ui/empty-state'
+import { StatCard } from '@/components/ui/stat-card'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { planById, formatFcfa, formatPrice } from '@/lib/plans'
 import { computeBillingState } from '@/lib/billing'
 import { OrganizationAdminActions } from '@/components/admin/organization-admin-actions'
 import { TimeFr } from '@/components/admin/time-fr'
+import { formatInteger } from '@/lib/table'
 
 export const metadata = { title: 'Organisation — Administration EFLEX' }
 export const dynamic = 'force-dynamic'
@@ -122,32 +127,47 @@ export default async function AdminOrganizationPage({ params }: { params: Promis
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link href="/admin/organizations" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />Toutes les organisations
+      <div className="space-y-3">
+        <Link
+          href="/admin/organizations"
+          className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Toutes les organisations
         </Link>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-            <Building2 className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
-            {organization.name}
-          </h1>
-          <Badge variant="outline">{state.plan.label}</Badge>
-          {state.suspended && <Badge variant="destructive">Suspendue</Badge>}
-          {state.phase === 'past_due' && (
-            <Badge variant={state.blocked ? 'destructive' : 'warning'}>
-              {state.blocked ? 'Impayé — bloquée' : `Impayé — grâce ${state.graceDaysLeft ?? 0} j`}
-            </Badge>
-          )}
-          {state.phase === 'expired' && <Badge variant="warning">Période échue</Badge>}
-          {state.manualOverride && <Badge variant="outline">Plan manuel</Badge>}
-        </div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {organization.slug} · créée le <TimeFr value={organization.createdAt} dateOnly /> ·{' '}
-          {usage.members} membre{usage.members > 1 ? 's' : ''} · {usage.projects} projet{usage.projects > 1 ? 's' : ''} ·{' '}
-          {pendingInvitations} invitation{pendingInvitations > 1 ? 's' : ''} en attente
-        </p>
+        <PageHeader
+          title={
+            <span className="flex flex-wrap items-center gap-2">
+              <Building2 className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+              {organization.name}
+            </span>
+          }
+          description={
+            <>
+              {organization.slug} · créée le <TimeFr value={organization.createdAt} dateOnly /> ·{' '}
+              {formatInteger(usage.members)} membre{usage.members > 1 ? 's' : ''} ·{' '}
+              {formatInteger(usage.projects)} projet{usage.projects > 1 ? 's' : ''} ·{' '}
+              {formatInteger(pendingInvitations)} invitation{pendingInvitations > 1 ? 's' : ''} en attente
+            </>
+          }
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={state.plan.id} label={state.plan.label} tone="neutral" dot={false} />
+              {state.suspended && <StatusBadge status="suspended" />}
+              {state.phase === 'past_due' && (
+                <StatusBadge
+                  status="past_due"
+                  label={state.blocked ? 'Impayé — bloquée' : `Impayé — grâce ${state.graceDaysLeft ?? 0} j`}
+                  tone={state.blocked ? 'destructive' : 'warning'}
+                />
+              )}
+              {state.phase === 'expired' && <StatusBadge status="expired" label="Période échue" tone="warning" />}
+              {state.manualOverride && <StatusBadge status="manual" label="Plan manuel" tone="neutral" dot={false} />}
+            </div>
+          }
+        />
         {organization.suspendedAt && (
-          <p className="mt-2 flex items-start gap-2 rounded-lg border border-destructive/25 bg-destructive/10 p-3 text-sm text-destructive">
+          <p className="flex items-start gap-2 rounded-lg border border-destructive/25 bg-destructive/10 p-3 text-sm text-destructive">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>
               Suspendue le <TimeFr value={organization.suspendedAt} />
@@ -157,6 +177,41 @@ export default async function AdminOrganizationPage({ params }: { params: Promis
           </p>
         )}
       </div>
+
+      <section aria-label="Indicateurs de facturation et de consommation" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Plan effectif"
+          value={state.plan.label}
+          hint={`Souscrit : ${state.subscribedPlan.label} · statut ${state.phase}`}
+          icon={Wallet}
+          tone={state.phase === 'past_due' ? 'warning' : 'neutral'}
+        />
+        <StatCard
+          label="Période jusqu’au"
+          value={state.periodEnd ? <TimeFr value={state.periodEnd} dateOnly /> : '—'}
+          hint={
+            state.graceUntil
+              ? `Grâce jusqu’au ${state.graceUntil.toLocaleDateString('fr-FR')} · ${state.blocked ? 'déploiements bloqués' : 'déploiements autorisés'}`
+              : 'Aucune période de grâce active'
+          }
+          icon={CreditCard}
+          tone={state.blocked ? 'critical' : state.phase === 'past_due' ? 'warning' : 'neutral'}
+        />
+        <StatCard
+          label="Applications"
+          value={`${formatInteger(usage.apps)} / ${formatInteger(state.limits.projects)}`}
+          hint={usage.apps >= state.limits.projects ? 'Quota atteint' : `${formatInteger(usage.projects)} projet${usage.projects > 1 ? 's' : ''} réels`}
+          icon={Gauge}
+          tone={usage.apps >= state.limits.projects ? 'warning' : 'neutral'}
+        />
+        <StatCard
+          label="Membres"
+          value={`${formatInteger(usage.members)} / ${formatInteger(state.limits.members)}`}
+          hint={usage.members >= state.limits.members ? 'Quota atteint' : 'Dans la limite du plan'}
+          icon={Users}
+          tone={usage.members >= state.limits.members ? 'warning' : 'neutral'}
+        />
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -275,10 +330,10 @@ export default async function AdminOrganizationPage({ params }: { params: Promis
         </Card>
 
         <Card>
-          <CardHeader><h2 className="font-semibold">Projets ({organization.projects.length})</h2></CardHeader>
+          <CardHeader><h2 className="font-semibold">Projets ({formatInteger(organization.projects.length)})</h2></CardHeader>
           <CardContent>
             {organization.projects.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Aucun projet.</p>
+              <EmptyState icon={Building2} title="Aucun projet" description="Cette organisation ne contient pas encore de projet." />
             ) : (
               <ul className="divide-y divide-border">
                 {organization.projects.map((project) => {
@@ -314,7 +369,7 @@ export default async function AdminOrganizationPage({ params }: { params: Promis
           </CardHeader>
           <CardContent>
             {organization.payments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Aucun paiement.</p>
+              <EmptyState icon={CreditCard} title="Aucun paiement" description="Aucune transaction enregistrée pour cette organisation." />
             ) : (
               <ul className="divide-y divide-border">
                 {organization.payments.map((payment) => (
@@ -350,7 +405,7 @@ export default async function AdminOrganizationPage({ params }: { params: Promis
           <CardHeader><h2 className="font-semibold">Journal d’activité récent</h2></CardHeader>
           <CardContent>
             {auditLogs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Aucune entrée d’audit.</p>
+              <EmptyState icon={FileText} title="Aucune entrée d’audit" description="Aucune activité d’administration enregistrée récemment." />
             ) : (
               <ul className="divide-y divide-border">
                 {auditLogs.map((entry) => (

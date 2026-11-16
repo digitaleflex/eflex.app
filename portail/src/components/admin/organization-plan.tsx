@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { PLANS, PLAN_IDS } from '@/lib/plans'
 
 const STATUSES = [
@@ -63,39 +65,31 @@ export function AdminOrganizationPlan({
         </p>
       )}
       <div className="flex flex-wrap items-end gap-3">
-        <label className="space-y-1 text-sm">
-          <span className="block text-muted-foreground">Plan</span>
-          <select
+        <div className="min-w-[11rem]">
+          <Select
+            label="Plan"
             value={plan}
             onChange={(e) => setPlan(e.target.value)}
-            className="h-11 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {PLAN_IDS.map((id) => (
-              <option key={id} value={id}>{PLANS[id].label}</option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1 text-sm">
-          <span className="block text-muted-foreground">Statut</span>
-          <select
+            options={PLAN_IDS.map((id) => ({ value: id, label: PLANS[id].label }))}
+          />
+        </div>
+        <div className="min-w-[11rem]">
+          <Select
+            label="Statut"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="h-11 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {STATUSES.map((item) => (
-              <option key={item.value} value={item.value}>{item.label}</option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1 text-sm">
-          <span className="block text-muted-foreground">Motif (obligatoire)</span>
-          <input
+            options={STATUSES.map((item) => ({ value: item.value, label: item.label }))}
+          />
+        </div>
+        <div className="min-w-[14rem] flex-1">
+          <Input
+            id={`org-plan-reason-${organizationId}`}
+            label="Motif (obligatoire)"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             maxLength={500}
-            className="h-11 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
-        </label>
+        </div>
         <Button type="button" size="sm" loading={saving} disabled={reason.trim().length < 3} onClick={() => void save()}>
           Enregistrer
         </Button>

@@ -1,12 +1,18 @@
 import Link from 'next/link'
 import type { Prisma } from '@prisma/client'
-import { Building2, Filter, TriangleAlert } from 'lucide-react'
+import { Building2, Filter, ShieldAlert, TriangleAlert, Wallet } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/page-header'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Select } from '@/components/ui/select'
+import { StatCard } from '@/components/ui/stat-card'
+import { StatusBadge, type StatusTone } from '@/components/ui/status-badge'
 import { PLAN_IDS, PLANS } from '@/lib/plans'
 import { computeBillingState } from '@/lib/billing'
 import { TimeFr } from '@/components/admin/time-fr'
+import { formatInteger } from '@/lib/table'
 import { cn } from '@/lib/utils'
 
 export const metadata = { title: 'Organisations — Administration EFLEX' }
@@ -22,7 +28,7 @@ function flags(
   inactiveDays: number | null,
   usage: { apps: number; members: number },
 ) {
-  const out: { label: string; tone: 'warning' | 'destructive' | 'outline' | 'success' }[] = []
+  const out: { label: string; tone: StatusTone }[] = []
   if (state.suspended) out.push({ label: 'Suspendue', tone: 'destructive' })
   if (state.phase === 'past_due') {
     out.push(
@@ -36,7 +42,7 @@ function flags(
   if (usage.apps >= state.limits.projects || usage.members >= state.limits.members) {
     out.push({ label: 'Quota atteint', tone: 'warning' })
   }
-  if (inactiveDays != null && inactiveDays >= 60) out.push({ label: `Inactive ${inactiveDays} j`, tone: 'outline' })
+  if (inactiveDays != null && inactiveDays >= 60) out.push({ label: `Inactive ${inactiveDays} j`, tone: 'neutral' })
   if (out.length === 0) out.push({ label: 'À jour', tone: 'success' })
   return out
 }
@@ -151,137 +157,186 @@ export default async function AdminOrganizationsPage({
     row.usage.apps >= row.state.limits.projects || row.usage.members >= row.state.limits.members || row.inactive >= 60,
   )
   const displayed = filters.vue === 'attention' ? attention : rows
+  const suspendedCount = rows.filter((row) => row.state.suspended).length
+  const pastDueCount = rows.filter((row) => row.state.phase === 'past_due').length
+  const blockedCount = rows.filter((row) => row.state.blocked).length
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Organisations</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Plans, consommation, impayés et suspension. Une suspension ne supprime ni projet ni application en ligne.
-        </p>
-      </div>
-
-      <Card className="p-4">
-        <form method="get" className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1.5">
-            <label htmlFor="filter-plan" className="text-sm font-medium">Plan</label>
-            <select
-              id="filter-plan"
-              name="plan"
-              defaultValue={filters.plan ?? ''}
-              className="h-11 rounded-lg border border-input bg-background px-3 text-sm"
-            >
-              <option value="">Tous les plans</option>
-              {PLAN_IDS.map((id) => <option key={id} value={id}>{PLANS[id].label}</option>)}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label htmlFor="filter-paiement" className="text-sm font-medium">Paiement</label>
-            <select
-              id="filter-paiement"
-              name="paiement"
-              defaultValue={filters.paiement ?? ''}
-              className="h-11 rounded-lg border border-input bg-background px-3 text-sm"
-            >
-              <option value="">Tous</option>
-              <option value="past_due">Impayé (past_due)</option>
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label htmlFor="filter-suspendue" className="text-sm font-medium">Suspension</label>
-            <select
-              id="filter-suspendue"
-              name="suspendue"
-              defaultValue={filters.suspendue ?? ''}
-              className="h-11 rounded-lg border border-input bg-background px-3 text-sm"
-            >
-              <option value="">Toutes</option>
-              <option value="1">Suspendues</option>
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label htmlFor="filter-inactive" className="text-sm font-medium">Inactive depuis</label>
-            <select
-              id="filter-inactive"
-              name="inactive"
-              defaultValue={filters.inactive ?? ''}
-              className="h-11 rounded-lg border border-input bg-background px-3 text-sm"
-            >
-              <option value="">Peu importe</option>
-              {INACTIVE_DAYS.map((days) => <option key={days} value={days}>{days} jours</option>)}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label htmlFor="filter-vue" className="text-sm font-medium">Vue</label>
-            <select
-              id="filter-vue"
-              name="vue"
-              defaultValue={filters.vue ?? ''}
-              className="h-11 rounded-lg border border-input bg-background px-3 text-sm"
-            >
-              <option value="">Toutes</option>
-              <option value="attention">À surveiller</option>
-            </select>
-          </div>
-          <button
-            type="submit"
-            className="inline-flex h-11 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <Filter className="h-4 w-4" aria-hidden="true" />
-            Filtrer
-          </button>
-          <Link href="/admin/organizations" className="text-sm text-muted-foreground underline underline-offset-4">
-            Réinitialiser
+      <PageHeader
+        title="Organisations"
+        description="Plans, consommation, impayés et suspension. Une suspension ne supprime ni projet ni application en ligne."
+        actions={
+          <Link href="/admin/organizations?vue=attention" className="text-sm font-medium text-primary hover:underline">
+            Voir à surveiller ({formatInteger(attention.length)})
           </Link>
-        </form>
+        }
+      />
+
+      <section aria-label="Indicateurs des organisations" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Organisations affichées"
+          value={formatInteger(displayed.length)}
+          hint={
+            filters.vue === 'attention'
+              ? `Vue « à surveiller » · ${formatInteger(rows.length)} chargée${rows.length > 1 ? 's' : ''} après filtres`
+              : `${formatInteger(rows.length)} chargée${rows.length > 1 ? 's' : ''} après filtres`
+          }
+          icon={Building2}
+        />
+        <StatCard
+          label="À surveiller"
+          value={formatInteger(attention.length)}
+          hint="Impayé, suspension, quota atteint ou inactivité prolongée"
+          icon={TriangleAlert}
+          tone={attention.length > 0 ? 'warning' : 'neutral'}
+          href="/admin/organizations?vue=attention"
+        />
+        <StatCard
+          label="Impayés (past_due)"
+          value={formatInteger(pastDueCount)}
+          hint={`${formatInteger(blockedCount)} bloquée${blockedCount > 1 ? 's' : ''} (déploiements bloqués)`}
+          icon={Wallet}
+          tone={pastDueCount > 0 ? 'warning' : 'neutral'}
+        />
+        <StatCard
+          label="Suspendues"
+          value={formatInteger(suspendedCount)}
+          hint="Créations et nouveaux déploiements gelés"
+          icon={ShieldAlert}
+          tone={suspendedCount > 0 ? 'critical' : 'neutral'}
+        />
+      </section>
+
+      <Card>
+        <CardHeader className="border-b border-border pb-4">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <Filter className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            Filtres
+          </h2>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <form method="get" className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[11rem]">
+              <Select
+                name="plan"
+                label="Plan"
+                defaultValue={filters.plan ?? ''}
+                options={[{ value: '', label: 'Tous les plans' }, ...PLAN_IDS.map((id) => ({ value: id, label: PLANS[id].label }))]}
+              />
+            </div>
+            <div className="min-w-[11rem]">
+              <Select
+                name="paiement"
+                label="Paiement"
+                defaultValue={filters.paiement ?? ''}
+                options={[
+                  { value: '', label: 'Tous' },
+                  { value: 'past_due', label: 'Impayé (past_due)' },
+                ]}
+              />
+            </div>
+            <div className="min-w-[11rem]">
+              <Select
+                name="suspendue"
+                label="Suspension"
+                defaultValue={filters.suspendue ?? ''}
+                options={[
+                  { value: '', label: 'Toutes' },
+                  { value: '1', label: 'Suspendues' },
+                ]}
+              />
+            </div>
+            <div className="min-w-[11rem]">
+              <Select
+                name="inactive"
+                label="Inactive depuis"
+                defaultValue={filters.inactive ?? ''}
+                options={[
+                  { value: '', label: 'Peu importe' },
+                  ...INACTIVE_DAYS.map((days) => ({ value: String(days), label: `${days} jours` })),
+                ]}
+              />
+            </div>
+            <div className="min-w-[11rem]">
+              <Select
+                name="vue"
+                label="Vue"
+                defaultValue={filters.vue ?? ''}
+                options={[
+                  { value: '', label: 'Toutes' },
+                  { value: 'attention', label: 'À surveiller' },
+                ]}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2 pb-0.5">
+              <Button type="submit">
+                <Filter className="h-4 w-4" aria-hidden="true" />
+                Filtrer
+              </Button>
+              <Link href="/admin/organizations" className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline underline-offset-4">
+                Réinitialiser
+              </Link>
+            </div>
+          </form>
+        </CardContent>
       </Card>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
-          <span className="font-medium tabular-nums">{displayed.length}</span> organisation{displayed.length > 1 ? 's' : ''} affichée{displayed.length > 1 ? 's' : ''}
+          <span className="font-medium tabular-nums">{formatInteger(displayed.length)}</span> organisation{displayed.length > 1 ? 's' : ''} affichée{displayed.length > 1 ? 's' : ''}
           {filters.vue === 'attention' && ' · vue « à surveiller »'}
         </p>
-        <Link tabIndex={-1} href="/admin/organizations?vue=attention" className="text-sm font-medium text-primary hover:underline">
-          Voir à surveiller ({attention.length})
+        <Link href="/admin/organizations?vue=attention" className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline">
+          Voir à surveiller ({formatInteger(attention.length)})
         </Link>
       </div>
 
       {displayed.length === 0 ? (
         <Card>
-          <p className="p-8 text-center text-sm text-muted-foreground">Aucune organisation ne correspond à ces filtres.</p>
+          <EmptyState
+            icon={Building2}
+            title="Aucune organisation trouvée"
+            description="Aucune organisation ne correspond à ces filtres. Modifiez les critères ou réinitialisez la recherche."
+            action={
+              <Link href="/admin/organizations" className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline">
+                Réinitialiser les filtres
+              </Link>
+            }
+          />
         </Card>
       ) : (
         <div className="space-y-3">
           {displayed.map(({ organization, state, usage, activity, badges }) => (
             <Card key={organization.id} className="p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="flex flex-wrap items-center gap-2 font-semibold">
+                <div className="min-w-0 space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2 font-semibold">
                     <Link href={`/admin/organizations/${organization.id}`} className="inline-flex items-center gap-1.5 hover:underline">
                       <Building2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                       {organization.name}
                     </Link>
-                    <Badge variant="outline">{state.plan.label}</Badge>
+                    <StatusBadge status={state.plan.id} label={state.plan.label} tone="neutral" dot={false} />
                     {badges.map((badge) => (
-                      <Badge key={badge.label} variant={badge.tone}>{badge.label}</Badge>
+                      <StatusBadge key={badge.label} status={badge.label} label={badge.label} tone={badge.tone} />
                     ))}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {organization.slug} · {usage.members} membre{usage.members > 1 ? 's' : ''} ·{' '}
-                    {usage.projects} projet{usage.projects > 1 ? 's' : ''} ·{' '}
-                    {usage.apps} / <span className="tabular-nums">{state.limits.projects}</span> application{state.limits.projects > 1 ? 's' : ''} ·{' '}
-                    <span className="tabular-nums">{pending.get(organization.id) ?? 0}</span> invitation
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {organization.slug} · {formatInteger(usage.members)} membre{usage.members > 1 ? 's' : ''} ·{' '}
+                    {formatInteger(usage.projects)} projet{usage.projects > 1 ? 's' : ''} ·{' '}
+                    <span className="tabular-nums">{formatInteger(usage.apps)} / {formatInteger(state.limits.projects)}</span> application{state.limits.projects > 1 ? 's' : ''} ·{' '}
+                    <span className="tabular-nums">{formatInteger(pending.get(organization.id) ?? 0)}</span> invitation
                     {(pending.get(organization.id) ?? 0) > 1 ? 's' : ''} en attente · créée le{' '}
                     <TimeFr value={organization.createdAt} dateOnly />
                   </p>
                   {organization.suspendedAt && organization.suspensionReason && (
-                    <p className="mt-1 flex items-start gap-1.5 text-xs text-destructive">
+                    <p className="flex items-start gap-1.5 text-xs text-destructive">
                       <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                       Motif : {organization.suspensionReason}
                     </p>
                   )}
                   {state.phase === 'past_due' && state.graceUntil && (
-                    <p className="mt-1 text-xs text-warning">
+                    <p className="text-xs text-warning">
                       Grâce jusqu’au <TimeFr value={state.graceUntil} /> ·{' '}
                       {state.blocked ? 'déploiements bloqués' : 'déploiements encore autorisés'}
                     </p>
@@ -292,7 +347,7 @@ export default async function AdminOrganizationsPage({
                   <p className={cn('font-medium', state.blocked && 'text-destructive')}>
                     <TimeFr value={activity} />
                   </p>
-                  <Link href={`/admin/organizations/${organization.id}`} className="mt-2 inline-block font-medium text-primary hover:underline">
+                  <Link href={`/admin/organizations/${organization.id}`} className="mt-2 inline-flex min-h-11 items-center font-medium text-primary hover:underline">
                     Ouvrir la fiche
                   </Link>
                 </div>
