@@ -180,7 +180,11 @@ model Project {
   supportTickets        SupportTicket[]
   analytics             ProjectAnalytics?
   trafficStats          TrafficDailyStat[]
+  trafficSiteStats      TrafficDailySiteStat[]
   eventStats            AnalyticsEventDaily[]
+  analyticsDailyVisitors AnalyticsDailyVisitor[]
+  trafficDimensions     TrafficDailyDimension[]
+  analyticsDimensionVisitors AnalyticsDailyDimensionVisitor[]
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 
@@ -644,6 +648,10 @@ model ProjectAnalytics {
   respectDnt     Boolean   @default(true)
   /// Collecte du chemin de page (agrégé par jour). Désactivable pour ne garder qu'un volume global.
   collectPath    Boolean   @default(true)
+  /// Collecte agrégée du référent (domaine/source) sur les pages vues.
+  collectReferrer Boolean  @default(true)
+  /// Collecte agrégée appareil/navigateur/OS (dérivés du User-Agent) sur les pages vues.
+  collectDevice   Boolean  @default(true)
   /// Durée de conservation cible des statistiques quotidiennes (jours). Borne appliquée côté API.
   retentionDays  Int       @default(90)
   /// Noms d'événements considérés comme objectifs de conversion (#111). Liste bornée, sans propriétés ni données nominatives.
@@ -672,6 +680,68 @@ model TrafficDailyStat {
 
   @@unique([projectId, date, path])
   @@index([projectId, date])
+}
+
+/// Totaux quotidiens site/projet (vues et visiteurs uniques du jour). Agrégat dérivé des mesures reçues.
+model TrafficDailySiteStat {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// Jour UTC de la mesure.
+  date      DateTime @db.Date
+  /// Nombre total de pages vues comptées ce jour.
+  views     Int      @default(0)
+  /// Nombre de visiteurs uniques comptés ce jour (déduplication privacy-friendly, par jour uniquement).
+  visitors  Int      @default(0)
+
+  @@unique([projectId, date])
+  @@index([projectId, date])
+}
+
+/// Empreinte éphémère de déduplication des visiteurs uniques par jour (hash non réversible, sel quotidien).
+/// Ne contient ni IP ni identifiant persistant ; sert uniquement à éviter de recompter un visiteur le même jour.
+model AnalyticsDailyVisitor {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// Jour UTC concerné.
+  date      DateTime @db.Date
+  /// Empreinte HMAC hex (64 chars) dérivée de (IP, User-Agent) avec un sel rotatif quotidien.
+  hash      String   @db.VarChar(64)
+
+  @@unique([projectId, date, hash])
+  @@index([projectId, date])
+}
+
+/// Agrégat quotidien par dimension (référent, appareil, navigateur, OS). Valeurs bornées/normalisées, sans donnée brute.
+model TrafficDailyDimension {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  /// Dimension : referrer | device | browser | os
+  dimension String   @db.VarChar(32)
+  /// Valeur normalisée (domaine, direct, desktop/mobile/..., nom navigateur/OS).
+  value     String   @db.VarChar(255)
+  views     Int      @default(0)
+  visitors  Int      @default(0)
+
+  @@unique([projectId, date, dimension, value])
+  @@index([projectId, date, dimension])
+}
+
+/// Déduplication visiteurs uniques par segment de dimension et par jour (même empreinte journalière que P0).
+model AnalyticsDailyDimensionVisitor {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  dimension String   @db.VarChar(32)
+  value     String   @db.VarChar(255)
+  hash      String   @db.VarChar(64)
+
+  @@unique([projectId, date, dimension, value, hash])
+  @@index([projectId, date, dimension])
 }
 
 /// Statistique quotidienne agrégée d'événements nommés (#111). Aucun identifiant visiteur,
