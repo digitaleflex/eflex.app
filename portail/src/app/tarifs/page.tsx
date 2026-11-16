@@ -36,8 +36,8 @@ const billingFaq = [
 function LimitRow({ label, value }: { label: string; value: string }) {
   return (
     <li className="flex items-start justify-between gap-4 py-2 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium tabular-nums text-foreground text-right">{value}</span>
+      <span className="min-w-0 text-muted-foreground">{label}</span>
+      <span className="shrink-0 font-medium tabular-nums text-foreground text-right">{value}</span>
     </li>
   )
 }
@@ -132,13 +132,13 @@ export default function TarifsPage() {
           </div>
 
           <div className="mt-10 grid gap-4 lg:grid-cols-2">
-            <Card>
+            <Card className="min-w-0">
               <CardHeader>
                 <h2 className="text-base font-semibold">Comparatif des limites</h2>
                 <p className="text-sm text-muted-foreground">Valeurs issues de la configuration des plans de la plateforme.</p>
               </CardHeader>
               <CardContent>
-                <div className="max-w-full overflow-x-auto">
+                <div className="w-full max-w-full overflow-x-auto">
                   <table className="w-full min-w-[520px] text-left text-sm">
                     <caption className="sr-only">Comparatif des plans EFLEX</caption>
                     <thead>
