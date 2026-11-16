@@ -190,7 +190,7 @@ export function MigrationTeaser({ contactEmail }: { contactEmail: string }) {
               aria-label="Maquette illustrative du futur Migration Center : sélection de la source, analyse de compatibilité et aperçu d’un résultat d’exemple. Fonction non disponible."
               className="migration-demo overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-b from-white/[0.08] to-white/[0.03] p-1 shadow-2xl shadow-black/30 backdrop-blur-sm"
             >
-              <div className="overflow-hidden rounded-[1.35rem] bg-eflexnavy/60 ring-1 ring-white/10">
+              <div className="overflow-hidden rounded-3xl bg-eflexnavy/60 ring-1 ring-white/10">
                 <div
                   aria-hidden="true"
                   className="flex items-center gap-2 border-b border-white/10 px-4 py-3 text-white/60"
