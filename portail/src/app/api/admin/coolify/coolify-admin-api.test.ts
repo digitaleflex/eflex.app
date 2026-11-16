@@ -18,6 +18,8 @@ const ROUTES: Array<{ name: string; call: () => Promise<Response> }> = [
   { name: 'GET vulnerabilities', call: async () => (await import('./vulnerabilities/route')).GET() },
   { name: 'GET audit', call: async () => (await import('./audit/route')).GET(new Request('http://x/api/admin/coolify/audit')) },
   { name: 'GET deployments', call: async () => (await import('./deployments/route')).GET() },
+  { name: 'GET ops-tools', call: async () => (await import('./ops-tools/route')).GET() },
+  { name: 'POST ops-tools', call: async () => (await import('./ops-tools/route')).POST(new Request('http://x', { method: 'POST', body: '{"action":"install","tool":"logs"}' })) },
 ]
 
 const user = { user: { id: 'u1', email: 'simple@exemple.fr', role: 'user', banned: false }, session: {} }
@@ -66,5 +68,14 @@ describe('API pilotage Coolify : validation', () => {
     const response = await POST(new Request('http://x', { method: 'POST', body: JSON.stringify(body) }))
     expect(response.status).toBe(400)
     expect((await response.json()).error).toContain('https://')
+  })
+
+  it('outils d’exploitation : refuse un outil inconnu et une clé d’agent invalide', async () => {
+    state.session = admin
+    const { POST } = await import('./ops-tools/route')
+    const post = (body: unknown) => POST(new Request('http://x', { method: 'POST', body: JSON.stringify(body) }))
+    expect((await post({ action: 'install', tool: 'grafana' })).status).toBe(400)
+    expect((await post({ action: 'agent-key', tool: 'metrics', key: 'rm -rf /', token: 'abcdefgh' })).status).toBe(400)
+    expect((await post({ action: 'agent-key', tool: 'logs', key: 'ssh-ed25519 AAAA', token: 'abcdefgh' })).status).toBe(400)
   })
 })

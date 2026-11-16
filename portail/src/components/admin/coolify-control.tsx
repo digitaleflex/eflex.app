@@ -33,6 +33,8 @@ const STATE_FR: Record<string, string> = {
   cancelled: 'annulé',
   ready: 'prêt',
   building: 'installation',
+  starting: 'démarrage',
+  restarting: 'redémarrage',
 }
 const fr = (state: string | null | undefined) => (state ? (STATE_FR[state] ?? state) : 'état inconnu')
 
@@ -664,11 +666,184 @@ function AuditTab() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Supervision : outils d'exploitation                                  */
+/* ------------------------------------------------------------------ */
+
+interface OpsToolRow {
+  id: 'uptime' | 'metrics' | 'logs'
+  product: string
+  title: string
+  description: string
+  url: string | null
+  installed: boolean
+  status: string | null
+  needsAgentKey: boolean
+}
+
+type Credentials = { tool: string; url: string; user: string; password: string }
+
+function CredentialsBox({ credentials, onClose }: { credentials: Credentials; onClose: () => void }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <div role="status" className="space-y-2 rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm">
+      <p className="font-semibold">Accès à {credentials.tool} : notez-le maintenant, il ne sera plus affiché.</p>
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 font-mono text-xs">
+        <dt className="font-sans text-muted-foreground">Adresse</dt>
+        <dd className="break-all">{credentials.url}</dd>
+        <dt className="font-sans text-muted-foreground">Utilisateur</dt>
+        <dd>{credentials.user}</dd>
+        <dt className="font-sans text-muted-foreground">Mot de passe</dt>
+        <dd className="break-all">{credentials.password}</dd>
+      </dl>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            void navigator.clipboard?.writeText(credentials.password).then(() => setCopied(true))
+          }}
+        >
+          {copied ? 'Mot de passe copié' : 'Copier le mot de passe'}
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+          J’ai noté l’accès
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Cet accès protège l’outil avant même sa propre page de connexion. Le certificat HTTPS est émis à la première visite
+        (quelques secondes).
+      </p>
+    </div>
+  )
+}
+
+function BeszelKeyForm({ onDone }: { onDone: (feedback: Feedback) => void }) {
+  const [key, setKey] = useState('')
+  const [token, setToken] = useState('')
+  const [busy, setBusy] = useState(false)
+  return (
+    <form
+      className="space-y-2 border-t border-border pt-3"
+      onSubmit={async (event) => {
+        event.preventDefault()
+        setBusy(true)
+        const result = await call<{ ok: true }>('/ops-tools', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'agent-key', tool: 'metrics', key: key.trim(), token: token.trim() }),
+        })
+        setBusy(false)
+        if (result.ok) {
+          setKey('')
+          setToken('')
+        }
+        onDone(result.ok ? { tone: 'success', message: 'Agent relié : les mesures du serveur apparaissent dans Beszel d’ici une minute.' } : { tone: 'error', message: result.error })
+      }}
+    >
+      <p className="text-xs text-muted-foreground">
+        Dans Beszel, « Ajouter un système » (hôte : <span className="font-mono">/beszel_socket/beszel.sock</span>), puis copiez
+        ici la clé publique et le jeton affichés.
+      </p>
+      <Input label="Clé publique (ssh-ed25519 …)" value={key} onChange={(event) => setKey(event.target.value)} className="font-mono" autoComplete="off" />
+      <Input label="Jeton" value={token} onChange={(event) => setToken(event.target.value)} className="font-mono" autoComplete="off" />
+      <Button type="submit" size="sm" variant="outline" loading={busy} disabled={!key.trim() || !token.trim()}>
+        Relier l’agent
+      </Button>
+    </form>
+  )
+}
+
+function OpsToolsTab() {
+  const { data, error, loading, reload } = useLoad<{ tools: OpsToolRow[]; rootDomain: string | null }>('/ops-tools')
+  const [feedback, setFeedback] = useState<Feedback>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [credentials, setCredentials] = useState<Credentials | null>(null)
+  const [confirmRotate, setConfirmRotate] = useState<OpsToolRow | null>(null)
+
+  async function run(tool: OpsToolRow, action: 'install' | 'rotate') {
+    setBusy(`${action}-${tool.id}`)
+    setFeedback(null)
+    setConfirmRotate(null)
+    const result = await call<Omit<Credentials, 'tool'>>('/ops-tools', { method: 'POST', body: JSON.stringify({ action, tool: tool.id }) })
+    setBusy(null)
+    if (!result.ok) {
+      setFeedback({ tone: 'error', message: result.error })
+      return
+    }
+    setCredentials({ tool: tool.product, ...result.data })
+    await reload()
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="max-w-3xl text-sm text-muted-foreground">
+        Ce que Coolify ne fournit pas : surveillance de disponibilité, ressources des serveurs et journaux en direct. E-FLEX
+        installe chaque outil sur un sous-domaine de {data?.rootDomain ?? 'la plateforme'}, protégé par un accès dédié.
+      </p>
+      {credentials && <CredentialsBox credentials={credentials} onClose={() => setCredentials(null)} />}
+      <Notice feedback={feedback} />
+      <LoadState loading={loading} error={error} onRetry={() => void reload()} />
+      {data && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          {data.tools.map((tool) => (
+            <Card key={tool.id}>
+              <CardContent className="flex h-full flex-col gap-3 p-4">
+                <div>
+                  <h2 className="font-semibold">{tool.title}</h2>
+                  <p className="text-xs text-muted-foreground">{tool.product}</p>
+                </div>
+                <p className="text-sm text-muted-foreground">{tool.description}</p>
+                <p className="flex items-center gap-2 text-sm">
+                  <Dot tone={tool.installed ? (tool.status?.startsWith('running') ? 'ok' : 'warn') : 'muted'} />
+                  {tool.installed ? `Installé · ${fr(tool.status?.split(':')[0])}` : 'Non installé'}
+                </p>
+                {tool.url && (
+                  <p className="break-all font-mono text-xs">
+                    {tool.installed ? (
+                      <a href={tool.url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                        {tool.url}
+                      </a>
+                    ) : (
+                      tool.url
+                    )}
+                  </p>
+                )}
+                <div className="mt-auto flex flex-wrap gap-2">
+                  {tool.installed ? (
+                    <Button type="button" variant="outline" size="sm" loading={busy === `rotate-${tool.id}`} onClick={() => setConfirmRotate(tool)}>
+                      Nouveau mot de passe
+                    </Button>
+                  ) : (
+                    <Button type="button" size="sm" loading={busy === `install-${tool.id}`} disabled={!data.rootDomain} onClick={() => void run(tool, 'install')}>
+                      Installer
+                    </Button>
+                  )}
+                </div>
+                {tool.installed && tool.needsAgentKey && <BeszelKeyForm onDone={setFeedback} />}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+      <ConfirmDialog
+        open={confirmRotate !== null}
+        title={`Nouveau mot de passe pour ${confirmRotate?.product ?? 'l’outil'} ?`}
+        description="L’ancien accès cesse de fonctionner et l’outil redémarre (quelques secondes d’indisponibilité). Ses données sont conservées."
+        confirmLabel="Générer"
+        onConfirm={() => (confirmRotate ? run(confirmRotate, 'rotate') : undefined)}
+        onCancel={() => setConfirmRotate(null)}
+      />
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /* Onglets                                                             */
 /* ------------------------------------------------------------------ */
 
 const TABS = [
   { id: 'servers', label: 'Serveurs', render: () => <ServersTab /> },
+  { id: 'ops', label: 'Supervision', render: () => <OpsToolsTab /> },
   { id: 'storages', label: 'Stockages S3', render: () => <StoragesTab /> },
   { id: 'security', label: 'Sécurité des images', render: () => <SecurityTab /> },
   { id: 'deployments', label: 'Déploiements Coolify', render: () => <DeploymentsTab /> },

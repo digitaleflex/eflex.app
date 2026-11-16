@@ -388,3 +388,70 @@ export function parseDeployments(raw: unknown): CoolifyDeploymentView[] {
 }
 
 export const listCoolifyDeployments = () => read('/deployments', parseDeployments)
+
+/* ------------------------------------------------------------------ */
+/* Services (outils d'exploitation installés par E-FLEX)               */
+/* ------------------------------------------------------------------ */
+
+export interface CoolifyServiceView {
+  id: string
+  name: string
+  status: string | null
+}
+
+export function parseServices(raw: unknown): CoolifyServiceView[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      const data = obj(item)
+      const id = str(data.uuid)
+      if (!id) return null
+      return { id, name: str(data.name) ?? id, status: str(data.status) }
+    })
+    .filter((item): item is CoolifyServiceView => item !== null)
+}
+
+export const listCoolifyServices = () => read('/services', parseServices)
+
+/** Crée un service à partir d'un compose fourni et le démarre. */
+export async function createComposeService(input: {
+  name: string
+  description: string
+  compose: string
+  serverUuid: string
+  projectUuid: string
+  environmentName: string
+}): Promise<{ id: string } | { error: string }> {
+  const res = await coolifyFetch<{ uuid?: unknown }>('/services', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: input.name,
+      description: input.description,
+      server_uuid: input.serverUuid,
+      project_uuid: input.projectUuid,
+      environment_name: input.environmentName,
+      docker_compose_raw: Buffer.from(input.compose, 'utf8').toString('base64'),
+      instant_deploy: true,
+    }),
+  })
+  if (res.error) return { error: res.error }
+  const id = str(res.data?.uuid)
+  return id ? { id } : { error: "L'hébergement n'a pas renvoyé l'identifiant du service." }
+}
+
+/** Remplace le compose d'un service puis le redémarre (nouveau mot de passe, nouvelle version). */
+export async function replaceServiceCompose(serviceUuid: string, compose: string) {
+  const updated = await send(`/services/${enc(serviceUuid)}`, 'PATCH', {
+    docker_compose_raw: Buffer.from(compose, 'utf8').toString('base64'),
+  })
+  if ('error' in updated) return updated
+  return send(`/services/${enc(serviceUuid)}/restart`, 'POST')
+}
+
+/** Enregistre des variables d'un service (valeurs masquées dans Coolify) puis le redémarre. */
+export async function setServiceVariables(serviceUuid: string, variables: Record<string, string>) {
+  const data = Object.entries(variables).map(([key, value]) => ({ key, value, is_literal: true, is_shown_once: true }))
+  const res = await coolifyFetch(`/services/${enc(serviceUuid)}/envs/bulk`, { method: 'PATCH', body: JSON.stringify({ data }) })
+  if (res.error) return { error: res.error }
+  return send(`/services/${enc(serviceUuid)}/restart`, 'POST')
+}
