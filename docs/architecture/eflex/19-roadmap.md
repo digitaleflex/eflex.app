@@ -17,11 +17,10 @@ La roadmap privilégie la protection des clients existants, la réduction du tra
 ## Phase 1 — Backup & Recovery (P0)
 
 - Externaliser la sauvegarde de la base E-FLEX ; vérifier les clés et la procédure de reconstruction.
-- Livrer #130 pour les bases managées.
-- Définir une stratégie distincte pour volumes/fichiers.
-- Tester des restaurations isolées.
-- Ajouter statut, rétention et alertes.
-- Protéger les suppressions d'applications/volumes.
+- Bases clientes PostgreSQL (#130) : planification, UI, restauration assistée et alertes en place ; généraliser la copie hors site (S3) et les tests réguliers de restauration.
+- Définir une stratégie distincte pour volumes/fichiers (et Redis si données durables).
+- Ajouter statut, rétention et preuves de restauration par ressource.
+- Protéger les suppressions d'applications/volumes/bases.
 
 **Sortie :** sauvegarde hors site et restauration réellement testée pour les ressources annoncées.
 

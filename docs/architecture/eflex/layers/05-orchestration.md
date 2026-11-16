@@ -46,5 +46,5 @@ Ne pas mélanger la machine d'état d'un déploiement avec celle d'une sauvegard
 - Webhook dupliqué ne provoque pas de double déploiement.
 - Un worker redémarré ne laisse pas une opération silencieusement bloquée.
 - Les états sont monotones ou les transitions inverses sont des actions explicites (rollback, reprise).
-- Chaque job possède une limite temporelle et un diagnostic.
+- Chaque job possède une limite temporelle et un diagnostic ; les échecs de déploiement peuvent être accompagnés de diagnostics prescriptifs lorsque des motifs observables sont reconnus.
 - Les tâches destructrices nécessitent une autorisation explicite.

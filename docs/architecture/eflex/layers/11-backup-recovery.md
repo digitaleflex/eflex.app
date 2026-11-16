@@ -12,9 +12,16 @@ Le dépôt contient `scripts/backup-db.sh`, `scripts/restore-test.sh` et `script
 
 ### Sauvegarde des données clientes
 
-La sauvegarde/restauration des bases managées et des volumes clients n'est pas un parcours E-FLEX complet intégré. L'issue existante **[#130 — OPS-3](https://github.com/digitaleflex/eflex.app/issues/130)** couvre ce chantier. Ne pas annoncer de sauvegardes clientes garanties tant que la destination, le chiffrement, la rétention et la restauration n'ont pas été testés.
+**Bases PostgreSQL managées** (`ProjectDatabase`) : un parcours intégré existe (planification automatique via Coolify à la création et rattrapage idempotent, UI de suivi, sauvegarde manuelle, restauration assistée via `POST /databases/{uuid}/imports` avec suivi, alertes `database.backup_failed`, script de vérification hors production `scripts/verify-db-backup.sh`). Détail opérationnel : [client-database-backups.md](../../operations/client-database-backups.md).
 
-Coolify propose des sauvegardes planifiées pour plusieurs moteurs relationnels/documentaires vers des destinations distantes ; Redis et les fichiers/volumes demandent des stratégies adaptées. Vérifier la compatibilité avec la version installée et compléter les lacunes.
+Limites actuelles à ne pas masquer :
+- **Copie hors site** : optionnelle, uniquement si `COOLIFY_BACKUP_S3_STORAGE_UUID` est configuré ; sans cela les copies restent sur le serveur de la base.
+- **Redis** : non sauvegardé (Coolify ne le permet pas ; Redis est traité comme cache/file).
+- **Volumes/fichiers clients** : pas de stratégie ni de parcours intégré.
+- **Preuve de restauration** : la restauration assistée existe, mais le **test mensuel de restauration** reste une opération manuelle à réaliser et consigner.
+- **RPO** : pas d'archivage WAL ; perte possible des données écrites depuis la dernière sauvegarde réussie.
+
+Ne pas annoncer de sauvegardes clientes garanties au-delà de ce périmètre et sans copie hors site/test de restauration effectif.
 
 ## Architecture cible
 
@@ -41,25 +48,24 @@ Chaque base, volume ou service doit avoir une politique explicite :
 
 ## Flux de sauvegarde
 
-Identifier la ressource → produire un dump/snapshot cohérent → chiffrer → envoyer hors site → vérifier l'intégrité → enregistrer le résultat → appliquer la rétention → alerter en cas d'échec.
+Identifier la ressource → produire un dump/snapshot cohérent → (chiffrer/copier hors site si configuré) → vérifier l'intégrité → enregistrer le résultat → appliquer la rétention → alerter en cas d'échec.
 
 ## Flux de restauration
 
-Sélectionner la sauvegarde → vérifier sa compatibilité/intégrité → restaurer en environnement isolé → valider les données et l'application → obtenir l'approbation opérateur/client → restaurer en production → contrôler le service → consigner le résultat.
+Sélectionner la sauvegarde → vérifier sa compatibilité/intégrité → restaurer (assisté en production via Coolify, ou en environnement isolé pour vérification) → valider les données et l'application → obtenir l'approbation opérateur/client si nécessaire → contrôler le service → consigner le résultat.
 
 Une tâche réussie ou un fichier présent ne constitue pas une preuve de restauration.
 
 ## Priorités
 
 1. Vérifier et externaliser la sauvegarde du PostgreSQL du portail.
-2. Couvrir les bases clientes via #130.
-3. Définir une stratégie pour les volumes/fichiers.
-4. Ajouter la restauration isolée et les preuves de tests.
-5. Protéger les suppressions de projets/volumes par garde-fous.
+2. Généraliser la copie hors site et la preuve de restauration régulière pour les bases clientes PostgreSQL.
+3. Définir une stratégie pour Redis (données durables le cas échéant) et les volumes/fichiers.
+4. Protéger les suppressions de projets/volumes/bases par garde-fous et sauvegarde préalable.
 
 ## Critères d'acceptation
 
-- Copies hors site indépendantes du serveur source.
+- Copies hors site indépendantes du serveur source pour les données promises.
 - Aucun secret de sauvegarde dans les logs.
 - Tests de restauration documentés et réguliers.
 - Le rapport distingue « sauvegarde réussie » et « restauration testée ».

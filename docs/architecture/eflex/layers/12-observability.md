@@ -27,9 +27,13 @@ Ne pas mélanger indisponibilité et baisse de trafic ; ce sont des signaux diff
 
 ## Analytics déjà disponible
 
-La mesure d'audience E-FLEX est une collecte agrégée, activée explicitement par projet. Elle enregistre des pages vues agrégées par jour et chemin, ainsi que des événements nommés sans propriétés. Elle est conçue sans cookie ni identifiant visiteur. Elle ne fournit pas les visiteurs uniques, sessions, durée moyenne, taux de rebond, référents, UTM, appareils, navigateurs ou géographie. Ne pas afficher ces dimensions comme si elles étaient mesurées.
+La mesure d'audience E-FLEX est une collecte agrégée, activée explicitement par projet, sans cookie ni identifiant visiteur persistant, sans IP/`User-Agent`/URL référente complète stockés.
 
-Respecter le document [analytics](../../operations/analytics.md) pour les paramètres de confidentialité, la rétention, les exports et les alertes.
+**Mesuré (selon configuration du projet)** : pages vues par jour/chemin ; **visiteurs uniques quotidiens** (empreinte journalière éphémère, non réversible — le total sur une période est la somme des uniques quotidiens, sans déduplication inter-jours) ; dimensions agrégées opt-in (référent/source, appareil, navigateur, OS, pays via base GeoIP locale, paramètres UTM) avec vues et visiteurs uniques du jour par segment ; événements nommés (sans propriété) et objectifs déclaratifs ; alertes de trafic sur pages vues agrégées.
+
+**Non mesuré** : sessions (entité distincte), durée moyenne, taux de rebond, visiteurs uniques multi-jours, attribution/propriétés d'événements, profilage. Ne pas afficher ces éléments comme mesurés.
+
+Respecter le document [analytics](../../operations/analytics.md) pour les paramètres de confidentialité, la rétention, les exports, les alertes et les limites exactes.
 
 ## Pipeline d'incident cible
 

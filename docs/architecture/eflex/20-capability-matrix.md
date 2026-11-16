@@ -11,16 +11,16 @@ Cette matrice empêche de confondre présence de code, capacité activée, preuv
 | File et machine de déploiement | En place | BullMQ, worker et états ; maintenir les tests de reprise/idempotence |
 | Coolify runtime | En place | Backend du portail via `lib/coolify.ts` |
 | GitHub / webhooks | En place, vérifier parcours | Vérifier les scénarios dépôts privés et push réels |
-| Déploiement multi-services | Partiel | Compose fourni pris en charge ; plans multi-services générés sans Compose refusés |
+| Déploiement multi-services | Partiel | Compose fourni pris en charge ; diagnostics prescriptifs ; plans multi-services générés sans Compose refusés |
 | Volumes persistants | Partiel / flag | Testé sur staging ; `EFLEX_PERSISTENT_VOLUMES` documenté OFF par défaut prod |
-| Bases clientes | En place | Provisionnement ; sauvegarde/restauration intégrée non terminée |
+| Bases clientes | En place / partiel | Provisionnement PostgreSQL/Redis ; sauvegarde/restauration intégrée pour PostgreSQL (planification Coolify, UI, restauration, alertes), copie hors site optionnelle via S3, Redis non sauvegardé |
 | Backup PostgreSQL du portail | Partiel | Scripts et restore test ; archive locale, copie hors site à assurer |
-| Backup bases clientes | À construire | Issue #130 |
+| Backup bases clientes (PostgreSQL) | Partiel | Automatique côté E-FLEX/Coolify ; copie S3 et test mensuel de restauration restent opérationnels à assurer (voir `docs/operations/client-database-backups.md`) |
 | Backup fichiers / volumes clients | À construire | Politique et restore test à définir |
 | Monitoring plateforme | En place / partiel | Healthcheck et statut plateforme |
 | Monitoring continu des sites clients | À construire / à compléter | Probes et incidents par projet |
 | Logs runtime et métriques app | Partiel | Coolify et disponibilité API/configuration |
-| Analytics audience | En place | Agrégats privacy-first ; limites listées dans docs/operations/analytics.md |
+| Analytics audience | En place | Agrégats privacy-first : pages vues, visiteurs uniques quotidiens (somme sur période), dimensions opt-in (référent, appareil/navigateur/OS, pays local, UTM) et événements nommés ; sans sessions/durée/rebond ni déduplication inter-jours (voir `docs/operations/analytics.md`) |
 | Build Plane dédié | À construire | Pas de serveur/registre dédié intégré dans le chemin actuel du portail |
 | Registry immuable | À construire dans le pipeline E-FLEX | Réutiliser un registre existant |
 | Quotas CPU/RAM | À construire / partiel | Issue #131 |

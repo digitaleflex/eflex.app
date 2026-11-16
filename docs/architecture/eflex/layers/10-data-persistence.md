@@ -20,7 +20,8 @@ Bases de données managées, fichiers, médias, volumes Docker, données applica
 - Les volumes persistants Coolify sont traduits depuis le plan et activés derrière `EFLEX_PERSISTENT_VOLUMES`.
 - La validation des volumes a été réalisée sur staging ; le drapeau reste documenté comme désactivé par défaut en production.
 - L'existence d'un volume persistant ne constitue pas une sauvegarde.
-- Les sauvegardes des bases clientes ne sont pas encore un système complet intégré au portail (#130).
+- **Bases clientes (PostgreSQL)** : planification de sauvegardes, suivi, restauration assistée et alertes sont intégrés (voir [Layer 11](11-backup-recovery.md) et [client-database-backups.md](../../operations/client-database-backups.md)). La copie hors site dépend de `COOLIFY_BACKUP_S3_STORAGE_UUID` et Redis n'est pas sauvegardé.
+- **Volumes/fichiers clients** : pas de stratégie de sauvegarde intégrée.
 
 ## Règles de persistance
 
