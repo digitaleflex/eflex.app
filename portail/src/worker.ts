@@ -324,7 +324,8 @@ export async function processDeployment(
       await fail(deploymentId, `Compose non vérifié : ${fetched.error}`)
       return
     }
-    const inspection = inspectCompose(fetched.content)
+    // Les labels Traefik du compose ne peuvent viser que les domaines du projet.
+    const inspection = inspectCompose(fetched.content, hosts)
     if (!inspection.ok) {
       await fail(deploymentId, `Déploiement refusé : ${inspection.error}`)
       return

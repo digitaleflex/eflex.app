@@ -15,11 +15,23 @@ import {
 } from './rate-limit'
 
 describe('getClientIp', () => {
-  it('prend la première IP de x-forwarded-for', () => {
+  it('retient l’adresse ajoutée par le proxy (dernière entrée), pas celle envoyée par le client', () => {
+    // Le client envoie « 1.1.1.1 » pour se faire passer pour un autre ; Traefik ajoute l'adresse réelle.
     const req = new Request('https://example.test', {
-      headers: { 'x-forwarded-for': '203.0.113.1, 10.0.0.1' },
+      headers: { 'x-forwarded-for': '1.1.1.1, 203.0.113.1' },
     })
     expect(getClientIp(req)).toBe('203.0.113.1')
+    expect(getClientIp(new Request('https://example.test', { headers: { 'x-forwarded-for': '203.0.113.9' } }))).toBe('203.0.113.9')
+  })
+
+  it('suit TRUSTED_PROXY_HOPS quand plusieurs proxys de confiance se suivent', () => {
+    process.env.TRUSTED_PROXY_HOPS = '2'
+    try {
+      const req = new Request('https://example.test', { headers: { 'x-forwarded-for': '1.1.1.1, 203.0.113.1, 10.0.0.2' } })
+      expect(getClientIp(req)).toBe('203.0.113.1')
+    } finally {
+      delete process.env.TRUSTED_PROXY_HOPS
+    }
   })
 
   it('utilise x-real-ip ou cf-connecting-ip en repli', () => {

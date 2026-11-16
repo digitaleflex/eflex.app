@@ -208,12 +208,21 @@ export async function allowOrg(
   return (await checkOrg(organizationId, action, limit, windowMs)).allowed
 }
 
-/** Extrait la meilleure IP cliente disponible (proxy de confiance en tête). */
+/**
+ * Adresse du client telle que vue par le proxy de confiance (Traefik, un seul saut).
+ *
+ * `X-Forwarded-For` est envoyé par le client : la première entrée est donc falsifiable et permettait de
+ * contourner les limites par IP en changeant d'adresse à chaque requête. Le proxy ajoute l'adresse
+ * réelle **à la fin** : c'est celle-ci qui est retenue (audit de sécurité 2026-11). Avec plusieurs
+ * proxys de confiance, régler `TRUSTED_PROXY_HOPS`.
+ */
 export function getClientIp(request: Request): string {
   const forwarded = request.headers.get('x-forwarded-for')
   if (forwarded) {
-    const first = forwarded.split(',')[0]?.trim()
-    if (first) return first
+    const entries = forwarded.split(',').map((entry) => entry.trim()).filter(Boolean)
+    const hops = Math.min(10, Math.max(1, Number.parseInt(process.env.TRUSTED_PROXY_HOPS ?? '1', 10) || 1))
+    const chosen = entries[Math.max(0, entries.length - hops)]
+    if (chosen) return chosen
   }
   const realIp = request.headers.get('x-real-ip')?.trim()
   if (realIp) return realIp

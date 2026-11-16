@@ -155,9 +155,21 @@ run('POST /api/projects/[id]/transfer', () => {
       data: { projectId: activeProject.id, commitSha: 'b'.repeat(40), status: 'building' },
     })
 
-    // Organisation cible déjà pleine (plan gratuit : 5 projets).
+    // Organisation cible déjà pleine (plan gratuit : 5 applications).
     for (let index = 0; index < 5; index += 1) {
-      await makeProject(quotaTarget.id, quotaOwner.id, `plein-${index}`)
+      const p = await makeProject(quotaTarget.id, quotaOwner.id, `plein-${index}`)
+      await prisma.projectApp.create({
+        data: {
+          projectId: p.id,
+          name: 'web',
+          root: '',
+          position: 0,
+          plan: { framework: 'node', port: 80, root: '' },
+          framework: 'node',
+          port: 80,
+          domain: `plein-${index}-${stamp}.eflex.app`,
+        },
+      })
     }
   })
 
