@@ -277,9 +277,15 @@ export async function processDeployment(
     return
   }
   if (kind === 'multiple-without-compose') {
+    const volumes = plan.volumes?.filter((volume) => volume.trim() !== '') ?? []
+    const persistence =
+      volumes.length > 0
+        ? `La persistance déclarée (${volumes.join(', ')}, notamment les fichiers téléversés) ne peut pas être garantie sans compose : déclarez les volumes dans ce fichier. `
+        : ''
     await fail(
       deploymentId,
       `Ce plan nécessite plusieurs services (${artifacts.services.join(', ')}), mais la plateforme ne génère pas de compose multi-services. ` +
+        persistence +
         "Action : ajoutez un fichier `docker-compose.yml` (ou `compose.yaml`) à la racine de l’application dans votre dépôt, avec tous les services nécessaires. " +
         "EFLEX déploiera alors ce compose fourni tel quel (voie D1). Sans ce fichier, le déploiement ne peut pas continuer et aucun compose n’est écrit dans le dépôt.",
     )
