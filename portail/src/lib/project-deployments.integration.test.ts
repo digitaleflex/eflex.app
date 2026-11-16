@@ -14,6 +14,7 @@ vi.mock('@/lib/queue', () => ({
     queueMock.calls.push({ id, ...(options?.rollback ? { rollback: true } : {}) })
   },
   removeQueuedDeployment: async () => 'removed',
+  acquireDeploymentLocks: async () => ({ acquired: true, release: async () => undefined }),
 }))
 
 const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`

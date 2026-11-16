@@ -182,6 +182,7 @@ vi.mock('@/lib/coolify', async (importOriginal) => {
 vi.mock('@/lib/queue', () => ({
   enqueueDeployment: vi.fn(async () => undefined),
   removeQueuedDeployment: vi.fn(async () => 'removed' as const),
+  acquireDeploymentLocks: vi.fn(async () => ({ acquired: true, release: async () => undefined })),
 }))
 vi.mock('@/lib/project-deployments', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/project-deployments')>()
