@@ -219,6 +219,7 @@ run('isolation cross-tenant des routes projet/déploiement (#22)', () => {
     orgA: '', orgB: '',
     projectA: '', projectASlug: '',
     appA: '', deploymentA: '', domainA: '', domainAHost: '', databaseA: '', envKey: 'SECRET_TOKEN',
+    paymentA: '', invoiceA: '', paymentRefA: '',
   }
 
   const as = (userId: string | null, activeOrgId?: string | null) => {
@@ -291,6 +292,25 @@ run('isolation cross-tenant des routes projet/déploiement (#22)', () => {
       },
     })
     ids.databaseA = database.id
+
+    // Ressource org-scopée hors projet : facture/paiement approuvé de l'organisation A.
+    const payment = await prisma.payment.create({
+      data: {
+        reference: `ref-a-${stamp}`,
+        organizationId: orgA.id,
+        userId: owner.id,
+        plan: 'starter',
+        provider: 'kkiapay',
+        providerRef: `prov-a-${stamp}`,
+        amountFcfa: 5000,
+        status: 'approved',
+        invoiceNumber: `INV-A-${stamp}`,
+        invoicedAt: new Date(),
+      },
+    })
+    ids.paymentA = payment.id
+    ids.invoiceA = payment.invoiceNumber ?? ''
+    ids.paymentRefA = payment.reference
   })
 
   afterAll(async () => {
@@ -385,5 +405,30 @@ run('isolation cross-tenant des routes projet/déploiement (#22)', () => {
     expect(text).not.toContain(ids.projectA)
     expect(text).not.toContain(ids.projectASlug)
     expect(text).not.toContain('ProjetSecret')
+  })
+
+  it('GET /api/billing/invoices/[paymentId] refuse l’accès cross-tenant sans fuite', async () => {
+    as(ids.strangerUser, ids.orgB)
+    const { GET } = await import('@/app/api/billing/invoices/[paymentId]/route')
+    const res = await GET(new Request('http://localhost/api/billing/invoices/x'), {
+      params: Promise.resolve({ paymentId: ids.paymentA }),
+    })
+    expect([401, 403, 404].includes(res.status), `statut inattendu ${res.status}`).toBe(true)
+    await expectNoLeak(res, [ids.paymentA, ids.invoiceA, ids.paymentRefA, ids.orgA, 'OrgA'])
+  })
+
+  it('GET /api/billing/payments ne liste pas les paiements d’une autre organisation', async () => {
+    as(ids.strangerUser, ids.orgB)
+    const { GET } = await import('@/app/api/billing/payments/route')
+    const res = await GET()
+    if (res.status === 200) {
+      const text = await res.text()
+      expect(text).not.toContain(ids.paymentA)
+      expect(text).not.toContain(ids.invoiceA)
+      expect(text).not.toContain(ids.paymentRefA)
+    } else {
+      expect([401, 403, 404].includes(res.status), `statut inattendu ${res.status}`).toBe(true)
+      await expectNoLeak(res, [ids.paymentA, ids.invoiceA, ids.paymentRefA])
+    }
   })
 })
