@@ -291,17 +291,6 @@ export async function processDeployment(
     return
   }
   if (kind === 'multiple-without-compose') {
-<<<<<<< HEAD
-    const volumes = plan.volumes?.filter((volume) => volume.trim() !== '') ?? []
-    const persistence =
-      volumes.length > 0
-        ? `La persistance déclarée (${volumes.join(', ')}, notamment les fichiers téléversés) ne peut pas être garantie sans compose : déclarez les volumes dans ce fichier. `
-        : ''
-    await fail(
-      deploymentId,
-      `Ce plan nécessite plusieurs services (${artifacts.services.join(', ')}), mais la plateforme ne génère pas de compose multi-services. ` +
-        persistence +
-=======
     const persistence =
       artifacts.persistentVolumes.length > 0
         ? ` Persistance déclarée (${artifacts.persistentVolumes.map((volume) => volume.mountPath).join(', ')}) non appliquée : aucun stockage Coolify n’est créé tant que le déploiement est refusé. ` +
@@ -310,7 +299,6 @@ export async function processDeployment(
     await fail(
       deploymentId,
       `Ce plan nécessite plusieurs services (${artifacts.services.join(', ')}), mais la plateforme ne génère pas de compose multi-services.${persistence} ` +
->>>>>>> integrate/vague-0
         "Action : ajoutez un fichier `docker-compose.yml` (ou `compose.yaml`) à la racine de l’application dans votre dépôt, avec tous les services nécessaires. " +
         "EFLEX déploiera alors ce compose fourni tel quel (voie D1). Sans ce fichier, le déploiement ne peut pas continuer et aucun compose n’est écrit dans le dépôt.",
     )
