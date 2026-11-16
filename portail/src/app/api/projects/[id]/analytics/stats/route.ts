@@ -165,6 +165,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     devices: topDimension('device'),
     browsers: topDimension('browser'),
     operatingSystems: topDimension('os'),
+    countries: topDimension('country'),
+    utmSources: topDimension('utm_source'),
+    utmMediums: topDimension('utm_medium'),
+    utmCampaigns: topDimension('utm_campaign'),
+    utmTerms: topDimension('utm_term'),
+    utmContents: topDimension('utm_content'),
     goalEvents: config?.goalEvents ?? [],
     comparison: {
       previousTotal,

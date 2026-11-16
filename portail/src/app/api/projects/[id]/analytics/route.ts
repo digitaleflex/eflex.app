@@ -12,6 +12,7 @@ import {
   buildAnalyticsSnippet,
   firstAnalyticsIssue,
   generateAnalyticsPublicKey,
+  isAnalyticsCountryAvailable,
   normalizeGoalEvents,
   purgeTrafficStatsForProject,
 } from '@/lib/analytics'
@@ -23,13 +24,15 @@ function collectUrl() {
   return appUrl('/api/collect')
 }
 
-function serializeConfig(config: {
+async function serializeConfig(config: {
   enabled: boolean
   publicKey: string
   respectDnt: boolean
   collectPath: boolean
   collectReferrer: boolean
   collectDevice: boolean
+  collectCountry: boolean
+  collectUtm: boolean
   retentionDays: number
   goalEvents: string[]
   lastReceivedAt: Date | null
@@ -37,6 +40,7 @@ function serializeConfig(config: {
   updatedAt: Date
 }) {
   const url = collectUrl()
+  const countryAvailable = await isAnalyticsCountryAvailable()
   return {
     enabled: config.enabled,
     publicKey: config.publicKey,
@@ -44,6 +48,9 @@ function serializeConfig(config: {
     collectPath: config.collectPath,
     collectReferrer: config.collectReferrer,
     collectDevice: config.collectDevice,
+    collectCountry: config.collectCountry,
+    collectUtm: config.collectUtm,
+    countryAvailable,
     retentionDays: config.retentionDays,
     goalEvents: config.goalEvents ?? [],
     lastReceivedAt: config.lastReceivedAt ? config.lastReceivedAt.toISOString() : null,
@@ -70,6 +77,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     where: { projectId: scoped.project.id },
   })
 
+  const countryAvailable = await isAnalyticsCountryAvailable()
   if (!config) {
     return NextResponse.json({
       config: {
@@ -79,6 +87,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         collectPath: true,
         collectReferrer: true,
         collectDevice: true,
+        collectCountry: true,
+        collectUtm: true,
+        countryAvailable,
         retentionDays: ANALYTICS_RETENTION_DEFAULT_DAYS,
         goalEvents: [],
         lastReceivedAt: null,
@@ -95,7 +106,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   // Rétention effectivement appliquée : purge opportuniste des statistiques expirées.
   await purgeTrafficStatsForProject(prisma, scoped.project.id)
 
-  return NextResponse.json({ config: serializeConfig(config) })
+  return NextResponse.json({ config: await serializeConfig(config) })
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -144,6 +155,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     collectPath?: boolean
     collectReferrer?: boolean
     collectDevice?: boolean
+    collectCountry?: boolean
+    collectUtm?: boolean
     retentionDays?: number
     publicKey?: string
     goalEvents?: string[]
@@ -154,6 +167,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (parsed.data.collectPath !== undefined) data.collectPath = parsed.data.collectPath
   if (parsed.data.collectReferrer !== undefined) data.collectReferrer = parsed.data.collectReferrer
   if (parsed.data.collectDevice !== undefined) data.collectDevice = parsed.data.collectDevice
+  if (parsed.data.collectCountry !== undefined) data.collectCountry = parsed.data.collectCountry
+  if (parsed.data.collectUtm !== undefined) data.collectUtm = parsed.data.collectUtm
   if (parsed.data.retentionDays !== undefined) data.retentionDays = parsed.data.retentionDays
   if (parsed.data.goalEvents !== undefined) data.goalEvents = normalizeGoalEvents(parsed.data.goalEvents)
   if (!existing || parsed.data.regenerateKey) data.publicKey = generateAnalyticsPublicKey()
@@ -169,6 +184,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           collectPath: data.collectPath ?? true,
           collectReferrer: data.collectReferrer ?? true,
           collectDevice: data.collectDevice ?? true,
+          collectCountry: data.collectCountry ?? true,
+          collectUtm: data.collectUtm ?? true,
           retentionDays: data.retentionDays ?? ANALYTICS_RETENTION_DEFAULT_DAYS,
           goalEvents: data.goalEvents ?? [],
         },
@@ -183,6 +200,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (parsed.data.collectPath !== undefined) changes.collectPath = config.collectPath
   if (parsed.data.collectReferrer !== undefined) changes.collectReferrer = config.collectReferrer
   if (parsed.data.collectDevice !== undefined) changes.collectDevice = config.collectDevice
+  if (parsed.data.collectCountry !== undefined) changes.collectCountry = config.collectCountry
+  if (parsed.data.collectUtm !== undefined) changes.collectUtm = config.collectUtm
   if (parsed.data.retentionDays !== undefined) changes.retentionDays = config.retentionDays
   if (parsed.data.goalEvents !== undefined) changes.goalEventsCount = config.goalEvents.length
   if (parsed.data.regenerateKey) changes.keyRotated = true
@@ -196,5 +215,5 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     request,
   })
 
-  return NextResponse.json({ config: serializeConfig(config) })
+  return NextResponse.json({ config: await serializeConfig(config) })
 }

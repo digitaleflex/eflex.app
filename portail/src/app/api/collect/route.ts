@@ -10,7 +10,9 @@ import {
   normalizeAnalyticsEventName,
   normalizeAnalyticsPath,
   normalizeAnalyticsReferrer,
+  normalizeAnalyticsUtmValue,
   parseAnalyticsUserAgent,
+  resolveAnalyticsCountry,
   utcDay,
 } from '@/lib/analytics'
 
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
   const parsed = collectPayloadSchema.safeParse(body)
   if (!parsed.success) return noContent(204)
 
-  const { k: publicKey, p, t, n, r } = parsed.data
+  const { k: publicKey, p, t, n, r, us, um, uc, ut, uo } = parsed.data
   if (!isAnalyticsPublicKey(publicKey)) return noContent(204)
 
   // Limite par clé d'écriture pour éviter qu'un seul projet ne sature l'ingestion.
@@ -76,6 +78,8 @@ export async function POST(request: Request) {
       collectPath: true,
       collectReferrer: true,
       collectDevice: true,
+      collectCountry: true,
+      collectUtm: true,
       lastReceivedAt: true,
     },
   })
@@ -160,6 +164,22 @@ export async function POST(request: Request) {
         dimensions.push({ dimension: 'device', value: ua.device })
         dimensions.push({ dimension: 'browser', value: ua.browser })
         dimensions.push({ dimension: 'os', value: ua.os })
+      }
+      if (config.collectCountry) {
+        const country = await resolveAnalyticsCountry(ip)
+        if (country) dimensions.push({ dimension: 'country', value: country })
+      }
+      if (config.collectUtm) {
+        const utmSource = normalizeAnalyticsUtmValue(us)
+        const utmMedium = normalizeAnalyticsUtmValue(um)
+        const utmCampaign = normalizeAnalyticsUtmValue(uc)
+        const utmTerm = normalizeAnalyticsUtmValue(ut)
+        const utmContent = normalizeAnalyticsUtmValue(uo)
+        if (utmSource) dimensions.push({ dimension: 'utm_source', value: utmSource })
+        if (utmMedium) dimensions.push({ dimension: 'utm_medium', value: utmMedium })
+        if (utmCampaign) dimensions.push({ dimension: 'utm_campaign', value: utmCampaign })
+        if (utmTerm) dimensions.push({ dimension: 'utm_term', value: utmTerm })
+        if (utmContent) dimensions.push({ dimension: 'utm_content', value: utmContent })
       }
       for (const { dimension, value } of dimensions) {
         let isNewDimVisitor = false

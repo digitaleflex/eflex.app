@@ -34,6 +34,9 @@ type AnalyticsConfig = {
   collectPath: boolean
   collectReferrer?: boolean
   collectDevice?: boolean
+  collectCountry?: boolean
+  collectUtm?: boolean
+  countryAvailable?: boolean
   retentionDays: number
   goalEvents: string[]
   lastReceivedAt: string | null
@@ -95,6 +98,12 @@ type StatsPayload = {
   devices?: DimensionStat[]
   browsers?: DimensionStat[]
   operatingSystems?: DimensionStat[]
+  countries?: DimensionStat[]
+  utmSources?: DimensionStat[]
+  utmMediums?: DimensionStat[]
+  utmCampaigns?: DimensionStat[]
+  utmTerms?: DimensionStat[]
+  utmContents?: DimensionStat[]
   goalEvents: string[]
   comparison?: {
     previousTotal: number
@@ -399,6 +408,23 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
                         </button>
                       )}
                     </li>
+                    <li className="flex flex-wrap items-center gap-2">
+                      <span>Pays (GeoIP locale) : {config.collectCountry !== false ? 'activé' : 'désactivé'}</span>
+                      {config.collectCountry !== false && config.countryAvailable === false && <span className="text-warning">(base GeoIP indisponible)</span>}
+                      {canManage && (
+                        <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => void updateConfig({ collectCountry: !(config.collectCountry !== false) }, !(config.collectCountry !== false) ? 'Collecte du pays activée.' : 'Collecte du pays désactivée.')} disabled={saving}>
+                          {config.collectCountry !== false ? 'Désactiver' : 'Activer'}
+                        </button>
+                      )}
+                    </li>
+                    <li className="flex flex-wrap items-center gap-2">
+                      <span>Campagnes UTM : {config.collectUtm !== false ? 'activées' : 'désactivées'}</span>
+                      {canManage && (
+                        <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => void updateConfig({ collectUtm: !(config.collectUtm !== false) }, !(config.collectUtm !== false) ? 'Collecte UTM activée.' : 'Collecte UTM désactivée.')} disabled={saving}>
+                          {config.collectUtm !== false ? 'Désactiver' : 'Activer'}
+                        </button>
+                      )}
+                    </li>
                     <li>Objectifs définis : <span className="tabular-nums">{goalEvents.length}</span></li>
                   </ul>
                 )}
@@ -471,7 +497,7 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
               </div>
 
               <Notice tone="info" title="Métriques disponibles et limites">
-                Affichés (données réelles, agrégées) : pages vues, <strong>visiteurs uniques par jour</strong> (déduplication privacy-friendly, sans cookie ni identifiant persistant ni IP stockée ; le total sur la période est la <strong>somme des uniques quotidiens</strong>, non dédupliquée entre jours), évolution quotidienne, comparaison avec la période précédente, chemins les plus consultés, sources/référents, appareils, navigateurs, systèmes d’exploitation (si activés) et événements nommés/objectifs. Les visiteurs par dimension sont des uniques/jour sur le segment (somme sur la période). <strong>Non mesurés</strong> : sessions, durée moyenne, taux de rebond, visiteurs uniques multi-jours et propriétés d’événement. <strong>Non collectés</strong> : paramètres UTM/campagnes détaillés et géographie (pays).
+                Affichés (données réelles, agrégées) : pages vues, <strong>visiteurs uniques par jour</strong> (déduplication privacy-friendly, sans cookie ni identifiant persistant ni IP stockée ; le total sur la période est la <strong>somme des uniques quotidiens</strong>, non dédupliquée entre jours), évolution quotidienne, comparaison avec la période précédente, chemins les plus consultés, sources/référents, pays (GeoIP locale, si activé et disponible), appareils, navigateurs, systèmes d’exploitation, campagnes UTM (source/medium/campagne/terme/contenu, si activées) et événements nommés/objectifs. Les visiteurs par dimension sont des uniques/jour sur le segment (somme sur la période). <strong>Non mesurés</strong> : sessions, durée moyenne, taux de rebond, visiteurs uniques multi-jours et propriétés d’événement.
               </Notice>
 
               <div className="grid gap-6 lg:grid-cols-2">
@@ -517,9 +543,15 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
                 <div className="grid gap-6 lg:grid-cols-2">
                   {[
                     { title: 'Sources / référents', items: stats?.referrers ?? [], empty: 'Aucun référent enregistré sur la période.' },
+                    { title: 'Pays', items: stats?.countries ?? [], empty: 'Aucune donnée pays sur la période (vérifiez que la collecte pays est activée et que la base GeoIP locale est disponible).' },
                     { title: 'Appareils', items: stats?.devices ?? [], empty: 'Aucune donnée appareil sur la période.' },
                     { title: 'Navigateurs', items: stats?.browsers ?? [], empty: 'Aucune donnée navigateur sur la période.' },
                     { title: 'Systèmes d’exploitation', items: stats?.operatingSystems ?? [], empty: 'Aucune donnée système sur la période.' },
+                    { title: 'UTM — Source', items: stats?.utmSources ?? [], empty: 'Aucune source UTM enregistrée sur la période.' },
+                    { title: 'UTM — Medium', items: stats?.utmMediums ?? [], empty: 'Aucun medium UTM enregistré sur la période.' },
+                    { title: 'UTM — Campagne', items: stats?.utmCampaigns ?? [], empty: 'Aucune campagne UTM enregistrée sur la période.' },
+                    { title: 'UTM — Terme', items: stats?.utmTerms ?? [], empty: 'Aucun terme UTM enregistré sur la période.' },
+                    { title: 'UTM — Contenu', items: stats?.utmContents ?? [], empty: 'Aucun contenu UTM enregistré sur la période.' },
                   ].map((section) => (
                     <div key={section.title} className="rounded-lg border border-border bg-card p-4">
                       <h3 className="text-sm font-semibold">{section.title}</h3>
