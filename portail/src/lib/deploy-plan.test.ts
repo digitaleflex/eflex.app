@@ -150,6 +150,19 @@ describe('coolifyApplicationSettings', () => {
     expect(settings.startCommand).toBe("cd 'apps/web' && next start")
   })
 
+  it('construit un monorepo pnpm Turborepo (dépendance interne) depuis la racine', () => {
+    const settings = coolifyApplicationSettings({
+      ...monorepoPlan,
+      workspace: { manager: 'pnpm', name: '@acme/web', buildScript: 'build' },
+    })
+
+    expect(settings.baseDirectory).toBe('/')
+    expect(settings.baseDirectoryIsDefault).toBe(true)
+    expect(settings.installCommand).toBe('pnpm install --frozen-lockfile')
+    expect(settings.buildCommand).toBe("pnpm --filter '@acme/web'... run 'build'")
+    expect(settings.startCommand).toBe("cd 'apps/web' && next start")
+  })
+
   it('construit un monorepo yarn/npm depuis la racine en ciblant le paquet du workspace', () => {
     for (const manager of ['yarn', 'npm'] as const) {
       const settings = coolifyApplicationSettings({

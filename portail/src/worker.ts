@@ -290,9 +290,14 @@ export async function processDeployment(
     return
   }
   if (kind === 'multiple-without-compose') {
+    const persistence =
+      artifacts.persistentVolumes.length > 0
+        ? ` Persistance déclarée (${artifacts.persistentVolumes.map((volume) => volume.mountPath).join(', ')}) non appliquée : aucun stockage Coolify n’est créé tant que le déploiement est refusé. ` +
+          'Pour conserver ces données, ajoutez un fichier compose (D1) qui déclare les volumes partagés entre services (par exemple `storage` pour Laravel).'
+        : ''
     await fail(
       deploymentId,
-      `Ce plan nécessite plusieurs services (${artifacts.services.join(', ')}), mais la plateforme ne génère pas de compose multi-services. ` +
+      `Ce plan nécessite plusieurs services (${artifacts.services.join(', ')}), mais la plateforme ne génère pas de compose multi-services.${persistence} ` +
         "Action : ajoutez un fichier `docker-compose.yml` (ou `compose.yaml`) à la racine de l’application dans votre dépôt, avec tous les services nécessaires. " +
         "EFLEX déploiera alors ce compose fourni tel quel (voie D1). Sans ce fichier, le déploiement ne peut pas continuer et aucun compose n’est écrit dans le dépôt.",
     )
