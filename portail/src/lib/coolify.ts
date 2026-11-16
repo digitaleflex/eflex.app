@@ -54,7 +54,7 @@ interface CoolifyDeploymentSummary {
   message?: string
 }
 
-interface Target {
+export interface Target {
   projectUuid: string
   serverUuid: string
   environmentName: string
@@ -181,7 +181,7 @@ async function fetchEnvironmentName(projectUuid: string): Promise<string> {
  * Découvre (et crée au besoin) le serveur, le projet et l'environnement cibles.
  * La promesse est mémorisée pour éviter les créations concurrentes.
  */
-async function resolveTarget(): Promise<Target> {
+export async function resolveTarget(): Promise<Target> {
   if (!targetPromise) {
     targetPromise = (async () => {
       const serverUuid = await fetchServerUuid()

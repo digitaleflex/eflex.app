@@ -1,5 +1,6 @@
 /** Slugs de projets : normalisation + unicité sans erreur 500 (issue 08). */
 import { randomBytes } from 'node:crypto'
+import { RESERVED_SUBDOMAINS } from '@/lib/reserved-subdomains'
 
 export function slugify(name: string): string {
   const slug = name
@@ -16,8 +17,9 @@ export function slugify(name: string): string {
 
 /**
  * Le slug est unique pour toute la plateforme : si le nom est déjà pris
- * (même chez un autre utilisateur), on ajoute un suffixe aléatoire plutôt que
- * de laisser `prisma.project.create` lever une contrainte d'unicité.
+ * (même chez un autre utilisateur) ou réservé à la plateforme (`RESERVED_SUBDOMAINS`),
+ * on ajoute un suffixe aléatoire plutôt que de laisser `prisma.project.create`
+ * lever une contrainte d'unicité.
  */
 export async function uniqueSlug(
   name: string,
@@ -26,7 +28,8 @@ export async function uniqueSlug(
   const base = slugify(name)
   let candidate = base
   for (let attempt = 0; attempt < 8; attempt += 1) {
-    if (!(await exists(candidate))) return candidate
+    // Un sous-domaine de la plateforme (api, uptime, logs…) n'est jamais attribué à un projet client.
+    if (!RESERVED_SUBDOMAINS.has(candidate) && !(await exists(candidate))) return candidate
     candidate = `${base}-${randomBytes(2).toString('hex')}`
   }
   return `${base}-${randomBytes(4).toString('hex')}`

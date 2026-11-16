@@ -70,6 +70,11 @@ services:
       - DATABASE_BACKUP_RETENTION_LOCAL=${DATABASE_BACKUP_RETENTION_LOCAL:-}
       - DATABASE_BACKUP_RETENTION_S3=${DATABASE_BACKUP_RETENTION_S3:-}
       - DATABASE_BACKUP_MAX_AGE_HOURS=${DATABASE_BACKUP_MAX_AGE_HOURS:-}
+      # Accès aux outils de supervision (docs/operations/outils-supervision.md).
+      - OPS_ROOT_DOMAIN=${OPS_ROOT_DOMAIN:-}
+      - OPS_PRIVATE_NETWORK=${OPS_PRIVATE_NETWORK:-}
+      - OPS_ALLOWED_IPS=${OPS_ALLOWED_IPS:-}
+      - OPS_CERT_RESOLVER=${OPS_CERT_RESOLVER:-}
       - PORTAL_DOMAIN=${PORTAL_DOMAIN:?sourcer config/domains.sh}
       - PORTAL_URL=${PORTAL_URL:?sourcer config/domains.sh}
       # ─── Statut public et maintenance ─────────────────────────────────────
