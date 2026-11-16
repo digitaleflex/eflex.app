@@ -137,30 +137,32 @@ export default function TarifsPage() {
                 <h2 className="text-base font-semibold">Comparatif des limites</h2>
                 <p className="text-sm text-muted-foreground">Valeurs issues de la configuration des plans de la plateforme.</p>
               </CardHeader>
-              <CardContent className="overflow-x-auto">
-                <table className="w-full min-w-[520px] text-left text-sm">
-                  <caption className="sr-only">Comparatif des plans EFLEX</caption>
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Plan</th>
-                      <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Prix / {PERIOD_DAYS} jours</th>
-                      <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Applications</th>
-                      <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Membres</th>
-                      <th scope="col" className="py-2 font-medium text-muted-foreground">Domaines / projet</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {plans.map((plan) => (
-                      <tr key={plan.id} className={cn('border-b border-border last:border-0', plan.highlighted && 'bg-primary/5')}>
-                        <th scope="row" className="py-3 pr-3 font-medium">{plan.label}</th>
-                        <td className="py-3 pr-3 tabular-nums">{formatPrice(plan.priceFcfa)}</td>
-                        <td className="py-3 pr-3 tabular-nums">{Number.isFinite(plan.projectLimit) ? plan.projectLimit.toLocaleString('fr-FR') : 'Illimité'}</td>
-                        <td className="py-3 pr-3 tabular-nums">{plan.memberLimit.toLocaleString('fr-FR')}</td>
-                        <td className="py-3 tabular-nums">{plan.customDomainLimit.toLocaleString('fr-FR')}</td>
+              <CardContent>
+                <div className="max-w-full overflow-x-auto">
+                  <table className="w-full min-w-[520px] text-left text-sm">
+                    <caption className="sr-only">Comparatif des plans EFLEX</caption>
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Plan</th>
+                        <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Prix / {PERIOD_DAYS} jours</th>
+                        <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Applications</th>
+                        <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">Membres</th>
+                        <th scope="col" className="py-2 font-medium text-muted-foreground">Domaines / projet</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {plans.map((plan) => (
+                        <tr key={plan.id} className={cn('border-b border-border last:border-0', plan.highlighted && 'bg-primary/5')}>
+                          <th scope="row" className="py-3 pr-3 font-medium">{plan.label}</th>
+                          <td className="py-3 pr-3 tabular-nums">{formatPrice(plan.priceFcfa)}</td>
+                          <td className="py-3 pr-3 tabular-nums">{Number.isFinite(plan.projectLimit) ? plan.projectLimit.toLocaleString('fr-FR') : 'Illimité'}</td>
+                          <td className="py-3 pr-3 tabular-nums">{plan.memberLimit.toLocaleString('fr-FR')}</td>
+                          <td className="py-3 tabular-nums">{plan.customDomainLimit.toLocaleString('fr-FR')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </CardContent>
             </Card>
 

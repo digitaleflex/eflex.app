@@ -101,8 +101,10 @@ function UnavailableResource({ icon: Icon, label, reason }: { icon: typeof HardD
         <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
         {label}
       </dt>
-      <dd className="mt-2 text-sm font-medium text-muted-foreground">Non disponible</dd>
-      <p className="mt-1 text-xs text-muted-foreground">{reason}</p>
+      <dd className="mt-2">
+        <p className="text-sm font-medium text-muted-foreground">Non disponible</p>
+        <p className="mt-1 text-xs text-muted-foreground">{reason}</p>
+      </dd>
     </div>
   )
 }
@@ -246,37 +248,43 @@ export function UsageView({ projects, quota }: { projects: UsageProject[]; quota
           <dl className="mt-4 grid gap-3 sm:grid-cols-3">
             <div className="rounded-lg border border-border bg-background p-3">
               <dt className="text-xs font-medium text-muted-foreground">Applications déployables</dt>
-              <dd className="mt-1 font-mono text-base font-semibold tabular-nums">
-                {quota.apps.used.toLocaleString('fr-FR')} / {Number.isFinite(quota.apps.limit) ? quota.apps.limit.toLocaleString('fr-FR') : 'Illimité'}
+              <dd className="mt-1">
+                <p className="font-mono text-base font-semibold tabular-nums">
+                  {quota.apps.used.toLocaleString('fr-FR')} / {Number.isFinite(quota.apps.limit) ? quota.apps.limit.toLocaleString('fr-FR') : 'Illimité'}
+                </p>
+                <QuotaBar used={quota.apps.used} limit={quota.apps.limit} label="Quota d’applications" />
+                <p className="mt-2 text-xs text-muted-foreground">Unité : applications (compte organisation). Source : compteur de projets/applications.</p>
               </dd>
-              <QuotaBar used={quota.apps.used} limit={quota.apps.limit} label="Quota d’applications" />
-              <p className="mt-2 text-xs text-muted-foreground">Unité : applications (compte organisation). Source : compteur de projets/applications.</p>
             </div>
             <div className="rounded-lg border border-border bg-background p-3">
               <dt className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Users className="h-4 w-4 shrink-0" aria-hidden="true" />
                 Membres
               </dt>
-              <dd className="mt-1 font-mono text-base font-semibold tabular-nums">
-                {quota.members.used.toLocaleString('fr-FR')} / {quota.members.limit.toLocaleString('fr-FR')}
+              <dd className="mt-1">
+                <p className="font-mono text-base font-semibold tabular-nums">
+                  {quota.members.used.toLocaleString('fr-FR')} / {quota.members.limit.toLocaleString('fr-FR')}
+                </p>
+                <QuotaBar used={quota.members.used} limit={quota.members.limit} label="Quota de membres" />
+                <p className="mt-2 text-xs text-muted-foreground">Unité : membres de l’organisation. Source : compteur de membres.</p>
               </dd>
-              <QuotaBar used={quota.members.used} limit={quota.members.limit} label="Quota de membres" />
-              <p className="mt-2 text-xs text-muted-foreground">Unité : membres de l’organisation. Source : compteur de membres.</p>
             </div>
             <div className="rounded-lg border border-border bg-background p-3">
               <dt className="text-xs font-medium text-muted-foreground">Domaines personnalisés</dt>
-              <dd className="mt-1 font-mono text-base font-semibold tabular-nums">
-                {quota.customDomains.used.toLocaleString('fr-FR')} au total
+              <dd className="mt-1">
+                <p className="font-mono text-base font-semibold tabular-nums">
+                  {quota.customDomains.used.toLocaleString('fr-FR')} au total
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+                  Limite : {quota.customDomains.limitPerProject.toLocaleString('fr-FR')} par projet · utilisation max observée sur un projet : {quota.customDomains.maxPerProject.toLocaleString('fr-FR')}
+                </p>
+                <QuotaBar
+                  used={quota.customDomains.maxPerProject}
+                  limit={quota.customDomains.limitPerProject}
+                  label="Utilisation maximale de domaines par projet"
+                />
+                <p className="mt-2 text-xs text-muted-foreground">Unités : domaines personnalisés (total organisation) et limite par projet. Source : compteur de domaines.</p>
               </dd>
-              <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-                Limite : {quota.customDomains.limitPerProject.toLocaleString('fr-FR')} par projet · utilisation max observée sur un projet : {quota.customDomains.maxPerProject.toLocaleString('fr-FR')}
-              </p>
-              <QuotaBar
-                used={quota.customDomains.maxPerProject}
-                limit={quota.customDomains.limitPerProject}
-                label="Utilisation maximale de domaines par projet"
-              />
-              <p className="mt-2 text-xs text-muted-foreground">Unités : domaines personnalisés (total organisation) et limite par projet. Source : compteur de domaines.</p>
             </div>
           </dl>
           <p className="mt-3 text-xs text-muted-foreground">
@@ -438,21 +446,25 @@ export function UsageView({ projects, quota }: { projects: UsageProject[]; quota
                           <Cpu className="h-4 w-4 shrink-0" aria-hidden="true" />
                           CPU (instantané)
                         </dt>
-                        <dd className="mt-1 font-mono text-base font-semibold tabular-nums">{formatPercent(m.cpuPercent)}</dd>
-                        <Meter value={m.cpuPercent} label="Utilisation CPU instantanée" />
+                        <dd className="mt-1">
+                          <p className="font-mono text-base font-semibold tabular-nums">{formatPercent(m.cpuPercent)}</p>
+                          <Meter value={m.cpuPercent} label="Utilisation CPU instantanée" />
+                        </dd>
                       </div>
                       <div className="rounded-lg border border-border bg-background p-3">
                         <dt className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                           <MemoryStick className="h-4 w-4 shrink-0" aria-hidden="true" />
                           Mémoire (instantané)
                         </dt>
-                        <dd className="mt-1 font-mono text-base font-semibold tabular-nums">
-                          {formatMemory(m.memoryUsedMb, m.memoryLimitMb)}
+                        <dd className="mt-1">
+                          <p className="font-mono text-base font-semibold tabular-nums">
+                            {formatMemory(m.memoryUsedMb, m.memoryLimitMb)}
+                          </p>
+                          {m.memoryPercent !== null && (
+                            <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">{formatPercent(m.memoryPercent)} utilisée</p>
+                          )}
+                          <Meter value={m.memoryPercent} label="Utilisation mémoire instantanée" />
                         </dd>
-                        {m.memoryPercent !== null && (
-                          <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">{formatPercent(m.memoryPercent)} utilisée</p>
-                        )}
-                        <Meter value={m.memoryPercent} label="Utilisation mémoire instantanée" />
                       </div>
                     </dl>
                   ) : (
