@@ -49,7 +49,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     repoUrl: true,
     repoFullName: true,
     productionBranch: true,
-    managedByEflex: true,
     suspendedAt: true,
     createdAt: true,
     updatedAt: true,
@@ -80,7 +79,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     repoUrl: string | null
     repoFullName: string | null
     productionBranch: string | null
-    managedByEflex: boolean
     suspendedAt: Date | null
     createdAt: Date
     updatedAt: Date
@@ -128,7 +126,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       framework: project.framework ?? null,
       repository: repoLabel(project.repoUrl, project.repoFullName),
       productionBranch: project.productionBranch ?? null,
-      managedByEflex: Boolean(project.managedByEflex),
+      managedByEflex: true,
       suspended: Boolean(project.suspendedAt),
       createdAt: project.createdAt.toISOString(),
       updatedAt: project.updatedAt.toISOString(),
