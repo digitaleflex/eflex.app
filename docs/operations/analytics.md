@@ -1,3 +1,5 @@
+> Référentiel architectural : [Layer 12 — Observability & Analytics](../architecture/eflex/layers/12-observability.md). Cette fonctionnalité de mesure d'audience est déjà intégrée au portail ; ce n'est pas une future intégration Umami/Plausible. Respecter les limites de collecte et de confidentialité décrites ci-dessous.
+
 # Mesure d’audience (analytics) — confidentialité et conformité
 
 Ce document décrit la fonctionnalité de mesure de trafic intégrée au portail (socle #109, confidentialité/conformité #112, événements/objectifs #111, cadrage et compléments #108/#113/#110). Il est factuel : il ne décrit que ce qui est effectivement implémenté et mesuré, sans données inventées.
