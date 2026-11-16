@@ -64,7 +64,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const config = await prisma.projectAnalytics.findUnique({ where: { projectId: projectResult.project.id }, select: { id: true } })
   if (!config) return NextResponse.json({ error: 'Activez d’abord la mesure d’audience pour configurer des alertes.' }, { status: 400 })
 
-  const updates = input.alerts.filter((a): a is Record<string, unknown> => !!a && typeof a === 'object' && isAlertType((a as any).type))
+  const updates = input.alerts.filter((a): a is Record<string, unknown> => !!a && typeof a === 'object' && isAlertType((a as { type?: unknown }).type))
   for (const a of updates) {
     const clamped = clampAlert({
       type: a.type as AlertType,
