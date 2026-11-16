@@ -1,15 +1,26 @@
-# Captures visuelles de référence (console)
+# Captures visuelles de référence (#80)
 
-Ce dossier contient les captures de référence **versionnées** pour la validation visuelle de la console (issue #80).
+Ce dossier contient les captures de référence **versionnées** pour la validation visuelle
+de l’« accueil » demandé par l’issue #80, interprété comme :
 
-## Contenu attendu
-- Accueil du tableau de bord (`/dashboard`) aux largeurs **360, 768 et 1440 px**, thèmes **clair et sombre**, avec la **barre latérale dépliée et repliée** lorsque applicable (≥ 768 px).
-- Autres pages clés si nécessaires (public/auth/admin) selon les besoins de non-régression.
+- **accueil public** (`/`, page d’accueil du site) ;
+- **accueil de la console** (`/dashboard`, page d’accueil du tableau de bord).
+
+Les références couvrent les thèmes **clair et sombre** aux largeurs **360, 768 et 1440 px**.
+Pour l’accueil console, la **barre latérale dépliée et repliée** est versionnée aux largeurs
+≥ 768 px (à 360 px la console utilise la navigation en barre du bas).
+
+## Contenu
+
+- `dashboard/<thème>/<largeur>/...` : accueil console (`/dashboard`), base seedée.
+- `public/<thème>/<largeur>/accueil.png` : accueil public (`/`).
+- `public/<thème>/<largeur>/{login,status,cette-page-nexiste-pas}.png` : autres pages publiques clés versionnées pour la non-régression visuelle.
 
 ## Génération
-Les captures sont produites par `portail/e2e/screenshots.spec.ts` dans `portail/e2e/screenshots/<thème>/<largeur>/` (dossier ignoré par Git).
 
-Exemples :
+Les captures sont produites par `portail/e2e/screenshots.spec.ts` dans
+`portail/e2e/screenshots/<thème>/<largeur>/` (dossier ignoré par Git).
+
 ```bash
 cd portail
 npm run test:screenshots
@@ -17,17 +28,24 @@ npm run test:screenshots
 PLAYWRIGHT_AUTH=1 PLAYWRIGHT_ADMIN=1 npm run test:screenshots
 ```
 
+## Nomenclature
+
+- Accueil public : `public/<thème>/<largeur>/accueil.png` (correspond à la route `/`).
+- Accueil console : `dashboard/<thème>/<largeur>/sidebar-expanded.png`, `sidebar-collapsed.png` (≥ 768 px) ou `overview.png` (360 px).
+- Toujours conserver la structure `<zone>/<thème>/<largeur>/<état-ou-nom>.png`.
+
 ## Mise à jour des références
-1. Générer les captures dans un environnement reproductible (base seedée si parcours authentifié).
-2. Vérifier visuellement les différences (viewport, thème, état sidebar).
-3. Copier les images validées dans ce dossier (en conservant une nomenclature claire, ex. `dashboard/light/1440/sidebar-expanded.png`) et les committer.
+
+1. Générer les captures dans un environnement reproductible (base seedée pour le parcours authentifié).
+2. Vérifier visuellement les différences (viewport, thème, état de la barre latérale).
+3. Copier les images validées dans ce dossier en conservant la nomenclature, puis committer.
 4. Pour un changement UI intentionnel, mettre à jour les références dans la même PR et décrire la raison du changement.
 
 Les fichiers de ce dossier sont destinés à être revus en revue de code comme toute autre modification visuelle.
 
-## Jeu actuel (accueil de la console, `/dashboard`)
+## Jeu actuel — accueil de la console (`/dashboard`)
 
-Base seedée par `e2e/seed-auth.mjs` (compte `a11y-e2e@example.test`, un projet, plan Découverte). Dix captures, nommées `dashboard/<thème>/<largeur>/<état>.png` :
+Base seedée par `e2e/seed-auth.mjs` (compte `a11y-e2e@example.test`, un projet, plan Découverte). Dix captures :
 
 | Largeur | Fichiers |
 | --- | --- |
@@ -36,6 +54,10 @@ Base seedée par `e2e/seed-auth.mjs` (compte `a11y-e2e@example.test`, un projet,
 | 1440 px | `sidebar-expanded.png`, `sidebar-collapsed.png` |
 
 Chaque fichier existe en `light` et `dark`. Les autres pages (projet, équipe, paramètres, administration) restent des artefacts locaux : les versionner demande de figer des données plus variables.
+
+## Jeu actuel — accueil public (`/`)
+
+Captures versionnées en `public/<thème>/<largeur>/accueil.png` pour chaque combinaison thème × largeur (360/768/1440).
 
 ## Particularités des captures pleine page
 
@@ -46,10 +68,8 @@ Ce sont des limites de la capture, pas des défauts de l'interface :
 
 ## Générer le même jeu
 
-Voir `e2e/README.md` pour la base et le serveur de production, puis `PLAYWRIGHT_AUTH=1 PLAYWRIGHT_ADMIN=1 npm run test:screenshots`. Le test pose l'état de la barre latérale dans le cookie **et** dans `localStorage` (la barre lit d'abord `localStorage`). Le limiteur de connexion de l'application (10 par minute) peut interrompre une longue série : vider la table `RateLimit` et relancer les largeurs concernées avec `-g`.
-
-
-
-## Références publiques (versionnées)
-
-Le dossier `public/<thème>/<largeur>/` contient des captures de référence des pages publiques clés (accueil, connexion, statut, 404) en thèmes clair/sombre et aux largeurs 360/768/1440 px, générées via `e2e/screenshots.spec.ts` (parcours public).
+Voir `e2e/README.md` pour la base et le serveur de production, puis
+`PLAYWRIGHT_AUTH=1 PLAYWRIGHT_ADMIN=1 npm run test:screenshots`. Le test pose l'état de
+la barre latérale dans le cookie **et** dans `localStorage` (la barre lit d'abord
+`localStorage`). Le limiteur de connexion de l'application (10 par minute) peut interrompre
+une longue série : vider la table `RateLimit` et relancer les largeurs concernées avec `-g`.

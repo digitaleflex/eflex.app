@@ -54,7 +54,7 @@ function format(violations: Awaited<ReturnType<AxeBuilder['analyze']>>['violatio
 }
 
 /** Vérifie une page : zéro violation sérieuse/critique et aucun débordement horizontal. */
-async function expectAccessible(page: Page, route: string, theme: string, width: number) {
+async function expectAccessible(page: Page, route: string, theme: string, width: number, state?: string) {
   await page.goto(route, { waitUntil: 'domcontentloaded' })
   // Laisse le rendu, les polices et les hydratations se stabiliser sans attendre
   // les flux SSE (le réseau ne redevient jamais totalement inactif dans la console).
@@ -62,7 +62,8 @@ async function expectAccessible(page: Page, route: string, theme: string, width:
 
   const { violations } = await new AxeBuilder({ page }).withTags(TAGS).analyze()
   const blocking = violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical')
-  expect(blocking, `${route} (${theme}, ${width} px)\n${format(blocking)}`).toEqual([])
+  const label = state ? `${route} [${state}]` : route
+  expect(blocking, `${label} (${theme}, ${width} px)\n${format(blocking)}`).toEqual([])
 
   const overflow = await page.evaluate(() => ({
     scroll: document.documentElement.scrollWidth,
@@ -70,8 +71,25 @@ async function expectAccessible(page: Page, route: string, theme: string, width:
   }))
   expect(
     overflow.scroll,
-    `${route} (${theme}, ${width} px) déborde horizontalement de ${overflow.scroll - overflow.client} px`,
+    `${label} (${theme}, ${width} px) déborde horizontalement de ${overflow.scroll - overflow.client} px`,
   ).toBeLessThanOrEqual(overflow.client + 1)
+}
+
+/**
+ * La barre latérale lit d'abord `localStorage` (`eflex:sidebar-collapsed`), écrit dès la première
+ * visite : poser seulement le cookie laisserait donc l'état précédent. On pose les deux.
+ */
+async function setSidebar(
+  context: import('@playwright/test').BrowserContext,
+  page: Page,
+  collapsed: boolean,
+  baseURL: string,
+) {
+  await context.clearCookies({ name: 'eflex-sidebar' })
+  await context.addCookies([
+    { name: 'eflex-sidebar', value: collapsed ? 'collapsed' : 'expanded', domain: new URL(baseURL).hostname, path: '/' },
+  ])
+  await page.evaluate((value) => window.localStorage.setItem('eflex:sidebar-collapsed', value), collapsed ? '1' : '0')
 }
 
 async function setTheme(context: import('@playwright/test').BrowserContext, theme: string, baseURL: string) {
@@ -261,7 +279,14 @@ if (!AUTH) {
           ]
 
           for (const route of [...DASHBOARD_PAGES, ...projectPages]) {
-            await expectAccessible(page, route, theme, viewport.width)
+            if (route === '/dashboard' && viewport.width >= 768) {
+              await setSidebar(context, page, false, baseURL!)
+              await expectAccessible(page, route, theme, viewport.width, 'barre latérale dépliée')
+              await setSidebar(context, page, true, baseURL!)
+              await expectAccessible(page, route, theme, viewport.width, 'barre latérale repliée')
+            } else {
+              await expectAccessible(page, route, theme, viewport.width)
+            }
           }
           await context.close()
         })
