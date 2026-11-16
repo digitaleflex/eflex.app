@@ -132,7 +132,7 @@ export default async function AdminDeploymentsPage({
           value={formatInteger(active.length)}
           hint="File d’attente enregistrée en base (100 premiers affichés)."
           icon={ListOrdered}
-          tone={active.length === 0 ? 'success' : 'warning'}
+          tone={active.length === 0 ? 'positive' : 'warning'}
         />
         <StatCard
           label="Déploiements bloqués"
@@ -146,7 +146,7 @@ export default async function AdminDeploymentsPage({
           value={queueCounts ? formatInteger(queueCounts.waiting) : '—'}
           hint={queueCounts ? 'Indicateur interne du worker au chargement.' : 'Redis/BullMQ indisponible.'}
           icon={Server}
-          tone={queueUnavailable ? 'neutral' : queueCounts.waiting > 0 ? 'warning' : 'success'}
+          tone={queueUnavailable ? 'neutral' : queueCounts.waiting > 0 ? 'warning' : 'positive'}
         />
         <StatCard
           label="Historique affiché"
