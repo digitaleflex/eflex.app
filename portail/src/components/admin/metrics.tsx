@@ -52,12 +52,36 @@ export function ExportCsvLink({ days }: { days: PeriodDays }) {
 
 /** Alertes : le libellé de gravité est écrit, la couleur ne porte jamais l'information seule. */
 export function AlertsPanel({ alerts }: { alerts: AdminMetrics['alerts'] }) {
+  const criticalCount = alerts.filter((a) => a.severity === 'critical').length
+  const warningCount = alerts.filter((a) => a.severity === 'warning').length
+  const hasIssues = alerts.length > 0
+
   return (
-    <section aria-labelledby="admin-alerts-title" className="rounded-xl border border-border bg-card">
-      <div className="border-b border-border px-5 py-3">
-        <h2 id="admin-alerts-title" className="font-semibold">
-          Alertes
-        </h2>
+    <section
+      aria-labelledby="admin-alerts-title"
+      className={cn(
+        'rounded-xl border bg-card',
+        hasIssues ? 'border-warning/40' : 'border-border',
+      )}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
+        <div className="flex items-center gap-2">
+          <h3 id="admin-alerts-title" className="font-semibold">
+            Alertes
+          </h3>
+          {hasIssues && (
+            <Badge variant={criticalCount > 0 ? 'destructive' : warningCount > 0 ? 'warning' : 'outline'}>
+              {formatInteger(alerts.length)} {alerts.length > 1 ? 'alertes' : 'alerte'}
+            </Badge>
+          )}
+        </div>
+        {hasIssues && (
+          <p className="text-xs text-muted-foreground tabular-nums">
+            {criticalCount > 0 && `${formatInteger(criticalCount)} critique${criticalCount > 1 ? 's' : ''}`}
+            {criticalCount > 0 && warningCount > 0 && ' · '}
+            {warningCount > 0 && `${formatInteger(warningCount)} attention`}
+          </p>
+        )}
       </div>
       {alerts.length === 0 ? (
         <p className="flex items-center gap-2 px-5 py-4 text-sm text-muted-foreground">
@@ -133,9 +157,9 @@ export function DeploymentChart({
   return (
     <section aria-labelledby="admin-deployments-title" className="rounded-xl border border-border bg-card p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="admin-deployments-title" className="font-semibold">
+        <h3 id="admin-deployments-title" className="font-semibold">
           Déploiements par jour
-        </h2>
+        </h3>
         <p className="text-xs text-muted-foreground tabular-nums">
           {formatInteger(total)} sur {days} jours
         </p>
@@ -236,7 +260,7 @@ export function DeploymentChart({
   )
 }
 
-/** Réussite par stack : le tableau est lui-même l'alternative textuelle du graphique. */
+/** Erreurs récurrentes : causes probables à investiguer sur les déploiements en échec. */
 export function RecurringErrorsPanel({
   errors,
   days,
@@ -244,12 +268,24 @@ export function RecurringErrorsPanel({
   errors: AdminMetrics['recurringErrors']
   days: PeriodDays
 }) {
+  const hasErrors = errors.length > 0
+
   return (
-    <section aria-labelledby="admin-recurring-errors-title" className="rounded-xl border border-border bg-card p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="admin-recurring-errors-title" className="font-semibold">
-          Erreurs récurrentes
-        </h2>
+    <section
+      aria-labelledby="admin-recurring-errors-title"
+      className={cn('rounded-xl border bg-card p-5', hasErrors ? 'border-destructive/30' : 'border-border')}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h3 id="admin-recurring-errors-title" className="font-semibold">
+            Erreurs récurrentes
+          </h3>
+          {hasErrors && (
+            <Badge variant="destructive">
+              {formatInteger(errors.length)} {errors.length > 1 ? 'causes' : 'cause'}
+            </Badge>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground">Échecs sur {days} jours (échantillon de journaux stockés)</p>
       </div>
 
@@ -263,9 +299,15 @@ export function RecurringErrorsPanel({
             <caption className="sr-only">Causes probables récurrentes des déploiements en échec</caption>
             <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th scope="col" className="px-2 py-2 font-medium">Cause probable</th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">Occurrences</th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">Dernière occurrence</th>
+                <th scope="col" className="px-2 py-2 font-medium">
+                  Cause probable
+                </th>
+                <th scope="col" className="px-2 py-2 text-right font-medium">
+                  Occurrences
+                </th>
+                <th scope="col" className="px-2 py-2 text-right font-medium">
+                  Dernière occurrence
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -300,9 +342,9 @@ export function StackTable({ stacks, days }: { stacks: AdminMetrics['deployments
   return (
     <section aria-labelledby="admin-stacks-title" className="rounded-xl border border-border bg-card p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="admin-stacks-title" className="font-semibold">
+        <h3 id="admin-stacks-title" className="font-semibold">
           Taux de réussite par stack
-        </h2>
+        </h3>
         <p className="text-xs text-muted-foreground">Sur {days} jours</p>
       </div>
 
@@ -316,11 +358,21 @@ export function StackTable({ stacks, days }: { stacks: AdminMetrics['deployments
             </caption>
             <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th scope="col" className="px-2 py-2 font-medium">Stack</th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">Réussis</th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">Échecs</th>
-                <th scope="col" className="hidden px-2 py-2 text-right font-medium sm:table-cell">Autres</th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">Taux</th>
+                <th scope="col" className="px-2 py-2 font-medium">
+                  Stack
+                </th>
+                <th scope="col" className="px-2 py-2 text-right font-medium">
+                  Réussis
+                </th>
+                <th scope="col" className="px-2 py-2 text-right font-medium">
+                  Échecs
+                </th>
+                <th scope="col" className="hidden px-2 py-2 text-right font-medium sm:table-cell">
+                  Autres
+                </th>
+                <th scope="col" className="px-2 py-2 text-right font-medium">
+                  Taux
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -336,7 +388,10 @@ export function StackTable({ stacks, days }: { stacks: AdminMetrics['deployments
                   </td>
                   <td className="px-2 py-2.5">
                     <div className="flex items-center justify-end gap-2">
-                      <span aria-hidden="true" className="hidden h-2 w-20 overflow-hidden rounded-full bg-destructive/20 sm:block">
+                      <span
+                        aria-hidden="true"
+                        className="hidden h-2 w-20 overflow-hidden rounded-full bg-destructive/20 sm:block"
+                      >
                         <span
                           className="block h-full rounded-full bg-success"
                           style={{ width: `${stack.successRate ?? 0}%` }}
