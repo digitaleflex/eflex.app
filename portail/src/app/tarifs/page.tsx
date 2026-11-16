@@ -73,7 +73,7 @@ export default function TarifsPage() {
               <Card
                 key={plan.id}
                 className={cn(
-                  'flex h-full flex-col',
+                  'flex h-full min-w-0 flex-col',
                   plan.highlighted && 'border-primary shadow-lg ring-1 ring-primary/20',
                 )}
               >
@@ -138,7 +138,12 @@ export default function TarifsPage() {
                 <p className="text-sm text-muted-foreground">Valeurs issues de la configuration des plans de la plateforme.</p>
               </CardHeader>
               <CardContent>
-                <div className="w-full max-w-full overflow-x-auto">
+                <div
+                  className="w-full max-w-full overflow-x-auto"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Comparatif des plans EFLEX"
+                >
                   <table className="w-full min-w-[520px] text-left text-sm">
                     <caption className="sr-only">Comparatif des plans EFLEX</caption>
                     <thead>
@@ -166,7 +171,7 @@ export default function TarifsPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="min-w-0">
               <CardHeader>
                 <h2 className="text-base font-semibold">Moyens de paiement</h2>
                 <p className="text-sm text-muted-foreground">Paiements sécurisés pour activer ou renouveler un abonnement.</p>
