@@ -84,7 +84,7 @@ async function announce(
       appId: d.appId,
       appName: d.app?.name ?? null,
       previousStatus,
-    } as any)
+    })
   } catch (error) {
     console.error('[eflex/worker] annonce du statut impossible :', error instanceof Error ? error.message : error)
   }

@@ -9,13 +9,13 @@ export type AnnounceDeploymentStatusInput = {
   projectName: string
   deploymentId: string
   status: string
-  /** État précédent connu (traçabilité des transitions). */
-  previousStatus?: string | null
   /** Présent pour les déploiements multi-applications partageant un lot. */
   groupId?: string | null
   appId?: string | null
   /** Nom de l’application (utile au suivi temps réel). */
   appName?: string | null
+  /** Statut précédent, fourni à des fins de traçabilité lors des transitions. */
+  previousStatus?: string | null
 }
 
 /**
