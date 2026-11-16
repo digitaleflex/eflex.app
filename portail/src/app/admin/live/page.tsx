@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/admin'
+import { PageHeader } from '@/components/page-header'
 import { LiveFeed } from '@/components/admin/live-feed'
 import { organizationNames, toWireEvent } from '@/lib/live-events-server'
 
@@ -25,17 +26,20 @@ export default async function LivePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Activité en direct</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Déploiements, inscriptions et actions d’administration de toutes les organisations, au fil de l’eau. Les charges utiles
-          sont filtrées côté serveur : aucun secret ne remonte ici. Les actions d’administration sont aussi détaillées dans le{' '}
-          <Link href="/admin/audit" className="text-primary underline-offset-4 hover:underline">
-            journal d’audit
-          </Link>
-          .
-        </p>
-      </div>
+      <PageHeader
+        title="Activité en direct"
+        description={
+          <>
+            Déploiements, inscriptions et actions d’administration de toutes les organisations, au fil de l’eau. Les
+            charges utiles sont filtrées côté serveur : aucun secret ne remonte ici. Les actions d’administration sont
+            aussi détaillées dans le{' '}
+            <Link href="/admin/audit" className="text-primary underline-offset-4 hover:underline">
+              journal d’audit
+            </Link>
+            .
+          </>
+        }
+      />
       <LiveFeed initialEvents={events} initialOrganizations={organizations} />
     </div>
   )

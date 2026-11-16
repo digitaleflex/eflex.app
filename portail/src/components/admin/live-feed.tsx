@@ -236,65 +236,90 @@ export function LiveFeed({ initialEvents, initialOrganizations }: Props) {
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex flex-col gap-3 border-b border-border p-4 xl:flex-row xl:items-center">
-        <span className="flex items-center gap-2 text-sm font-medium">
-          <span aria-hidden="true" className={cn('h-2.5 w-2.5 rounded-full', dot, state === 'live' && 'animate-pulse motion-reduce:animate-none')} />
-          {paused ? 'En pause' : STATE_LABEL[state]}
-        </span>
-        <span className="text-xs text-muted-foreground">
-          {visible.length === events.length
-            ? `${events.length} événement${events.length > 1 ? 's' : ''}`
-            : `${visible.length} sur ${events.length} événements`}
-          {dropped > 0 && ` · ${dropped} ancien${dropped > 1 ? 's' : ''} retiré${dropped > 1 ? 's' : ''}`}
-        </span>
-        <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
-          <div className="relative min-w-0 flex-1 sm:flex-none">
-            <Search aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="space-y-4 border-b border-border p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-1">
+            <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'h-2.5 w-2.5 rounded-full',
+                  dot,
+                  state === 'live' && 'animate-pulse motion-reduce:animate-none',
+                )}
+              />
+              {paused ? 'Flux en pause' : STATE_LABEL[state]}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Vue globale de toutes les organisations ·{' '}
+              {visible.length === events.length
+                ? `${events.length} événement${events.length > 1 ? 's' : ''} affiché${events.length > 1 ? 's' : ''}`
+                : `${visible.length} sur ${events.length} événement${events.length > 1 ? 's' : ''}`}
+              {dropped > 0 && ` · ${dropped} ancien${dropped > 1 ? 's' : ''} retiré${dropped > 1 ? 's' : ''}`}
+            </p>
+          </div>
+          <Button variant={paused ? 'primary' : 'outline'} size="sm" onClick={togglePause} aria-pressed={paused}>
+            {paused ? <Play className="h-4 w-4" aria-hidden="true" /> : <Pause className="h-4 w-4" aria-hidden="true" />}
+            {paused ? 'Reprendre le flux' : 'Mettre en pause'}
+          </Button>
+        </div>
+
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-end">
+          <div className="relative min-w-0 flex-1">
+            <label htmlFor="live-search" className="sr-only">
+              Rechercher dans les événements
+            </label>
+            <Search
+              aria-hidden="true"
+              className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            />
             <input
+              id="live-search"
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Rechercher…"
-              aria-label="Rechercher dans les événements"
-              className="h-11 w-full rounded-lg border border-input bg-background pl-8 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-48"
+              placeholder="Rechercher un événement, un type ou une organisation…"
+              className="h-11 w-full rounded-lg border border-input bg-background pl-8 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
-          <label className="sr-only" htmlFor="live-category">
-            Filtrer par type d’événement
-          </label>
-          <select
-            id="live-category"
-            value={category}
-            onChange={(event) => setCategory(event.target.value as LiveCategory | 'all')}
-            className="h-11 rounded-lg border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <option value="all">Tous les types</option>
-            {CATEGORIES.map((value) => (
-              <option key={value} value={value}>
-                {CATEGORY_LABEL[value]}
-              </option>
-            ))}
-          </select>
-          <label className="sr-only" htmlFor="live-severity">
-            Filtrer par gravité
-          </label>
-          <select
-            id="live-severity"
-            value={severity}
-            onChange={(event) => setSeverity(event.target.value as LiveSeverity | 'all')}
-            className="h-11 rounded-lg border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <option value="all">Toutes les gravités</option>
-            {SEVERITIES.map((value) => (
-              <option key={value} value={value}>
-                {SEVERITY_LABEL[value]}
-              </option>
-            ))}
-          </select>
-          <Button variant={paused ? 'primary' : 'outline'} size="sm" onClick={togglePause} aria-pressed={paused}>
-            {paused ? <Play className="h-4 w-4" aria-hidden="true" /> : <Pause className="h-4 w-4" aria-hidden="true" />}
-            {paused ? 'Reprendre' : 'Pause'}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <div>
+              <label className="sr-only" htmlFor="live-category">
+                Filtrer par type d’événement
+              </label>
+              <select
+                id="live-category"
+                value={category}
+                onChange={(event) => setCategory(event.target.value as LiveCategory | 'all')}
+                className="h-11 min-w-[11rem] rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="all">Tous les types</option>
+                {CATEGORIES.map((value) => (
+                  <option key={value} value={value}>
+                    {CATEGORY_LABEL[value]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="sr-only" htmlFor="live-severity">
+                Filtrer par gravité
+              </label>
+              <select
+                id="live-severity"
+                value={severity}
+                onChange={(event) => setSeverity(event.target.value as LiveSeverity | 'all')}
+                className="h-11 min-w-[11rem] rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="all">Toutes les gravités</option>
+                {SEVERITIES.map((value) => (
+                  <option key={value} value={value}>
+                    {SEVERITY_LABEL[value]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
