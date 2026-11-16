@@ -12,6 +12,7 @@ vi.mock('next/headers', () => ({ headers: async () => new Headers() }))
 vi.mock('@/lib/queue', () => ({
   enqueueDeployment: vi.fn(async () => undefined),
   removeQueuedDeployment: vi.fn(async () => 'removed' as const),
+  acquireDeploymentLocks: vi.fn(async () => ({ acquired: true, release: async () => undefined })),
 }))
 
 vi.mock('@/lib/coolify', async (importOriginal) => {

@@ -13,6 +13,7 @@ vi.mock('@/lib/queue', () => ({
     queueState.enqueued.push({ id, options })
   },
   removeQueuedDeployment: async () => 'missing',
+  acquireDeploymentLocks: async () => ({ acquired: true, release: async () => undefined }),
 }))
 // L'audit et les événements écrivent en base ; on ne teste ici que l'entrée d'audit.
 vi.mock('@/lib/event-bus', () => ({ publish: async () => undefined }))
