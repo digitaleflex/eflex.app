@@ -13,10 +13,13 @@
 | Exécution | Coolify | `pg_dump` au format « custom » selon `DATABASE_BACKUP_FREQUENCY` (défaut : chaque jour à 02:00 UTC). |
 | Copie hors serveur | Coolify | Seulement si `COOLIFY_BACKUP_S3_STORAGE_UUID` est renseignée (voir §2). |
 | Affichage | E-FLEX | Paramètres du projet → base PostgreSQL → « Sauvegardes » : état, dernière réussite, historique, « Sauvegarder maintenant ». |
+| Restauration | E-FLEX + Coolify | Historique → « Restaurer » sur une sauvegarde réussie, confirmation en saisissant RESTAURER (propriétaires et administrateurs). Coolify (`POST /databases/{uuid}/imports`, version ≥ 4.7) restaure depuis le fichier resté sur le serveur, sinon depuis la copie S3, et remplace les objets existants. Suivi en direct dans le panneau ; action inscrite au journal d'audit. |
 | Alerte | E-FLEX | Notification `database.backup_failed` (application et e-mail) aux propriétaires et administrateurs de l'organisation quand la dernière sauvegarde a échoué, ou qu'aucune n'a réussi depuis `DATABASE_BACKUP_MAX_AGE_HOURS` (26 h par défaut). Une alerte par base et par jour au plus. |
 
-**Ce qui n'est pas automatique : la restauration** (Coolify n'expose pas
-d'API pour la lancer). Voir §4 et §5.
+Une sauvegarde n'est restaurable depuis E-FLEX que si son fichier existe encore :
+sur le serveur (rétention locale) ou dans le stockage S3 configuré. Coolify refuse
+de restaurer le fichier d'une autre base. **Ce qui n'est pas automatique : le test
+mensuel de restauration** (§4).
 
 ## 2. Configurer la copie hors serveur (à faire une fois)
 
@@ -36,8 +39,8 @@ une panne de disque emporte la base et ses sauvegardes. L'interface l'indique
 Les bases **déjà planifiées** gardent leur réglage : pour y ajouter la copie
 S3, l'activer dans Coolify (base → Backups → la planification → « Save to S3 »).
 
-Le jeton `COOLIFY_API_TOKEN` doit avoir la permission **deploy** pour le bouton
-« Sauvegarder maintenant » (`backup_now`), en plus de `read:sensitive` et
+Le jeton `COOLIFY_API_TOKEN` doit avoir la permission **deploy** pour les boutons
+« Sauvegarder maintenant » (`backup_now`) et « Restaurer » (`imports`), en plus de `read:sensitive` et
 `delete` déjà requises par les bases managées.
 
 ## 3. Variables
@@ -75,17 +78,20 @@ corrompu est bien refusé (code 1).
 
 1. **Ne rien supprimer.** Arrêter l'application cliente si elle écrit des
    données incohérentes (Paramètres → Disponibilité → Arrêter).
-2. Choisir la sauvegarde (historique dans E-FLEX, fichiers dans Coolify ou S3)
-   et la vérifier avec `verify-db-backup.sh` (§4).
-3. Dans Coolify : base → **Import Backups** → téléverser le fichier, ou
-   restaurer depuis S3. Coolify exécute `pg_restore` dans le conteneur de la base.
+2. Lancer « Sauvegarder maintenant » : l'état actuel, même abîmé, reste récupérable.
+3. Dans l'historique, choisir la sauvegarde et cliquer sur « Restaurer »
+   (saisir RESTAURER). En cas de doute sur le fichier, le vérifier d'abord avec
+   `verify-db-backup.sh` (§4). La base doit être démarrée.
 4. Redémarrer l'application, vérifier ses pages principales, prévenir le client
    en indiquant l'heure de la sauvegarde utilisée (données perdues depuis).
+
+Si E-FLEX est indisponible : dans Coolify, base → **Import Backups**.
 
 ## 6. Limites connues
 
 - Pas de restauration à la seconde (pas d'archivage WAL) : on perd au plus les
   données écrites depuis la dernière sauvegarde réussie.
-- La restauration reste manuelle (§5).
+- La restauration vise la base elle-même : il n'y a pas encore de restauration
+  dans une base de test à côté de la production.
 - Supprimer une base dans E-FLEX supprime la base dans Coolify ; vérifier dans
   le stockage S3 si des copies doivent être conservées avant de supprimer.

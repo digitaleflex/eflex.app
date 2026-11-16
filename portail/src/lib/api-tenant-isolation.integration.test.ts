@@ -92,6 +92,7 @@ const ROUTE_MANIFEST: Record<string, RouteClass> = {
   '/projects/[id]/databases/[databaseId]': 'org-project',
   '/projects/[id]/databases/[databaseId]/action': 'org-project',
   '/projects/[id]/databases/[databaseId]/backups': 'org-project',
+  '/projects/[id]/databases/[databaseId]/backups/restores/[importId]': 'org-project',
   '/projects/[id]/deployments': 'org-project',
   '/projects/[id]/deployments/[deploymentId]/cancel': 'org-project',
   '/projects/[id]/deployments/[deploymentId]/logs': 'org-project',
@@ -364,6 +365,8 @@ run('isolation cross-tenant des routes projet/déploiement (#22)', () => {
     { name: 'POST /api/projects/[id]/databases/[databaseId]/action', method: 'POST', path: '...', importPath: '@/app/api/projects/[id]/databases/[databaseId]/action/route', params: { id: 'PROJECT', databaseId: 'DATABASE' }, body: { action: 'restart' } },
     { name: 'GET /api/projects/[id]/databases/[databaseId]/backups', method: 'GET', path: '...', importPath: '@/app/api/projects/[id]/databases/[databaseId]/backups/route', params: { id: 'PROJECT', databaseId: 'DATABASE' } },
     { name: 'POST /api/projects/[id]/databases/[databaseId]/backups', method: 'POST', path: '...', importPath: '@/app/api/projects/[id]/databases/[databaseId]/backups/route', params: { id: 'PROJECT', databaseId: 'DATABASE' }, body: { action: 'run' } },
+    { name: 'POST /api/projects/[id]/databases/[databaseId]/backups (restore)', method: 'POST', path: '...', importPath: '@/app/api/projects/[id]/databases/[databaseId]/backups/route', params: { id: 'PROJECT', databaseId: 'DATABASE' }, body: { action: 'restore', executionId: 'exec-1' } },
+    { name: 'GET /api/projects/[id]/databases/[databaseId]/backups/restores/[importId]', method: 'GET', path: '...', importPath: '@/app/api/projects/[id]/databases/[databaseId]/backups/restores/[importId]/route', params: { id: 'PROJECT', databaseId: 'DATABASE', importId: '42' } },
     { name: 'GET /api/deployments/[id]', method: 'GET', path: '/api/deployments/:id', importPath: '@/app/api/deployments/[id]/route', params: { id: 'DEPLOYMENT' } },
   ]
 

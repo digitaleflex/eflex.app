@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ArchiveRestore, CloudUpload, ShieldCheck } from 'lucide-react'
+import { ArchiveRestore, CloudUpload, History, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
 
 type Health = 'ok' | 'running' | 'never' | 'stale' | 'failed'
@@ -12,7 +13,10 @@ interface Execution {
   status: 'success' | 'failed' | 'running' | 'unknown'
   size: number | null
   createdAt: string
+  restorable: boolean
 }
+
+type RestoreState = { importId: string; backupCreatedAt: string; state: 'running' | 'finished' | 'failed' }
 
 interface BackupStatus {
   supported: boolean
@@ -88,6 +92,8 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
+  const [confirmRestore, setConfirmRestore] = useState<Execution | null>(null)
+  const [restore, setRestore] = useState<RestoreState | null>(null)
 
   const url = `/api/projects/${projectId}/databases/${databaseId}/backups`
 
@@ -110,6 +116,52 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
   useEffect(() => {
     void load()
   }, [load])
+
+  // Suivi de la restauration en cours, toutes les 3 s, jusqu'à son issue.
+  useEffect(() => {
+    if (!restore || restore.state !== 'running') return
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`${url}/restores/${restore.importId}`, { cache: 'no-store' })
+        const body = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          setRestore({ ...restore, state: 'failed' })
+          setFeedback({ tone: 'error', message: body.error ?? 'Suivi de la restauration impossible.' })
+          return
+        }
+        if (body.state === 'finished' || body.state === 'failed') {
+          setRestore({ ...restore, state: body.state })
+          setFeedback(
+            body.state === 'finished'
+              ? { tone: 'success', message: `Base restaurée depuis la sauvegarde du ${formatDate(restore.backupCreatedAt)}. Vérifiez votre application.` }
+              : { tone: 'error', message: 'La restauration a échoué. Les données n’ont peut-être pas été modifiées : contactez le support avant de réessayer.' },
+          )
+        } else {
+          setRestore({ ...restore })
+        }
+      } catch {
+        setRestore({ ...restore })
+      }
+    }, 3_000)
+    return () => window.clearTimeout(timer)
+  }, [restore, url])
+
+  async function startRestore(execution: Execution) {
+    setFeedback(null)
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'restore', executionId: execution.id }),
+    }).catch(() => null)
+    const body = response ? await response.json().catch(() => ({})) : {}
+    setConfirmRestore(null)
+    if (!response || !response.ok) {
+      setFeedback({ tone: 'error', message: body.error ?? 'Impossible de lancer la restauration.' })
+      return
+    }
+    setRestore({ importId: String(body.importId), backupCreatedAt: execution.createdAt, state: 'running' })
+    setFeedback({ tone: 'success', message: body.message ?? 'Restauration lancée.' })
+  }
 
   async function act(action: 'enable' | 'run') {
     setWorking(true)
@@ -190,6 +242,13 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
         )}
       </div>
 
+      {restore?.state === 'running' && (
+        <p role="status" className="flex items-center gap-2 text-xs font-medium">
+          <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-warning" />
+          Restauration en cours depuis la sauvegarde du {formatDate(restore.backupCreatedAt)}…
+        </p>
+      )}
+
       {feedback && (
         <p
           role={feedback.tone === 'error' ? 'alert' : 'status'}
@@ -210,7 +269,12 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
               <tr>
                 <th scope="col" className="py-1 pr-3 font-medium">Date</th>
                 <th scope="col" className="py-1 pr-3 font-medium">Résultat</th>
-                <th scope="col" className="py-1 font-medium">Taille</th>
+                <th scope="col" className="py-1 pr-3 font-medium">Taille</th>
+                {status.canManage && (
+                  <th scope="col" className="py-1 font-medium">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="tabular-nums">
@@ -220,13 +284,44 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
                   <td className={cn('py-1 pr-3', execution.status === 'failed' && 'text-destructive')}>
                     {EXECUTION[execution.status]}
                   </td>
-                  <td className="py-1">{formatBytes(execution.size)}</td>
+                  <td className="py-1 pr-3">{formatBytes(execution.size)}</td>
+                  {status.canManage && (
+                    <td className="py-1 text-right">
+                      {execution.restorable && (
+                        <button
+                          type="button"
+                          disabled={restore?.state === 'running'}
+                          onClick={() => setConfirmRestore(execution)}
+                          className="inline-flex min-h-11 items-center gap-1 rounded-md px-2 font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                        >
+                          <History className="h-3.5 w-3.5" aria-hidden="true" />
+                          Restaurer
+                          <span className="sr-only"> la sauvegarde du {formatDate(execution.createdAt)}</span>
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </details>
       )}
+
+      <ConfirmDialog
+        open={confirmRestore !== null}
+        title="Restaurer cette sauvegarde ?"
+        description={
+          confirmRestore
+            ? `Les données actuelles de la base seront remplacées par celles du ${formatDate(confirmRestore.createdAt)}. Tout ce qui a été écrit depuis sera perdu. Conseil : lancez d’abord « Sauvegarder maintenant ».`
+            : ''
+        }
+        confirmLabel="Restaurer"
+        destructive
+        requireText="RESTAURER"
+        onConfirm={() => (confirmRestore ? startRestore(confirmRestore) : undefined)}
+        onCancel={() => setConfirmRestore(null)}
+      />
     </section>
   )
 }

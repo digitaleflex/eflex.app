@@ -5,15 +5,26 @@ import {
   backupNeedsAlert,
   backupSettings,
   backupSupported,
+  restoreSourceFor,
   summarizeBackups,
+  toPublicExecution,
 } from '@/lib/database-backups'
 import { describeFrequency, formatBytes } from '@/components/database-backups'
 
 const NOW = new Date('2026-11-16T12:00:00Z')
 const hoursAgo = (hours: number) => new Date(NOW.getTime() - hours * 3_600_000).toISOString()
 
-function schedule(executions: DatabaseBackupSchedule['executions'], saveS3 = true): DatabaseBackupSchedule {
-  return { id: 'sched', frequency: '0 2 * * *', enabled: true, saveS3, executions }
+type ExecInput = Pick<DatabaseBackupSchedule['executions'][number], 'id' | 'status' | 'size' | 'createdAt'> &
+  Partial<DatabaseBackupSchedule['executions'][number]>
+
+function schedule(executions: ExecInput[], saveS3 = true): DatabaseBackupSchedule {
+  return {
+    id: 'sched',
+    frequency: '0 2 * * *',
+    enabled: true,
+    saveS3,
+    executions: executions.map((execution) => ({ filename: null, localDeleted: false, s3Uploaded: false, ...execution })),
+  }
 }
 
 describe('backupSettings', () => {
@@ -149,5 +160,45 @@ describe('affichage', () => {
     expect(formatBytes(512)).toBe('512 o')
     expect(formatBytes(1536)).toBe('1,5 Ko')
     expect(formatBytes(5 * 1024 * 1024)).toBe('5 Mo')
+  })
+})
+
+describe('restoreSourceFor', () => {
+  const base = { status: 'success' as const, filename: '/data/coolify/backups/databases/t-0/db/pg.dmp' }
+
+  it('préfère le fichier resté sur le serveur', () => {
+    expect(restoreSourceFor({ ...base, localDeleted: false, s3Uploaded: true }, 's3-1')).toEqual({
+      source: 'server',
+      path: base.filename,
+    })
+  })
+
+  it('se rabat sur la copie S3 quand le fichier local a été purgé', () => {
+    expect(restoreSourceFor({ ...base, localDeleted: true, s3Uploaded: true }, 's3-1')).toEqual({
+      source: 's3',
+      s3StorageUuid: 's3-1',
+      path: base.filename,
+    })
+  })
+
+  it('refuse sans fichier disponible, sans stockage S3, ou pour une sauvegarde en échec', () => {
+    expect(restoreSourceFor({ ...base, localDeleted: true, s3Uploaded: true })).toBeNull()
+    expect(restoreSourceFor({ ...base, localDeleted: true, s3Uploaded: false }, 's3-1')).toBeNull()
+    expect(restoreSourceFor({ ...base, status: 'failed', localDeleted: false, s3Uploaded: false })).toBeNull()
+    expect(restoreSourceFor({ status: 'success', filename: null, localDeleted: false, s3Uploaded: false })).toBeNull()
+  })
+
+  it('ne renvoie jamais le chemin du fichier à l’interface', () => {
+    const view = toPublicExecution({
+      id: 'e1',
+      status: 'success',
+      size: 10,
+      createdAt: '2026-11-16T02:00:00Z',
+      ...base,
+      localDeleted: false,
+      s3Uploaded: false,
+    })
+    expect(view).toEqual({ id: 'e1', status: 'success', size: 10, createdAt: '2026-11-16T02:00:00Z', restorable: true })
+    expect(JSON.stringify(view)).not.toContain('/data/')
   })
 })

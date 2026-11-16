@@ -2,10 +2,14 @@ import type { ProjectDatabase } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import {
   createDatabaseBackup,
+  getDatabaseImportStatus,
   listDatabaseBackups,
   runDatabaseBackup,
+  startDatabaseImport,
   type DatabaseBackupExecution,
   type DatabaseBackupSchedule,
+  type DatabaseImportSource,
+  type DatabaseImportState,
 } from '@/lib/coolify'
 import { memberIds, notify } from '@/lib/notifications'
 
@@ -16,8 +20,9 @@ import { memberIds, notify } from '@/lib/notifications'
  * alerte quand elle ne fonctionne plus. Avec `COOLIFY_BACKUP_S3_STORAGE_UUID` (stockage S3 déclaré
  * dans Coolify), chaque sauvegarde est aussi copiée hors du serveur ; sans lui, les copies restent sur
  * le serveur de la base, ce que l'interface signale. Coolify ne sait pas sauvegarder Redis : seules
- * les bases PostgreSQL sont concernées. La restauration n'est pas automatisée (pas d'API Coolify) :
- * procédure et script de vérification dans `docs/operations/backups.md`.
+ * les bases PostgreSQL sont concernées. Restauration : `POST /databases/{uuid}/imports` (Coolify ≥ 4.7),
+ * depuis le fichier resté sur le serveur, sinon depuis la copie S3. Procédure et script de vérification
+ * dans `docs/operations/client-database-backups.md`.
  */
 
 export const BACKUP_SUPPORTED_KINDS = ['postgresql'] as const
@@ -159,8 +164,42 @@ export interface DatabaseBackupStatus {
   /** Copies hors serveur configurées sur la plateforme (variable d'environnement). */
   offsiteConfigured: boolean
   frequency: string
-  summary: BackupSummary | null
+  summary: (Omit<BackupSummary, 'recent'> & { recent: PublicBackupExecution[] }) | null
   error: string | null
+}
+
+/** Exécution telle que renvoyée à l'interface : sans chemin de fichier. */
+export interface PublicBackupExecution {
+  id: string
+  status: DatabaseBackupExecution['status']
+  size: number | null
+  createdAt: string
+  /** Un fichier est encore disponible pour la restaurer. */
+  restorable: boolean
+}
+
+/**
+ * D'où restaurer une exécution : le fichier local s'il existe encore (plus rapide), sinon la copie S3 si un
+ * stockage est configuré. `null` si rien n'est disponible. Fonction pure.
+ */
+export function restoreSourceFor(
+  execution: Pick<DatabaseBackupExecution, 'status' | 'filename' | 'localDeleted' | 's3Uploaded'>,
+  s3StorageUuid?: string,
+): DatabaseImportSource | null {
+  if (execution.status !== 'success' || !execution.filename) return null
+  if (!execution.localDeleted) return { source: 'server', path: execution.filename }
+  if (execution.s3Uploaded && s3StorageUuid) return { source: 's3', s3StorageUuid, path: execution.filename }
+  return null
+}
+
+export function toPublicExecution(execution: DatabaseBackupExecution, s3StorageUuid?: string): PublicBackupExecution {
+  return {
+    id: execution.id,
+    status: execution.status,
+    size: execution.size,
+    createdAt: execution.createdAt,
+    restorable: restoreSourceFor(execution, s3StorageUuid) !== null,
+  }
 }
 
 export async function getDatabaseBackupStatus(
@@ -177,7 +216,48 @@ export async function getDatabaseBackupStatus(
   if (!base.supported || !database.backupId) return { ...base, summary: null, error: null }
   const schedules = await listDatabaseBackups(database.coolifyId)
   if ('error' in schedules) return { ...base, summary: null, error: schedules.error }
-  return { ...base, summary: summarizeBackups(schedules, now, settings.maxAgeHours), error: null }
+  const summary = summarizeBackups(schedules, now, settings.maxAgeHours)
+  return {
+    ...base,
+    summary: { ...summary, recent: summary.recent.map((item) => toPublicExecution(item, settings.s3StorageUuid)) },
+    error: null,
+  }
+}
+
+/**
+ * Restaure une sauvegarde réussie de cette base. L'exécution est cherchée dans les planifications de la base
+ * elle-même : impossible de viser le fichier d'une autre base. Les données actuelles sont remplacées.
+ */
+export async function restoreDatabaseBackup(
+  database: BackupTarget,
+  executionId: string,
+  settings = backupSettings(),
+): Promise<{ importId: string; backupCreatedAt: string } | { error: string; status: number }> {
+  if (!backupSupported(database.kind)) return { error: 'La restauration n’est disponible que pour PostgreSQL.', status: 400 }
+  const schedules = await listDatabaseBackups(database.coolifyId)
+  if ('error' in schedules) return { error: schedules.error, status: 502 }
+  const execution = schedules.flatMap((schedule) => schedule.executions).find((item) => item.id === executionId)
+  if (!execution) return { error: 'Sauvegarde introuvable.', status: 404 }
+  const source = restoreSourceFor(execution, settings.s3StorageUuid)
+  if (!source) {
+    return {
+      error:
+        execution.status === 'success'
+          ? 'Le fichier de cette sauvegarde n’est plus disponible (ni sur le serveur, ni dans le stockage externe).'
+          : 'Seule une sauvegarde réussie peut être restaurée.',
+      status: 409,
+    }
+  }
+  const started = await startDatabaseImport(database.coolifyId, source)
+  if ('error' in started) return { error: started.error, status: 502 }
+  return { importId: started.id, backupCreatedAt: execution.createdAt }
+}
+
+export async function getDatabaseRestoreStatus(
+  database: Pick<ProjectDatabase, 'coolifyId'>,
+  importId: string,
+): Promise<{ state: DatabaseImportState; finishedAt: string | null } | { error: string }> {
+  return getDatabaseImportStatus(database.coolifyId, importId)
 }
 
 /** Planifie si besoin, puis lance une sauvegarde immédiate. */

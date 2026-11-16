@@ -794,6 +794,12 @@ export interface DatabaseBackupExecution {
   /** Taille du fichier en octets, si connue. */
   size: number | null
   createdAt: string
+  /** Chemin du fichier sur le serveur (usage serveur uniquement : jamais renvoyé à l'interface). */
+  filename: string | null
+  /** La copie locale a été supprimée par la rétention. */
+  localDeleted: boolean
+  /** Une copie a été envoyée sur le stockage S3. */
+  s3Uploaded: boolean
 }
 
 /** Une planification de sauvegarde Coolify et ses exécutions (plus récentes d'abord). */
@@ -821,7 +827,17 @@ function parseExecution(raw: unknown): DatabaseBackupExecution | null {
   const status = row.status === 'success' || row.status === 'failed' || row.status === 'running' ? row.status : 'unknown'
   const size = typeof row.size === 'number' ? row.size : typeof row.size === 'string' && /^\d+$/.test(row.size) ? Number(row.size) : null
   const createdAt = typeof row.created_at === 'string' ? row.created_at : ''
-  return { id, status, size, createdAt }
+  const filename = typeof row.filename === 'string' && row.filename !== '' ? row.filename : null
+  const flag = (value: unknown) => value === true || value === 1 || value === '1'
+  return {
+    id,
+    status,
+    size,
+    createdAt,
+    filename,
+    localDeleted: flag(row.local_storage_deleted),
+    s3Uploaded: flag(row.s3_uploaded),
+  }
 }
 
 function parseBackupSchedule(raw: unknown): DatabaseBackupSchedule | null {
@@ -893,6 +909,55 @@ export async function runDatabaseBackup(
   )
   if (res.error) return { error: res.error }
   return { ok: true }
+}
+
+/** Source d'une restauration : fichier resté sur le serveur, ou copie S3 (même chemin, sans « / » initial). */
+export type DatabaseImportSource =
+  | { source: 'server'; path: string }
+  | { source: 's3'; s3StorageUuid: string; path: string }
+
+/**
+ * Restaure une sauvegarde dans la base (`POST /databases/{uuid}/imports`, Coolify ≥ 4.7). Coolify n'accepte
+ * que les sauvegardes de cette même base, exige une base démarrée et la permission `deploy`. Avec
+ * `replace_existing`, les objets existants sont supprimés avant la restauration. Renvoie l'identifiant
+ * de l'opération, à suivre avec `getDatabaseImportStatus`.
+ */
+export async function startDatabaseImport(
+  databaseId: string,
+  source: DatabaseImportSource,
+): Promise<{ id: string } | { error: string }> {
+  const payload =
+    source.source === 's3'
+      ? { source: 's3', s3_storage_uuid: source.s3StorageUuid, path: source.path.replace(/^\/+/, '') }
+      : { source: 'server', path: source.path }
+  const res = await coolifyFetch<{ id?: unknown }>(`/databases/${encodeURIComponent(databaseId)}/imports`, {
+    method: 'POST',
+    body: JSON.stringify({ ...payload, replace_existing: true, keep_owners: false }),
+  })
+  if (res.error) return { error: res.error }
+  const id = typeof res.data?.id === 'number' || typeof res.data?.id === 'string' ? String(res.data.id) : null
+  if (!id) return { error: "L'hébergement n'a pas renvoyé l'identifiant de la restauration." }
+  return { id }
+}
+
+export type DatabaseImportState = 'running' | 'finished' | 'failed'
+
+/** État d'une restauration (Coolify vérifie qu'elle concerne bien cette base). */
+export async function getDatabaseImportStatus(
+  databaseId: string,
+  importId: string,
+): Promise<{ state: DatabaseImportState; finishedAt: string | null } | { error: string }> {
+  const res = await coolifyFetch<{ status?: unknown; exit_code?: unknown; finished_at?: unknown }>(
+    `/databases/${encodeURIComponent(databaseId)}/imports/${encodeURIComponent(importId)}`,
+    { signal: AbortSignal.timeout(8_000) },
+  )
+  if (res.error) return { error: res.error }
+  const status = typeof res.data?.status === 'string' ? res.data.status : ''
+  const exitCode = typeof res.data?.exit_code === 'number' ? res.data.exit_code : null
+  let state: DatabaseImportState = 'running'
+  if (status === 'finished') state = exitCode === null || exitCode === 0 ? 'finished' : 'failed'
+  else if (['error', 'killed', 'cancelled', 'closed'].includes(status)) state = 'failed'
+  return { state, finishedAt: typeof res.data?.finished_at === 'string' ? res.data.finished_at : null }
 }
 
 /** Démarre, arrête ou redémarre une base managée. */

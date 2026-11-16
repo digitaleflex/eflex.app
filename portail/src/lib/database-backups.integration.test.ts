@@ -7,6 +7,7 @@ const coolify = vi.hoisted(() => ({
   schedules: new Map<string, Array<{ id: string; frequency: string; enabled: boolean; saveS3: boolean; executions: unknown[] }>>(),
   created: [] as Array<{ databaseId: string; options: unknown }>,
   failCreate: false,
+  imports: [] as Array<{ databaseId: string; source: unknown }>,
 }))
 
 vi.mock('@/lib/coolify', () => ({
@@ -19,6 +20,11 @@ vi.mock('@/lib/coolify', () => ({
     return { id }
   },
   runDatabaseBackup: async () => ({ ok: true }),
+  startDatabaseImport: async (databaseId: string, source: unknown) => {
+    coolify.imports.push({ databaseId, source })
+    return { id: '99' }
+  },
+  getDatabaseImportStatus: async () => ({ state: 'finished', finishedAt: null }),
 }))
 
 const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
@@ -62,6 +68,7 @@ run('sauvegardes des bases (intégration)', () => {
     coolify.schedules.clear()
     coolify.created.length = 0
     coolify.failCreate = false
+    coolify.imports.length = 0
   })
 
   afterAll(async () => {
@@ -129,5 +136,48 @@ run('sauvegardes des bases (intégration)', () => {
     expect(notifications).toHaveLength(1)
     expect(notifications[0]?.title).toBe('Sauvegarde en défaut : Boutique')
     expect(notifications[0]?.href).toMatch(/^\/dashboard\/projects\/.+\/settings$/)
+  })
+
+  it('ne restaure qu’une sauvegarde réussie de cette même base', async () => {
+    const { database } = await fixture()
+    const other = await fixture()
+    const file = (id: string) => `/data/coolify/backups/databases/t-0/${id}/pg.dmp`
+    coolify.schedules.set(database.coolifyId, [
+      {
+        id: 'sched',
+        frequency: 'daily',
+        enabled: true,
+        saveS3: true,
+        executions: [
+          { id: 'ok', status: 'success', size: 1, createdAt: '2026-11-16T02:00:00Z', filename: file('a'), localDeleted: true, s3Uploaded: true },
+          { id: 'ko', status: 'failed', size: null, createdAt: '2026-11-15T02:00:00Z', filename: null, localDeleted: false, s3Uploaded: false },
+        ],
+      },
+    ])
+    coolify.schedules.set(other.database.coolifyId, [
+      {
+        id: 'sched-b',
+        frequency: 'daily',
+        enabled: true,
+        saveS3: false,
+        executions: [{ id: 'autre', status: 'success', size: 1, createdAt: '2026-11-16T02:00:00Z', filename: file('b'), localDeleted: false, s3Uploaded: false }],
+      },
+    ])
+    const settings = backups.backupSettings({ COOLIFY_BACKUP_S3_STORAGE_UUID: 's3-1' })
+
+    // L'exécution d'une autre base est introuvable depuis celle-ci.
+    expect(await backups.restoreDatabaseBackup(database, 'autre', settings)).toEqual({ error: 'Sauvegarde introuvable.', status: 404 })
+    expect((await backups.restoreDatabaseBackup(database, 'ko', settings)) as { status: number }).toMatchObject({ status: 409 })
+    expect(coolify.imports).toHaveLength(0)
+
+    const result = await backups.restoreDatabaseBackup(database, 'ok', settings)
+    expect(result).toEqual({ importId: '99', backupCreatedAt: '2026-11-16T02:00:00Z' })
+    expect(coolify.imports).toEqual([
+      { databaseId: database.coolifyId, source: { source: 's3', s3StorageUuid: 's3-1', path: file('a') } },
+    ])
+
+    const status = await backups.getDatabaseBackupStatus({ ...database, backupId: 'sched' }, new Date('2026-11-16T12:00:00Z'), settings)
+    expect(JSON.stringify(status)).not.toContain('/data/')
+    expect(status.summary?.recent.map((item) => [item.id, item.restorable])).toEqual([['ok', true], ['ko', false]])
   })
 })

@@ -3,7 +3,12 @@ import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { audit } from '@/lib/audit'
 import { canManageProjects } from '@/lib/organizations'
-import { ensureDatabaseBackup, getDatabaseBackupStatus, runDatabaseBackupNow } from '@/lib/database-backups'
+import {
+  ensureDatabaseBackup,
+  getDatabaseBackupStatus,
+  restoreDatabaseBackup,
+  runDatabaseBackupNow,
+} from '@/lib/database-backups'
 import { checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { requireOrg, requireProjectDatabase, tenantNotFound } from '@/lib/tenant'
 
@@ -36,9 +41,16 @@ export async function GET(
   )
 }
 
-const schema = z.object({ action: z.enum(['enable', 'run']) })
+const schema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('enable') }),
+  z.object({ action: z.literal('run') }),
+  z.object({ action: z.literal('restore'), executionId: z.string().trim().min(1).max(100) }),
+])
 
-/** `enable` : planifie les sauvegardes ; `run` : lance une sauvegarde immédiate. */
+/**
+ * `enable` : planifie les sauvegardes ; `run` : lance une sauvegarde immédiate ; `restore` : remplace les
+ * données de la base par celles d'une sauvegarde (suivi : `GET …/backups/restores/{importId}`).
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; databaseId: string }> },
@@ -70,6 +82,29 @@ export async function POST(
   }
   const parsed = schema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: 'Action invalide.' }, { status: 400 })
+
+  if (parsed.data.action === 'restore') {
+    const restored = await restoreDatabaseBackup(database, parsed.data.executionId)
+    if ('error' in restored) return NextResponse.json({ error: restored.error }, { status: restored.status })
+    await audit({
+      actor: { id: session.user.id, email: session.user.email },
+      action: 'project.database.backup_restore',
+      target: { type: 'project_database', id: database.id },
+      organizationId: org.organizationId,
+      details: {
+        projectId: id,
+        kind: database.kind,
+        executionId: parsed.data.executionId,
+        backupCreatedAt: restored.backupCreatedAt,
+        importId: restored.importId,
+      },
+      request,
+    })
+    return NextResponse.json(
+      { ok: true, importId: restored.importId, message: 'Restauration lancée. Ne modifiez pas la base pendant l’opération.' },
+      { status: 202 },
+    )
+  }
 
   const outcome =
     parsed.data.action === 'run' ? await runDatabaseBackupNow(database) : await ensureDatabaseBackup(database)
