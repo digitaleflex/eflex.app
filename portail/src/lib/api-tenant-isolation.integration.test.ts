@@ -28,6 +28,13 @@ type RouteClass =
  */
 const ROUTE_MANIFEST: Record<string, RouteClass> = {
   '/account/password': 'user',
+  '/admin/coolify/audit': 'admin',
+  '/admin/coolify/deployments': 'admin',
+  '/admin/coolify/s3-storages': 'admin',
+  '/admin/coolify/s3-storages/[storageId]/validate': 'admin',
+  '/admin/coolify/servers': 'admin',
+  '/admin/coolify/servers/[uuid]': 'admin',
+  '/admin/coolify/vulnerabilities': 'admin',
   '/admin/impersonation/stop': 'admin',
   '/admin/infrastructure/check': 'admin',
   '/admin/infrastructure/settings': 'admin',
