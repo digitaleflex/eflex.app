@@ -58,7 +58,7 @@ export function QueueRetryButton({
       <ConfirmDialog
         open={open}
         title={`Relancer le job de ${projectName} ?`}
-        description="Relance uniquement le traitement dans la file BullMQ (retry ou ré-enfilement). À utiliser si le job est manquant, en échec côté file ou bloqué, sans écraser un déploiement déjà terminé."
+        description="Relance uniquement le traitement dans la file BullMQ (retry, promotion d’un job différé ou ré-enfilement). À utiliser si le job est manquant, en échec côté file, différé ou résiduel, sans écraser un déploiement déjà terminé ni déplacer un job actif."
         confirmLabel="Relancer le job"
         confirmDisabled={busy}
         onCancel={() => setOpen(false)}

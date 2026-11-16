@@ -299,7 +299,7 @@ export function UsageView({ projects, quota }: { projects: UsageProject[]; quota
         <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-medium text-foreground">Ressources d’exécution (CPU, mémoire, disque)</h3>
-            <span className="inline-flex rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            <span className="inline-flex rounded-full border border-border bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
               {quota?.perPlanExecutionEnforced ? 'Limites appliquées par plan' : 'Profil commun · non imposé par le plan'}
             </span>
           </div>

@@ -269,7 +269,7 @@ export function VercelImport({ onPrefill, disabled }: VercelImportProps) {
         <span className="flex items-center gap-2">
           <DownloadCloud className="h-4 w-4 text-primary" aria-hidden="true" />
           <span className="text-sm font-medium">Importer depuis Vercel</span>
-          <span className="rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+          <span className="rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
             Inventaire &amp; variables
           </span>
         </span>
@@ -398,7 +398,7 @@ export function VercelImport({ onPrefill, disabled }: VercelImportProps) {
                               {selected ? 'Dépôt pré-rempli' : canPrefillRepo ? 'Pré-remplir le dépôt' : 'Pré-remplir le nom'}
                             </Button>
                             {!canPrefillRepo && (
-                              <span className="text-[11px] text-muted-foreground">Import GitHub requis pour le déploiement</span>
+                              <span className="text-xs text-muted-foreground">Import GitHub requis pour le déploiement</span>
                             )}
                           </div>
                         </div>
@@ -561,7 +561,7 @@ export function VercelImport({ onPrefill, disabled }: VercelImportProps) {
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="text-xs text-muted-foreground">
                                   Seules les valeurs lisibles sont pré-remplies (masquées dans l&apos;éditeur). Les variables à ressaisir
                                   ne sont pas devinées : complétez-les manuellement avant le déploiement.
                                 </p>

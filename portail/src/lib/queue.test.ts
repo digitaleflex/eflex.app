@@ -50,7 +50,7 @@ describe('diagnostics et verrous sans Redis', () => {
     await expect(getDeploymentQueueDiagnostics('dep-1')).resolves.toBeNull()
   })
 
-  it('n’acquiert pas de verrou distribué sans Redis (garde-fous DB conservés)', async () => {
+  it('n’utilise pas de verrou distribué sans Redis configuré (garde-fous DB conservés)', async () => {
     delete process.env.REDIS_URL
     const lock = await acquireDeploymentLocks(['eflex:deploy-lock:projet'])
     expect(lock.acquired).toBe(true)

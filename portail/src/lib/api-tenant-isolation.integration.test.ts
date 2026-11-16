@@ -41,6 +41,7 @@ const ROUTE_MANIFEST: Record<string, RouteClass> = {
   '/admin/projects/[id]/deployments/[deploymentId]/cancel': 'admin',
   '/admin/projects/[id]/deployments/[deploymentId]/logs': 'admin',
   '/admin/projects/[id]/deployments/[deploymentId]/queue': 'admin',
+  '/admin/projects/[id]/deployments/[deploymentId]/queue/retry': 'admin',
   '/admin/projects/[id]/deployments/[deploymentId]/unblock': 'admin',
   '/admin/projects/[id]/infrastructure': 'admin',
   '/admin/projects/[id]/redeploy': 'admin',
@@ -73,6 +74,7 @@ const ROUTE_MANIFEST: Record<string, RouteClass> = {
   '/github/repositories': 'user',
   '/health': 'public',
   '/maintenance': 'public',
+  '/migrations/vercel/env': 'org',
   '/migrations/vercel/inventory': 'org',
   '/notifications': 'user',
   '/notifications/preferences': 'user',
@@ -408,7 +410,10 @@ run('isolation cross-tenant des routes projet/déploiement (#22)', () => {
   })
 
   it('GET /api/billing/invoices/[paymentId] refuse l’accès cross-tenant sans fuite', async () => {
+<<<<<<< HEAD
     // L'utilisateur B est propriétaire de orgB (droit facturation) mais ne doit pas accéder à orgA.
+=======
+>>>>>>> integrate/vague-0
     as(ids.strangerUser, ids.orgB)
     const { GET } = await import('@/app/api/billing/invoices/[paymentId]/route')
     const res = await GET(new Request('http://localhost/api/billing/invoices/x'), {
@@ -422,7 +427,10 @@ run('isolation cross-tenant des routes projet/déploiement (#22)', () => {
     as(ids.strangerUser, ids.orgB)
     const { GET } = await import('@/app/api/billing/payments/route')
     const res = await GET()
+<<<<<<< HEAD
     // Selon le rôle/org active, refus ou liste vide de l'organisation B : jamais les données de A.
+=======
+>>>>>>> integrate/vague-0
     if (res.status === 200) {
       const text = await res.text()
       expect(text).not.toContain(ids.paymentA)
