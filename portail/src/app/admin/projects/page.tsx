@@ -1,8 +1,11 @@
 import Link from 'next/link'
-import { ArrowUpRight, ListOrdered, RefreshCw, Search } from 'lucide-react'
+import { ArrowUpRight, FolderKanban, ListOrdered, RefreshCw, Search } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/admin'
+import { PageHeader } from '@/components/page-header'
+import { LinkButton } from '@/components/link-button'
 import { Card } from '@/components/ui/card'
+import { EmptyState } from '@/components/ui/empty-state'
 import { StatusPill } from '@/components/dashboard/status-pill'
 import { frameworkLabel } from '@/lib/frameworks'
 import { relativeTime } from '@/lib/relative-time'
@@ -94,94 +97,87 @@ export default async function AdminProjectsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Projets</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Toutes les organisations. {numberFormat.format(filtered.length)} projet{filtered.length > 1 ? 's' : ''}
-            {query.stack ? ` en ${frameworkLabel(query.stack)}` : ''} correspondant aux filtres.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/admin/deployments"
-            className="inline-flex h-11 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <ListOrdered className="h-4 w-4" aria-hidden="true" />
-            File des déploiements
-          </Link>
-          <Link
-            href="/admin/projects/reconciliation"
-            className="inline-flex h-11 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />
-            Réconciliation
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Projets"
+        description={`Toutes les organisations. ${numberFormat.format(filtered.length)} projet${filtered.length > 1 ? 's' : ''}${query.stack ? ` en ${frameworkLabel(query.stack)}` : ''} correspondant aux filtres.`}
+        actions={
+          <>
+            <LinkButton href="/admin/deployments">
+              <ListOrdered className="h-4 w-4" aria-hidden="true" />
+              File des déploiements
+            </LinkButton>
+            <LinkButton href="/admin/projects/reconciliation">
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+              Réconciliation
+            </LinkButton>
+          </>
+        }
+      />
 
-      <nav aria-label="Filtrer les projets" className="flex flex-wrap gap-2">
-        {PROJECT_FILTERS.map((filter) => {
-          const label = filter === 'stuck' ? `${FILTER_LABELS[filter]} (> ${stuckMinutes} min)` : FILTER_LABELS[filter]
-          const active = query.filter === filter
-          return (
-            <Link
-              key={filter}
-              href={href(filter)}
-              aria-current={active ? 'page' : undefined}
-              className={
-                active
-                  ? 'inline-flex min-h-11 items-center rounded-full border border-primary/30 bg-primary/10 px-3 text-sm font-medium text-primary'
-                  : 'inline-flex min-h-11 items-center rounded-full border border-border bg-card px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground'
-              }
+      <Card className="space-y-4 p-4">
+        <nav aria-label="Filtrer les projets" className="flex flex-wrap gap-2">
+          {PROJECT_FILTERS.map((filter) => {
+            const label = filter === 'stuck' ? `${FILTER_LABELS[filter]} (> ${stuckMinutes} min)` : FILTER_LABELS[filter]
+            const active = query.filter === filter
+            return (
+              <Link
+                key={filter}
+                href={href(filter)}
+                aria-current={active ? 'page' : undefined}
+                className={
+                  active
+                    ? 'inline-flex min-h-11 items-center rounded-full border border-primary/30 bg-primary/10 px-3 text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                    : 'inline-flex min-h-11 items-center rounded-full border border-border bg-card px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                }
+              >
+                {label}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <form role="search" className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-end">
+          <input type="hidden" name="etat" value={query.filter === 'all' ? '' : query.filter} />
+          <div className="min-w-0 sm:flex-1">
+            <label htmlFor="q" className="mb-1.5 block text-sm font-medium">
+              Rechercher un projet
+            </label>
+            <input
+              id="q"
+              name="q"
+              type="search"
+              defaultValue={query.query}
+              placeholder="Nom, slug, dépôt ou domaine"
+              className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+          <div className="sm:w-52">
+            <label htmlFor="stack" className="mb-1.5 block text-sm font-medium">
+              Stack
+            </label>
+            <select
+              id="stack"
+              name="stack"
+              defaultValue={query.stack ?? ''}
+              className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {label}
-            </Link>
-          )
-        })}
-      </nav>
-
-      <form role="search" className="flex flex-col gap-2 sm:flex-row sm:items-end">
-        <input type="hidden" name="etat" value={query.filter === 'all' ? '' : query.filter} />
-        <div className="sm:flex-1">
-          <label htmlFor="q" className="mb-1 block text-sm font-medium">
-            Rechercher un projet
-          </label>
-          <input
-            id="q"
-            name="q"
-            type="search"
-            defaultValue={query.query}
-            placeholder="Nom, slug, dépôt ou domaine"
-            className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-        </div>
-        <div>
-          <label htmlFor="stack" className="mb-1 block text-sm font-medium">
-            Stack
-          </label>
-          <select
-            id="stack"
-            name="stack"
-            defaultValue={query.stack ?? ''}
-            className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-52"
+              <option value="">Toutes les stacks</option>
+              {['nextjs', 'nuxt', 'astro', 'vite', 'svelte', 'remix', 'solidstart', 'redwoodjs', 'node', 'laravel', 'php', 'python', 'static', 'docker', 'eflex-config'].map((stack) => (
+                <option key={stack} value={stack}>
+                  {frameworkLabel(stack)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="submit"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            <option value="">Toutes les stacks</option>
-            {['nextjs', 'nuxt', 'astro', 'vite', 'svelte', 'remix', 'solidstart', 'redwoodjs', 'node', 'laravel', 'php', 'python', 'static', 'docker', 'eflex-config'].map((stack) => (
-              <option key={stack} value={stack}>
-                {frameworkLabel(stack)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          type="submit"
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          <Search className="h-4 w-4" aria-hidden="true" />
-          Filtrer
-        </button>
-      </form>
+            <Search className="h-4 w-4" aria-hidden="true" />
+            Filtrer
+          </button>
+        </form>
+      </Card>
 
       {truncated && (
         <p role="status" className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm">
@@ -192,15 +188,16 @@ export default async function AdminProjectsPage({
 
       <Card>
         {rows.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="font-medium">Aucun projet pour ce filtre</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Modifiez la recherche ou revenez à la liste complète.
-            </p>
-            <Link href="/admin/projects" className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline">
-              Voir tous les projets
-            </Link>
-          </div>
+          <EmptyState
+            icon={FolderKanban}
+            title="Aucun projet pour ce filtre"
+            description="Modifiez la recherche ou revenez à la liste complète."
+            action={
+              <LinkButton href="/admin/projects" variant="secondary" size="sm">
+                Voir tous les projets
+              </LinkButton>
+            }
+          />
         ) : (
           <>
             <ul className="divide-y divide-border sm:hidden" aria-label="Liste des projets">
@@ -310,7 +307,7 @@ export default async function AdminProjectsPage({
       {pages > 1 && (
         <nav aria-label="Pagination" className="flex items-center justify-between text-sm">
           {page > 1 ? (
-            <Link href={href(query.filter, page - 1)} className="inline-flex min-h-11 items-center text-primary hover:underline">
+            <Link href={href(query.filter, page - 1)} className="inline-flex min-h-11 items-center font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               ← Précédent
             </Link>
           ) : (
@@ -320,7 +317,7 @@ export default async function AdminProjectsPage({
             Page {page} sur {pages}
           </span>
           {page < pages ? (
-            <Link href={href(query.filter, page + 1)} className="inline-flex min-h-11 items-center text-primary hover:underline">
+            <Link href={href(query.filter, page + 1)} className="inline-flex min-h-11 items-center font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               Suivant →
             </Link>
           ) : (

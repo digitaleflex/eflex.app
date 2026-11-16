@@ -1,10 +1,11 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, ExternalLink, Globe, Layers, Server, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Globe, History, Layers, Server, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/admin'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { EmptyState } from '@/components/ui/empty-state'
 import { StatusPill } from '@/components/dashboard/status-pill'
 import { FrameworkTile } from '@/components/dashboard/project-card'
 import { AdminProjectActions } from '@/components/admin/project-actions'
@@ -90,25 +91,28 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
 
   return (
     <div className="space-y-6">
-      <Link href="/admin/projects" className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+      <Link
+        href="/admin/projects"
+        className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         Tous les projets
       </Link>
 
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-center gap-4">
           <FrameworkTile framework={primary?.framework ?? null} name={project.name} size="lg" />
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-2xl font-bold tracking-tight">{project.name}</h1>
+              <h1 className="truncate font-display text-2xl font-bold tracking-tight">{project.name}</h1>
               <StatusPill status={last?.status} />
             </div>
-            <p className="mt-0.5 text-sm text-muted-foreground">
+            <p className="max-w-prose text-sm text-muted-foreground">
               {project.organization.name} · <span className="font-mono">{project.slug}</span>
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <a
             href={project.repoUrl}
             target="_blank"
@@ -256,14 +260,25 @@ export default async function AdminProjectPage({ params }: { params: Promise<{ i
       </div>
 
       <Card>
-        <div className="flex flex-wrap items-center justify-between gap-2 p-4 pb-2">
-          <h2 className="text-sm font-semibold">Derniers déploiements</h2>
-          <Link href={`/admin/deployments?projet=${project.id}`} className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline sm:min-h-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 pb-2">
+          <div className="space-y-1">
+            <h2 className="text-sm font-semibold">Derniers déploiements</h2>
+            <p className="text-xs text-muted-foreground">10 derniers déploiements, du plus récent au plus ancien.</p>
+          </div>
+          <Link
+            href={`/admin/deployments?projet=${project.id}`}
+            className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-0"
+          >
             Voir la file et l’historique
           </Link>
         </div>
         {project.deployments.length === 0 ? (
-          <p className="p-4 pt-0 text-sm text-muted-foreground">Aucun déploiement pour ce projet.</p>
+          <EmptyState
+            icon={History}
+            title="Aucun déploiement pour ce projet"
+            description="L’historique apparaîtra ici après le premier déploiement."
+            className="py-8"
+          />
         ) : (
           <ul className="divide-y divide-border">
             {project.deployments.map((deployment) => {
