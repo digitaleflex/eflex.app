@@ -33,6 +33,63 @@ pointe déjà sur le serveur : aucun enregistrement DNS à créer. Le certificat
 - Les sous-domaines de la plateforme (`uptime`, `metrics`, `logs`, `api`, `coolify`…)
   ne peuvent pas devenir le slug d'un projet client (`lib/reserved-subdomains.ts`).
 
+## Fermer l'accès au public (recommandé)
+
+Trois réglages, cumulables, lus par le portail (`.env.prod`) et appliqués à
+l'installation d'un outil ou avec « Nouveau mot de passe » :
+
+| Variable | Effet |
+|---|---|
+| `OPS_ALLOWED_IPS` | Seules ces adresses ou plages (séparées par des virgules) passent le proxy, **avant** le mot de passe. Une entrée invalide est ignorée et signalée dans l'onglet. |
+| `OPS_PRIVATE_NETWORK=tailscale` | Seuls les appareils de votre réseau privé Tailscale passent (100.64.0.0/10, fd7a:115c:a1e0::/48). |
+| `OPS_ROOT_DOMAIN` | Domaine dédié aux outils, par exemple `ops.eflex.app` → `logs.ops.eflex.app`. |
+| `OPS_CERT_RESOLVER` | Résolveur de certificat Traefik (`letsencrypt` par défaut). Avec une adresse privée, `letsencrypt-dns` (DNS-01). |
+
+L'onglet Supervision affiche le mode d'accès en vigueur.
+
+**Pourquoi pas la connexion admin E-FLEX ?** Les sites clients sont sur
+`*.<racine>`. Partager le cookie de session avec les sous-domaines des outils
+l'enverrait aussi à tous les sites clients, qui pourraient voler la session
+d'administration. Le filtrage par réseau + mot de passe ne crée pas ce risque.
+
+### Mode réseau privé avec Tailscale, pas à pas
+
+Résultat : les outils ne sont joignables que depuis vos appareils, et leur
+adresse ne mène à rien depuis Internet.
+
+1. Sur le serveur :
+   ```bash
+   curl -fsSL https://tailscale.com/install.sh | sh
+   sudo tailscale up
+   tailscale ip -4          # noter l'adresse 100.x.y.z
+   ```
+2. Sur votre ordinateur et votre téléphone : installer Tailscale et se connecter
+   au même compte.
+3. DNS (Cloudflare) : enregistrement `A` `*.ops.eflex.app` → `100.x.y.z`,
+   **sans proxy** (nuage gris). Une adresse privée dans un DNS public est
+   normale : elle n'est joignable que depuis Tailscale.
+4. `.env.prod` :
+   ```bash
+   OPS_ROOT_DOMAIN=ops.eflex.app
+   OPS_PRIVATE_NETWORK=tailscale
+   OPS_CERT_RESOLVER=letsencrypt-dns
+   ```
+   Let's Encrypt ne peut pas joindre une adresse privée en HTTP-01 : il faut le
+   résolveur DNS-01 (`letsencrypt-dns`, déjà configuré sur le serveur d'après
+   `PROD.md` ; vérifier son nom dans la configuration de Traefik).
+5. Redéployer le portail (`bash scripts/deploy-prod.sh`), puis dans Supervision :
+   « Installer », ou « Nouveau mot de passe » sur un outil déjà installé (il
+   prend alors sa nouvelle adresse).
+
+Le même réseau Tailscale servira à relier le futur serveur de build.
+
+### Mode adresses autorisées, sans Tailscale
+
+`OPS_ALLOWED_IPS=<votre IP publique>` suffit, sur le domaine de la plateforme.
+Si votre adresse change (box, 4G), il faut la mettre à jour et régénérer le mot de
+passe de chaque outil. Ce mode suppose que Traefik voit l'adresse réelle du
+visiteur : enregistrements DNS **sans proxy Cloudflare**, comme aujourd'hui.
+
 ## Première mise en route
 
 1. **Supervision → Installer** sur chaque outil ; noter l'accès affiché.

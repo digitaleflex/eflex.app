@@ -754,7 +754,11 @@ function BeszelKeyForm({ onDone }: { onDone: (feedback: Feedback) => void }) {
 }
 
 function OpsToolsTab() {
-  const { data, error, loading, reload } = useLoad<{ tools: OpsToolRow[]; rootDomain: string | null }>('/ops-tools')
+  const { data, error, loading, reload } = useLoad<{
+    tools: OpsToolRow[]
+    rootDomain: string | null
+    access: { privateNetwork: 'tailscale' | null; allowedRanges: string[]; invalid: string[]; publicAccess: boolean }
+  }>('/ops-tools')
   const [feedback, setFeedback] = useState<Feedback>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [credentials, setCredentials] = useState<Credentials | null>(null)
@@ -780,6 +784,33 @@ function OpsToolsTab() {
         Ce que Coolify ne fournit pas : surveillance de disponibilité, ressources des serveurs et journaux en direct. E-FLEX
         installe chaque outil sur un sous-domaine de {data?.rootDomain ?? 'la plateforme'}, protégé par un accès dédié.
       </p>
+      {data && (
+        <div
+          role="status"
+          className={cn(
+            'space-y-1 rounded-lg border p-3 text-sm',
+            data.access.publicAccess ? 'border-warning/30 bg-warning/10' : 'border-success/25 bg-success/10',
+          )}
+        >
+          <p className="font-medium">
+            {data.access.privateNetwork === 'tailscale'
+              ? 'Accès : réseau privé Tailscale uniquement, puis mot de passe.'
+              : data.access.publicAccess
+                ? 'Accès : depuis Internet, protégé par mot de passe.'
+                : 'Accès : adresses autorisées uniquement, puis mot de passe.'}
+          </p>
+          {data.access.allowedRanges.length > 0 && (
+            <p className="break-words font-mono text-xs">{data.access.allowedRanges.join(', ')}</p>
+          )}
+          {data.access.invalid.length > 0 && (
+            <p className="text-xs text-destructive">Ignoré dans OPS_ALLOWED_IPS (format invalide) : {data.access.invalid.join(', ')}</p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Réglages : OPS_PRIVATE_NETWORK, OPS_ALLOWED_IPS, OPS_ROOT_DOMAIN, OPS_CERT_RESOLVER. Un changement s’applique à
+            l’installation ou avec « Nouveau mot de passe ».
+          </p>
+        </div>
+      )}
       {credentials && <CredentialsBox credentials={credentials} onClose={() => setCredentials(null)} />}
       <Notice feedback={feedback} />
       <LoadState loading={loading} error={error} onRetry={() => void reload()} />

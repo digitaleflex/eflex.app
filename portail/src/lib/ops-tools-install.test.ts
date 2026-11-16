@@ -86,4 +86,15 @@ describe('installation des outils d’exploitation', () => {
       ['logs', false, 'https://logs.eflex.app'],
     ])
   })
+
+  it('applique le domaine dédié et le filtre d’adresses à l’installation', async () => {
+    vi.stubEnv('OPS_ROOT_DOMAIN', 'ops.eflex.app')
+    vi.stubEnv('OPS_PRIVATE_NETWORK', 'tailscale')
+    const { installOpsTool, listOpsTools } = await import('@/lib/ops-tools-install')
+    expect(await installOpsTool('logs')).toMatchObject({ url: 'https://logs.ops.eflex.app' })
+    expect(mock.created[0]?.compose).toContain('ipallowlist.sourcerange=100.64.0.0/10,fd7a:115c:a1e0::/48')
+    const list = await listOpsTools()
+    if ('error' in list) throw new Error(list.error)
+    expect(list.access).toMatchObject({ privateNetwork: 'tailscale', publicAccess: false })
+  })
 })

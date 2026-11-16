@@ -12,11 +12,24 @@ import {
   OPS_TOOL_IDS,
   OPS_USER,
   generateOpsPassword,
+  opsAccess,
   opsServiceName,
   opsToolCompose,
   opsToolHost,
+  type OpsAccess,
   type OpsToolId,
 } from '@/lib/ops-tools'
+
+const access = (): OpsAccess => opsAccess(process.env, platformDomain())
+
+/** Mode d'accès affiché à l'exploitant (sans rien de secret). */
+export interface OpsAccessView {
+  rootDomain: string | null
+  privateNetwork: 'tailscale' | null
+  allowedRanges: string[]
+  invalid: string[]
+  publicAccess: boolean
+}
 
 export interface OpsToolStatus {
   id: OpsToolId
@@ -30,13 +43,21 @@ export interface OpsToolStatus {
   needsAgentKey: boolean
 }
 
-export async function listOpsTools(): Promise<{ tools: OpsToolStatus[]; rootDomain: string | null } | { error: string }> {
+export async function listOpsTools(): Promise<{ tools: OpsToolStatus[]; rootDomain: string | null; access: OpsAccessView } | { error: string }> {
   const services = await listCoolifyServices()
   if ('error' in services) return services
-  const root = platformDomain()
+  const settings = access()
+  const root = settings.rootDomain
   const byName = new Map<string, CoolifyServiceView>(services.map((service) => [service.name, service]))
   return {
     rootDomain: root,
+    access: {
+      rootDomain: root,
+      privateNetwork: settings.privateNetwork,
+      allowedRanges: settings.sourceRanges,
+      invalid: settings.invalid,
+      publicAccess: settings.sourceRanges.length === 0,
+    },
     tools: OPS_TOOL_IDS.map((id) => {
       const tool = OPS_TOOLS[id]
       const service = byName.get(opsServiceName(id))
@@ -59,7 +80,8 @@ export type OpsCredentials = { url: string; user: string; password: string }
 
 /** Installe l'outil dans Coolify. Le mot de passe n'est renvoyé qu'ici : il n'est stocké nulle part. */
 export async function installOpsTool(id: OpsToolId): Promise<OpsCredentials | { error: string; status: number }> {
-  const root = platformDomain()
+  const settings = access()
+  const root = settings.rootDomain
   if (!root) return { error: 'Domaine de la plateforme non configuré (PORTAL_DOMAIN).', status: 409 }
   const services = await listCoolifyServices()
   if ('error' in services) return { error: services.error, status: 502 }
@@ -77,7 +99,7 @@ export async function installOpsTool(id: OpsToolId): Promise<OpsCredentials | { 
   const created = await createComposeService({
     name: opsServiceName(id),
     description: `${OPS_TOOLS[id].product} — outil d'exploitation installé par E-FLEX`,
-    compose: opsToolCompose(id, host, password),
+    compose: opsToolCompose(id, host, password, settings),
     serverUuid: target.serverUuid,
     projectUuid: target.projectUuid,
     environmentName: target.environmentName,
@@ -93,15 +115,16 @@ async function installedService(id: OpsToolId): Promise<CoolifyServiceView | { e
   return service ?? { error: 'Cet outil n’est pas installé.', status: 404 }
 }
 
-/** Génère un nouveau mot de passe d'accès et redémarre l'outil. */
+/** Génère un nouveau mot de passe d'accès, applique les réglages d'accès actuels et redémarre l'outil. */
 export async function rotateOpsPassword(id: OpsToolId): Promise<OpsCredentials | { error: string; status: number }> {
-  const root = platformDomain()
+  const settings = access()
+  const root = settings.rootDomain
   if (!root) return { error: 'Domaine de la plateforme non configuré (PORTAL_DOMAIN).', status: 409 }
   const service = await installedService(id)
   if ('error' in service) return service
   const host = opsToolHost(id, root)
   const password = generateOpsPassword()
-  const result = await replaceServiceCompose(service.id, opsToolCompose(id, host, password))
+  const result = await replaceServiceCompose(service.id, opsToolCompose(id, host, password, settings))
   if ('error' in result) return { error: result.error, status: 502 }
   return { url: `https://${host}`, user: OPS_USER, password }
 }

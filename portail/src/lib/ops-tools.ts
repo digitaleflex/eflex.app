@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
+import { isIP } from 'node:net'
 import { stringify } from 'yaml'
 import { traefikLabels } from '@eflex/renderer'
 export { RESERVED_SUBDOMAINS } from '@/lib/reserved-subdomains'
@@ -87,22 +88,92 @@ export function basicAuthEntry(user: string, password: string): string {
 export const OPS_USER = 'admin'
 export const OPS_PROXY_NETWORK = 'proxy'
 
-function routedLabels(tool: OpsTool, host: string, users: string): string[] {
+/**
+ * Réglages d'accès aux outils, lus dans l'environnement (appliqués à l'installation et à chaque
+ * « Nouveau mot de passe ») :
+ * - `OPS_ROOT_DOMAIN` : domaine des outils (défaut : domaine de la plateforme). Un domaine dédié, par
+ *   exemple `ops.eflex.app` avec `*.ops.eflex.app` pointant vers l'adresse Tailscale du serveur, rend
+ *   les outils invisibles depuis Internet ;
+ * - `OPS_PRIVATE_NETWORK=tailscale` : n'accepte que les appareils du réseau privé Tailscale
+ *   (100.64.0.0/10 et fd7a:115c:a1e0::/48) ;
+ * - `OPS_ALLOWED_IPS` : adresses ou plages supplémentaires autorisées (séparées par des virgules) ;
+ * - `OPS_CERT_RESOLVER` : résolveur de certificat Traefik (défaut `letsencrypt`, HTTP-01). Avec une
+ *   adresse privée, utiliser le résolveur DNS-01 du serveur (`letsencrypt-dns`).
+ * Sans `OPS_PRIVATE_NETWORK` ni `OPS_ALLOWED_IPS`, l'outil reste joignable depuis Internet, derrière son
+ * mot de passe.
+ */
+export interface OpsAccess {
+  rootDomain: string | null
+  sourceRanges: string[]
+  privateNetwork: 'tailscale' | null
+  certResolver: string
+  /** Entrées refusées de `OPS_ALLOWED_IPS` (affichées à l'exploitant). */
+  invalid: string[]
+}
+
+export const TAILSCALE_RANGES = ['100.64.0.0/10', 'fd7a:115c:a1e0::/48']
+
+/** Adresse IP ou plage CIDR valide (IPv4 ou IPv6). */
+export function isIpOrCidr(value: string): boolean {
+  const [address, prefix, ...rest] = value.split('/')
+  if (rest.length > 0 || !address) return false
+  const family = isIP(address)
+  if (family === 0) return false
+  if (prefix === undefined) return true
+  if (!/^\d{1,3}$/.test(prefix)) return false
+  return Number(prefix) <= (family === 4 ? 32 : 128)
+}
+
+const DOMAIN_RE = /^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)(?:\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/
+const RESOLVER_RE = /^[A-Za-z0-9_-]{1,64}$/
+
+export function opsAccess(env: Record<string, string | undefined>, platformRoot: string | null): OpsAccess {
+  const customRoot = env.OPS_ROOT_DOMAIN?.trim().toLowerCase().replace(/\.$/, '')
+  const rootDomain = customRoot && DOMAIN_RE.test(customRoot) ? customRoot : platformRoot
+  const privateNetwork = env.OPS_PRIVATE_NETWORK?.trim().toLowerCase() === 'tailscale' ? 'tailscale' : null
+  const entries = (env.OPS_ALLOWED_IPS ?? '').split(',').map((item) => item.trim()).filter(Boolean)
+  const invalid = entries.filter((item) => !isIpOrCidr(item))
+  const sourceRanges = [...new Set([...(privateNetwork ? TAILSCALE_RANGES : []), ...entries.filter(isIpOrCidr)])]
+  const resolver = env.OPS_CERT_RESOLVER?.trim()
+  return {
+    rootDomain,
+    sourceRanges,
+    privateNetwork,
+    certResolver: resolver && RESOLVER_RE.test(resolver) ? resolver : 'letsencrypt',
+    invalid,
+  }
+}
+
+function routedLabels(tool: OpsTool, host: string, users: string, access: Pick<OpsAccess, 'sourceRanges' | 'certResolver'>): string[] {
   const router = `eflex-ops-${tool.id}`
-  const middleware = `${router}-auth`
+  const auth = `${router}-auth`
+  const allow = `${router}-ip`
+  // Le filtre d'adresses passe avant le mot de passe : une adresse refusée ne voit même pas la demande.
+  const middlewares = access.sourceRanges.length > 0 ? [allow, auth] : [auth]
   return [
-    ...traefikLabels('eflex-ops', tool.id, host, tool.port, OPS_PROXY_NETWORK, { middlewares: [middleware] }),
-    `traefik.http.middlewares.${middleware}.basicauth.users=${users}`,
-    `traefik.http.middlewares.${middleware}.basicauth.realm=EFLEX`,
+    ...traefikLabels('eflex-ops', tool.id, host, tool.port, OPS_PROXY_NETWORK, {
+      middlewares,
+      certResolver: access.certResolver,
+    }),
+    `traefik.http.middlewares.${auth}.basicauth.users=${users}`,
+    `traefik.http.middlewares.${auth}.basicauth.realm=EFLEX`,
+    ...(access.sourceRanges.length > 0
+      ? [`traefik.http.middlewares.${allow}.ipallowlist.sourcerange=${access.sourceRanges.join(',')}`]
+      : []),
   ]
 }
 
 /** Fichier docker-compose de l'outil, prêt à être envoyé à Coolify (encodé en base64 par l'appelant). */
-export function opsToolCompose(id: OpsToolId, host: string, password: string): string {
+export function opsToolCompose(
+  id: OpsToolId,
+  host: string,
+  password: string,
+  access: Pick<OpsAccess, 'sourceRanges' | 'certResolver'> = { sourceRanges: [], certResolver: 'letsencrypt' },
+): string {
   const tool = OPS_TOOLS[id]
   const users = basicAuthEntry(OPS_USER, password)
   const network = { [OPS_PROXY_NETWORK]: { external: true } }
-  const common = { restart: 'unless-stopped', networks: [OPS_PROXY_NETWORK], labels: routedLabels(tool, host, users) }
+  const common = { restart: 'unless-stopped', networks: [OPS_PROXY_NETWORK], labels: routedLabels(tool, host, users, access) }
 
   if (id === 'uptime') {
     return stringify({
