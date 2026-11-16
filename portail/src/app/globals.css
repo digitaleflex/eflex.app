@@ -329,6 +329,19 @@
   75%, 100% { transform: scale(2); opacity: 0; }
 }
 
+/* ─── Maquette du Migration Center (accueil, `components/marketing/migration-teaser.tsx`) ───
+   Trois états illustratifs (source, analyse, résultat) en boucle ; réduit au résultat final. */
+.migration-demo .mig-state { position: absolute; inset: 1.25rem; opacity: 0; }
+@media (min-width: 640px) { .migration-demo .mig-state { inset: 1.5rem; } }
+.migration-demo .mig-1 { animation: mig-1 12s ease-in-out infinite; }
+.migration-demo .mig-2 { animation: mig-2 12s ease-in-out infinite; }
+.migration-demo .mig-3 { animation: mig-3 12s ease-in-out infinite; }
+.migration-demo .mig-progress { transform: scaleX(0); animation: mig-progress 12s linear infinite; }
+@keyframes mig-1 { 0%, 3% { opacity: 0; } 6%, 30% { opacity: 1; } 34%, 100% { opacity: 0; } }
+@keyframes mig-2 { 0%, 32% { opacity: 0; } 36%, 60% { opacity: 1; } 64%, 100% { opacity: 0; } }
+@keyframes mig-3 { 0%, 62% { opacity: 0; } 66%, 96% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes mig-progress { 0%, 32% { transform: scaleX(0); } 60% { transform: scaleX(1); } 64%, 100% { transform: scaleX(0); } }
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after {
@@ -340,6 +353,9 @@
   /* Animations de l'accueil : état final, immobile. */
   .deploy-demo .dd-step, .deploy-demo .dd-url { animation: none !important; opacity: 1 !important; transform: none !important; }
   .deploy-demo .dd-bar { animation: none !important; width: 100% !important; }
+  .migration-demo .mig-state { animation: none !important; opacity: 0 !important; }
+  .migration-demo .mig-3 { opacity: 1 !important; }
+  .migration-demo .mig-progress { animation: none !important; transform: scaleX(1) !important; }
   .tech-marquee-track { animation: none !important; flex-wrap: wrap; width: auto; justify-content: center; }
   .tech-marquee-row { -webkit-mask-image: none; mask-image: none; }
   .tech-marquee-copy { display: none !important; }
