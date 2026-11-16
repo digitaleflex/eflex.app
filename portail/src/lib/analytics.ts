@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { createHmac, randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import type { PrismaClient } from '@prisma/client'
 
@@ -33,6 +33,59 @@ export const ANALYTICS_RETENTION_DEFAULT_DAYS = 90
 export const ANALYTICS_EVENT_NAME_MAX = 64
 export const ANALYTICS_EVENT_NAME_PATTERN = /^[a-z0-9][a-z0-9_.:-]{0,63}$/
 export const ANALYTICS_GOAL_EVENTS_MAX = 20
+
+export const ANALYTICS_DIMENSIONS = ['referrer', 'device', 'browser', 'os'] as const
+export type AnalyticsDimension = (typeof ANALYTICS_DIMENSIONS)[number]
+
+const REFERRER_DIRECT = 'direct'
+
+export function normalizeAnalyticsReferrer(input: unknown): string {
+  if (typeof input !== 'string') return REFERRER_DIRECT
+  const raw = input.trim()
+  if (!raw) return REFERRER_DIRECT
+  try {
+    const url = /^https?:\/\//i.test(raw) ? new URL(raw) : new URL(`https://${raw}`)
+    let host = url.hostname.toLowerCase().replace(/\.$/, '')
+    host = host.replace(/[\u0000-\u001f\u007f]/g, '')
+    if (!host) return REFERRER_DIRECT
+    if (host.length > 255) host = host.slice(0, 255)
+    return host
+  } catch {
+    return REFERRER_DIRECT
+  }
+}
+
+export interface AnalyticsUaInfo {
+  device: 'desktop' | 'mobile' | 'tablet' | 'other'
+  browser: string
+  os: string
+}
+
+export function parseAnalyticsUserAgent(ua: string): AnalyticsUaInfo {
+  const s = ua || ''
+  const isTablet = /ipad|tablet|playbook|silk/i.test(s) || (/android/i.test(s) && !/mobile/i.test(s))
+  const isMobile = !isTablet && /mobi|iphone|ipod|android.*mobile|windows phone|blackberry|bb10|iemobile/i.test(s)
+  const device: AnalyticsUaInfo['device'] = isTablet ? 'tablet' : isMobile ? 'mobile' : s ? 'desktop' : 'other'
+
+  let os = 'Autre'
+  if (/windows nt/i.test(s)) os = 'Windows'
+  else if (/iphone|ipad|ipod/i.test(s) || /\bios\b/i.test(s)) os = 'iOS'
+  else if (/mac os x|macintosh/i.test(s)) os = 'macOS'
+  else if (/android/i.test(s)) os = 'Android'
+  else if (/cros/i.test(s)) os = 'ChromeOS'
+  else if (/linux/i.test(s)) os = 'Linux'
+
+  let browser = 'Autre'
+  if (/edg\//i.test(s) || /edgios|edga/i.test(s)) browser = 'Edge'
+  else if (/opr\//i.test(s) || /opera/i.test(s)) browser = 'Opera'
+  else if (/samsungbrowser/i.test(s)) browser = 'Samsung Internet'
+  else if (/firefox|fxios/i.test(s)) browser = 'Firefox'
+  else if (/crios/i.test(s)) browser = 'Chrome'
+  else if (/chrome\//i.test(s)) browser = 'Chrome'
+  else if (/safari/i.test(s)) browser = 'Safari'
+
+  return { device, browser, os }
+}
 
 export function generateAnalyticsPublicKey(): string {
   return `${ANALYTICS_PUBLIC_KEY_PREFIX}${randomBytes(ANALYTICS_PUBLIC_KEY_BYTES).toString('base64url')}`
@@ -97,6 +150,34 @@ export function utcDay(date = new Date()): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
 }
 
+function analyticsVisitorSecret(): string {
+  return (
+    process.env.ANALYTICS_VISITOR_SECRET ||
+    process.env.ENV_ENCRYPTION_KEY ||
+    process.env.BETTER_AUTH_SECRET ||
+    'eflex-analytics-dev-secret'
+  )
+}
+
+export function analyticsVisitorDayKey(date = new Date()): string {
+  return utcDay(date).toISOString().slice(0, 10)
+}
+
+function analyticsDailySalt(dayKey: string): Buffer {
+  return createHmac('sha256', analyticsVisitorSecret()).update(`analytics-visitor:${dayKey}`).digest()
+}
+
+/**
+ * Empreinte non réversible d'un visiteur pour un jour UTC donné.
+ * Entrées : IP et User-Agent tels que vus en mémoire (jamais persistés). Le sel
+ * quotidien (dérivé d'un secret serveur) empêche le recoupement entre jours.
+ */
+export function analyticsVisitorHash(date: Date, ip: string, userAgent: string): string {
+  const dayKey = analyticsVisitorDayKey(date)
+  const salt = analyticsDailySalt(dayKey)
+  return createHmac('sha256', salt).update(`${ip}\0${userAgent}`).digest('hex')
+}
+
 /** Indique si la requête exprime un refus de suivi (DNT ou GPC). */
 export function hasDoNotTrackSignal(headers: Headers): boolean {
   const dnt = headers.get('dnt')
@@ -118,6 +199,8 @@ export const analyticsConfigUpdateSchema = z
     enabled: z.boolean().optional(),
     respectDnt: z.boolean().optional(),
     collectPath: z.boolean().optional(),
+    collectReferrer: z.boolean().optional(),
+    collectDevice: z.boolean().optional(),
     retentionDays: z
       .number()
       .int()
@@ -136,6 +219,8 @@ export const analyticsConfigUpdateSchema = z
       value.enabled !== undefined ||
       value.respectDnt !== undefined ||
       value.collectPath !== undefined ||
+      value.collectReferrer !== undefined ||
+      value.collectDevice !== undefined ||
       value.retentionDays !== undefined ||
       value.regenerateKey === true ||
       value.goalEvents !== undefined,
@@ -154,6 +239,8 @@ export const collectPayloadSchema = z
     t: z.enum(['pageview', 'event']).optional().default('pageview'),
     /** Nom de l'événement nommé, requis si t = "event". */
     n: z.string().max(ANALYTICS_EVENT_NAME_MAX).optional(),
+    /** Référent de la page vue (URL ou vide). Ignoré côté serveur pour les événements. */
+    r: z.string().max(2048).optional(),
   })
   .superRefine((value, ctx) => {
     if (value.t === 'event' && normalizeAnalyticsEventName(value.n) === null) {
@@ -199,7 +286,8 @@ export function buildAnalyticsSnippet(
   const safeKey = JSON.stringify(publicKey)
   const safeUrl = JSON.stringify(collectUrl)
   const send =
-    `var d={k:${safeKey},p:location.pathname,t:"pageview"};` +
+    `var r="";try{r=document.referrer||""}catch(_){};` +
+    `var d={k:${safeKey},p:location.pathname,t:"pageview",r:r};` +
     `var b=JSON.stringify(d);` +
     `(navigator.sendBeacon&&navigator.sendBeacon(${safeUrl},new Blob([b],{type:"application/json"})))||` +
     `fetch(${safeUrl},{method:"POST",headers:{"content-type":"application/json"},body:b,keepalive:true,mode:"cors"})`
@@ -273,11 +361,20 @@ export interface TrafficStatRow {
 
 /**
  * Purge les statistiques quotidiennes d'un projet antérieures à sa rétention
- * (pages vues et événements nommés). Ne supprime rien si la configuration
- * n'existe pas. Retourne le nombre total de lignes supprimées.
+ * (pages vues, totaux site, visiteurs, dimensions et événements nommés). Ne supprime rien
+ * si la configuration n'existe pas. Retourne le nombre total de lignes supprimées.
  */
 export async function purgeTrafficStatsForProject(
-  prisma: Pick<PrismaClient, 'projectAnalytics' | 'trafficDailyStat' | 'analyticsEventDaily'>,
+  prisma: Pick<
+    PrismaClient,
+    | 'projectAnalytics'
+    | 'trafficDailyStat'
+    | 'trafficDailySiteStat'
+    | 'analyticsDailyVisitor'
+    | 'analyticsEventDaily'
+    | 'trafficDailyDimension'
+    | 'analyticsDailyDimensionVisitor'
+  >,
   projectId: string,
 ): Promise<number> {
   const config = await prisma.projectAnalytics.findUnique({
@@ -286,23 +383,39 @@ export async function purgeTrafficStatsForProject(
   })
   if (!config) return 0
   const cutoff = analyticsRetentionCutoff(config.retentionDays)
-  const [traffic, events] = await Promise.all([
+  const [traffic, site, visitors, events, dimensions, dimVisitors] = await Promise.all([
     prisma.trafficDailyStat.deleteMany({ where: { projectId, date: { lt: cutoff } } }),
+    prisma.trafficDailySiteStat.deleteMany({ where: { projectId, date: { lt: cutoff } } }),
+    prisma.analyticsDailyVisitor.deleteMany({ where: { projectId, date: { lt: cutoff } } }),
     prisma.analyticsEventDaily.deleteMany({ where: { projectId, date: { lt: cutoff } } }),
+    prisma.trafficDailyDimension.deleteMany({ where: { projectId, date: { lt: cutoff } } }),
+    prisma.analyticsDailyDimensionVisitor.deleteMany({ where: { projectId, date: { lt: cutoff } } }),
   ])
-  return traffic.count + events.count
+  return traffic.count + site.count + visitors.count + events.count + dimensions.count + dimVisitors.count
 }
 
 /** Supprime toutes les statistiques d'un projet (droit à l'effacement des mesures). */
 export async function deleteAllTrafficStatsForProject(
-  prisma: Pick<PrismaClient, 'trafficDailyStat' | 'analyticsEventDaily'>,
+  prisma: Pick<
+    PrismaClient,
+    | 'trafficDailyStat'
+    | 'trafficDailySiteStat'
+    | 'analyticsDailyVisitor'
+    | 'analyticsEventDaily'
+    | 'trafficDailyDimension'
+    | 'analyticsDailyDimensionVisitor'
+  >,
   projectId: string,
 ): Promise<number> {
-  const [traffic, events] = await Promise.all([
+  const [traffic, site, visitors, events, dimensions, dimVisitors] = await Promise.all([
     prisma.trafficDailyStat.deleteMany({ where: { projectId } }),
+    prisma.trafficDailySiteStat.deleteMany({ where: { projectId } }),
+    prisma.analyticsDailyVisitor.deleteMany({ where: { projectId } }),
     prisma.analyticsEventDaily.deleteMany({ where: { projectId } }),
+    prisma.trafficDailyDimension.deleteMany({ where: { projectId } }),
+    prisma.analyticsDailyDimensionVisitor.deleteMany({ where: { projectId } }),
   ])
-  return traffic.count + events.count
+  return traffic.count + site.count + visitors.count + events.count + dimensions.count + dimVisitors.count
 }
 
 /** Première issue Zod lisible (cohérent avec project-settings.ts). */

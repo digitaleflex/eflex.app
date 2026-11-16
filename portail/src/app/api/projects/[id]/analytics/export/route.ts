@@ -43,7 +43,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   // L'export reflète les données effectivement conservées selon la rétention.
   await purgeTrafficStatsForProject(prisma, projectId)
 
-  const [rows, eventRows, config] = await Promise.all([
+  const [rows, eventRows, config, siteRows, dimensionRows] = await Promise.all([
     prisma.trafficDailyStat.findMany({
       where: { projectId },
       orderBy: [{ date: 'asc' }, { path: 'asc' }],
@@ -55,6 +55,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       select: { date: true, name: true, count: true },
     }),
     prisma.projectAnalytics.findUnique({ where: { projectId }, select: { goalEvents: true } }),
+    prisma.trafficDailySiteStat.findMany({
+      where: { projectId },
+      orderBy: [{ date: 'asc' }],
+      select: { date: true, views: true, visitors: true },
+    }),
+    prisma.trafficDailyDimension.findMany({
+      where: { projectId },
+      orderBy: [{ date: 'asc' }, { dimension: 'asc' }, { views: 'desc' }],
+      select: { date: true, dimension: true, value: true, views: true, visitors: true },
+    }),
   ])
 
   const data = rows.map((row) => ({
@@ -69,6 +79,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     count: row.count,
     goal: goalSet.has(row.name),
   }))
+  const dailyTotals = siteRows.map((row) => ({
+    date: row.date.toISOString().slice(0, 10),
+    views: row.views,
+    visitors: row.visitors,
+  }))
+  const dimensions = dimensionRows.map((row) => ({
+    date: row.date.toISOString().slice(0, 10),
+    dimension: row.dimension,
+    value: row.value,
+    views: row.views,
+    visitors: row.visitors,
+  }))
 
   const url = new URL(request.url)
   const format = url.searchParams.get('format') === 'csv' ? 'csv' : 'json'
@@ -78,19 +100,31 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     action: 'project.analytics.export',
     target: { type: 'project', id: projectId },
     organizationId: org.organizationId,
-    details: { format, pageviewRows: data.length, eventRows: eventData.length },
+    details: {
+      format,
+      pageviewRows: data.length,
+      eventRows: eventData.length,
+      dailyTotalRows: dailyTotals.length,
+      dimensionRows: dimensions.length,
+    },
     request,
   })
 
   if (format === 'csv') {
-    const header = 'type,date,key,count,goal'
+    const header = 'type,date,key,count,visitors,goal'
     const trafficLines = data.map(
-      (row) => `pageview,${row.date},${escapeCsv(row.path)},${row.views},`,
+      (row) => `pageview,${row.date},${escapeCsv(row.path)},${row.views},,`,
     )
     const eventLines = eventData.map(
-      (row) => `event,${row.date},${escapeCsv(row.name)},${row.count},${row.goal ? 'true' : 'false'}`,
+      (row) => `event,${row.date},${escapeCsv(row.name)},${row.count},,${row.goal ? 'true' : 'false'}`,
     )
-    const csv = [header, ...trafficLines, ...eventLines].join('\n')
+    const dailyLines = dailyTotals.map(
+      (row) => `daily_total,${row.date},,${row.views},${row.visitors},`,
+    )
+    const dimensionLines = dimensions.map(
+      (row) => `dimension,${row.date},${escapeCsv(`${row.dimension}:${row.value}`)},${row.views},${row.visitors},`,
+    )
+    const csv = [header, ...trafficLines, ...eventLines, ...dailyLines, ...dimensionLines].join('\n')
     return new NextResponse(csv, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
@@ -106,6 +140,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     retentionApplied: true,
     rows: data,
     events: eventData,
+    dailyTotals,
+    visitorsAggregation: 'sum_daily_unique',
+    dimensions,
     goalEvents: config?.goalEvents ?? [],
   })
 }

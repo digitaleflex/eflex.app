@@ -28,6 +28,8 @@ function serializeConfig(config: {
   publicKey: string
   respectDnt: boolean
   collectPath: boolean
+  collectReferrer: boolean
+  collectDevice: boolean
   retentionDays: number
   goalEvents: string[]
   lastReceivedAt: Date | null
@@ -40,6 +42,8 @@ function serializeConfig(config: {
     publicKey: config.publicKey,
     respectDnt: config.respectDnt,
     collectPath: config.collectPath,
+    collectReferrer: config.collectReferrer,
+    collectDevice: config.collectDevice,
     retentionDays: config.retentionDays,
     goalEvents: config.goalEvents ?? [],
     lastReceivedAt: config.lastReceivedAt ? config.lastReceivedAt.toISOString() : null,
@@ -73,6 +77,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         publicKey: null,
         respectDnt: true,
         collectPath: true,
+        collectReferrer: true,
+        collectDevice: true,
         retentionDays: ANALYTICS_RETENTION_DEFAULT_DAYS,
         goalEvents: [],
         lastReceivedAt: null,
@@ -136,6 +142,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     enabled?: boolean
     respectDnt?: boolean
     collectPath?: boolean
+    collectReferrer?: boolean
+    collectDevice?: boolean
     retentionDays?: number
     publicKey?: string
     goalEvents?: string[]
@@ -144,6 +152,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (parsed.data.enabled !== undefined) data.enabled = parsed.data.enabled
   if (parsed.data.respectDnt !== undefined) data.respectDnt = parsed.data.respectDnt
   if (parsed.data.collectPath !== undefined) data.collectPath = parsed.data.collectPath
+  if (parsed.data.collectReferrer !== undefined) data.collectReferrer = parsed.data.collectReferrer
+  if (parsed.data.collectDevice !== undefined) data.collectDevice = parsed.data.collectDevice
   if (parsed.data.retentionDays !== undefined) data.retentionDays = parsed.data.retentionDays
   if (parsed.data.goalEvents !== undefined) data.goalEvents = normalizeGoalEvents(parsed.data.goalEvents)
   if (!existing || parsed.data.regenerateKey) data.publicKey = generateAnalyticsPublicKey()
@@ -157,6 +167,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           enabled: data.enabled ?? false,
           respectDnt: data.respectDnt ?? true,
           collectPath: data.collectPath ?? true,
+          collectReferrer: data.collectReferrer ?? true,
+          collectDevice: data.collectDevice ?? true,
           retentionDays: data.retentionDays ?? ANALYTICS_RETENTION_DEFAULT_DAYS,
           goalEvents: data.goalEvents ?? [],
         },
@@ -169,6 +181,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (parsed.data.enabled !== undefined) changes.enabled = config.enabled
   if (parsed.data.respectDnt !== undefined) changes.respectDnt = config.respectDnt
   if (parsed.data.collectPath !== undefined) changes.collectPath = config.collectPath
+  if (parsed.data.collectReferrer !== undefined) changes.collectReferrer = config.collectReferrer
+  if (parsed.data.collectDevice !== undefined) changes.collectDevice = config.collectDevice
   if (parsed.data.retentionDays !== undefined) changes.retentionDays = config.retentionDays
   if (parsed.data.goalEvents !== undefined) changes.goalEventsCount = config.goalEvents.length
   if (parsed.data.regenerateKey) changes.keyRotated = true

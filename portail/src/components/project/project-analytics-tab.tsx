@@ -31,6 +31,8 @@ type AnalyticsConfig = {
   publicKey: string | null
   respectDnt: boolean
   collectPath: boolean
+  collectReferrer?: boolean
+  collectDevice?: boolean
   retentionDays: number
   goalEvents: string[]
   lastReceivedAt: string | null
@@ -43,15 +45,29 @@ type AnalyticsConfig = {
 }
 
 type EventStat = { name: string; count: number; goal: boolean }
+type DimensionStat = { value: string; views: number; visitors: number }
 
 type StatsPayload = {
   rangeDays: number
   total: number
-  days: { date: string; views: number }[]
+  totalVisitors?: number
+  visitorsAggregation?: string
+  days: { date: string; views: number; visitors?: number }[]
   paths: { path: string; views: number }[]
   events: EventStat[]
+  referrers?: DimensionStat[]
+  devices?: DimensionStat[]
+  browsers?: DimensionStat[]
+  operatingSystems?: DimensionStat[]
   goalEvents: string[]
-  comparison?: { previousTotal: number; previousActiveDays: number; changePct: number; previousEvents: number }
+  comparison?: {
+    previousTotal: number
+    previousActiveDays: number
+    changePct: number
+    previousVisitors?: number
+    visitorsChangePct?: number
+    previousEvents: number
+  }
   installation?: { enabled: boolean; lastReceivedAt: string | null }
 }
 
@@ -147,20 +163,24 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
 
   useEffect(() => { void load() }, [load])
 
-  const toggleEnabled = async (enabled: boolean) => {
+  const updateConfig = async (patch: Record<string, unknown>, successNotice: string) => {
     if (!canManage) return
     setSaving(true); setError(''); setNotice('')
     try {
       const res = await fetch(`/api/projects/${projectId}/analytics`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }),
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? 'Modification impossible.')
       setConfig((data.config ?? null) as AnalyticsConfig | null)
-      setNotice(enabled ? 'Mesure d’audience activée pour ce projet.' : 'Mesure d’audience désactivée pour ce projet.')
+      setNotice(successNotice)
       await load({ silent: true })
     } catch (e) { setError(e instanceof Error ? e.message : 'Modification impossible.') }
     finally { setSaving(false) }
+  }
+
+  const toggleEnabled = async (enabled: boolean) => {
+    await updateConfig({ enabled }, enabled ? 'Mesure d’audience activée pour ce projet.' : 'Mesure d’audience désactivée pour ce projet.')
   }
 
   const addGoal = () => {
@@ -237,6 +257,7 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
   }
 
   const maxDayViews = useMemo(() => Math.max(1, ...(stats?.days.map((d) => d.views) ?? [1])), [stats])
+  const totalVisitors = stats?.totalVisitors ?? 0
   const hasPageData = (stats?.total ?? 0) > 0
   const events = stats?.events ?? []
   const hasEventData = events.length > 0
@@ -288,7 +309,7 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
                 <p className="text-sm font-medium">{enabled ? 'Mesure d’audience activée' : 'Mesure d’audience désactivée'}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {enabled
-                    ? 'Les pages vues et événements nommés reçus depuis vos sites intégrés sont agrégés par jour, par chemin et par nom.'
+                    ? 'Les pages vues, visiteurs uniques, sources, appareils/navigateurs/OS (si activés) et événements nommés reçus sont agrégés par jour.'
                     : 'Aucune collecte n’a lieu tant que la mesure n’est pas activée. Les données affichées ci-dessous correspondent uniquement aux statistiques déjà conservées, le cas échéant.'}
                 </p>
                 {config && (
@@ -296,6 +317,22 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
                     <li>Rétention : <span className="tabular-nums">{config.retentionDays}</span> jours</li>
                     <li>Respect DNT/GPC : {config.respectDnt ? 'activé' : 'désactivé'}</li>
                     <li>Collecte du chemin : {config.collectPath ? 'activée' : 'désactivée (compteur global)'}</li>
+                    <li className="flex flex-wrap items-center gap-2">
+                      <span>Référents/sources : {config.collectReferrer !== false ? 'activés' : 'désactivés'}</span>
+                      {canManage && (
+                        <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => void updateConfig({ collectReferrer: !(config.collectReferrer !== false) }, !(config.collectReferrer !== false) ? 'Collecte des référents activée.' : 'Collecte des référents désactivée.')} disabled={saving}>
+                          {config.collectReferrer !== false ? 'Désactiver' : 'Activer'}
+                        </button>
+                      )}
+                    </li>
+                    <li className="flex flex-wrap items-center gap-2">
+                      <span>Appareil/navigateur/OS : {config.collectDevice !== false ? 'activés' : 'désactivés'}</span>
+                      {canManage && (
+                        <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => void updateConfig({ collectDevice: !(config.collectDevice !== false) }, !(config.collectDevice !== false) ? 'Collecte appareil/navigateur/OS activée.' : 'Collecte appareil/navigateur/OS désactivée.')} disabled={saving}>
+                          {config.collectDevice !== false ? 'Désactiver' : 'Activer'}
+                        </button>
+                      )}
+                    </li>
                     <li>Objectifs définis : <span className="tabular-nums">{goalEvents.length}</span></li>
                   </ul>
                 )}
@@ -333,7 +370,7 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
 
           {hasPageData && (
             <>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <div className="rounded-lg border border-border bg-card p-4">
                   <p className="text-xs font-medium text-muted-foreground">Pages vues</p>
                   <p className="mt-2 font-mono text-2xl font-semibold tabular-nums">{stats?.total.toLocaleString('fr-FR')}</p>
@@ -343,9 +380,17 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
                   </div>
                 </div>
                 <div className="rounded-lg border border-border bg-card p-4">
+                  <p className="text-xs font-medium text-muted-foreground">Visiteurs uniques</p>
+                  <p className="mt-2 font-mono text-2xl font-semibold tabular-nums">{totalVisitors.toLocaleString('fr-FR')}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span>uniques/jour (somme période)</span>
+                    {comparison && <Trend value={comparison.visitorsChangePct ?? 0} />}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-4">
                   <p className="text-xs font-medium text-muted-foreground">Période précédente</p>
                   <p className="mt-2 font-mono text-2xl font-semibold tabular-nums">{(comparison?.previousTotal ?? 0).toLocaleString('fr-FR')}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{stats?.rangeDays} jours précédents (comparaison)</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{(comparison?.previousVisitors ?? 0).toLocaleString('fr-FR')} visiteurs · {stats?.rangeDays} jours</p>
                 </div>
                 <div className="rounded-lg border border-border bg-card p-4">
                   <p className="text-xs font-medium text-muted-foreground">Pages distinctes</p>
@@ -360,22 +405,24 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
               </div>
 
               <Notice tone="info" title="Métriques disponibles et limites">
-                Affichés (données réelles, agrégées) : pages vues, évolution quotidienne, comparaison avec la période précédente, chemins les plus consultés et événements nommés/objectifs. <strong>Non mesurés</strong> (privacy-by-design, sans identifiant visiteur ni cookie) : visiteurs uniques, sessions, durée moyenne, taux de rebond et propriétés d’événement. <strong>Non collectés</strong> (#110) : sources/référents/UTM, appareils/navigateurs, géographie — ces dimensions ne seront exposées que si une collecte compatible (opt-in, minimisation, agrégation sans ré-identification) est mise en place.
+                Affichés (données réelles, agrégées) : pages vues, <strong>visiteurs uniques par jour</strong> (déduplication privacy-friendly, sans cookie ni identifiant persistant ni IP stockée ; le total sur la période est la <strong>somme des uniques quotidiens</strong>, non dédupliquée entre jours), évolution quotidienne, comparaison avec la période précédente, chemins les plus consultés, sources/référents, appareils, navigateurs, systèmes d’exploitation (si activés) et événements nommés/objectifs. Les visiteurs par dimension sont des uniques/jour sur le segment (somme sur la période). <strong>Non mesurés</strong> : sessions, durée moyenne, taux de rebond, visiteurs uniques multi-jours et propriétés d’événement. <strong>Non collectés</strong> : paramètres UTM/campagnes détaillés et géographie (pays).
               </Notice>
 
               <div className="grid gap-6 lg:grid-cols-2">
                 <div className="rounded-lg border border-border bg-card p-4">
                   <h3 className="text-sm font-semibold">Évolution sur la période</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">Pages vues agrégées par jour (UTC).</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Pages vues et visiteurs uniques agrégés par jour (UTC).</p>
                   {stats && stats.days.length > 0 ? (
-                    <ul className="mt-4 space-y-2" aria-label="Pages vues par jour">
+                    <ul className="mt-4 space-y-2" aria-label="Pages vues et visiteurs par jour">
                       {stats.days.map((day) => (
-                        <li key={day.date} className="grid grid-cols-[5.5rem_1fr_3.5rem] items-center gap-2 text-sm">
+                        <li key={day.date} className="grid grid-cols-[5.5rem_1fr_auto] items-center gap-2 text-sm">
                           <span className="text-muted-foreground">{formatDay(day.date)}</span>
                           <div className="h-2 overflow-hidden rounded-full bg-muted" aria-hidden="true">
                             <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(2, (day.views / maxDayViews) * 100)}%` }} />
                           </div>
-                          <span className="text-right font-mono text-xs tabular-nums">{day.views.toLocaleString('fr-FR')}</span>
+                          <span className="text-right font-mono text-xs tabular-nums whitespace-nowrap">
+                            {day.views.toLocaleString('fr-FR')} vues · {(day.visitors ?? 0).toLocaleString('fr-FR')} vis.
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -400,6 +447,35 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
                   ) : <p className="mt-4 text-sm text-muted-foreground">Aucun chemin enregistré sur la période.</p>}
                 </div>
               </div>
+              {hasPageData && (
+                <div className="grid gap-6 lg:grid-cols-2">
+                  {[
+                    { title: 'Sources / référents', items: stats?.referrers ?? [], empty: 'Aucun référent enregistré sur la période.' },
+                    { title: 'Appareils', items: stats?.devices ?? [], empty: 'Aucune donnée appareil sur la période.' },
+                    { title: 'Navigateurs', items: stats?.browsers ?? [], empty: 'Aucune donnée navigateur sur la période.' },
+                    { title: 'Systèmes d’exploitation', items: stats?.operatingSystems ?? [], empty: 'Aucune donnée système sur la période.' },
+                  ].map((section) => (
+                    <div key={section.title} className="rounded-lg border border-border bg-card p-4">
+                      <h3 className="text-sm font-semibold">{section.title}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">Vues et visiteurs uniques/jour sur la période (somme des uniques quotidiens du segment).</p>
+                      {section.items.length > 0 ? (
+                        <ul className="mt-4 space-y-2" aria-label={section.title}>
+                          {section.items.map((row) => (
+                            <li key={row.value} className="flex items-start justify-between gap-3 text-sm">
+                              <span className="min-w-0 flex-1 break-all font-mono text-xs sm:text-sm">{row.value}</span>
+                              <span className="shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">
+                                {row.views.toLocaleString('fr-FR')} vues · {row.visitors.toLocaleString('fr-FR')} vis.
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-4 text-sm text-muted-foreground">{section.empty}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
 

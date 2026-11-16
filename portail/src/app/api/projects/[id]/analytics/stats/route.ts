@@ -40,7 +40,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const previousSince = new Date(since)
   previousSince.setUTCDate(previousSince.getUTCDate() - days)
 
-  const [stats, prevStats, eventStats, prevEventStats, config] = await Promise.all([
+  const [stats, prevStats, eventStats, prevEventStats, config, siteStats, prevSiteStats, dimensionStats] = await Promise.all([
     prisma.trafficDailyStat.findMany({
       where: { projectId, date: { gte: since } },
       orderBy: [{ date: 'asc' }, { views: 'desc' }],
@@ -63,6 +63,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       where: { projectId },
       select: { goalEvents: true, lastReceivedAt: true, enabled: true },
     }),
+    prisma.trafficDailySiteStat.findMany({
+      where: { projectId, date: { gte: since } },
+      orderBy: { date: 'asc' },
+      select: { date: true, views: true, visitors: true },
+    }),
+    prisma.trafficDailySiteStat.findMany({
+      where: { projectId, date: { gte: previousSince, lt: since } },
+      orderBy: { date: 'asc' },
+      select: { visitors: true, views: true },
+    }),
+    prisma.trafficDailyDimension.findMany({
+      where: { projectId, date: { gte: since } },
+      select: { dimension: true, value: true, views: true, visitors: true },
+    }),
   ])
 
   const byDay = new Map<string, number>()
@@ -75,9 +89,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     total += row.views
   }
 
-  const daysSeries = Array.from(byDay.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, views]) => ({ date, views }))
+  const visitorsByDay = new Map<string, number>()
+  let totalVisitors = 0
+  for (const row of siteStats) {
+    const day = row.date.toISOString().slice(0, 10)
+    visitorsByDay.set(day, row.visitors)
+    totalVisitors += row.visitors
+  }
+
+  const allDays = new Set<string>([...byDay.keys(), ...visitorsByDay.keys()])
+  const daysSeries = Array.from(allDays)
+    .sort((a, b) => a.localeCompare(b))
+    .map((date) => ({ date, views: byDay.get(date) ?? 0, visitors: visitorsByDay.get(date) ?? 0 }))
 
   const paths = Array.from(byPath.entries())
     .sort((a, b) => b[1] - a[1])
@@ -100,23 +123,55 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     previousTotal += row.views
     prevDays.add(row.date.toISOString().slice(0, 10))
   }
+  let previousVisitors = 0
+  for (const row of prevSiteStats) previousVisitors += row.visitors
   let previousEvents = 0
   for (const row of prevEventStats) previousEvents += row.count
 
   const changePct =
     previousTotal > 0 ? Math.round(((total - previousTotal) / previousTotal) * 100) : total > 0 ? 100 : 0
+  const visitorsChangePct =
+    previousVisitors > 0
+      ? Math.round(((totalVisitors - previousVisitors) / previousVisitors) * 100)
+      : totalVisitors > 0
+        ? 100
+        : 0
+
+  const dimAgg = new Map<string, { views: number; visitors: number }>()
+  for (const row of dimensionStats) {
+    const key = `${row.dimension}\0${row.value}`
+    const cur = dimAgg.get(key) ?? { views: 0, visitors: 0 }
+    cur.views += row.views
+    cur.visitors += row.visitors
+    dimAgg.set(key, cur)
+  }
+  function topDimension(dimension: string, limit = 20) {
+    return Array.from(dimAgg.entries())
+      .filter(([k]) => k.startsWith(`${dimension}\0`))
+      .map(([k, v]) => ({ value: k.slice(dimension.length + 1), views: v.views, visitors: v.visitors }))
+      .sort((a, b) => b.views - a.views || b.visitors - a.visitors)
+      .slice(0, limit)
+  }
 
   return NextResponse.json({
     rangeDays: days,
     total,
+    totalVisitors,
+    visitorsAggregation: 'sum_daily_unique',
     days: daysSeries,
     paths,
     events,
+    referrers: topDimension('referrer'),
+    devices: topDimension('device'),
+    browsers: topDimension('browser'),
+    operatingSystems: topDimension('os'),
     goalEvents: config?.goalEvents ?? [],
     comparison: {
       previousTotal,
       previousActiveDays: prevDays.size,
       changePct,
+      previousVisitors,
+      visitorsChangePct,
       previousEvents,
     },
     installation: {

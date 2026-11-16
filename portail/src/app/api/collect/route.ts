@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { check, checkIp, rateLimitHeaders } from '@/lib/rate-limit'
+import { check, checkIp, getClientIp, rateLimitHeaders } from '@/lib/rate-limit'
 import {
+  analyticsVisitorHash,
   collectPayloadSchema,
   hasDoNotTrackSignal,
   isAnalyticsPublicKey,
   normalizeAnalyticsEventName,
   normalizeAnalyticsPath,
+  normalizeAnalyticsReferrer,
+  parseAnalyticsUserAgent,
   utcDay,
 } from '@/lib/analytics'
 
@@ -53,7 +56,7 @@ export async function POST(request: Request) {
   const parsed = collectPayloadSchema.safeParse(body)
   if (!parsed.success) return noContent(204)
 
-  const { k: publicKey, p, t, n } = parsed.data
+  const { k: publicKey, p, t, n, r } = parsed.data
   if (!isAnalyticsPublicKey(publicKey)) return noContent(204)
 
   // Limite par clé d'écriture pour éviter qu'un seul projet ne sature l'ingestion.
@@ -64,7 +67,16 @@ export async function POST(request: Request) {
 
   const config = await prisma.projectAnalytics.findUnique({
     where: { publicKey },
-    select: { id: true, projectId: true, enabled: true, respectDnt: true, collectPath: true, lastReceivedAt: true },
+    select: {
+      id: true,
+      projectId: true,
+      enabled: true,
+      respectDnt: true,
+      collectPath: true,
+      collectReferrer: true,
+      collectDevice: true,
+      lastReceivedAt: true,
+    },
   })
 
   // Réponse muette pour ne pas révéler l'existence ou l'état d'une clé.
@@ -98,11 +110,66 @@ export async function POST(request: Request) {
       counted = true
     } else {
       const path = config.collectPath ? normalizeAnalyticsPath(p) : '/'
+      const ip = getClientIp(request)
+      const userAgent = request.headers.get('user-agent') ?? ''
+      const hash = analyticsVisitorHash(date, ip, userAgent)
+
+      let isNewVisitor = false
+      try {
+        await prisma.analyticsDailyVisitor.create({
+          data: { projectId: config.projectId, date, hash },
+        })
+        isNewVisitor = true
+      } catch (error) {
+        if ((error as { code?: string }).code !== 'P2002') throw error
+      }
+
       await prisma.trafficDailyStat.upsert({
         where: { projectId_date_path: { projectId: config.projectId, date, path } },
         create: { projectId: config.projectId, date, path, views: 1 },
         update: { views: { increment: 1 } },
       })
+      await prisma.trafficDailySiteStat.upsert({
+        where: { projectId_date: { projectId: config.projectId, date } },
+        create: { projectId: config.projectId, date, views: 1, visitors: isNewVisitor ? 1 : 0 },
+        update: {
+          views: { increment: 1 },
+          ...(isNewVisitor ? { visitors: { increment: 1 } } : {}),
+        },
+      })
+
+      const dimensions: { dimension: string; value: string }[] = []
+      if (config.collectReferrer) {
+        dimensions.push({ dimension: 'referrer', value: normalizeAnalyticsReferrer(r) })
+      }
+      if (config.collectDevice) {
+        const ua = parseAnalyticsUserAgent(userAgent)
+        dimensions.push({ dimension: 'device', value: ua.device })
+        dimensions.push({ dimension: 'browser', value: ua.browser })
+        dimensions.push({ dimension: 'os', value: ua.os })
+      }
+      for (const { dimension, value } of dimensions) {
+        let isNewDimVisitor = false
+        try {
+          await prisma.analyticsDailyDimensionVisitor.create({
+            data: { projectId: config.projectId, date, dimension, value, hash },
+          })
+          isNewDimVisitor = true
+        } catch (error) {
+          if ((error as { code?: string }).code !== 'P2002') throw error
+        }
+        await prisma.trafficDailyDimension.upsert({
+          where: {
+            projectId_date_dimension_value: { projectId: config.projectId, date, dimension, value },
+          },
+          create: { projectId: config.projectId, date, dimension, value, views: 1, visitors: isNewDimVisitor ? 1 : 0 },
+          update: {
+            views: { increment: 1 },
+            ...(isNewDimVisitor ? { visitors: { increment: 1 } } : {}),
+          },
+        })
+      }
+
       counted = true
     }
   } catch {

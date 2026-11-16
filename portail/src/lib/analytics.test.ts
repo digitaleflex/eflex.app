@@ -3,6 +3,8 @@ import {
   ANALYTICS_PUBLIC_KEY_PREFIX,
   analyticsConfigUpdateSchema,
   analyticsRetentionCutoff,
+  analyticsVisitorDayKey,
+  analyticsVisitorHash,
   buildAnalyticsEventSnippet,
   buildAnalyticsSnippet,
   clampRetentionDays,
@@ -12,7 +14,9 @@ import {
   isAnalyticsPublicKey,
   normalizeAnalyticsEventName,
   normalizeAnalyticsPath,
+  normalizeAnalyticsReferrer,
   normalizeGoalEvents,
+  parseAnalyticsUserAgent,
   utcDay,
 } from './analytics'
 
@@ -121,6 +125,16 @@ describe('collectPayloadSchema', () => {
     }
   })
 
+  it('accepte un référent sur une page vue', () => {
+    const parsed = collectPayloadSchema.safeParse({
+      k: 'efx_pub_abcdefghijklmnopqrstuvwxyz',
+      p: '/accueil',
+      r: 'https://www.google.com/search?q=eflex',
+    })
+    expect(parsed.success).toBe(true)
+    if (parsed.success) expect(parsed.data.r).toContain('google')
+  })
+
   it('accepte un événement nommé sans propriété', () => {
     const parsed = collectPayloadSchema.safeParse({ k: 'efx_pub_abcdefghijklmnopqrstuvwxyz', t: 'event', n: 'signup' })
     expect(parsed.success).toBe(true)
@@ -154,6 +168,11 @@ describe('analyticsConfigUpdateSchema', () => {
     expect(analyticsConfigUpdateSchema.safeParse({ retentionDays: 9999 }).success).toBe(false)
   })
 
+  it('accepte les réglages de collecte référent et appareil', () => {
+    expect(analyticsConfigUpdateSchema.safeParse({ collectReferrer: false }).success).toBe(true)
+    expect(analyticsConfigUpdateSchema.safeParse({ collectDevice: true }).success).toBe(true)
+  })
+
   it('accepte des objectifs de conversion bornés et validés', () => {
     expect(analyticsConfigUpdateSchema.safeParse({ goalEvents: ['signup', 'purchase'] }).success).toBe(true)
     expect(analyticsConfigUpdateSchema.safeParse({ goalEvents: [] }).success).toBe(true)
@@ -163,12 +182,13 @@ describe('analyticsConfigUpdateSchema', () => {
 })
 
 describe('buildAnalyticsSnippet', () => {
-  it('inclut la clé, le point de collecte et un envoi non bloquant', () => {
+  it('inclut la clé, le point de collecte, le référent et un envoi non bloquant', () => {
     const snippet = buildAnalyticsSnippet('efx_pub_testkey123456789012', 'https://eflex.app/api/collect')
     expect(snippet).toContain('<script')
     expect(snippet).toContain('data-eflex-analytics')
     expect(snippet).toContain('efx_pub_testkey123456789012')
     expect(snippet).toContain('https://eflex.app/api/collect')
+    expect(snippet).toContain('document.referrer')
     expect(snippet).toContain('sendBeacon')
     expect(snippet).toContain('keepalive')
     expect(snippet).toContain('pageview')
@@ -226,5 +246,77 @@ describe('analyticsRetentionCutoff', () => {
     const now = new Date('2026-05-12T15:00:00.000Z')
     const cutoff = analyticsRetentionCutoff(30, now)
     expect(cutoff.toISOString()).toBe('2026-04-12T00:00:00.000Z')
+  })
+})
+
+describe('analyticsVisitorDayKey', () => {
+  it('formate le jour UTC en YYYY-MM-DD', () => {
+    expect(analyticsVisitorDayKey(new Date('2026-11-16T23:59:59.000Z'))).toBe('2026-11-16')
+  })
+})
+
+describe('analyticsVisitorHash', () => {
+  it('retourne une empreinte hex stable pour le même jour, IP et UA', () => {
+    const day = new Date('2026-11-16T12:00:00.000Z')
+    const a = analyticsVisitorHash(day, '203.0.113.10', 'Mozilla/5.0')
+    const b = analyticsVisitorHash(day, '203.0.113.10', 'Mozilla/5.0')
+    expect(a).toMatch(/^[a-f0-9]{64}$/)
+    expect(a).toBe(b)
+  })
+
+  it("change quand l'IP ou le UA change", () => {
+    const day = new Date('2026-11-16T12:00:00.000Z')
+    const base = analyticsVisitorHash(day, '203.0.113.10', 'Mozilla/5.0')
+    expect(analyticsVisitorHash(day, '203.0.113.11', 'Mozilla/5.0')).not.toBe(base)
+    expect(analyticsVisitorHash(day, '203.0.113.10', 'curl/8')).not.toBe(base)
+  })
+
+  it("change d'un jour UTC à l'autre pour le même visiteur (sel rotatif)", () => {
+    const a = analyticsVisitorHash(new Date('2026-11-16T10:00:00.000Z'), '203.0.113.10', 'Mozilla/5.0')
+    const b = analyticsVisitorHash(new Date('2026-11-17T10:00:00.000Z'), '203.0.113.10', 'Mozilla/5.0')
+    expect(a).not.toBe(b)
+  })
+})
+
+describe('normalizeAnalyticsReferrer', () => {
+  it('retourne direct si absent ou vide', () => {
+    expect(normalizeAnalyticsReferrer('')).toBe('direct')
+    expect(normalizeAnalyticsReferrer(undefined)).toBe('direct')
+    expect(normalizeAnalyticsReferrer(null)).toBe('direct')
+  })
+
+  it("extrait le domaine d'une URL référente", () => {
+    expect(normalizeAnalyticsReferrer('https://www.google.com/search?q=eflex')).toBe('www.google.com')
+  })
+
+  it('normalise en minuscules', () => {
+    expect(normalizeAnalyticsReferrer('HTTPS://NEWS.YCOMBINATOR.COM/item?id=1')).toBe('news.ycombinator.com')
+  })
+})
+
+describe('parseAnalyticsUserAgent', () => {
+  it('détecte mobile iOS Safari', () => {
+    const r = parseAnalyticsUserAgent(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    )
+    expect(r.device).toBe('mobile')
+    expect(r.os).toBe('iOS')
+    expect(r.browser).toBe('Safari')
+  })
+
+  it('détecte desktop Chrome Windows', () => {
+    const r = parseAnalyticsUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    )
+    expect(r.device).toBe('desktop')
+    expect(r.os).toBe('Windows')
+    expect(r.browser).toBe('Chrome')
+  })
+
+  it('retombe sur des valeurs bornées si inconnu', () => {
+    const r = parseAnalyticsUserAgent('')
+    expect(['desktop', 'mobile', 'tablet', 'other']).toContain(r.device)
+    expect(typeof r.browser).toBe('string')
+    expect(typeof r.os).toBe('string')
   })
 })
