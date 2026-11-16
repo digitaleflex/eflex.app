@@ -447,6 +447,42 @@ npm ERR! network request to https://registry.npmjs.org/react/-/react-18.3.1.tgz 
     expect(d?.cause).toContain('santé')
   })
 
+  it('détecte un compose refusé pour raison de sécurité', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: "Compose refusé pour raison de sécurité : le montage de la socket Docker (`/var/run/docker.sock`) donne un contrôle total sur l’hôte et est interdit.",
+      projectId: 'p1',
+    })
+    expect(d?.cause).toContain('Docker Compose')
+  })
+
+  it('détecte un plan multi-services sans compose fourni', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: "Ce plan nécessite plusieurs services (app, worker), mais la plateforme ne génère pas de compose multi-services.",
+      projectId: 'p1',
+    })
+    expect(d?.cause).toContain('plusieurs services')
+  })
+
+  it('détecte des volumes persistants non montés', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: '[volumes] /app/storage non montés : EFLEX_PERSISTENT_VOLUMES n’est pas activé.',
+      projectId: 'p1',
+    })
+    expect(d?.cause).toContain('volumes persistants')
+  })
+
+  it('détecte une erreur remontée par Coolify', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'Coolify: impossible de démarrer le conteneur (erreur serveur).',
+      projectId: 'p1',
+    })
+    expect(d?.cause).toContain('Coolify')
+  })
+
   it('ne diagnostique pas un journal sans motif connu', () => {
     expect(
       diagnoseFailure({ status: 'failed', logs: 'quelque chose de totalement différent', projectId: 'p1' }),

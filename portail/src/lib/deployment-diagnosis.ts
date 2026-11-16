@@ -256,6 +256,34 @@ const RULES: Rule[] = [
     action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
   },
   {
+    id: 'compose-rejected',
+    test: (t) =>
+      /Compose refusé pour raison de sécurité|Compose invalide|Le fichier Docker Compose est invalide|section `services`/i.test(t),
+    cause: 'Le fichier Docker Compose fourni est invalide ou refusé pour raison de sécurité.',
+    action: (id) => ({ label: 'Voir les journaux et corriger le compose', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
+    id: 'multi-services-without-compose',
+    test: (t) =>
+      /plusieurs services .* mais la plateforme ne génère pas de compose multi-services|nécessite plusieurs services/i.test(t),
+    cause: 'Ce déploiement nécessite plusieurs services sans fichier Docker Compose fourni : la plateforme ne peut pas le générer automatiquement.',
+    action: (id) => ({ label: 'Ajouter un docker-compose.yml au dépôt', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
+    id: 'volumes-not-persisted',
+    test: (t) =>
+      /Volumes persistants non configurés|EFLEX_PERSISTENT_VOLUMES n.?est pas activé|non montés/i.test(t) && /volumes?/i.test(t),
+    cause: 'Les volumes persistants requis ne sont pas montés : les données pourraient ne pas être conservées.',
+    action: (id) => ({ label: 'Voir les journaux et la configuration des volumes', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
+    id: 'coolify-error',
+    test: (t) =>
+      /\bCoolify\b/i.test(t) && /\b(erreur|impossible|refus|indisponible|échou|timeout)\b/i.test(t),
+    cause: "L'hébergement (Coolify) a signalé une erreur pendant le déploiement.",
+    action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
     id: 'build-failed',
     test: (t) =>
       /build (failed|error)|command failed|npm (err|error)|pnpm .*err|yarn .*error|exit code [1-9]/i.test(t),
