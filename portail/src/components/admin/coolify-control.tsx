@@ -1004,6 +1004,51 @@ function CapabilitiesTab() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Services Coolify                                                    */
+/* ------------------------------------------------------------------ */
+
+interface CoolifyServiceRow {
+  id: string
+  name: string
+  status: string | null
+}
+
+function ServicesTab() {
+  const { data, error, loading, reload } = useLoad<{ services: CoolifyServiceRow[] }>('/services')
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
+          Services gérés par Coolify sur l’instance (one-click/compose). Cette vue est en lecture seule dans E-FLEX pour l’instant.
+        </p>
+        <Button type="button" variant="ghost" size="sm" onClick={() => void reload()}>
+          <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+          Actualiser
+        </Button>
+      </div>
+      <LoadState loading={loading} error={error} onRetry={() => void reload()} />
+      {data && data.services.length === 0 && <p className="text-sm text-muted-foreground">Aucun service Coolify trouvé.</p>}
+      {data && data.services.length > 0 && (
+        <ul className="space-y-2">
+          {data.services.map((service) => (
+            <li key={service.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
+              <div className="min-w-0">
+                <p className="font-medium">{service.name}</p>
+                <p className="break-all font-mono text-xs text-muted-foreground">{service.id}</p>
+              </div>
+              <span className="inline-flex items-center gap-2 rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+                <Dot tone={service.status?.startsWith('running') ? 'ok' : service.status?.includes('exited') || service.status?.includes('stopped') ? 'warn' : 'muted'} />
+                {fr(service.status)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /* Onglets                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -1014,6 +1059,7 @@ const TABS = [
   { id: 'storages', label: 'Stockages S3', render: () => <StoragesTab /> },
   { id: 'security', label: 'Sécurité des images', render: () => <SecurityTab /> },
   { id: 'deployments', label: 'Déploiements Coolify', render: () => <DeploymentsTab /> },
+  { id: 'services', label: 'Services Coolify', render: () => <ServicesTab /> },
   { id: 'audit', label: 'Journal Coolify', render: () => <AuditTab /> },
 ] as const
 
