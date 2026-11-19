@@ -80,6 +80,7 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
           root: app.root,
           domain: app.domain,
           framework: app.framework,
+          deployed: Boolean(app.coolifyAppId),
         }))}
         transferTargets={transferTargets}
         envVars={project.envVars.map((item) => ({

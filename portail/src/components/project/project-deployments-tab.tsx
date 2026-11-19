@@ -3,6 +3,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { RedeployButton } from '@/components/redeploy-button'
 import { DeploymentItem, type DeploymentItemData } from '@/components/project/deployment-item'
 import { RollbackImagesPanel } from '@/components/project/rollback-images-panel'
+import { CoolifyDeploymentsPanel } from '@/components/project/coolify-deployments-panel'
 import { statusInfo } from '@/lib/project-status'
 
 export function ProjectDeploymentsTab({
@@ -55,6 +56,7 @@ export function ProjectDeploymentsTab({
       ) : (
         <>
           {canManage && <RollbackImagesPanel projectId={projectId} multiApp={multiApp} />}
+          {canManage && <CoolifyDeploymentsPanel projectId={projectId} multiApp={multiApp} />}
           {multiApp && (
             <p className="border-b border-border px-4 py-3 text-xs text-muted-foreground sm:px-5">
               Un déploiement par application : le nom de l’application est indiqué à côté du commit.

@@ -29,6 +29,7 @@ import { Input } from '@/components/ui/input'
 import { ProjectRuntimeControls } from '@/components/project-runtime-controls'
 import { ProjectDomains } from '@/components/project-domains'
 import { ProjectDatabases } from '@/components/project-databases'
+import { AppConfigPanel } from '@/components/project/app-config-panel'
 import { EnvEditor } from '@/components/env/env-editor'
 import { rowsToVars, type EnvRow } from '@/lib/env-parse'
 import { ProjectTransfer, type TransferTarget } from '@/components/project-transfer'
@@ -49,6 +50,7 @@ interface SettingsApp {
   root: string
   domain: string | null
   framework: string
+  deployed?: boolean
 }
 
 interface ProjectSettingsProps {
@@ -591,7 +593,20 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
             icon={Activity}
             description="Statut du conteneur sur la plateforme et actions immédiates. Le redéploiement complet reste disponible depuis la page du projet."
           >
-            <ProjectRuntimeControls projectId={project.id} apps={apps.map((app) => ({ id: app.id, name: app.name }))} />
+            <div className="space-y-6">
+              <ProjectRuntimeControls projectId={project.id} apps={apps.map((app) => ({ id: app.id, name: app.name }))} />
+              <div className="border-t border-border pt-6">
+                <h3 className="mb-1 text-sm font-medium">Configuration applicative (santé & déploiement)</h3>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  Réglages contrôlés côté hébergement : contrôle de santé (healthcheck) et chemins surveillés (watch paths). Les options avancées non listées restent gérées côté plateforme.
+                </p>
+                <AppConfigPanel
+                  projectId={project.id}
+                  canManage={true}
+                  apps={apps.map((app) => ({ id: app.id, name: app.name, deployed: Boolean(app.deployed) }))}
+                />
+              </div>
+            </div>
           </SettingsSection>
         </div>
       </section>

@@ -475,6 +475,53 @@ export interface RollbackImage {
   createdAt?: string | null
 }
 
+export interface CoolifyApplicationDeployment {
+  id: string
+  status: string
+  commit: string | null
+  createdAt: string | null
+  serverName?: string | null
+}
+
+function normalizeApplicationDeployments(raw: unknown): CoolifyApplicationDeployment[] {
+  if (!Array.isArray(raw)) return []
+  const rows: CoolifyApplicationDeployment[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const id =
+      typeof row.deployment_uuid === 'string'
+        ? row.deployment_uuid
+        : typeof row.uuid === 'string'
+          ? row.uuid
+          : typeof row.id === 'string' || typeof row.id === 'number'
+            ? String(row.id)
+            : null
+    if (!id) continue
+    const status = typeof row.status === 'string' ? row.status : 'unknown'
+    const commitRaw = typeof row.commit === 'string' ? row.commit : typeof row.git_commit_sha === 'string' ? row.git_commit_sha : null
+    const commit = commitRaw && /^[0-9a-f]{7,40}$/i.test(commitRaw) ? commitRaw.slice(0, 7) : commitRaw
+    const createdAt = typeof row.created_at === 'string' ? row.created_at : typeof row.createdAt === 'string' ? row.createdAt : null
+    const serverName = typeof row.server_name === 'string' ? row.server_name : null
+    rows.push({ id, status, commit, createdAt, serverName })
+  }
+  return rows.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
+}
+
+/** Historique des déploiements connus par Coolify pour une application (utile pour réconciliation/diagnostic). */
+export async function listApplicationDeployments(
+  appId: string,
+): Promise<{ deployments: CoolifyApplicationDeployment[] } | { error: string }> {
+  const res = await coolifyFetch<unknown>(`/deployments/applications/${encodeURIComponent(appId)}`)
+  if (res.error) {
+    if (res.error.includes('Hébergement API 404') || res.error.includes('Hébergement API 405')) {
+      return { deployments: [] }
+    }
+    return { error: res.error }
+  }
+  return { deployments: normalizeApplicationDeployments(res.data) }
+}
+
 function normalizeRollbackImages(raw: unknown): RollbackImage[] {
   if (!Array.isArray(raw)) return []
   const images: RollbackImage[] = []
@@ -1158,10 +1205,14 @@ export interface ApplicationAdvancedConfig {
   healthCheckRetries: number
   healthCheckStartPeriod: number
   watchPaths: string
+  limitsCpus: string
+  limitsMemory: string
+  limitsMemorySwap: string
+  limitsMemoryReservation: string
 }
 
 function str(value: unknown, fallback = ''): string {
-  return typeof value === 'string' ? value : fallback
+  return typeof value === 'string' ? value : typeof value === 'number' ? String(value) : fallback
 }
 function num(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value)) ? Number(value) : fallback
@@ -1187,6 +1238,10 @@ export async function getApplicationAdvancedConfig(
     healthCheckRetries: num(d.health_check_retries, 10),
     healthCheckStartPeriod: num(d.health_check_start_period, 30),
     watchPaths: str(d.watch_paths, ''),
+    limitsCpus: str(d.limits_cpus ?? d.limits_cpu ?? '', ''),
+    limitsMemory: str(d.limits_memory, ''),
+    limitsMemorySwap: str(d.limits_memory_swap, ''),
+    limitsMemoryReservation: str(d.limits_memory_reservation, ''),
   }
 }
 
@@ -1204,6 +1259,10 @@ export type ApplicationAdvancedConfigPatch = Partial<{
   healthCheckRetries: number
   healthCheckStartPeriod: number
   watchPaths: string
+  limitsCpus: string
+  limitsMemory: string
+  limitsMemorySwap: string
+  limitsMemoryReservation: string
 }>
 
 export async function updateApplicationAdvancedConfig(
@@ -1224,6 +1283,10 @@ export async function updateApplicationAdvancedConfig(
   if (patch.healthCheckRetries !== undefined) payload.health_check_retries = patch.healthCheckRetries
   if (patch.healthCheckStartPeriod !== undefined) payload.health_check_start_period = patch.healthCheckStartPeriod
   if (patch.watchPaths !== undefined) payload.watch_paths = patch.watchPaths
+  if (patch.limitsCpus !== undefined) payload.limits_cpus = patch.limitsCpus
+  if (patch.limitsMemory !== undefined) payload.limits_memory = patch.limitsMemory
+  if (patch.limitsMemorySwap !== undefined) payload.limits_memory_swap = patch.limitsMemorySwap
+  if (patch.limitsMemoryReservation !== undefined) payload.limits_memory_reservation = patch.limitsMemoryReservation
   if (Object.keys(payload).length === 0) return { ok: true }
   const res = await coolifyFetch(`/applications/${encodeURIComponent(appId)}`, {
     method: 'PATCH',
