@@ -1,34 +1,31 @@
 import type { ProjectDatabase } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import {
-  createDatabaseBackup,
-  getDatabaseImportStatus,
-  listDatabaseBackups,
-  runDatabaseBackup,
-  startDatabaseImport,
-  type DatabaseBackupExecution,
-  type DatabaseBackupSchedule,
-  type DatabaseImportSource,
-  type DatabaseImportState,
+import type {
+  DatabaseBackupExecution,
+  DatabaseBackupSchedule,
+  DatabaseImportSource,
+  DatabaseImportState,
 } from '@/lib/coolify'
+import { getDatabaseBackupAdapter } from '@/lib/database-backup-adapters'
+import { getDatabaseEngineCapabilities, isManagedDatabaseKind } from '@/lib/database-capabilities'
 import { memberIds, notify } from '@/lib/notifications'
 
 /**
  * Sauvegardes des bases managées.
  *
- * Coolify exécute les sauvegardes (`pg_dump`) selon une planification ; E-FLEX la crée, l'affiche et
- * alerte quand elle ne fonctionne plus. Avec `COOLIFY_BACKUP_S3_STORAGE_UUID` (stockage S3 déclaré
- * dans Coolify), chaque sauvegarde est aussi copiée hors du serveur ; sans lui, les copies restent sur
- * le serveur de la base, ce que l'interface signale. Coolify ne sait pas sauvegarder Redis : seules
- * les bases PostgreSQL sont concernées. Restauration : `POST /databases/{uuid}/imports` (Coolify ≥ 4.7),
- * depuis le fichier resté sur le serveur, sinon depuis la copie S3. Procédure et script de vérification
- * dans `docs/operations/client-database-backups.md`.
+ * Aujourd'hui : intégration Coolify pour PostgreSQL (planification, exécutions, copie S3 optionnelle,
+ * restauration assistée). Les autres moteurs ne bénéficient pas encore d'un parcours intégré EFLEX :
+ * le support est piloté par le registre de capacités (`database-capabilities.ts`) afin d'étendre
+ * proprement par moteur/provider (outils natifs, adaptateurs EFLEX) sans généralisation implicite.
  */
 
 export const BACKUP_SUPPORTED_KINDS = ['postgresql'] as const
 
-export function backupSupported(kind: string): boolean {
-  return (BACKUP_SUPPORTED_KINDS as readonly string[]).includes(kind)
+/** Support sauvegarde intégrée EFLEX, piloté par les capacités du moteur. */
+export async function backupSupported(kind: string): Promise<boolean> {
+  if (!isManagedDatabaseKind(kind)) return false
+  const { capabilities } = await getDatabaseEngineCapabilities(kind)
+  return capabilities.backupSupported
 }
 
 export interface BackupSettings {
@@ -129,42 +126,119 @@ export function backupNeedsAlert(
 }
 
 type BackupTarget = Pick<ProjectDatabase, 'id' | 'kind' | 'coolifyId' | 'backupId'>
+type RestoreProofFields = Pick<
+  ProjectDatabase,
+  | 'lastRestoreExecutionId'
+  | 'lastRestoreBackupCreatedAt'
+  | 'lastRestoreImportId'
+  | 'lastRestoreStartedAt'
+  | 'lastRestoreFinishedAt'
+  | 'lastRestoreStatus'
+  | 'lastSuccessfulRestoreAt'
+  | 'lastSuccessfulRestoreBackupCreatedAt'
+>
+
+const iso = (date: Date | null | undefined): string | null => (date ? date.toISOString() : null)
+
+export interface RestoreProof {
+  status: DatabaseImportState | null
+  executionId: string | null
+  /** Date de la sauvegarde restaurée (tentative en cours ou dernière). */
+  backupCreatedAt: string | null
+  startedAt: string | null
+  finishedAt: string | null
+  /** Dernière restauration réussie consignée (preuve). */
+  lastSuccessfulAt: string | null
+  lastSuccessfulBackupCreatedAt: string | null
+}
+
+export function toRestoreProof(fields: RestoreProofFields): RestoreProof {
+  const status =
+    fields.lastRestoreStatus === 'running' || fields.lastRestoreStatus === 'finished' || fields.lastRestoreStatus === 'failed'
+      ? fields.lastRestoreStatus
+      : null
+  return {
+    status,
+    executionId: fields.lastRestoreExecutionId ?? null,
+    backupCreatedAt: iso(fields.lastRestoreBackupCreatedAt),
+    startedAt: iso(fields.lastRestoreStartedAt),
+    finishedAt: iso(fields.lastRestoreFinishedAt),
+    lastSuccessfulAt: iso(fields.lastSuccessfulRestoreAt),
+    lastSuccessfulBackupCreatedAt: iso(fields.lastSuccessfulRestoreBackupCreatedAt),
+  }
+}
+
+function scheduleNeedsOffsite(schedule: DatabaseBackupSchedule, s3StorageUuid: string): boolean {
+  return !schedule.saveS3 || schedule.s3StorageId !== s3StorageUuid
+}
+
+async function reconcileBackupSchedules(
+  adapter: Awaited<ReturnType<typeof getDatabaseBackupAdapter>>,
+  databaseId: string,
+  schedules: readonly DatabaseBackupSchedule[],
+  settings: BackupSettings,
+): Promise<string | null> {
+  if (!settings.s3StorageUuid || schedules.length === 0) return null
+  for (const schedule of schedules) {
+    if (!scheduleNeedsOffsite(schedule, settings.s3StorageUuid)) continue
+    const updated = await adapter.updateSchedule(databaseId, schedule.id, {
+      frequency: schedule.frequency || settings.frequency,
+      enabled: schedule.enabled,
+      s3StorageUuid: settings.s3StorageUuid,
+      retentionLocal: settings.retentionLocal,
+      retentionS3: settings.retentionS3,
+    })
+    if ('error' in updated) return updated.error
+  }
+  return null
+}
 
 /**
  * Garantit qu'une planification existe. Idempotent : reprend une planification déjà présente dans
- * Coolify (créée à la main, par exemple) plutôt que d'en créer une seconde.
+ * Coolify (créée à la main, par exemple) plutôt que d'en créer une seconde. Si un stockage S3 est
+ * configuré sur la plateforme, applique la copie hors serveur aux planifications existantes.
  */
 export async function ensureDatabaseBackup(
   database: BackupTarget,
   settings = backupSettings(),
-): Promise<{ backupId: string; created: boolean } | { error: string }> {
-  if (!backupSupported(database.kind)) return { error: 'Les sauvegardes ne sont disponibles que pour PostgreSQL.' }
-  if (database.backupId) return { backupId: database.backupId, created: false }
+): Promise<{ backupId: string; created: boolean; reconciled?: boolean } | { error: string }> {
+  const adapter = await getDatabaseBackupAdapter(database.kind)
+  if (!adapter.supported) return { error: 'Les sauvegardes ne sont disponibles que pour PostgreSQL.' }
 
-  const existing = await listDatabaseBackups(database.coolifyId)
-  if ('error' in existing) return { error: existing.error }
-  let backupId = existing[0]?.id ?? null
+  const schedules = await adapter.listSchedules(database.coolifyId)
+  if ('error' in schedules) return { error: schedules.error }
+
+  let backupId = database.backupId ?? schedules[0]?.id ?? null
   let created = false
   if (!backupId) {
-    const result = await createDatabaseBackup(database.coolifyId, settings)
+    const result = await adapter.createSchedule(database.coolifyId, settings)
     if ('error' in result) return { error: result.error }
     backupId = result.id
     created = true
+    // La nouvelle planification est créée avec les bons réglages S3.
+  } else {
+    const reconcileError = await reconcileBackupSchedules(adapter, database.coolifyId, schedules, settings)
+    if (reconcileError) return { error: reconcileError }
   }
+
   await prisma.projectDatabase.update({
     where: { id: database.id },
-    data: { backupId, backupScheduledAt: new Date() },
+    data: { backupId, backupScheduledAt: database.backupId ? undefined : new Date() },
   })
-  return { backupId, created }
+  return { backupId, created, ...(settings.s3StorageUuid && !created ? { reconciled: true } : {}) }
 }
 
 export interface DatabaseBackupStatus {
   supported: boolean
   scheduled: boolean
-  /** Copies hors serveur configurées sur la plateforme (variable d'environnement). */
+  /** Copie hors serveur configurée sur la plateforme (variable d'environnement). */
   offsiteConfigured: boolean
   frequency: string
-  summary: (Omit<BackupSummary, 'recent'> & { recent: PublicBackupExecution[] }) | null
+  /** Au moins une planification copie effectivement vers le stockage S3. */
+  scheduleOffsite: boolean | null
+  summary: (Omit<BackupSummary, 'recent' | 'offsite'> & { recent: PublicBackupExecution[] }) | null
+  /** Dernière restauration consignée (preuve exploitable). */
+  restore: RestoreProof | null
   error: string | null
 }
 
@@ -203,23 +277,29 @@ export function toPublicExecution(execution: DatabaseBackupExecution, s3StorageU
 }
 
 export async function getDatabaseBackupStatus(
-  database: BackupTarget,
+  database: BackupTarget & RestoreProofFields,
   now = new Date(),
   settings = backupSettings(),
 ): Promise<DatabaseBackupStatus> {
+  const adapter = await getDatabaseBackupAdapter(database.kind)
   const base = {
-    supported: backupSupported(database.kind),
+    supported: adapter.supported,
     scheduled: Boolean(database.backupId),
     offsiteConfigured: Boolean(settings.s3StorageUuid),
     frequency: settings.frequency,
+    restore: toRestoreProof(database),
   }
-  if (!base.supported || !database.backupId) return { ...base, summary: null, error: null }
-  const schedules = await listDatabaseBackups(database.coolifyId)
-  if ('error' in schedules) return { ...base, summary: null, error: schedules.error }
+  if (!base.supported || !database.backupId) {
+    return { ...base, scheduleOffsite: null, summary: null, error: null }
+  }
+  const schedules = await adapter.listSchedules(database.coolifyId)
+  if ('error' in schedules) return { ...base, scheduleOffsite: null, summary: null, error: schedules.error }
   const summary = summarizeBackups(schedules, now, settings.maxAgeHours)
+  const { offsite, recent, ...rest } = summary
   return {
     ...base,
-    summary: { ...summary, recent: summary.recent.map((item) => toPublicExecution(item, settings.s3StorageUuid)) },
+    scheduleOffsite: offsite,
+    summary: { ...rest, recent: recent.map((item) => toPublicExecution(item, settings.s3StorageUuid)) },
     error: null,
   }
 }
@@ -227,14 +307,18 @@ export async function getDatabaseBackupStatus(
 /**
  * Restaure une sauvegarde réussie de cette base. L'exécution est cherchée dans les planifications de la base
  * elle-même : impossible de viser le fichier d'une autre base. Les données actuelles sont remplacées.
+ * Enregistre la tentative (preuve de restauration) dès le lancement.
  */
 export async function restoreDatabaseBackup(
   database: BackupTarget,
   executionId: string,
   settings = backupSettings(),
 ): Promise<{ importId: string; backupCreatedAt: string } | { error: string; status: number }> {
-  if (!backupSupported(database.kind)) return { error: 'La restauration n’est disponible que pour PostgreSQL.', status: 400 }
-  const schedules = await listDatabaseBackups(database.coolifyId)
+  const adapter = await getDatabaseBackupAdapter(database.kind)
+  if (!adapter.supported) {
+    return { error: 'La restauration n’est disponible que pour PostgreSQL.', status: 400 }
+  }
+  const schedules = await adapter.listSchedules(database.coolifyId)
   if ('error' in schedules) return { error: schedules.error, status: 502 }
   const execution = schedules.flatMap((schedule) => schedule.executions).find((item) => item.id === executionId)
   if (!execution) return { error: 'Sauvegarde introuvable.', status: 404 }
@@ -248,23 +332,74 @@ export async function restoreDatabaseBackup(
       status: 409,
     }
   }
-  const started = await startDatabaseImport(database.coolifyId, source)
+  const started = await adapter.startRestore(database.coolifyId, source)
   if ('error' in started) return { error: started.error, status: 502 }
+  const now = new Date()
+  const backupCreatedAtDate = Number.isFinite(Date.parse(execution.createdAt)) ? new Date(execution.createdAt) : now
+  await prisma.projectDatabase.update({
+    where: { id: database.id },
+    data: {
+      lastRestoreExecutionId: executionId,
+      lastRestoreBackupCreatedAt: backupCreatedAtDate,
+      lastRestoreImportId: started.id,
+      lastRestoreStartedAt: now,
+      lastRestoreFinishedAt: null,
+      lastRestoreStatus: 'running',
+    },
+  })
   return { importId: started.id, backupCreatedAt: execution.createdAt }
 }
 
+/** État brut d'une restauration côté provider/adaptateur (sans effet de bord). */
 export async function getDatabaseRestoreStatus(
-  database: Pick<ProjectDatabase, 'coolifyId'>,
+  database: Pick<ProjectDatabase, 'kind' | 'coolifyId'>,
   importId: string,
 ): Promise<{ state: DatabaseImportState; finishedAt: string | null } | { error: string }> {
-  return getDatabaseImportStatus(database.coolifyId, importId)
+  const adapter = await getDatabaseBackupAdapter(database.kind)
+  return adapter.getRestoreStatus(database.coolifyId, importId)
+}
+
+type RestoreTrackTarget = Pick<
+  ProjectDatabase,
+  'id' | 'kind' | 'coolifyId' | 'lastRestoreImportId' | 'lastRestoreBackupCreatedAt'
+>
+
+/**
+ * Lit l'état d'une restauration et, si elle est terminée pour l'import suivi, consigne l'issue
+ * (preuve de restauration). Idempotent ; ignore un import qui n'est plus celui en cours.
+ */
+export async function getTrackedRestoreStatus(
+  database: RestoreTrackTarget,
+  importId: string,
+): Promise<{ state: DatabaseImportState; finishedAt: string | null } | { error: string }> {
+  const adapter = await getDatabaseBackupAdapter(database.kind)
+  const status = await adapter.getRestoreStatus(database.coolifyId, importId)
+  if ('error' in status) return status
+  if (status.state !== 'running' && database.lastRestoreImportId === importId) {
+    const finishedAt = status.finishedAt ? new Date(status.finishedAt) : new Date()
+    await prisma.projectDatabase.updateMany({
+      where: { id: database.id, lastRestoreImportId: importId },
+      data: {
+        lastRestoreStatus: status.state,
+        lastRestoreFinishedAt: finishedAt,
+        ...(status.state === 'finished'
+          ? {
+              lastSuccessfulRestoreAt: finishedAt,
+              lastSuccessfulRestoreBackupCreatedAt: database.lastRestoreBackupCreatedAt ?? undefined,
+            }
+          : {}),
+      },
+    })
+  }
+  return status
 }
 
 /** Planifie si besoin, puis lance une sauvegarde immédiate. */
 export async function runDatabaseBackupNow(database: BackupTarget): Promise<{ ok: true } | { error: string }> {
   const ensured = await ensureDatabaseBackup(database)
   if ('error' in ensured) return ensured
-  return runDatabaseBackup(database.coolifyId, ensured.backupId)
+  const adapter = await getDatabaseBackupAdapter(database.kind)
+  return adapter.runSchedule(database.coolifyId, ensured.backupId)
 }
 
 /**
@@ -299,10 +434,17 @@ export async function evaluateDatabaseBackups(now = new Date(), settings = backu
         backupId = ensured.backupId
         scheduledAt = now
       }
-      const schedules = await listDatabaseBackups(database.coolifyId)
+      const adapter = await getDatabaseBackupAdapter(database.kind)
+      const schedules = await adapter.listSchedules(database.coolifyId)
       if ('error' in schedules) {
         console.error('[backups] lecture impossible', database.id, schedules.error)
         continue
+      }
+      if (backupId && settings.s3StorageUuid) {
+        const reconcileError = await reconcileBackupSchedules(adapter, database.coolifyId, schedules, settings)
+        if (reconcileError) {
+          console.error('[backups] réconciliation S3 impossible', database.id, reconcileError)
+        }
       }
       const summary = summarizeBackups(schedules, now, settings.maxAgeHours)
       if (!backupNeedsAlert(summary, scheduledAt, now, settings.maxAgeHours)) continue

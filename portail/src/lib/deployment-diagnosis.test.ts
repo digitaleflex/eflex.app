@@ -483,6 +483,21 @@ npm ERR! network request to https://registry.npmjs.org/react/-/react-18.3.1.tgz 
     expect(d?.cause).toContain('Coolify')
   })
 
+  it('détecte un montage de cache BuildKit impossible sur tsconfig.tsbuildinfo', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: `#14 [stage-0  9/11] RUN --mount=type=cache,id=app-tsconfigtsbuildinfo,target=/app/tsconfig.tsbuildinfo next build
+0.330 runc run failed: unable to start container process: error during container init: error mounting "/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/159889/fs" to rootfs at "/app/tsconfig.tsbuildinfo": mount src=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/159889/fs, dst=/app/tsconfig.tsbuildinfo, dstFd=/proc/thread-self/fd/14, flags=MS_BIND|MS_REC: not a directory
+ERROR: failed to build: failed to solve: process "/bin/bash -ol pipefail -c next build" did not complete successfully: exit code: 1`,
+      projectId: 'p1',
+    })
+    expect(d).toEqual({
+      cause:
+        "La construction échoue car un fichier `tsconfig.tsbuildinfo` (artefact TypeScript) est traité comme un dossier par un montage de cache. Supprimez ce fichier du dépôt (et ajoutez-le au `.gitignore`/`.dockerignore`), puis videz le cache de build et relancez le déploiement.",
+      action: { label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' },
+    })
+  })
+
   it('ne diagnostique pas un journal sans motif connu', () => {
     expect(
       diagnoseFailure({ status: 'failed', logs: 'quelque chose de totalement différent', projectId: 'p1' }),

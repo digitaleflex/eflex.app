@@ -2,8 +2,11 @@
 
 > Portée : les bases **PostgreSQL** créées par E-FLEX pour les projets clients
 > (`ProjectDatabase`, onglet Paramètres d'un projet). La base du portail lui-même
-> est traitée dans `backups.md`. Redis n'est pas sauvegardé : Coolify ne le
-> permet pas, et Redis sert de cache ou de file, pas de stockage principal.
+> est traitée dans `backups.md`. Seules les bases PostgreSQL bénéficient du
+> parcours de sauvegarde/restauration intégré décrit ici ; les autres moteurs
+> managés (Redis, MySQL, MariaDB, MongoDB, ClickHouse, Dragonfly, KeyDB,
+> SQLite…) ne sont pas couverts par ce mécanisme et doivent être traités selon
+> leurs garanties et outils propres.
 
 ## 1. Ce qui est automatique
 
@@ -12,14 +15,16 @@
 | Planification | E-FLEX | À la création de chaque base PostgreSQL, et pour les bases existantes à la première passe de surveillance (au plus 2 min après le démarrage du portail, puis toutes les 6 h). Idempotent : une planification déjà créée à la main dans Coolify est reprise, pas dupliquée. |
 | Exécution | Coolify | `pg_dump` au format « custom » selon `DATABASE_BACKUP_FREQUENCY` (défaut : chaque jour à 02:00 UTC). |
 | Copie hors serveur | Coolify | Seulement si `COOLIFY_BACKUP_S3_STORAGE_UUID` est renseignée (voir §2). |
-| Affichage | E-FLEX | Paramètres du projet → base PostgreSQL → « Sauvegardes » : état, dernière réussite, historique, « Sauvegarder maintenant ». |
-| Restauration | E-FLEX + Coolify | Historique → « Restaurer » sur une sauvegarde réussie, confirmation en saisissant RESTAURER (propriétaires et administrateurs). Coolify (`POST /databases/{uuid}/imports`, version ≥ 4.7) restaure depuis le fichier resté sur le serveur, sinon depuis la copie S3, et remplace les objets existants. Suivi en direct dans le panneau ; action inscrite au journal d'audit. |
+| Affichage | E-FLEX | Paramètres du projet → base PostgreSQL → « Sauvegardes » : état, dernière réussite, historique, « Sauvegarder maintenant », statut de copie hors serveur (S3 actif sur la planification ou non) et preuve de la dernière restauration consignée. |
+| Restauration | E-FLEX + Coolify | Historique → « Restaurer » sur une sauvegarde réussie, confirmation en saisissant RESTAURER (propriétaires et administrateurs). Coolify (`POST /databases/{uuid}/imports`, version ≥ 4.7) restaure depuis le fichier resté sur le serveur, sinon depuis la copie S3, et remplace les objets existants. Suivi en direct dans le panneau ; l’issue (en cours / réussite / échec) est consignée côté E-FLEX comme preuve exploitable ; action inscrite au journal d'audit. |
 | Alerte | E-FLEX | Notification `database.backup_failed` (application et e-mail) aux propriétaires et administrateurs de l'organisation quand la dernière sauvegarde a échoué, ou qu'aucune n'a réussi depuis `DATABASE_BACKUP_MAX_AGE_HOURS` (26 h par défaut). Une alerte par base et par jour au plus. |
 
 Une sauvegarde n'est restaurable depuis E-FLEX que si son fichier existe encore :
 sur le serveur (rétention locale) ou dans le stockage S3 configuré. Coolify refuse
-de restaurer le fichier d'une autre base. **Ce qui n'est pas automatique : le test
-mensuel de restauration** (§4).
+de restaurer le fichier d'une autre base. Une restauration lancée depuis E-FLEX
+et terminée est **consignée** dans le portail (preuve de restauration), mais
+**cela ne remplace pas le test régulier de restauration en environnement isolé**
+(§4), qui reste une opération à réaliser et à archiver.
 
 ## 2. Configurer la copie hors serveur (à faire une fois)
 
@@ -36,8 +41,12 @@ une panne de disque emporte la base et ses sauvegardes. L'interface l'indique
    `COOLIFY_BACKUP_S3_STORAGE_UUID=…`
 4. Redéployer le portail (`bash scripts/deploy-prod.sh`).
 
-Les bases **déjà planifiées** gardent leur réglage : pour y ajouter la copie
-S3, l'activer dans Coolify (base → Backups → la planification → « Save to S3 »).
+Une fois le stockage configuré, E-FLEX tente d’**appliquer automatiquement** la
+copie S3 aux planifications PostgreSQL existantes (lors des accès/assurances de
+planification et à chaque passe de surveillance). Vérifiez dans le portail
+(statut « copie hors serveur ») ou dans Coolify que la planification est bien à
+jour ; en cas d’échec d’application automatique, activez « Save to S3 » dans
+Coolify (base → Backups → la planification).
 
 Le jeton `COOLIFY_API_TOKEN` doit avoir la permission **deploy** pour les boutons
 « Sauvegarder maintenant » (`backup_now`) et « Restaurer » (`imports`), en plus de `read:sensitive` et
@@ -57,8 +66,10 @@ Ces réglages s'appliquent aux **nouvelles** planifications.
 
 ## 4. Vérifier qu'une sauvegarde se restaure (au moins une fois par mois)
 
-Une sauvegarde jamais restaurée n'est pas une garantie. Sur le serveur de la
-base (ou après avoir téléchargé le fichier depuis S3) :
+Une sauvegarde jamais restaurée n'est pas une garantie. Le portail consigne les
+restaurations effectuées via l'assistant (preuve), mais la **vérification de
+restaurabilité** recommandée reste un test hors production (base jetable). Sur
+le serveur de la base (ou après avoir téléchargé le fichier depuis S3) :
 
 ```bash
 ls -t /data/coolify/backups/databases/*/*/ | head      # trouver le fichier le plus récent

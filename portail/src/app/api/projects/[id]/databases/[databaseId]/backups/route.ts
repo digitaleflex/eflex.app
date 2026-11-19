@@ -15,8 +15,34 @@ import { requireOrg, requireProjectDatabase, tenantNotFound } from '@/lib/tenant
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const DATABASE_SELECT = { id: true, kind: true, coolifyId: true, backupId: true } as const
-type BackupDatabase = { id: string; kind: string; coolifyId: string; backupId: string | null }
+const DATABASE_SELECT = {
+  id: true,
+  kind: true,
+  coolifyId: true,
+  backupId: true,
+  lastRestoreExecutionId: true,
+  lastRestoreBackupCreatedAt: true,
+  lastRestoreImportId: true,
+  lastRestoreStartedAt: true,
+  lastRestoreFinishedAt: true,
+  lastRestoreStatus: true,
+  lastSuccessfulRestoreAt: true,
+  lastSuccessfulRestoreBackupCreatedAt: true,
+} as const
+type BackupDatabase = {
+  id: string
+  kind: string
+  coolifyId: string
+  backupId: string | null
+  lastRestoreExecutionId: string | null
+  lastRestoreBackupCreatedAt: Date | null
+  lastRestoreImportId: string | null
+  lastRestoreStartedAt: Date | null
+  lastRestoreFinishedAt: Date | null
+  lastRestoreStatus: string | null
+  lastSuccessfulRestoreAt: Date | null
+  lastSuccessfulRestoreBackupCreatedAt: Date | null
+}
 
 /** État des sauvegardes d'une base managée (aucun nom de fichier ni message interne renvoyé). */
 export async function GET(

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { canManageProjects } from '@/lib/organizations'
-import { getDatabaseRestoreStatus } from '@/lib/database-backups'
+import { getTrackedRestoreStatus } from '@/lib/database-backups'
 import { requireOrg, requireProjectDatabase, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
@@ -9,7 +9,8 @@ export const runtime = 'nodejs'
 
 /**
  * Suivi d'une restauration. La base est d'abord vérifiée dans l'organisation ; Coolify vérifie ensuite que
- * l'opération concerne bien cette base (sinon 404). La sortie brute de la commande n'est jamais renvoyée.
+ * l'opération concerne bien cette base (sinon 404). Une restauration terminée est consignée comme preuve.
+ * La sortie brute de la commande n'est jamais renvoyée.
  */
 export async function GET(
   _request: NextRequest,
@@ -26,10 +27,25 @@ export async function GET(
 
   const { id, databaseId, importId } = await params
   if (!/^\d{1,20}$/.test(importId)) return tenantNotFound('Restauration introuvable.')
-  const result = await requireProjectDatabase(org, id, databaseId, { coolifyId: true })
+  const result = await requireProjectDatabase(org, id, databaseId, {
+    id: true,
+    kind: true,
+    coolifyId: true,
+    lastRestoreImportId: true,
+    lastRestoreBackupCreatedAt: true,
+  })
   if ('response' in result) return result.response
 
-  const status = await getDatabaseRestoreStatus(result.database as { coolifyId: string }, importId)
+  const status = await getTrackedRestoreStatus(
+    result.database as {
+      id: string
+      kind: string
+      coolifyId: string
+      lastRestoreImportId: string | null
+      lastRestoreBackupCreatedAt: Date | null
+    },
+    importId,
+  )
   if ('error' in status) {
     const notFound = status.error.includes('404')
     return NextResponse.json(

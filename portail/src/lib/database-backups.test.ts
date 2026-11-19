@@ -8,6 +8,7 @@ import {
   restoreSourceFor,
   summarizeBackups,
   toPublicExecution,
+  toRestoreProof,
 } from '@/lib/database-backups'
 import { describeFrequency, formatBytes } from '@/components/database-backups'
 
@@ -23,6 +24,7 @@ function schedule(executions: ExecInput[], saveS3 = true): DatabaseBackupSchedul
     frequency: '0 2 * * *',
     enabled: true,
     saveS3,
+    s3StorageId: saveS3 ? 's3-1' : null,
     executions: executions.map((execution) => ({ filename: null, localDeleted: false, s3Uploaded: false, ...execution })),
   }
 }
@@ -58,9 +60,9 @@ describe('backupSettings', () => {
 })
 
 describe('backupSupported', () => {
-  it('ne concerne que PostgreSQL (Coolify ne sauvegarde pas Redis)', () => {
-    expect(backupSupported('postgresql')).toBe(true)
-    expect(backupSupported('redis')).toBe(false)
+  it('ne concerne que PostgreSQL (Coolify ne sauvegarde pas Redis)', async () => {
+    await expect(backupSupported('postgresql')).resolves.toBe(true)
+    await expect(backupSupported('redis')).resolves.toBe(false)
   })
 })
 
@@ -145,6 +147,45 @@ describe('backupNeedsAlert', () => {
   it('n’alerte pas quand tout va bien', () => {
     expect(backupNeedsAlert({ health: 'ok' }, new Date(hoursAgo(100)), NOW, 26)).toBe(false)
     expect(backupNeedsAlert({ health: 'running' }, new Date(hoursAgo(100)), NOW, 26)).toBe(false)
+  })
+})
+
+describe('toRestoreProof', () => {
+  it('expose la dernière tentative et la dernière réussite consignée', () => {
+    const proof = toRestoreProof({
+      lastRestoreExecutionId: 'exec-1',
+      lastRestoreBackupCreatedAt: new Date('2026-11-16T02:00:00Z'),
+      lastRestoreImportId: '99',
+      lastRestoreStartedAt: new Date('2026-11-16T10:00:00Z'),
+      lastRestoreFinishedAt: new Date('2026-11-16T10:05:00Z'),
+      lastRestoreStatus: 'finished',
+      lastSuccessfulRestoreAt: new Date('2026-11-16T10:05:00Z'),
+      lastSuccessfulRestoreBackupCreatedAt: new Date('2026-11-16T02:00:00Z'),
+    })
+    expect(proof).toEqual({
+      status: 'finished',
+      executionId: 'exec-1',
+      backupCreatedAt: '2026-11-16T02:00:00.000Z',
+      startedAt: '2026-11-16T10:00:00.000Z',
+      finishedAt: '2026-11-16T10:05:00.000Z',
+      lastSuccessfulAt: '2026-11-16T10:05:00.000Z',
+      lastSuccessfulBackupCreatedAt: '2026-11-16T02:00:00.000Z',
+    })
+  })
+
+  it('retourne un statut nul sans tentative consignée', () => {
+    expect(
+      toRestoreProof({
+        lastRestoreExecutionId: null,
+        lastRestoreBackupCreatedAt: null,
+        lastRestoreImportId: null,
+        lastRestoreStartedAt: null,
+        lastRestoreFinishedAt: null,
+        lastRestoreStatus: null,
+        lastSuccessfulRestoreAt: null,
+        lastSuccessfulRestoreBackupCreatedAt: null,
+      }),
+    ).toMatchObject({ status: null, lastSuccessfulAt: null })
   })
 })
 

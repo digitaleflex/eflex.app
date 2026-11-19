@@ -17,8 +17,8 @@
 
 | Composant | Rôle | Fréquence | État |
 |---|---|---|---|
-| `backup-db.sh` | `pg_dump` custom + gzip, vérifications, rétention | quotidien 03:30 | à installer (§5) |
-| `restore-test.sh` | restaure la dernière sauvegarde dans `eflex_restore_test`, vérifie, supprime | dimanche 05:15 | à installer (§5) |
+| `backup-db.sh` | `pg_dump` custom + gzip, vérifications, rétention, copie hors site optionnelle, statut | quotidien 03:30 | à installer (§5) |
+| `restore-test.sh` | restaure la dernière sauvegarde dans `eflex_restore_test`, vérifie, supprime, consigne une preuve | dimanche 05:15 | à installer (§5) |
 | `healthcheck.sh` | HTTP, TLS, Docker, PostgreSQL, Redis + alertes | toutes les 15 min | à installer (§5) |
 
 Les scripts sont indépendants : ils peuvent être lancés à la main sans systemd.
@@ -36,13 +36,16 @@ l'apex pendant la mise en place.
 ## 2. Emplacement, nommage, permissions
 
 - Dossier par défaut : **`/home/fantome/backups/eflex`** (surchargeable par
-  `EFLEX_BACKUP_DIR`). Le dossier est créé en **700**, les archives et journaux
-  en **600** (`umask 077`).
+  `EFLEX_BACKUP_DIR`). Le dossier est créé en **700**, les archives, journaux et
+  fichiers de statut en **600** (`umask 077`).
 - Quotidiennes : `eflex-db-daily-AAAAMMJJ.dump.gz`
 - Hebdomadaires : `eflex-db-weekly-AAAA-Wss.dump.gz` (semaine ISO, créée le
   dimanche comme **lien dur** vers la quotidienne : aucun espace supplémentaire)
 - Format : `pg_dump --format=custom --compress=0` puis `gzip -9`. Restauration :
   `gunzip -c fichier.dump.gz | pg_restore …`.
+- Statuts/preuves locaux : `backup.status` (dernière sauvegarde locale réussie,
+  fichier, base, résultat de copie hors site) et `restore-test.status`
+  (dernier test de restauration réussi consigné).
 - Une exécution le même jour **remplace** la quotidienne du jour (pas de
   doublons).
 
@@ -83,8 +86,9 @@ par la restauration.
 
 - Pas d'archivage WAL : **pas de PITR** (restauration à la seconde). Le RPO est
   la dernière sauvegarde.
-- Les sauvegardes sont sur le **même disque** que la production. Un disque
-  perdu perd aussi les sauvegardes : une copie hors-site reste nécessaire (§10).
+- Les sauvegardes locales sont sur le **même disque** que la production. Un
+  disque perdu perd aussi les sauvegardes locales : une copie hors site
+  automatisée et vérifiée reste nécessaire (§10).
 - Le dump ne contient **pas** les rôles PostgreSQL globaux
   (`pg_dumpall --globals-only`) ni `.env.prod`. Sur un cluster neuf, recréer le
   rôle applicatif (`POSTGRES_USER`) avant de restaurer ; sans
@@ -156,7 +160,8 @@ qui suffit à `systemctl --failed`. Pour un envoi actif, configurez
    `Organization`, `_prisma_migrations`), ≥ 20 tables, ≥ 1 migration,
    0 migration non terminée, comptage utilisateurs/projets comparé à la
    production (simple avertissement si écart : écriture après le dump) ;
-5. supprime la base de test, **même en cas d'échec** (sauf `--keep`).
+5. consigne le succès dans `restore-test.status` (preuve locale du dernier test réussi) ;
+6. supprime la base de test, **même en cas d'échec** (sauf `--keep`).
 
 ```bash
 bash scripts/restore-test.sh
@@ -293,21 +298,37 @@ anomalies.
    dossier, l'état de `eflex-postgres`, puis relancer à la main. Corriger la
    cause avant de considérer la protection rétablie.
 
-## 10. Copie hors-site (recommandée, non automatisée)
+## 10. Copie hors site (recommandée, à automatiser)
 
 Le dossier de sauvegarde est sur le même disque que la production. Pour couvrir
 la perte du VPS, synchroniser les archives vers un autre hôte (NAS, autre VPS,
-stockage objet compatible S3) — hors périmètre de ces scripts, car il dépend de
-la destination :
+stockage objet compatible S3).
+
+### Automatisation via le script
+
+`backup-db.sh` peut exécuter une commande de copie après la sauvegarde locale
+réussie si `EFLEX_BACKUP_OFFSITE_CMD` est défini (ex. dans l’environnement du
+service systemd ou un fichier chargé par l’unité). Variables disponibles pour la
+commande : `EFLEX_BACKUP_DIR`, `EFLEX_BACKUP_FILE` (archive quotidienne produite),
+`EFLEX_BACKUP_DB`.
 
 ```bash
 # Exemple rsync (clé SSH sans passphrase dédiée, destination déjà chiffrée) :
-rsync -a --delete /home/fantome/backups/eflex/ backup@autre-hote:/srv/eflex-backups/
+EFLEX_BACKUP_OFFSITE_CMD='rsync -a --delete "$EFLEX_BACKUP_DIR"/ backup@autre-hote:/srv/eflex-backups/' \
+  bash scripts/backup-db.sh
 ```
 
-À planifier **après** la sauvegarde (par exemple un timer à 04:15) et à
-surveiller : une copie hors-site non testée n'est pas une sauvegarde. Vérifier
-périodiquement `gzip -t` et un `restore-test.sh --file` sur la copie distante.
+Si la commande échoue, le script échoue (et `backup.status` n’est pas marqué en
+succès) afin que l’absence de copie hors site soit visible (journald / timer).
+
+### Bonnes pratiques
+
+- Planifier la copie après la sauvegarde (ou via le hook ci-dessus) et la
+  surveiller.
+- Vérifier périodiquement `gzip -t` et un `restore-test.sh --file` sur la copie
+  distante/isolée.
+- Une copie hors site non testée n’est pas une garantie : conserver les preuves
+  (`backup.status`, `restore-test.status`, journaux).
 
 ## 11. Sécurité
 

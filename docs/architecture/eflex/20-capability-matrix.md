@@ -13,9 +13,9 @@ Cette matrice empêche de confondre présence de code, capacité activée, preuv
 | GitHub / webhooks | En place, vérifier parcours | Vérifier les scénarios dépôts privés et push réels |
 | Déploiement multi-services | Partiel | Compose fourni pris en charge ; diagnostics prescriptifs ; plans multi-services générés sans Compose refusés |
 | Volumes persistants | Partiel / flag | Testé sur staging ; `EFLEX_PERSISTENT_VOLUMES` documenté OFF par défaut prod |
-| Bases clientes | En place / partiel | Provisionnement PostgreSQL/Redis ; sauvegarde/restauration intégrée pour PostgreSQL (planification Coolify, UI, restauration, alertes), copie hors site optionnelle via S3, Redis non sauvegardé |
-| Backup PostgreSQL du portail | Partiel | Scripts et restore test ; archive locale, copie hors site à assurer |
-| Backup bases clientes (PostgreSQL) | Partiel | Automatique côté E-FLEX/Coolify ; copie S3 et test mensuel de restauration restent opérationnels à assurer (voir `docs/operations/client-database-backups.md`) |
+| Bases clientes | En place / partiel | Provisionnement PostgreSQL/Redis ; sauvegarde/restauration intégrée pour PostgreSQL (planification Coolify, UI, restauration assistée, preuve de restauration consignée, alertes), copie hors site optionnelle via S3, Redis non sauvegardé |
+| Backup PostgreSQL du portail | Partiel | Scripts, statut/preuve locaux et hook de copie hors site (`EFLEX_BACKUP_OFFSITE_CMD`) ; copie hors site effective et vérification régulière restent à configurer/assurer |
+| Backup bases clientes (PostgreSQL) | Partiel | Automatique côté E-FLEX/Coolify avec statut de copie hors serveur et preuve consignée ; copie S3 et tests réguliers de restauration en environnement isolé restent opérationnels à assurer (voir `docs/operations/client-database-backups.md`) |
 | Backup fichiers / volumes clients | À construire | Politique et restore test à définir |
 | Monitoring plateforme | En place / partiel | Healthcheck et statut plateforme |
 | Monitoring continu des sites clients | À construire / à compléter | Probes et incidents par projet |

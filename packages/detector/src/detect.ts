@@ -246,6 +246,19 @@ function unique(values: readonly string[]): string[] {
   return [...new Set(values)];
 }
 
+const TSBUILDINFO_WARNING =
+  'Un fichier `*.tsbuildinfo` est présent dans le dépôt. Retirez-le du suivi Git et ajoutez `*.tsbuildinfo` au `.gitignore` (et au `.dockerignore`) : il peut provoquer un échec de build (montage de cache BuildKit sur un fichier).';
+
+function buildArtifactWarnings(view: RepoView): string[] {
+  return view.files.some((file) => file.endsWith('.tsbuildinfo')) ? [TSBUILDINFO_WARNING] : [];
+}
+
+function withBuildArtifactWarnings(result: DetectionResult, view: RepoView): DetectionResult {
+  const extra = buildArtifactWarnings(view);
+  if (extra.length === 0) return result;
+  return { ...result, warnings: unique([...result.warnings, ...extra]) };
+}
+
 /** Keep at most two alternatives that differ from the primary plan. */
 function selectAlternatives(primary: BuildPlan, plans: readonly BuildPlan[]): BuildPlan[] {
   const seen = new Set<string>([JSON.stringify(primary)]);
@@ -382,19 +395,22 @@ export function resolveApplication(view: RepoView, app: string): DetectionResult
   const workspace = workspaceContext(view, app, plan);
   if (workspace) plan.workspace = workspace;
 
-  return {
-    plan,
-    confidence,
-    framework: subResult.framework,
-    reasons: unique([`Application détectée dans \`${app}\`.`, ...subResult.reasons]),
-    warnings: subResult.warnings,
-    questions: confidence < 0.7 ? subResult.questions : [],
-    alternatives: subResult.alternatives.map((alternative) => ({
-      ...alternative,
-      root: app,
-      repoRoot,
-    })),
-  };
+  return withBuildArtifactWarnings(
+    {
+      plan,
+      confidence,
+      framework: subResult.framework,
+      reasons: unique([`Application détectée dans \`${app}\`.`, ...subResult.reasons]),
+      warnings: subResult.warnings,
+      questions: confidence < 0.7 ? subResult.questions : [],
+      alternatives: subResult.alternatives.map((alternative) => ({
+        ...alternative,
+        root: app,
+        repoRoot,
+      })),
+    },
+    view,
+  );
 }
 
 /**
@@ -500,7 +516,7 @@ export function detectAt(view: RepoView, root: string, allowMonorepo: boolean): 
 /** Deterministically turn a repository snapshot into a deployment build plan. */
 export function detect(snapshot: RepoSnapshot): DetectionResult {
   const view = createView(snapshot);
-  return detectAt(view, '', true);
+  return withBuildArtifactWarnings(detectAt(view, '', true), view);
 }
 
 /**
@@ -511,6 +527,6 @@ export function detect(snapshot: RepoSnapshot): DetectionResult {
 export function detectApplication(snapshot: RepoSnapshot, app: string): DetectionResult {
   const view = createView(snapshot);
   const wanted = normalizePath(app).replace(/\/+$/, '');
-  if (!discoverApps(view.files, '').includes(wanted)) return unknownResult();
+  if (!discoverApps(view.files, '').includes(wanted)) return withBuildArtifactWarnings(unknownResult(), view);
   return resolveApplication(view, wanted);
 }

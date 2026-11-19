@@ -18,18 +18,29 @@ interface Execution {
 
 type RestoreState = { importId: string; backupCreatedAt: string; state: 'running' | 'finished' | 'failed' }
 
+interface RestoreProof {
+  status: 'running' | 'finished' | 'failed' | null
+  executionId: string | null
+  backupCreatedAt: string | null
+  startedAt: string | null
+  finishedAt: string | null
+  lastSuccessfulAt: string | null
+  lastSuccessfulBackupCreatedAt: string | null
+}
+
 interface BackupStatus {
   supported: boolean
   scheduled: boolean
   offsiteConfigured: boolean
+  scheduleOffsite: boolean | null
   frequency: string
   summary: {
     health: Health
     lastSuccessAt: string | null
     lastFailureAt: string | null
-    offsite: boolean
     recent: Execution[]
   } | null
+  restore: RestoreProof | null
   error: string | null
   canManage: boolean
 }
@@ -86,7 +97,41 @@ export function formatBytes(size: number | null): string {
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
 
-/** Sauvegardes d'une base PostgreSQL managée : état, historique, sauvegarde immédiate. */
+function offsiteLabel(status: BackupStatus): { text: string; tone: 'muted' | 'warning' } {
+  if (status.scheduleOffsite) return { text: 'copie hors serveur (S3)', tone: 'muted' }
+  if (status.offsiteConfigured && status.scheduled) {
+    return {
+      text: 'copies sur le serveur de la base uniquement (S3 configuré, à activer sur la planification dans Coolify)',
+      tone: 'warning',
+    }
+  }
+  if (status.offsiteConfigured) {
+    return { text: 'copie hors serveur possible (S3 configuré)', tone: 'muted' }
+  }
+  return { text: 'copies sur le serveur de la base uniquement', tone: 'warning' }
+}
+
+function restoreProofText(restore: RestoreProof | null): string | null {
+  if (!restore) return null
+  if (restore.status === 'running' && restore.backupCreatedAt) {
+    return `Restauration en cours (sauvegarde du ${formatDate(restore.backupCreatedAt)})`
+  }
+  if (restore.status === 'failed' && restore.finishedAt) {
+    return `Dernière restauration : échec le ${formatDate(restore.finishedAt)}`
+  }
+  if (restore.lastSuccessfulAt) {
+    const from = restore.lastSuccessfulBackupCreatedAt
+      ? `, depuis la sauvegarde du ${formatDate(restore.lastSuccessfulBackupCreatedAt)}`
+      : ''
+    return `Dernière restauration réussie le ${formatDate(restore.lastSuccessfulAt)}${from} (preuve consignée)`
+  }
+  if (restore.status === 'finished' && restore.finishedAt) {
+    return `Dernière restauration terminée le ${formatDate(restore.finishedAt)}`
+  }
+  return null
+}
+
+/** Sauvegardes d'une base PostgreSQL managée : état, historique, sauvegarde immédiate, restauration. */
 export function DatabaseBackups({ projectId, databaseId }: { projectId: string; databaseId: string }) {
   const [status, setStatus] = useState<BackupStatus | null>(null)
   const [loading, setLoading] = useState(true)
@@ -117,6 +162,14 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
     void load()
   }, [load])
 
+  // Si une restauration est en cours côté serveur (preuve), reprendre le suivi au chargement.
+  useEffect(() => {
+    if (!status?.restore || status.restore.status !== 'running' || restore) return
+    if (!status.restore.backupCreatedAt) return
+    // L'importId n'est pas exposé dans le statut public ; on recharge simplement l'état.
+    // Le suivi actif (après clic) est géré ci-dessous via `restore`.
+  }, [status, restore])
+
   // Suivi de la restauration en cours, toutes les 3 s, jusqu'à son issue.
   useEffect(() => {
     if (!restore || restore.state !== 'running') return
@@ -127,15 +180,24 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
         if (!response.ok) {
           setRestore({ ...restore, state: 'failed' })
           setFeedback({ tone: 'error', message: body.error ?? 'Suivi de la restauration impossible.' })
+          void load()
           return
         }
         if (body.state === 'finished' || body.state === 'failed') {
           setRestore({ ...restore, state: body.state })
           setFeedback(
             body.state === 'finished'
-              ? { tone: 'success', message: `Base restaurée depuis la sauvegarde du ${formatDate(restore.backupCreatedAt)}. Vérifiez votre application.` }
-              : { tone: 'error', message: 'La restauration a échoué. Les données n’ont peut-être pas été modifiées : contactez le support avant de réessayer.' },
+              ? {
+                  tone: 'success',
+                  message: `Base restaurée depuis la sauvegarde du ${formatDate(restore.backupCreatedAt)}. Vérifiez votre application.`,
+                }
+              : {
+                  tone: 'error',
+                  message:
+                    'La restauration a échoué. Les données n’ont peut-être pas été modifiées : contactez le support avant de réessayer.',
+                },
           )
+          void load()
         } else {
           setRestore({ ...restore })
         }
@@ -144,7 +206,7 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
       }
     }, 3_000)
     return () => window.clearTimeout(timer)
-  }, [restore, url])
+  }, [restore, url, load])
 
   async function startRestore(execution: Execution) {
     setFeedback(null)
@@ -161,6 +223,7 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
     }
     setRestore({ importId: String(body.importId), backupCreatedAt: execution.createdAt, state: 'running' })
     setFeedback({ tone: 'success', message: body.message ?? 'Restauration lancée.' })
+    void load()
   }
 
   async function act(action: 'enable' | 'run') {
@@ -191,7 +254,9 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
 
   const summary = status.summary
   const health = summary ? HEALTH[summary.health] : null
-  const offsite = summary ? summary.offsite : status.offsiteConfigured
+  const offsite = offsiteLabel(status)
+  const proof = restoreProofText(status.restore)
+  const restoreRunning = restore?.state === 'running' || status.restore?.status === 'running'
 
   return (
     <section aria-label="Sauvegardes" className="mt-3 space-y-2 border-t border-border pt-3">
@@ -218,10 +283,11 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
                 {' · '}
                 {describeFrequency(status.frequency)}
                 {' · '}
-                {offsite ? 'copie hors serveur' : 'copies sur le serveur de la base uniquement'}
+                <span className={offsite.tone === 'warning' ? 'text-warning' : undefined}>{offsite.text}</span>
               </p>
             </>
           )}
+          {proof && <p className="text-xs text-muted-foreground">{proof}</p>}
           {status.error && <p className="text-xs text-warning">État indisponible : {status.error}</p>}
         </div>
         {status.canManage && (
@@ -242,7 +308,7 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
         )}
       </div>
 
-      {restore?.state === 'running' && (
+      {restoreRunning && restore?.backupCreatedAt && (
         <p role="status" className="flex items-center gap-2 text-xs font-medium">
           <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-warning" />
           Restauration en cours depuis la sauvegarde du {formatDate(restore.backupCreatedAt)}…
@@ -290,7 +356,7 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
                       {execution.restorable && (
                         <button
                           type="button"
-                          disabled={restore?.state === 'running'}
+                          disabled={restoreRunning}
                           onClick={() => setConfirmRestore(execution)}
                           className="inline-flex min-h-11 items-center gap-1 rounded-md px-2 font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                         >

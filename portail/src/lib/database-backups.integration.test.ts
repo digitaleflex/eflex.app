@@ -4,8 +4,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 const run = process.env.EFLEX_TEST_DB === '1' ? describe : describe.skip
 
 const coolify = vi.hoisted(() => ({
-  schedules: new Map<string, Array<{ id: string; frequency: string; enabled: boolean; saveS3: boolean; executions: unknown[] }>>(),
+  schedules: new Map<
+    string,
+    Array<{ id: string; frequency: string; enabled: boolean; saveS3: boolean; s3StorageId: string | null; executions: unknown[] }>
+  >(),
   created: [] as Array<{ databaseId: string; options: unknown }>,
+  updated: [] as Array<{ databaseId: string; scheduleId: string; options: unknown }>,
   failCreate: false,
   imports: [] as Array<{ databaseId: string; source: unknown }>,
 }))
@@ -16,8 +20,14 @@ vi.mock('@/lib/coolify', () => ({
     if (coolify.failCreate) return { error: 'Hébergement API 404' }
     coolify.created.push({ databaseId, options })
     const id = `sched-${databaseId}`
-    coolify.schedules.set(databaseId, [{ id, frequency: '0 2 * * *', enabled: true, saveS3: true, executions: [] }])
+    coolify.schedules.set(databaseId, [
+      { id, frequency: '0 2 * * *', enabled: true, saveS3: true, s3StorageId: 's3-1', executions: [] },
+    ])
     return { id }
+  },
+  updateDatabaseBackup: async (databaseId: string, scheduleId: string, options: unknown) => {
+    coolify.updated.push({ databaseId, scheduleId, options })
+    return { ok: true }
   },
   runDatabaseBackup: async () => ({ ok: true }),
   startDatabaseImport: async (databaseId: string, source: unknown) => {
@@ -67,6 +77,7 @@ run('sauvegardes des bases (intégration)', () => {
   beforeEach(() => {
     coolify.schedules.clear()
     coolify.created.length = 0
+    coolify.updated.length = 0
     coolify.failCreate = false
     coolify.imports.length = 0
   })
@@ -88,14 +99,34 @@ run('sauvegardes des bases (intégration)', () => {
     expect(stored.backupScheduledAt).toBeInstanceOf(Date)
 
     const second = await backups.ensureDatabaseBackup(stored, settings)
-    expect(second).toEqual({ backupId: stored.backupId, created: false })
+    expect(second).toMatchObject({ backupId: stored.backupId, created: false })
     expect(coolify.created).toHaveLength(1)
+    expect(coolify.updated).toHaveLength(0)
     expect(coolify.created[0]?.options).toMatchObject({ s3StorageUuid: 's3-1' })
+  })
+
+  it('applique la copie S3 aux planifications existantes quand la plateforme est configurée', async () => {
+    const { database } = await fixture()
+    coolify.schedules.set(database.coolifyId, [
+      { id: 'ancienne', frequency: 'daily', enabled: true, saveS3: false, s3StorageId: null, executions: [] },
+    ])
+    const settings = backups.backupSettings({ COOLIFY_BACKUP_S3_STORAGE_UUID: 's3-1' })
+    const result = await backups.ensureDatabaseBackup({ ...database, backupId: 'ancienne' }, settings)
+    expect(result).toMatchObject({ backupId: 'ancienne', created: false })
+    expect(coolify.updated).toEqual([
+      {
+        databaseId: database.coolifyId,
+        scheduleId: 'ancienne',
+        options: expect.objectContaining({ s3StorageUuid: 's3-1', enabled: true }),
+      },
+    ])
   })
 
   it('reprend une planification déjà présente dans Coolify au lieu d’en créer une autre', async () => {
     const { database } = await fixture()
-    coolify.schedules.set(database.coolifyId, [{ id: 'manuelle', frequency: 'daily', enabled: true, saveS3: false, executions: [] }])
+    coolify.schedules.set(database.coolifyId, [
+      { id: 'manuelle', frequency: 'daily', enabled: true, saveS3: false, s3StorageId: null, executions: [] },
+    ])
     const result = await backups.ensureDatabaseBackup(database)
     expect(result).toEqual({ backupId: 'manuelle', created: false })
     expect(coolify.created).toHaveLength(0)
@@ -127,6 +158,7 @@ run('sauvegardes des bases (intégration)', () => {
         frequency: '0 2 * * *',
         enabled: true,
         saveS3: true,
+        s3StorageId: 's3-1',
         executions: [{ id: 'e1', status: 'failed', size: null, createdAt: '2026-11-16T02:00:00Z' }],
       },
     ])
@@ -138,7 +170,7 @@ run('sauvegardes des bases (intégration)', () => {
     expect(notifications[0]?.href).toMatch(/^\/dashboard\/projects\/.+\/settings$/)
   })
 
-  it('ne restaure qu’une sauvegarde réussie de cette même base', async () => {
+  it('ne restaure qu’une sauvegarde réussie de cette même base et consigne la tentative', async () => {
     const { database } = await fixture()
     const other = await fixture()
     const file = (id: string) => `/data/coolify/backups/databases/t-0/${id}/pg.dmp`
@@ -148,9 +180,26 @@ run('sauvegardes des bases (intégration)', () => {
         frequency: 'daily',
         enabled: true,
         saveS3: true,
+        s3StorageId: 's3-1',
         executions: [
-          { id: 'ok', status: 'success', size: 1, createdAt: '2026-11-16T02:00:00Z', filename: file('a'), localDeleted: true, s3Uploaded: true },
-          { id: 'ko', status: 'failed', size: null, createdAt: '2026-11-15T02:00:00Z', filename: null, localDeleted: false, s3Uploaded: false },
+          {
+            id: 'ok',
+            status: 'success',
+            size: 1,
+            createdAt: '2026-11-16T02:00:00Z',
+            filename: file('a'),
+            localDeleted: true,
+            s3Uploaded: true,
+          },
+          {
+            id: 'ko',
+            status: 'failed',
+            size: null,
+            createdAt: '2026-11-15T02:00:00Z',
+            filename: null,
+            localDeleted: false,
+            s3Uploaded: false,
+          },
         ],
       },
     ])
@@ -160,14 +209,30 @@ run('sauvegardes des bases (intégration)', () => {
         frequency: 'daily',
         enabled: true,
         saveS3: false,
-        executions: [{ id: 'autre', status: 'success', size: 1, createdAt: '2026-11-16T02:00:00Z', filename: file('b'), localDeleted: false, s3Uploaded: false }],
+        s3StorageId: null,
+        executions: [
+          {
+            id: 'autre',
+            status: 'success',
+            size: 1,
+            createdAt: '2026-11-16T02:00:00Z',
+            filename: file('b'),
+            localDeleted: false,
+            s3Uploaded: false,
+          },
+        ],
       },
     ])
     const settings = backups.backupSettings({ COOLIFY_BACKUP_S3_STORAGE_UUID: 's3-1' })
 
     // L'exécution d'une autre base est introuvable depuis celle-ci.
-    expect(await backups.restoreDatabaseBackup(database, 'autre', settings)).toEqual({ error: 'Sauvegarde introuvable.', status: 404 })
-    expect((await backups.restoreDatabaseBackup(database, 'ko', settings)) as { status: number }).toMatchObject({ status: 409 })
+    expect(await backups.restoreDatabaseBackup(database, 'autre', settings)).toEqual({
+      error: 'Sauvegarde introuvable.',
+      status: 404,
+    })
+    expect((await backups.restoreDatabaseBackup(database, 'ko', settings)) as { status: number }).toMatchObject({
+      status: 409,
+    })
     expect(coolify.imports).toHaveLength(0)
 
     const result = await backups.restoreDatabaseBackup(database, 'ok', settings)
@@ -176,8 +241,21 @@ run('sauvegardes des bases (intégration)', () => {
       { databaseId: database.coolifyId, source: { source: 's3', s3StorageUuid: 's3-1', path: file('a') } },
     ])
 
-    const status = await backups.getDatabaseBackupStatus({ ...database, backupId: 'sched' }, new Date('2026-11-16T12:00:00Z'), settings)
+    const stored = await prisma.projectDatabase.findUniqueOrThrow({ where: { id: database.id } })
+    expect(stored.lastRestoreStatus).toBe('running')
+    expect(stored.lastRestoreExecutionId).toBe('ok')
+    expect(stored.lastRestoreImportId).toBe('99')
+    expect(stored.lastRestoreBackupCreatedAt?.toISOString()).toBe('2026-11-16T02:00:00.000Z')
+
+    const status = await backups.getDatabaseBackupStatus(stored, new Date('2026-11-16T12:00:00Z'), settings)
     expect(JSON.stringify(status)).not.toContain('/data/')
-    expect(status.summary?.recent.map((item) => [item.id, item.restorable])).toEqual([['ok', true], ['ko', false]])
+    expect(status.summary?.recent.map((item) => [item.id, item.restorable])).toEqual([
+      ['ok', true],
+      ['ko', false],
+    ])
+    expect(status.scheduleOffsite).toBe(true)
+    expect(status.restore?.status).toBe('running')
+    expect(status.restore?.executionId).toBe('ok')
+    expect(status.restore?.backupCreatedAt).toBe('2026-11-16T02:00:00.000Z')
   })
 })

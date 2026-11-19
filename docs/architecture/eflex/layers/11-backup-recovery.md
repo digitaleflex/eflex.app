@@ -8,17 +8,17 @@ Protéger la capacité de récupérer les données E-FLEX et les données des cl
 
 ### Sauvegarde du portail E-FLEX
 
-Le dépôt contient `scripts/backup-db.sh`, `scripts/restore-test.sh` et `scripts/healthcheck.sh`, documentés dans [docs/operations/backups.md](../../operations/backups.md). Ils concernent principalement le PostgreSQL du portail. Les archives sont actuellement décrites comme stockées sur le même disque de production ; une copie hors site reste nécessaire. Le test de restauration local existe.
+Le dépôt contient `scripts/backup-db.sh`, `scripts/restore-test.sh` et `scripts/healthcheck.sh`, documentés dans [docs/operations/backups.md](../../operations/backups.md). Ils concernent principalement le PostgreSQL du portail. Les scripts produisent des statuts/preuves locaux (`backup.status`, `restore-test.status`) et supportent un hook de copie hors site (`EFLEX_BACKUP_OFFSITE_CMD`) ; la copie hors site effective et la vérification régulière restent à configurer/assurer. Le test de restauration local existe.
 
 ### Sauvegarde des données clientes
 
-**Bases PostgreSQL managées** (`ProjectDatabase`) : un parcours intégré existe (planification automatique via Coolify à la création et rattrapage idempotent, UI de suivi, sauvegarde manuelle, restauration assistée via `POST /databases/{uuid}/imports` avec suivi, alertes `database.backup_failed`, script de vérification hors production `scripts/verify-db-backup.sh`). Détail opérationnel : [client-database-backups.md](../../operations/client-database-backups.md).
+**Bases PostgreSQL managées** (`ProjectDatabase`) : un parcours intégré existe (planification automatique via Coolify à la création et rattrapage idempotent, UI de suivi avec statut de copie hors serveur sur la planification, sauvegarde manuelle, restauration assistée via `POST /databases/{uuid}/imports` avec suivi, **preuve de restauration consignée** dans le portail — dernière tentative et dernière réussite —, alertes `database.backup_failed`, script de vérification hors production `scripts/verify-db-backup.sh`). Détail opérationnel : [client-database-backups.md](../../operations/client-database-backups.md).
 
 Limites actuelles à ne pas masquer :
-- **Copie hors site** : optionnelle, uniquement si `COOLIFY_BACKUP_S3_STORAGE_UUID` est configuré ; sans cela les copies restent sur le serveur de la base.
+- **Copie hors site** : optionnelle, uniquement si `COOLIFY_BACKUP_S3_STORAGE_UUID` est configuré ; E-FLEX tente d’appliquer la copie S3 aux planifications existantes, mais l’effectivité dépend de Coolify/du stockage et doit être vérifiée (sinon les copies restent sur le serveur de la base).
 - **Redis** : non sauvegardé (Coolify ne le permet pas ; Redis est traité comme cache/file).
 - **Volumes/fichiers clients** : pas de stratégie ni de parcours intégré.
-- **Preuve de restauration** : la restauration assistée existe, mais le **test mensuel de restauration** reste une opération manuelle à réaliser et consigner.
+- **Preuve de restauration** : les restaurations assistées sont consignées, mais le **test régulier de restauration en environnement isolé** (ex. mensuel) reste une opération manuelle à réaliser et archiver.
 - **RPO** : pas d'archivage WAL ; perte possible des données écrites depuis la dernière sauvegarde réussie.
 
 Ne pas annoncer de sauvegardes clientes garanties au-delà de ce périmètre et sans copie hors site/test de restauration effectif.

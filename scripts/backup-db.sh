@@ -27,6 +27,8 @@
 #   EFLEX_BACKUP_MIN_FREE_MB  espace libre minimal avant dump (déf. 100)
 #   EFLEX_DAILY_KEEP          quotidiennes conservées (déf. 7)
 #   EFLEX_WEEKLY_KEEP         hebdomadaires conservées (déf. 4)
+#   EFLEX_BACKUP_OFFSITE_CMD  commande de copie hors site exécutée après la sauvegarde locale
+#                             (reçoit EFLEX_BACKUP_DIR, EFLEX_BACKUP_FILE, EFLEX_BACKUP_DB)
 #
 # Code de sortie : 0 succès, 1 échec (journal lisible sur stdout + journald).
 # ═══════════════════════════════════════════════════════════════════════════
@@ -48,6 +50,7 @@ DAILY_NAME="${DAILY_PREFIX}$(date +%Y%m%d).dump.gz"
 WEEKLY_NAME="${WEEKLY_PREFIX}$(date +%G-W%V).dump.gz" # ISO : 2026-W45
 LOG="$BACKUP_DIR/backup.log"
 TMP=""
+OFFSITE_RESULT="skipped"
 
 log() {
   local line
@@ -210,6 +213,30 @@ prune() {
   log "rétention ${prefix}* : ${keep} conservées, ${removed} supprimée(s)"
 }
 
+run_offsite() {
+  OFFSITE_RESULT="skipped"
+  local cmd="${EFLEX_BACKUP_OFFSITE_CMD:-}"
+  [ -n "$cmd" ] || return 0
+  log "copie hors site : exécution de la commande configurée"
+  export EFLEX_BACKUP_DIR EFLEX_BACKUP_FILE="$BACKUP_DIR/$DAILY_NAME" EFLEX_BACKUP_DB="$PG_DB"
+  if bash -lc "$cmd" >>"$LOG" 2>&1; then
+    OFFSITE_RESULT="ok"
+    log "copie hors site : OK"
+    return 0
+  fi
+  OFFSITE_RESULT="error"
+  fail "copie hors site : la commande configurée a échoué (voir $LOG)"
+}
+
+write_status() {
+  local status_file="$BACKUP_DIR/backup.status"
+  local now
+  now="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  printf 'last_success_at=%s\nlast_file=%s\nlast_db=%s\noffsite=%s\n' \
+    "$now" "$DAILY_NAME" "$PG_DB" "$OFFSITE_RESULT" >"$status_file"
+  chmod 600 "$status_file"
+}
+
 main() {
   require_tools
 
@@ -222,11 +249,13 @@ main() {
   publish
   prune "$DAILY_PREFIX" "$DAILY_KEEP"
   prune "$WEEKLY_PREFIX" "$WEEKLY_KEEP"
+  run_offsite
+  write_status
 
   local count size_total
   count="$(find "$BACKUP_DIR" -maxdepth 1 -type f \( -name "${DAILY_PREFIX}*" -o -name "${WEEKLY_PREFIX}*" \) | wc -l)"
   size_total="$(du -sh -- "$BACKUP_DIR" 2>/dev/null | cut -f1)"
-  log "=== fin sauvegarde : OK (${count} archive(s), ${size_total} au total) ==="
+  log "=== fin sauvegarde : OK (${count} archive(s), ${size_total} au total, copie hors site=${OFFSITE_RESULT}) ==="
 }
 
 main "$@"

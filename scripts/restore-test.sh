@@ -264,6 +264,14 @@ main() {
     fail "${failures} vérification(s) en échec"
   fi
 
+  local status_file="$BACKUP_DIR/restore-test.status"
+  local now
+  now="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  printf 'last_success_at=%s\nlast_file=%s\nsource_db=%s\ntarget_db=%s\ntables=%s\nusers=%s\nprojects=%s\nmigrations=%s\n' \
+    "$now" "$(basename "$DUMP_FILE")" "$PG_DB" "$TARGET_DB" "$tables" "$users" "$projects" "$migrations" >"$status_file"
+  chmod 600 "$status_file"
+  log "preuve consignée : restore-test.status"
+
   log "=== fin test de restauration : OK ==="
 }
 

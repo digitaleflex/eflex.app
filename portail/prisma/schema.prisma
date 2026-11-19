@@ -286,8 +286,17 @@ model ProjectDatabase {
   /// Planification de sauvegarde Coolify (PostgreSQL uniquement ; null = pas encore planifiée).
   backupId          String?
   /// Date de la planification (sert à ne pas alerter avant la première sauvegarde attendue).
-  backupScheduledAt DateTime?
-  createdAt         DateTime @default(now())
+  backupScheduledAt          DateTime?
+  /// Preuve de restauration : dernière tentative et dernière réussite consignée.
+  lastRestoreExecutionId            String?
+  lastRestoreBackupCreatedAt        DateTime?
+  lastRestoreImportId               String?
+  lastRestoreStartedAt              DateTime?
+  lastRestoreFinishedAt             DateTime?
+  lastRestoreStatus                 String? // running | finished | failed
+  lastSuccessfulRestoreAt           DateTime?
+  lastSuccessfulRestoreBackupCreatedAt DateTime?
+  createdAt                         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   @@unique([projectId, kind])

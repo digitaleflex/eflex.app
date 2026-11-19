@@ -284,6 +284,16 @@ const RULES: Rule[] = [
     action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
   },
   {
+    id: 'tsbuildinfo-cache-mount',
+    test: (t) =>
+      /tsconfig(?:\.[^/\s"'`]*)*\.tsbuildinfo/i.test(t) &&
+      /not a directory|is not a directory/i.test(t) &&
+      /(error mounting|mount .* to rootfs|failed to (?:prepare|mount)|cache mount)/i.test(t),
+    cause:
+      "La construction échoue car un fichier `tsconfig.tsbuildinfo` (artefact TypeScript) est traité comme un dossier par un montage de cache. Supprimez ce fichier du dépôt (et ajoutez-le au `.gitignore`/`.dockerignore`), puis videz le cache de build et relancez le déploiement.",
+    action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
     id: 'build-failed',
     test: (t) =>
       /build (failed|error)|command failed|npm (err|error)|pnpm .*err|yarn .*error|exit code [1-9]/i.test(t),
