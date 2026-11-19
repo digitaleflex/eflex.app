@@ -723,7 +723,7 @@ export function ProjectAnalyticsTab({ projectId, canManage }: { projectId: strin
                               type="checkbox"
                               checked={alert.enabled}
                               onChange={(e) => updateAlert(alert.type, { enabled: e.target.checked })}
-                              className="h-4 w-4 rounded border-input text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              className="h-4 w-4 rounded-md border-input text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             />
                             Activée
                           </label>

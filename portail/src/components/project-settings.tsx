@@ -578,9 +578,9 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
 
           <SettingsSection
             id="bases"
-            title="Bases de données"
+            title="Bases de données & services"
             icon={Database}
-            description="Créez une base PostgreSQL ou un cache Redis privé sur l’infrastructure. La variable DATABASE_URL ou REDIS_URL est injectée automatiquement au déploiement."
+            description="Gérez vos ressources actives et ajoutez des bases ou services depuis le catalogue unifié : disponibilité réelle de l’instance, capacités (sauvegarde, restauration, provider) et services référencés. Les connexions sont privées et injectées automatiquement."
           >
             <ProjectDatabases projectId={project.id} />
           </SettingsSection>

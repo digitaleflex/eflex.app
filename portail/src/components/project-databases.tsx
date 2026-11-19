@@ -1,77 +1,46 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Database, Play, Plus, RefreshCw, RotateCw, Square, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { DatabaseBackups } from '@/components/database-backups'
-import { cn } from '@/lib/utils'
-
-interface ManagedDatabase {
-  id: string
-  kind: string
-  label: string
-  envKey: string
-  description: string | null
-  status: string
-  error: string | null
-  createdAt: string
-}
-
-interface AvailableDatabase {
-  kind: string
-  label: string
-  envKey: string
-  description: string
-}
+import { InstanceCapabilitiesPanel } from '@/components/services-hub/instance-capabilities-panel'
+import { ActiveResources, type ResourceAction } from '@/components/services-hub/active-resources'
+import { ServicesBrowser } from '@/components/services-hub/services-browser'
+import { ServiceDetailDialog } from '@/components/services-hub/service-detail-dialog'
+import {
+  buildServicesHubModel,
+  type EngineInfoView,
+  type ManagedDatabaseView,
+  type RuntimeView,
+  type UnifiedService,
+} from '@/lib/services-hub'
 
 interface DatabasesResponse {
-  databases: ManagedDatabase[]
+  databases: ManagedDatabaseView[]
   canManage: boolean
-  available: AvailableDatabase[]
+  available?: EngineInfoView[]
+  engines?: EngineInfoView[]
+  runtime?: RuntimeView
 }
 
 type Feedback = { tone: 'success' | 'error'; message: string } | null
-type Action = 'start' | 'stop' | 'restart'
-type ConfirmKind = Action | 'delete'
+type ConfirmState =
+  | { kind: 'restart' | 'stop' | 'delete'; database: ManagedDatabaseView }
+  | null
 
-const STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'muted' }> = {
-  running: { label: 'En ligne', tone: 'success' },
-  creating: { label: 'Création…', tone: 'warning' },
-  restarting: { label: 'Redémarrage…', tone: 'warning' },
-  starting: { label: 'Démarrage…', tone: 'warning' },
-  exited: { label: 'Arrêtée', tone: 'muted' },
-  stopped: { label: 'Arrêtée', tone: 'muted' },
-  unknown: { label: 'Inconnu', tone: 'muted' },
-}
-
-function statusView(status: string): { label: string; tone: 'success' | 'warning' | 'danger' | 'muted' } {
-  const base = status.split(':')[0] ?? status
-  if (base === 'running') {
-    return status.includes('unhealthy')
-      ? { label: 'Healthcheck en échec', tone: 'warning' }
-      : { label: 'En ligne', tone: 'success' }
-  }
-  return STATUS[base] ?? { label: status, tone: 'muted' }
-}
-
-const TONE: Record<string, string> = {
-  success: 'bg-success',
-  warning: 'bg-warning',
-  danger: 'bg-destructive',
-  muted: 'bg-muted-foreground/50',
-}
-
-/** Bases managées du projet : PostgreSQL et Redis privés, injectés par variables. */
+/**
+ * Hub « Bases de données & services » : capacités d’instance, ressources actives et catalogue unifié
+ * (moteurs runtime + indexation de services) sans duplication.
+ */
 export function ProjectDatabases({ projectId }: { projectId: string }) {
   const [data, setData] = useState<DatabasesResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState<string | null>(null)
   const [working, setWorking] = useState<string | null>(null)
-  const [confirm, setConfirm] = useState<{ kind: ConfirmKind; database: ManagedDatabase } | null>(null)
+  const [confirm, setConfirm] = useState<ConfirmState>(null)
   const [feedback, setFeedback] = useState<Feedback>(null)
   const [lastDeployment, setLastDeployment] = useState<string | null>(null)
+  const [selected, setSelected] = useState<UnifiedService | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -93,6 +62,16 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
     void load()
   }, [load])
 
+  const model = useMemo(() => {
+    if (!data) return null
+    return buildServicesHubModel({
+      databases: data.databases ?? [],
+      engines: data.engines ?? data.available ?? [],
+      runtime: data.runtime ?? null,
+      canManage: data.canManage,
+    })
+  }, [data])
+
   async function create(kind: string) {
     setCreating(kind)
     setFeedback(null)
@@ -109,6 +88,7 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
       }
       setFeedback({ tone: 'success', message: body.message ?? 'Base créée.' })
       if (body.deploymentId) setLastDeployment(body.deploymentId)
+      setSelected(null)
       await load()
     } catch {
       setFeedback({ tone: 'error', message: 'Impossible de contacter le serveur.' })
@@ -117,7 +97,7 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
     }
   }
 
-  async function act(database: ManagedDatabase, action: Action) {
+  async function act(database: ManagedDatabaseView, action: ResourceAction) {
     setWorking(database.id)
     setFeedback(null)
     try {
@@ -131,7 +111,11 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
         setFeedback({ tone: 'error', message: body.error ?? 'Action impossible.' })
         return
       }
-      setFeedback({ tone: 'success', message: action === 'stop' ? 'Base arrêtée.' : action === 'restart' ? 'Redémarrage lancé.' : 'Base démarrée.' })
+      setFeedback({
+        tone: 'success',
+        message:
+          action === 'stop' ? 'Base arrêtée.' : action === 'restart' ? 'Redémarrage lancé.' : 'Base démarrée.',
+      })
       setConfirm(null)
       await load()
     } catch {
@@ -141,7 +125,7 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
     }
   }
 
-  async function remove(database: ManagedDatabase) {
+  async function remove(database: ManagedDatabaseView) {
     setWorking(database.id)
     setFeedback(null)
     try {
@@ -162,13 +146,13 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
     }
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Chargement des bases…</p>
-  if (!data) return null
+  if (loading) return <p className="text-sm text-muted-foreground">Chargement des services et des ressources…</p>
+  if (!data || !model) return null
 
-  const canManage = data.canManage
+  const canManage = model.canManage
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {feedback && (
         <p
           role={feedback.tone === 'error' ? 'alert' : 'status'}
@@ -190,89 +174,57 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
         </p>
       )}
 
-      {data.databases.length > 0 && (
-        <ul className="space-y-2">
-          {data.databases.map((database) => {
-            const view = statusView(database.status)
-            const stopped = database.status.startsWith('exited') || database.status.startsWith('stopped')
-            return (
-              <li key={database.id} className="rounded-lg border border-border p-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                      <Database className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                      {database.label}
-                      <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">{database.envKey}</span>
-                    </p>
-                    <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span aria-hidden="true" className={cn('h-2 w-2 rounded-full', TONE[view.tone])} />
-                      {view.label}
-                      <span>· créée le {new Date(database.createdAt).toLocaleDateString('fr-FR')}</span>
-                    </p>
-                    {database.error && <p className="mt-1 text-xs text-warning">Statut indisponible : {database.error}</p>}
-                  </div>
-                  {canManage && (
-                    <div className="flex flex-wrap gap-2">
-                      {stopped ? (
-                        <Button type="button" size="sm" loading={working === database.id} onClick={() => void act(database, 'start')}>
-                          <Play className="h-3.5 w-3.5" aria-hidden="true" />
-                          Démarrer
-                        </Button>
-                      ) : (
-                        <>
-                          <Button type="button" variant="outline" size="sm" loading={working === database.id} onClick={() => setConfirm({ kind: 'restart', database })}>
-                            <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />
-                            Redémarrer
-                          </Button>
-                          <Button type="button" variant="destructive" size="sm" loading={working === database.id} onClick={() => setConfirm({ kind: 'stop', database })}>
-                            <Square className="h-3.5 w-3.5" aria-hidden="true" />
-                            Arrêter
-                          </Button>
-                        </>
-                      )}
-                      <Button type="button" variant="ghost" size="sm" onClick={() => void load()}>
-                        <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-                        Actualiser
-                      </Button>
-                      <Button type="button" variant="ghost" size="sm" loading={working === database.id} onClick={() => setConfirm({ kind: 'delete', database })}>
-                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        Supprimer
-                      </Button>
-                    </div>
-                  )}
-                </div>
-                {database.kind === 'postgresql' && <DatabaseBackups projectId={projectId} databaseId={database.id} />}
-              </li>
-            )
-          })}
-        </ul>
-      )}
+      <InstanceCapabilitiesPanel runtime={model.runtime} />
 
-      {canManage && data.available.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {data.available.map((item) => (
-            <Button
-              key={item.kind}
-              type="button"
-              variant="outline"
-              loading={creating === item.kind}
-              onClick={() => void create(item.kind)}
-            >
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              Créer {item.label}
-            </Button>
-          ))}
+      <section aria-labelledby="services-active-title" className="space-y-3">
+        <div>
+          <h3 id="services-active-title" className="text-sm font-semibold">Ressources actives</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">Bases et services provisionnés pour ce projet.</p>
         </div>
-      )}
+        <ActiveResources
+          projectId={projectId}
+          databases={model.activeDatabases}
+          canManage={canManage}
+          workingId={working}
+          onRefresh={() => void load()}
+          onRequestAction={(database, action) => {
+            if (action === 'start') void act(database, 'start')
+            else setConfirm({ kind: action, database })
+          }}
+          onRequestDelete={(database) => setConfirm({ kind: 'delete', database })}
+        />
+      </section>
 
-      {data.databases.length === 0 && !canManage && (
-        <p className="text-sm text-muted-foreground">Aucune base managée. Un administrateur peut en créer une.</p>
-      )}
+      <section aria-labelledby="services-catalog-title" className="space-y-3">
+        <div>
+          <h3 id="services-catalog-title" className="text-sm font-semibold">Ajouter un service</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Catalogue unifié des bases et services : disponibilité réelle sur cette instance, capacités (sauvegarde,
+            restauration, provider) et services référencés (Coolify one-click, EFLEX-géré, à venir). Ouvrez un service pour
+            voir sa compatibilité et, si possible, le provisionner.
+          </p>
+        </div>
+        <ServicesBrowser services={model.services} canManage={canManage} onOpen={setSelected} />
+      </section>
 
       <p className="text-xs text-muted-foreground">
-        La base est privée, accessible uniquement depuis le réseau Docker de l’application. Son URL est
-        chiffrée et injectée comme variable d’environnement au prochain déploiement.
+        Les ressources sont privées, accessibles depuis le réseau Docker de l’application. Les URLs/credentials sont
+        chiffrés et injectés comme variables d’environnement au prochain déploiement lorsque nécessaire. Les capacités
+        dépendent du moteur et de l’instance.
       </p>
+
+      <ServiceDetailDialog
+        service={selected}
+        canManage={canManage}
+        creating={creating !== null}
+        onClose={() => !creating && setSelected(null)}
+        onCreate={(kind) => void create(kind)}
+        onViewActive={(kind) => {
+          setSelected(null)
+          const el = document.getElementById(`resource-${kind}`)
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }}
+      />
 
       <ConfirmDialog
         open={confirm?.kind === 'restart'}

@@ -4,7 +4,13 @@ import type { ProjectDatabase } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { audit } from '@/lib/audit'
 import { canManageProjects } from '@/lib/organizations'
-import { DATABASE_KINDS, createProjectDatabase, isDatabaseKind, refreshProjectDatabase } from '@/lib/project-databases'
+import {
+  DATABASE_KINDS,
+  createProjectDatabase,
+  isDatabaseKind,
+  listManagedDatabaseCatalog,
+  refreshProjectDatabase,
+} from '@/lib/project-databases'
 import { checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { requireManagedProject, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
@@ -50,14 +56,37 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     }),
   )
 
+  const catalog = await listManagedDatabaseCatalog()
+  const createdKinds = new Set(databases.map((database) => database.kind))
+  const engines = catalog.engines.map((engine) => ({
+    kind: engine.kind,
+    label: engine.label,
+    envKey: engine.envKey,
+    envAliases: engine.envAliases ?? [],
+    description: engine.description,
+    backupSupported: engine.backupSupported,
+    restoreSupported: engine.restoreSupported,
+    provider: engine.provider,
+    provisionSupported: engine.provisionSupported,
+    lifecycleSupported: engine.lifecycleSupported,
+    notes: engine.notes,
+    ...(engine.reason ? { reason: engine.reason } : {}),
+    created: createdKinds.has(engine.kind),
+  }))
+  const available = engines.filter((engine) => engine.provisionSupported && !engine.created)
+
   return NextResponse.json(
     {
       databases,
       canManage: canManageProjects(org.role),
-      available: [
-        { kind: 'postgresql', ...DATABASE_KINDS.postgresql },
-        { kind: 'redis', ...DATABASE_KINDS.redis },
-      ].filter((item) => !databases.some((database) => database.kind === item.kind)),
+      available,
+      engines,
+      runtime: {
+        version: catalog.runtime.version,
+        reachable: catalog.runtime.reachable,
+        databaseApiAvailable: catalog.runtime.databaseApiAvailable ?? null,
+        checkedAt: catalog.runtime.checkedAt ?? null,
+      },
     },
     { headers: { 'Cache-Control': 'no-store, max-age=0' } },
   )
@@ -122,6 +151,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     details: { projectId: project.id, kind: result.database.kind, deploymentId: result.deploymentId },
     request,
   })
+  const label = DATABASE_KINDS[parsed.data.kind].label
+  const primaryKey = DATABASE_KINDS[parsed.data.kind].envKey
+  const aliases = DATABASE_KINDS[parsed.data.kind].envAliases ?? []
+  const varsHint = aliases.length > 0 ? `${primaryKey} (+ alias compatibles si disponibles)` : primaryKey
+
   return NextResponse.json(
     {
       database: {
@@ -132,8 +166,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       deploymentId: result.deploymentId,
       ready: result.ready,
       message: result.ready
-        ? `Base ${DATABASE_KINDS[parsed.data.kind].label} créée. La variable ${DATABASE_KINDS[parsed.data.kind].envKey} est injectée au prochain déploiement.`
-        : `Base ${DATABASE_KINDS[parsed.data.kind].label} en cours de démarrage. La variable ${DATABASE_KINDS[parsed.data.kind].envKey} est déjà enregistrée : relancez le déploiement quand la base est en ligne.`,
+        ? result.deploymentId
+          ? `Base ${label} créée. Les variables de connexion (${varsHint}) sont injectées et un déploiement a été lancé.`
+          : `Base ${label} créée. Les variables de connexion (${varsHint}) seront injectées au prochain déploiement.`
+        : `Base ${label} en cours de démarrage. Les variables de connexion (${varsHint}) sont enregistrées : relancez le déploiement quand la base est en ligne.`,
     },
     { status: 201 },
   )
