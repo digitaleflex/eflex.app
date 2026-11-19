@@ -10,6 +10,16 @@
 import type { BuildPlan } from '@eflex/detector'
 import { deploymentSlug, getPrimaryApp } from '@/lib/project-apps'
 
+export type DockerImagePlan = {
+  version: 1
+  source: 'docker-image'
+  framework: 'docker'
+  runtime: string
+  root: string
+  port: number
+  image: string
+}
+
 export interface DeploymentDomain {
   hostname: string
   verifiedAt: Date | null
@@ -50,8 +60,21 @@ export interface DeploymentContext {
   primary: boolean
 }
 
-/** Un `BuildPlan` minimal exploitable par le worker. */
+export function isDockerImagePlan(value: unknown): value is DockerImagePlan {
+  if (typeof value !== 'object' || value === null) return false
+  const plan = value as Record<string, unknown>
+  return (
+    plan.source === 'docker-image' &&
+    typeof plan.image === 'string' &&
+    plan.image.trim().length > 0 &&
+    typeof plan.port === 'number' &&
+    Number.isFinite(plan.port)
+  )
+}
+
+/** Un `BuildPlan` minimal exploitable par le worker (inclut les plans source image Docker). */
 export function isBuildPlan(value: unknown): value is BuildPlan {
+  if (isDockerImagePlan(value)) return true
   return typeof value === 'object' && value !== null && 'framework' in value && 'port' in value
 }
 

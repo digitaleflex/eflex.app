@@ -206,14 +206,26 @@ export function deploymentKind(plan: BuildPlan, artifacts: DeploymentArtifacts):
   return artifacts.services.length > 1 ? 'multiple-without-compose' : 'single'
 }
 
+export function isDockerImageSourcePlan(plan: unknown): boolean {
+  return Boolean(plan && typeof plan === 'object' && (plan as Record<string, unknown>).source === 'docker-image' && typeof (plan as Record<string, unknown>).image === 'string')
+}
+
+export function dockerImageRef(plan: unknown): string | null {
+  if (!plan || typeof plan !== 'object') return null
+  const image = (plan as Record<string, unknown>).image
+  return typeof image === 'string' && image.trim() ? image.trim() : null
+}
+
 /**
  * Mode de construction réellement utilisé par Coolify pour ce plan (affichage
  * et logique portail). Le renderer n'expose que dockercompose/dockerfile ; les
  * frameworks sans Dockerfile ni compose fourni sont construits avec Nixpacks.
+ * Un plan source `docker-image` est déployé depuis une image de registre.
  */
 export function effectiveBuildPack(
   plan: BuildPlan,
-): 'dockercompose' | 'dockerfile' | 'nixpacks' {
+): 'dockercompose' | 'dockerfile' | 'nixpacks' | 'dockerimage' {
+  if (isDockerImageSourcePlan(plan)) return 'dockerimage'
   if (plan.framework === 'compose') return 'dockercompose'
   if (plan.framework === 'docker') return 'dockerfile'
   return 'nixpacks'

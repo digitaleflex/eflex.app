@@ -351,10 +351,96 @@ export async function createApplication(
 }
 
 /** Met à jour les commandes, le dossier de travail et le port d'une application existante. */
+export interface CreateDockerImageApplicationParams {
+  name: string
+  /** Référence complète de l'image (registre/nom:tag ou @digest). */
+  dockerRegistryImageName: string
+  portsExposes?: string
+  domains?: readonly string[]
+  customLabels?: string[]
+}
+
+function splitDockerImageRef(ref: string): { name: string; tag: string } {
+  const value = ref.trim()
+  // Digest: garder tel quel dans le nom, tag vide.
+  if (value.includes('@')) return { name: value, tag: '' }
+  const lastSlash = value.lastIndexOf('/')
+  const lastColon = value.lastIndexOf(':')
+  if (lastColon > lastSlash) {
+    return { name: value.slice(0, lastColon), tag: value.slice(lastColon + 1) || 'latest' }
+  }
+  return { name: value, tag: 'latest' }
+}
+
+export async function createDockerImageApplication(
+  params: CreateDockerImageApplicationParams,
+): Promise<{ id: string } | { error: string }> {
+  try {
+    const target = await resolveTarget()
+    const hosts = (params.domains ?? [])
+      .map(normalizeHost)
+      .filter((host) => host.length > 0)
+    const image = splitDockerImageRef(params.dockerRegistryImageName)
+    const payload: Record<string, unknown> = {
+      name: params.name,
+      project_uuid: target.projectUuid,
+      server_uuid: target.serverUuid,
+      environment_name: target.environmentName,
+      docker_registry_image_name: image.name,
+      docker_registry_image_tag: image.tag,
+      ports_exposes: params.portsExposes ?? '80',
+      connect_to_docker_network: true,
+      autogenerate_domain: false,
+      is_auto_deploy_enabled: false,
+    }
+    if (hosts.length > 0) {
+      payload.domains = hosts.map((host) => `https://${host}`).join(',')
+      const labels = params.customLabels ?? []
+      if (labels.length > 0) {
+        payload.custom_labels = Buffer.from(labels.join('\n'), 'utf8').toString('base64')
+        payload.is_container_label_readonly_enabled = false
+      } else {
+        payload.is_container_label_readonly_enabled = true
+      }
+    } else {
+      payload.is_container_label_readonly_enabled = true
+    }
+
+    const res = await coolifyFetch<{ uuid?: string }>('/applications/dockerimage', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    if (res.error) return { error: res.error }
+    if (!res.data?.uuid) return { error: "L’hébergement n’a pas renvoyé l’identifiant de l’application." }
+    return { id: res.data.uuid }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Erreur d’hébergement inconnue.' }
+  }
+}
+
+export async function updateDockerImageApplication(
+  appId: string,
+  params: { dockerRegistryImageName?: string; portsExposes?: string },
+): Promise<{ ok: true } | { error: string }> {
+  const payload: Record<string, unknown> = {}
+  if (params.dockerRegistryImageName) {
+    const image = splitDockerImageRef(params.dockerRegistryImageName)
+    payload.docker_registry_image_name = image.name
+    payload.docker_registry_image_tag = image.tag
+  }
+  if (params.portsExposes !== undefined) payload.ports_exposes = params.portsExposes
+  const res = await coolifyFetch(`/applications/${encodeURIComponent(appId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+  if (res.error) return { error: res.error }
+  return { ok: true }
+}
+
 export async function updateApplication(
   appId: string,
   params: {
-    buildPack?: 'dockercompose' | 'dockerfile' | 'nixpacks'
+    buildPack?: 'dockercompose' | 'dockerfile' | 'nixpacks' | 'dockerimage'
     baseDirectory?: string | null
     dockerfileLocation?: string | null
     dockerComposeLocation?: string | null
