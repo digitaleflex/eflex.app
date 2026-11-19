@@ -1,4 +1,14 @@
-import { createOneClickService, deleteServiceInstance, getServiceInstance, listTargetServices, restartService, startService, stopService, type CoolifyServiceInstance } from '@/lib/coolify'
+import {
+  coolifyFetch,
+  createOneClickService,
+  deleteServiceInstance,
+  getServiceInstance,
+  listTargetServices,
+  restartService,
+  startService,
+  stopService,
+  type CoolifyServiceInstance,
+} from '@/lib/coolify'
 import { MANAGED_SERVICES_CATALOG } from '@/lib/managed-services-catalog'
 
 export type ProjectServiceView = {
@@ -84,6 +94,37 @@ export async function serviceAction(serviceId: string, action: 'start' | 'stop' 
   if (action === 'start') return startService(serviceId)
   if (action === 'stop') return stopService(serviceId)
   return restartService(serviceId)
+}
+
+export type ServiceEnvKeyView = {
+  key: string
+  isBuildTime: boolean
+  isPreview: boolean
+}
+
+function parseEnvKeys(raw: unknown): ServiceEnvKeyView[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const key = typeof row.key === 'string' ? row.key : null
+      if (!key) return null
+      return {
+        key,
+        isBuildTime: row.is_build_time === true || row.isBuildTime === true,
+        isPreview: row.is_preview === true || row.isPreview === true,
+      }
+    })
+    .filter((item): item is ServiceEnvKeyView => item !== null)
+    .sort((a, b) => a.key.localeCompare(b.key))
+}
+
+/** Liste les clés de variables d’un service (sans valeurs sensibles). */
+export async function listServiceEnvKeys(serviceId: string): Promise<{ keys: ServiceEnvKeyView[] } | { error: string }> {
+  const res = await coolifyFetch<unknown>(`/services/${encodeURIComponent(serviceId)}/envs`)
+  if (res.error) return { error: res.error }
+  return { keys: parseEnvKeys(res.data) }
 }
 
 export { deleteServiceInstance, getServiceInstance }
