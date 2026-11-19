@@ -466,6 +466,58 @@ export async function deployApplicationCommit(
   return { deploymentId }
 }
 
+export interface RollbackImage {
+  /** Identifiant de commit (SHA complet ou court selon Coolify). */
+  commit: string
+  /** Référence d'image/étiquette si fournie par Coolify. */
+  image?: string | null
+  /** Date de création si fournie. */
+  createdAt?: string | null
+}
+
+function normalizeRollbackImages(raw: unknown): RollbackImage[] {
+  if (!Array.isArray(raw)) return []
+  const images: RollbackImage[] = []
+  for (const item of raw) {
+    if (typeof item === 'string') {
+      const commit = item.trim()
+      if (commit) images.push({ commit })
+      continue
+    }
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const commit = [row.commit, row.sha, row.git_commit_sha, row.commit_sha, row.image, row.tag]
+      .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      ?.trim()
+    if (!commit) continue
+    const image = [row.image, row.image_name, row.tag]
+      .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      ?.trim() ?? null
+    const createdAt = [row.created_at, row.createdAt, row.date]
+      .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      ?.trim() ?? null
+    images.push({ commit, image, createdAt })
+  }
+  return images
+}
+
+/**
+ * Images/commits disponibles pour un retour arrière côté Coolify (`GET /applications/{uuid}/rollback-images`).
+ * Permet à l'interface d'indiquer quelles versions peuvent réellement être restaurées.
+ */
+export async function getApplicationRollbackImages(
+  appId: string,
+): Promise<{ images: RollbackImage[] } | { error: string }> {
+  const res = await coolifyFetch<unknown>(`/applications/${encodeURIComponent(appId)}/rollback-images`)
+  if (res.error) {
+    if (res.error.includes('Hébergement API 404') || res.error.includes('Hébergement API 405')) {
+      return { images: [] }
+    }
+    return { error: res.error }
+  }
+  return { images: normalizeRollbackImages(res.data) }
+}
+
 /** Statut d'un déploiement (`queued`, `in_progress`, `finished`, `failed`…). */
 export async function getDeploymentStatus(
   deploymentId: string,
@@ -1092,6 +1144,95 @@ export async function getApplicationRuntime(
   }
 }
 
+export interface ApplicationAdvancedConfig {
+  healthCheckEnabled: boolean
+  healthCheckPath: string
+  healthCheckMethod: string
+  healthCheckPort: string
+  healthCheckHost: string
+  healthCheckScheme: string
+  healthCheckReturnCode: number
+  healthCheckResponseText: string
+  healthCheckInterval: number
+  healthCheckTimeout: number
+  healthCheckRetries: number
+  healthCheckStartPeriod: number
+  watchPaths: string
+}
+
+function str(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback
+}
+function num(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value)) ? Number(value) : fallback
+}
+
+export async function getApplicationAdvancedConfig(
+  appId: string,
+): Promise<ApplicationAdvancedConfig | { error: string }> {
+  const res = await coolifyFetch<Record<string, unknown>>(`/applications/${encodeURIComponent(appId)}`)
+  if (res.error) return { error: res.error }
+  const d = res.data ?? {}
+  return {
+    healthCheckEnabled: d.health_check_enabled === true,
+    healthCheckPath: str(d.health_check_path, '/'),
+    healthCheckMethod: str(d.health_check_method, 'GET'),
+    healthCheckPort: str(d.health_check_port, ''),
+    healthCheckHost: str(d.health_check_host, ''),
+    healthCheckScheme: str(d.health_check_scheme, 'http'),
+    healthCheckReturnCode: num(d.health_check_return_code, 200),
+    healthCheckResponseText: str(d.health_check_response_text, ''),
+    healthCheckInterval: num(d.health_check_interval, 5),
+    healthCheckTimeout: num(d.health_check_timeout, 5),
+    healthCheckRetries: num(d.health_check_retries, 10),
+    healthCheckStartPeriod: num(d.health_check_start_period, 30),
+    watchPaths: str(d.watch_paths, ''),
+  }
+}
+
+export type ApplicationAdvancedConfigPatch = Partial<{
+  healthCheckEnabled: boolean
+  healthCheckPath: string
+  healthCheckMethod: string
+  healthCheckPort: string
+  healthCheckHost: string
+  healthCheckScheme: string
+  healthCheckReturnCode: number
+  healthCheckResponseText: string
+  healthCheckInterval: number
+  healthCheckTimeout: number
+  healthCheckRetries: number
+  healthCheckStartPeriod: number
+  watchPaths: string
+}>
+
+export async function updateApplicationAdvancedConfig(
+  appId: string,
+  patch: ApplicationAdvancedConfigPatch,
+): Promise<{ ok: true } | { error: string }> {
+  const payload: Record<string, unknown> = {}
+  if (patch.healthCheckEnabled !== undefined) payload.health_check_enabled = patch.healthCheckEnabled
+  if (patch.healthCheckPath !== undefined) payload.health_check_path = patch.healthCheckPath
+  if (patch.healthCheckMethod !== undefined) payload.health_check_method = patch.healthCheckMethod
+  if (patch.healthCheckPort !== undefined) payload.health_check_port = patch.healthCheckPort
+  if (patch.healthCheckHost !== undefined) payload.health_check_host = patch.healthCheckHost
+  if (patch.healthCheckScheme !== undefined) payload.health_check_scheme = patch.healthCheckScheme
+  if (patch.healthCheckReturnCode !== undefined) payload.health_check_return_code = patch.healthCheckReturnCode
+  if (patch.healthCheckResponseText !== undefined) payload.health_check_response_text = patch.healthCheckResponseText
+  if (patch.healthCheckInterval !== undefined) payload.health_check_interval = patch.healthCheckInterval
+  if (patch.healthCheckTimeout !== undefined) payload.health_check_timeout = patch.healthCheckTimeout
+  if (patch.healthCheckRetries !== undefined) payload.health_check_retries = patch.healthCheckRetries
+  if (patch.healthCheckStartPeriod !== undefined) payload.health_check_start_period = patch.healthCheckStartPeriod
+  if (patch.watchPaths !== undefined) payload.watch_paths = patch.watchPaths
+  if (Object.keys(payload).length === 0) return { ok: true }
+  const res = await coolifyFetch(`/applications/${encodeURIComponent(appId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+  if (res.error) return { error: res.error }
+  return { ok: true }
+}
+
 /**
  * Attache les domaines d'une application compose, sans jamais envoyer
  * `domains` (refusé en 422 par Coolify pour `build_pack=dockercompose`).
@@ -1150,6 +1291,146 @@ export async function applicationAction(
   })
   if (res.error) return { error: res.error }
   return { ok: true }
+}
+
+export interface ScheduledTask {
+  id: string
+  name: string
+  command: string
+  frequency: string
+  enabled: boolean
+  containerName?: string | null
+}
+
+export interface ScheduledTaskExecution {
+  id: string
+  status: string
+  createdAt: string | null
+  finishedAt: string | null
+  message?: string | null
+}
+
+function parseScheduledTask(raw: unknown): ScheduledTask | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as Record<string, unknown>
+  const id = typeof row.uuid === 'string' ? row.uuid : typeof row.id === 'number' || typeof row.id === 'string' ? String(row.id) : null
+  if (!id) return null
+  const name = typeof row.name === 'string' && row.name.trim() ? row.name : 'Tâche planifiée'
+  const command = typeof row.command === 'string' ? row.command : ''
+  const frequency = typeof row.frequency === 'string' ? row.frequency : typeof row.cron === 'string' ? row.cron : ''
+  const enabled = row.enabled !== false && row.is_enabled !== false
+  const containerName =
+    typeof row.container_name === 'string' ? row.container_name : typeof row.containerName === 'string' ? row.containerName : null
+  return { id, name, command, frequency, enabled, containerName }
+}
+
+function parseScheduledTaskExecution(raw: unknown): ScheduledTaskExecution | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as Record<string, unknown>
+  const id = typeof row.uuid === 'string' ? row.uuid : typeof row.id === 'number' || typeof row.id === 'string' ? String(row.id) : null
+  if (!id) return null
+  const status = typeof row.status === 'string' ? row.status : 'unknown'
+  const createdAt = typeof row.created_at === 'string' ? row.created_at : typeof row.createdAt === 'string' ? row.createdAt : null
+  const finishedAt = typeof row.finished_at === 'string' ? row.finished_at : typeof row.finishedAt === 'string' ? row.finishedAt : null
+  const message = typeof row.message === 'string' ? row.message : typeof row.output === 'string' ? row.output : null
+  return { id, status, createdAt, finishedAt, message }
+}
+
+export async function listScheduledTasks(
+  appId: string,
+): Promise<{ tasks: ScheduledTask[] } | { error: string }> {
+  const res = await coolifyFetch<unknown>(`/applications/${encodeURIComponent(appId)}/scheduled-tasks`)
+  if (res.error) return { error: res.error }
+  if (!Array.isArray(res.data)) return { tasks: [] }
+  return { tasks: res.data.map(parseScheduledTask).filter((item): item is ScheduledTask => item !== null) }
+}
+
+export async function createScheduledTask(
+  appId: string,
+  input: { name: string; command: string; frequency: string; containerName?: string; enabled?: boolean },
+): Promise<{ id: string } | { error: string }> {
+  const payload: Record<string, unknown> = {
+    name: input.name,
+    command: input.command,
+    frequency: input.frequency,
+    enabled: input.enabled !== false,
+  }
+  if (input.containerName) payload.container_name = input.containerName
+  const res = await coolifyFetch<{ uuid?: unknown; id?: unknown }>(
+    `/applications/${encodeURIComponent(appId)}/scheduled-tasks`,
+    { method: 'POST', body: JSON.stringify(payload) },
+  )
+  if (res.error) return { error: res.error }
+  const id =
+    typeof res.data?.uuid === 'string'
+      ? res.data.uuid
+      : typeof res.data?.id === 'string' || typeof res.data?.id === 'number'
+        ? String(res.data.id)
+        : null
+  if (!id) return { error: "L’hébergement n’a pas renvoyé l’identifiant de la tâche." }
+  return { id }
+}
+
+export async function updateScheduledTask(
+  appId: string,
+  taskId: string,
+  input: { name?: string; command?: string; frequency?: string; containerName?: string | null; enabled?: boolean },
+): Promise<{ ok: true } | { error: string }> {
+  const payload: Record<string, unknown> = {}
+  if (input.name !== undefined) payload.name = input.name
+  if (input.command !== undefined) payload.command = input.command
+  if (input.frequency !== undefined) payload.frequency = input.frequency
+  if (input.enabled !== undefined) payload.enabled = input.enabled
+  if (input.containerName !== undefined) payload.container_name = input.containerName
+  const res = await coolifyFetch(
+    `/applications/${encodeURIComponent(appId)}/scheduled-tasks/${encodeURIComponent(taskId)}`,
+    { method: 'PATCH', body: JSON.stringify(payload) },
+  )
+  if (res.error) return { error: res.error }
+  return { ok: true }
+}
+
+export async function deleteScheduledTask(
+  appId: string,
+  taskId: string,
+): Promise<{ ok: true } | { error: string }> {
+  const res = await coolifyFetch(
+    `/applications/${encodeURIComponent(appId)}/scheduled-tasks/${encodeURIComponent(taskId)}`,
+    { method: 'DELETE' },
+  )
+  if (res.error) {
+    if (res.error.includes('Hébergement API 404')) return { ok: true }
+    return { error: res.error }
+  }
+  return { ok: true }
+}
+
+export async function executeScheduledTask(
+  appId: string,
+  taskId: string,
+): Promise<{ ok: true } | { error: string }> {
+  const res = await coolifyFetch(
+    `/applications/${encodeURIComponent(appId)}/scheduled-tasks/${encodeURIComponent(taskId)}/execute`,
+    { method: 'POST' },
+  )
+  if (res.error) return { error: res.error }
+  return { ok: true }
+}
+
+export async function listScheduledTaskExecutions(
+  appId: string,
+  taskId: string,
+): Promise<{ executions: ScheduledTaskExecution[] } | { error: string }> {
+  const res = await coolifyFetch<unknown>(
+    `/applications/${encodeURIComponent(appId)}/scheduled-tasks/${encodeURIComponent(taskId)}/executions`,
+  )
+  if (res.error) return { error: res.error }
+  if (!Array.isArray(res.data)) return { executions: [] }
+  return {
+    executions: res.data
+      .map(parseScheduledTaskExecution)
+      .filter((item): item is ScheduledTaskExecution => item !== null),
+  }
 }
 
 /**
