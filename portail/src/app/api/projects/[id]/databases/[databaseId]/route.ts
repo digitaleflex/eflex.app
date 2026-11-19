@@ -34,8 +34,10 @@ export async function DELETE(
   const { id, databaseId } = await params
   const databaseResult = await requireProjectDatabase(org, id, databaseId, {
     id: true,
+    projectId: true,
     kind: true,
     coolifyId: true,
+    internalUrl: true,
     project: {
       select: {
         id: true,
@@ -50,8 +52,10 @@ export async function DELETE(
   if ('response' in databaseResult) return databaseResult.response
   const database = databaseResult.database as unknown as {
     id: string
+    projectId: string
     kind: string
     coolifyId: string
+    internalUrl: string
     project: {
       id: string
       slug: string
