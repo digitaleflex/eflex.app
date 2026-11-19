@@ -712,7 +712,16 @@ export async function ensureApplicationStorages(
   return { applications: res.data ?? [] }
 }
 
-export type ManagedDatabaseKind = 'postgresql' | 'redis'
+export type ManagedDatabaseKind =
+  | 'postgresql'
+  | 'redis'
+  | 'mysql'
+  | 'mariadb'
+  | 'mongodb'
+  | 'clickhouse'
+  | 'dragonfly'
+  | 'keydb'
+  | 'sqlite'
 
 export interface ManagedDatabaseInfo {
   id: string
@@ -721,7 +730,7 @@ export interface ManagedDatabaseInfo {
   name: string
 }
 
-/** Crée une base PostgreSQL ou Redis privée sur l'infrastructure. */
+/** Crée une base de données managée privée sur l'infrastructure. */
 export async function createManagedDatabase(
   kind: ManagedDatabaseKind,
   name: string,
@@ -808,6 +817,7 @@ export interface DatabaseBackupSchedule {
   frequency: string
   enabled: boolean
   saveS3: boolean
+  s3StorageId: string | null
   executions: DatabaseBackupExecution[]
 }
 
@@ -849,11 +859,14 @@ function parseBackupSchedule(raw: unknown): DatabaseBackupSchedule | null {
     .map(parseExecution)
     .filter((item): item is DatabaseBackupExecution => item !== null)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const s3Raw = row.s3_storage_uuid ?? row.s3_storage_id
+  const s3StorageId = typeof s3Raw === 'string' && s3Raw !== '' ? s3Raw : null
   return {
     id,
     frequency: typeof row.frequency === 'string' ? row.frequency : '',
     enabled: row.enabled === true || row.enabled === 1,
     saveS3: row.save_s3 === true || row.save_s3 === 1,
+    s3StorageId,
     executions,
   }
 }
@@ -906,6 +919,32 @@ export async function runDatabaseBackup(
   const res = await coolifyFetch(
     `/databases/${encodeURIComponent(databaseId)}/backups/${encodeURIComponent(scheduleId)}`,
     { method: 'PATCH', body: JSON.stringify({ backup_now: true }) },
+  )
+  if (res.error) return { error: res.error }
+  return { ok: true }
+}
+
+/** Met à jour une planification (fréquence, rétention, copie S3) sans déclencher de sauvegarde. */
+export async function updateDatabaseBackup(
+  databaseId: string,
+  scheduleId: string,
+  options: DatabaseBackupOptions & { enabled?: boolean },
+): Promise<{ ok: true } | { error: string }> {
+  const res = await coolifyFetch(
+    `/databases/${encodeURIComponent(databaseId)}/backups/${encodeURIComponent(scheduleId)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        frequency: options.frequency,
+        enabled: options.enabled ?? true,
+        dump_all: false,
+        save_s3: Boolean(options.s3StorageUuid),
+        ...(options.s3StorageUuid
+          ? { s3_storage_uuid: options.s3StorageUuid, database_backup_retention_amount_s3: options.retentionS3 }
+          : {}),
+        database_backup_retention_amount_locally: options.retentionLocal,
+      }),
+    },
   )
   if (res.error) return { error: res.error }
   return { ok: true }

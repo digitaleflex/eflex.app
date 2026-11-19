@@ -437,3 +437,13 @@
   --info: 199 89% 66%;
   --destructive: 0 85% 68%;
 }
+
+/* Icônes de services/bases : plaque teintée par la couleur de marque (cohérent avec .framework-icon) */
+.service-icon {
+  background-color: rgb(var(--brand-rgb) / 0.12);
+  color: rgb(var(--brand-rgb));
+}
+.dark .service-icon {
+  background-color: rgb(var(--brand-rgb) / 0.18);
+  color: rgb(var(--brand-rgb));
+}

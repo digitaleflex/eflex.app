@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { ServiceIcon } from '@/components/service-icon'
 
 /**
  * Pilotage de Coolify depuis l'administration : serveurs, stockages S3, sécurité des images,
@@ -362,7 +363,7 @@ function StoragesTab() {
     setOpen(false)
     setFeedback({
       tone: 'success',
-      message: `Stockage créé (${result.data.id}). Pour l’utiliser pour les sauvegardes, mettez cet identifiant dans COOLIFY_BACKUP_S3_STORAGE_UUID puis redéployez.`,
+      message: `Stockage créé (${result.data.id}). Pour l’utiliser pour les sauvegardes, mettez cet identifiant dans COOLIFY_BACKUP_S3_STORAGE_UUID puis redéployez ; E-FLEX tentera ensuite d’appliquer la copie S3 aux planifications existantes.`,
     })
     await reload()
   }
@@ -869,11 +870,146 @@ function OpsToolsTab() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Capacités                                                           */
+/* ------------------------------------------------------------------ */
+
+interface EngineCapabilityRow {
+  kind: string
+  label: string
+  envKey: string
+  provisionSupported: boolean
+  lifecycleSupported: boolean
+  backupSupported: boolean
+  restoreSupported: boolean
+  provider: string
+  reason?: string
+  notes: string[]
+}
+
+function CapabilitiesTab() {
+  const [forceKey, setForceKey] = useState(0)
+  const { data, error, loading, reload } = useLoad<{
+    runtime: { version: string | null; reachable: boolean; databaseApiAvailable?: boolean | null; checkedAt: number }
+    engines: EngineCapabilityRow[]
+  }>(forceKey > 0 ? '/capabilities?force=1' : '/capabilities')
+
+  const refresh = useCallback(
+    async (force = false) => {
+      if (force) setForceKey((value) => value + 1)
+      await reload()
+    },
+    [reload],
+  )
+
+  useEffect(() => {
+    if (forceKey > 0) void reload()
+  }, [forceKey, reload])
+
+  const dbApiTone =
+    data?.runtime.databaseApiAvailable === true ? 'ok' : data?.runtime.databaseApiAvailable === false ? 'bad' : 'warn'
+  const dbApiLabel =
+    data?.runtime.databaseApiAvailable === true
+      ? 'API bases managées : disponible'
+      : data?.runtime.databaseApiAvailable === false
+        ? 'API bases managées : indisponible'
+        : 'API bases managées : non confirmée'
+
+  return (
+    <div className="space-y-4">
+      <p className="max-w-3xl text-sm text-muted-foreground">
+        Version et capacités détectées de l’instance Coolify, et support par moteur de base managée (provisionnement,
+        cycle de vie, sauvegarde/restauration intégrés EFLEX). Ces informations pilotent ce qui est proposé aux projets.
+      </p>
+      <LoadState loading={loading} error={error} onRetry={() => void refresh(false)} />
+      {data && (
+        <>
+          <Card>
+            <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+              <div>
+                <h2 className="font-semibold">Instance Coolify</h2>
+                <p className="mt-1 flex items-center gap-2 text-sm">
+                  <Dot tone={data.runtime.reachable ? 'ok' : 'bad'} />
+                  {data.runtime.reachable ? 'Joignable' : 'Injoignable'}
+                  {data.runtime.version ? ` · version ${data.runtime.version}` : ' · version inconnue'}
+                </p>
+                <p className="mt-1 flex items-center gap-2 text-sm">
+                  <Dot tone={dbApiTone} />
+                  {dbApiLabel}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+                  Vérifié : {dateTime(new Date(data.runtime.checkedAt).toISOString())}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => void refresh(true)}>
+                  <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                  Re-sonder
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Moteur</th>
+                  <th className="px-3 py-2 font-medium">Variable</th>
+                  <th className="px-3 py-2 font-medium">Provision</th>
+                  <th className="px-3 py-2 font-medium">Cycle de vie</th>
+                  <th className="px-3 py-2 font-medium">Sauvegarde</th>
+                  <th className="px-3 py-2 font-medium">Restauration</th>
+                  <th className="px-3 py-2 font-medium">Provider</th>
+                </tr>
+              </thead>
+              <tbody className="tabular-nums">
+                {data.engines.map((engine) => (
+                  <tr key={engine.kind} className="border-t border-border align-top">
+                    <td className="px-3 py-2">
+                      <div className="flex items-start gap-2">
+                        <ServiceIcon kind={engine.kind} label={engine.label} className="h-7 w-7" />
+                        <div className="min-w-0">
+                          <p className="font-medium">{engine.label}</p>
+                          <p className="font-mono text-xs text-muted-foreground">{engine.kind}</p>
+                          {engine.reason && <p className="mt-1 text-xs text-warning">{engine.reason}</p>}
+                          {engine.notes.length > 0 && (
+                            <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                              {engine.notes.map((note) => (
+                                <li key={note}>• {note}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 font-mono text-xs">{engine.envKey}</td>
+                    <td className="px-3 py-2">{engine.provisionSupported ? 'Oui' : 'Non'}</td>
+                    <td className="px-3 py-2">{engine.lifecycleSupported ? 'Oui' : 'Non'}</td>
+                    <td className="px-3 py-2">{engine.backupSupported ? 'Oui' : 'Non'}</td>
+                    <td className="px-3 py-2">{engine.restoreSupported ? 'Oui' : 'Non'}</td>
+                    <td className="px-3 py-2">{engine.provider === 'coolify' ? 'Coolify' : 'EFLEX'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Les capacités « Sauvegarde/Restauration » indiquent le support intégré EFLEX. Un moteur peut être provisionnable
+            sans parcours de sauvegarde/restauration géré par EFLEX.
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /* Onglets                                                             */
 /* ------------------------------------------------------------------ */
 
 const TABS = [
   { id: 'servers', label: 'Serveurs', render: () => <ServersTab /> },
+  { id: 'capabilities', label: 'Capacités', render: () => <CapabilitiesTab /> },
   { id: 'ops', label: 'Supervision', render: () => <OpsToolsTab /> },
   { id: 'storages', label: 'Stockages S3', render: () => <StoragesTab /> },
   { id: 'security', label: 'Sécurité des images', render: () => <SecurityTab /> },

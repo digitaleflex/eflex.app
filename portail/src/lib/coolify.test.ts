@@ -778,6 +778,7 @@ describe('sauvegardes de bases', () => {
         frequency: '0 2 * * *',
         enabled: true,
         saveS3: true,
+        s3StorageId: null,
         executions: [
           { id: 'e2', status: 'failed', size: null, createdAt: '2026-11-16T02:00:00Z', filename: null, localDeleted: false, s3Uploaded: false },
           {
