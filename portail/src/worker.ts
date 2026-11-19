@@ -10,13 +10,15 @@
 import { Worker, type Job } from 'bullmq'
 import { prisma } from '@/lib/prisma'
 import { decrypt } from '@/lib/crypto'
-import { resolveDeploymentContext } from '@/lib/deployment-context'
+import { isDockerImagePlan, resolveDeploymentContext } from '@/lib/deployment-context'
 import {
   buildProjectArtifacts,
   buildApplicationLabels,
   composeDomains,
   coolifyApplicationSettings,
   deploymentKind,
+  dockerImageRef,
+  isDockerImageSourcePlan,
   nixpacksRuntimeVariables,
   persistentVolumesEnabled,
 } from '@/lib/deploy-plan'
@@ -39,6 +41,7 @@ import { isCommitSha } from '@/lib/deployment-rollback'
 import {
   cancelDeployment as cancelCoolifyDeployment,
   createApplication,
+  createDockerImageApplication,
   createPrivateKey,
   deployApplication,
   deployApplicationCommit,
@@ -48,6 +51,7 @@ import {
   setApplicationLabels,
   setEnvironmentVariable,
   updateApplication,
+  updateDockerImageApplication,
 } from '@/lib/coolify'
 
 const POLL_ATTEMPTS = 200
@@ -271,6 +275,107 @@ export async function processDeployment(
         `[eflex/worker] déploiement ${deploymentId} non démarrable depuis « ${status} » (verrou ou état incohérent).`,
       )
     }
+    return
+  }
+
+  const imageSource = isDockerImagePlan(plan) || isDockerImageSourcePlan(plan)
+  if (imageSource) {
+    const image = dockerImageRef(plan)
+    if (!image) {
+      await fail(deploymentId, "Source image Docker invalide : aucune référence d'image fournie.")
+      return
+    }
+    if (!(await setStatus(deploymentId, 'provisioning'))) return
+
+    let appId = effectiveApp ? effectiveApp.coolifyAppId : project.coolifyAppId
+    const saveCoolifyAppId = async (value: string): Promise<void> => {
+      if (effectiveApp) {
+        await prisma.projectApp.update({ where: { id: effectiveApp.id }, data: { coolifyAppId: value } })
+        if (context.primary) {
+          await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: value } }).catch(() => undefined)
+        }
+        return
+      }
+      await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: value } }).catch(() => undefined)
+    }
+
+    const portsExposes = String((plan as { port?: number }).port ?? 80)
+    if (!appId) {
+      const created = await createDockerImageApplication({
+        name: context.deployKey,
+        dockerRegistryImageName: image,
+        portsExposes,
+        domains: hosts,
+        customLabels: hosts.length > 0 ? buildApplicationLabels(context.deployKey, hosts, Number(portsExposes) || 80) : undefined,
+      })
+      if ('error' in created) {
+        await fail(deploymentId, `Préparation de l'hébergement (image Docker) impossible : ${created.error}`)
+        return
+      }
+      appId = created.id
+      await saveCoolifyAppId(appId)
+    } else {
+      const updatedImage = await updateDockerImageApplication(appId, { dockerRegistryImageName: image, portsExposes })
+      if ('error' in updatedImage) {
+        await fail(deploymentId, `Mise à jour de l'application image impossible : ${updatedImage.error}`)
+        return
+      }
+    }
+
+    if (effectiveApp && context.primary && appId && project.coolifyAppId !== appId) {
+      await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: appId } }).catch(() => undefined)
+    }
+
+    if (hosts.length > 0) {
+      const labels = buildApplicationLabels(context.deployKey, hosts, Number(portsExposes) || 80)
+      const labeled = await setApplicationLabels(appId, labels, hosts)
+      if ('error' in labeled) {
+        await fail(deploymentId, `Configuration réseau non appliquée : ${labeled.error}`)
+        return
+      }
+    }
+
+    const envVars = await prisma.envVar.findMany({
+      where: {
+        projectId: project.id,
+        ...(app ? { OR: [{ appId: null }, { appId: app.id }] } : {}),
+      },
+    })
+    for (const variable of envVars) {
+      let value: string
+      try {
+        value = decrypt(variable.value, `${project.id}:${variable.key}`)
+      } catch (error) {
+        await fail(deploymentId, `Variable « ${variable.key} » illisible : ${error instanceof Error ? error.message : 'erreur inconnue'}`)
+        return
+      }
+      const result = await setEnvironmentVariable(appId, variable.key, value)
+      if ('error' in result) {
+        await fail(deploymentId, `Variable « ${variable.key} » non transmise : ${result.error}`)
+        return
+      }
+    }
+
+    await appendLogs(deploymentId, `[source] Déploiement depuis l'image Docker \`${image}\` (port ${portsExposes}).`)
+
+    if (!(await setStatus(deploymentId, 'building'))) return
+    const started = await deployApplication(appId)
+    if ('error' in started) {
+      await fail(deploymentId, `Déclenchement du déploiement impossible : ${started.error}`)
+      return
+    }
+    await prisma.deployment.update({
+      where: { id: deploymentId },
+      data: { coolifyBuildId: started.deploymentId, commitSha: deployment.commitSha },
+    })
+
+    await monitorDeployment(deploymentId, started.deploymentId, {
+      hosts,
+      domain,
+      app,
+      projectId: project.id,
+      primary: context.primary,
+    })
     return
   }
 
