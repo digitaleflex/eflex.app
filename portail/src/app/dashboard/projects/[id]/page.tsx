@@ -26,6 +26,7 @@ import { toDeploymentItemData } from '@/lib/deployment-item-data'
 import { ProjectVariablesTab } from '@/components/project/project-variables-tab'
 import { ProjectRuntimeLogsTab } from '@/components/project/project-runtime-logs-tab'
 import { ProjectAnalyticsTab } from '@/components/project/project-analytics-tab'
+import { ProjectTasksTab } from '@/components/project/project-tasks-tab'
 import { statusInfo } from '@/lib/project-status'
 import { runtimeHealth, tlsHealth } from '@/lib/project-health'
 import { nextProjectAction, projectSituation, type NextProjectAction } from '@/lib/project-actions'
@@ -358,6 +359,18 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           envVars={project.envVars}
           canManage={canManage}
           appNameById={appNameById}
+        />
+      )}
+
+      {tab === 'tasks' && (
+        <ProjectTasksTab
+          projectId={project.id}
+          canManage={canManage}
+          apps={project.apps.map((app) => ({
+            id: app.id,
+            name: app.name,
+            deployed: Boolean(app.coolifyAppId),
+          }))}
         />
       )}
 
