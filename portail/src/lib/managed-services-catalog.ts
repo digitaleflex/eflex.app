@@ -36,18 +36,18 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
   { id: 'keydb', label: 'KeyDB', category: 'cache', description: 'Alternative Redis multi-thread compatible.', availability: 'available', managedDatabaseKind: 'keydb', icon: 'keydb' },
 
   // Stockage objet
-  { id: 'minio', label: 'MinIO (S3)', category: 'storage', description: 'Stockage objet compatible S3 pour fichiers, médias et backups.', availability: 'eflex-managed', icon: 'minio', notes: 'Ajoutable comme service EFLEX-géré (volume, réseau privé, credentials).' },
+  { id: 'minio', label: 'MinIO (S3)', category: 'storage', description: 'Stockage objet compatible S3 pour fichiers, médias et backups.', availability: 'eflex-managed', coolifyServiceType: 'minio', icon: 'minio', notes: 'Provisionnable via Coolify (one-click) ou service EFLEX-géré selon le contexte.' },
 
   // Recherche
-  { id: 'meilisearch', label: 'Meilisearch', category: 'search', description: 'Moteur de recherche full-text rapide et tolérant aux fautes.', availability: 'eflex-managed', icon: 'meilisearch', notes: 'Exposable via Coolify one-click ou service EFLEX-géré.' },
-  { id: 'typesense', label: 'Typesense', category: 'search', description: 'Recherche instantanée, typo-tolerante, facile à opérer.', availability: 'eflex-managed', icon: 'typesense' },
-  { id: 'elasticsearch', label: 'Elasticsearch', category: 'search', description: 'Recherche et analytics distribués (ELK).', availability: 'coolify-oneclick', icon: 'elasticsearch', notes: 'Disponible comme service Coolify ; exposition dans EFLEX à venir.' },
-  { id: 'opensearch', label: 'OpenSearch', category: 'search', description: 'Fork open source d’Elasticsearch pour recherche/observabilité.', availability: 'coolify-oneclick', icon: 'opensearch' },
+  { id: 'meilisearch', label: 'Meilisearch', category: 'search', description: 'Moteur de recherche full-text rapide et tolérant aux fautes.', availability: 'eflex-managed', coolifyServiceType: 'meilisearch', icon: 'meilisearch', notes: 'Provisionnable via Coolify (one-click) ; le type dépend du support de l’instance.' },
+  { id: 'typesense', label: 'Typesense', category: 'search', description: 'Recherche instantanée, typo-tolerante, facile à opérer.', availability: 'eflex-managed', coolifyServiceType: 'typesense', icon: 'typesense', notes: 'Provisionnable via Coolify (one-click) si le template est disponible.' },
+  { id: 'elasticsearch', label: 'Elasticsearch', category: 'search', description: 'Recherche et analytics distribués (ELK).', availability: 'coolify-oneclick', coolifyServiceType: 'elasticsearch', icon: 'elasticsearch', notes: 'Service one-click Coolify ; le provisionnement dépend du support de l’instance.' },
+  { id: 'opensearch', label: 'OpenSearch', category: 'search', description: 'Fork open source d’Elasticsearch pour recherche/observabilité.', availability: 'coolify-oneclick', icon: 'opensearch', notes: 'Référencé ; type one-click à confirmer selon l’instance (provisionnement manuel possible).' },
 
   // Messagerie / streaming
-  { id: 'rabbitmq', label: 'RabbitMQ', category: 'messaging', description: 'Broker de messages (AMQP), files fiables et routage.', availability: 'eflex-managed', icon: 'rabbitmq', notes: 'Exposable via Coolify one-click ou service EFLEX-géré.' },
-  { id: 'nats', label: 'NATS', category: 'messaging', description: 'Messagerie légère, streaming et requête/réponse cloud-native.', availability: 'eflex-managed', icon: 'nats' },
-  { id: 'kafka', label: 'Kafka', category: 'messaging', description: 'Streaming d’événements distribué haute capacité.', availability: 'coolify-oneclick', icon: 'kafka', notes: 'Disponible comme service Coolify ; intégration EFLEX à venir.' },
+  { id: 'rabbitmq', label: 'RabbitMQ', category: 'messaging', description: 'Broker de messages (AMQP), files fiables et routage.', availability: 'eflex-managed', coolifyServiceType: 'rabbitmq', icon: 'rabbitmq', notes: 'Provisionnable via Coolify (one-click) si le template est disponible.' },
+  { id: 'nats', label: 'NATS', category: 'messaging', description: 'Messagerie légère, streaming et requête/réponse cloud-native.', availability: 'eflex-managed', coolifyServiceType: 'nats', icon: 'nats', notes: 'Provisionnable via Coolify (one-click) si le template est disponible.' },
+  { id: 'kafka', label: 'Kafka', category: 'messaging', description: 'Streaming d’événements distribué haute capacité.', availability: 'coolify-oneclick', icon: 'kafka', notes: 'Référencé ; type one-click à confirmer selon l’instance.' },
 
   // Vector / IA
   { id: 'qdrant', label: 'Qdrant', category: 'vector', description: 'Base vectorielle pour RAG, recherche sémantique et IA.', availability: 'eflex-managed', icon: 'qdrant', notes: 'Candidat prioritaire service EFLEX-géré (pointe IA).' },

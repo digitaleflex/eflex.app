@@ -239,8 +239,11 @@ export function buildServicesHubModel(input: {
     else if (engine) {
       if (engine.provisionSupported && engine.lifecycleSupported) state = 'creatable'
       else state = 'unavailable'
+    } else if (coolifyServiceType) {
+      // Provisionnable via un template one-click Coolify (même si aussi référencé comme EFLEX-géré/à venir).
+      state = 'creatable'
     } else if (entry.availability === 'coolify-oneclick') {
-      state = coolifyServiceType ? 'creatable' : 'coolify-oneclick'
+      state = 'coolify-oneclick'
     } else if (entry.availability === 'eflex-managed') state = 'eflex-managed'
     else if (entry.availability === 'planned') state = 'planned'
     else state = 'unavailable'
