@@ -58,7 +58,7 @@ export function ServiceDetailDialog({
     if (!service && dialog.open) dialog.close()
   }, [service])
 
-  const open = Boolean(service)
+
   const creatable = service?.state === 'creatable' && canManage && Boolean(service.managedDatabaseKind)
 
   return (

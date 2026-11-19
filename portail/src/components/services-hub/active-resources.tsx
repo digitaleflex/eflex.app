@@ -41,6 +41,7 @@ export function ActiveResources({
   databases,
   canManage,
   workingId,
+  aliasesByKind = {},
   onRefresh,
   onRequestAction,
   onRequestDelete,
@@ -49,6 +50,7 @@ export function ActiveResources({
   databases: ManagedDatabaseView[]
   canManage: boolean
   workingId: string | null
+  aliasesByKind?: Record<string, string[]>
   onRefresh: () => void
   onRequestAction: (database: ManagedDatabaseView, action: ResourceAction) => void
   onRequestDelete: (database: ManagedDatabaseView) => void
@@ -78,7 +80,21 @@ export function ActiveResources({
                   <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
                     {database.envKey}
                   </span>
+                  {(aliasesByKind[database.kind] ?? []).length > 0 && (
+                    <span
+                      className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                      title={(aliasesByKind[database.kind] ?? []).join(', ')}
+                    >
+                      +{(aliasesByKind[database.kind] ?? []).length} alias
+                    </span>
+                  )}
                 </p>
+                {(aliasesByKind[database.kind] ?? []).length > 0 && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Alias compatibles injectés si disponibles :{' '}
+                    <span className="font-mono text-foreground">{(aliasesByKind[database.kind] ?? []).join(', ')}</span>
+                  </p>
+                )}
                 <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span aria-hidden="true" className={cn('h-2 w-2 rounded-full', TONE[view.tone])} />
                   {view.label}

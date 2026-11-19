@@ -72,6 +72,12 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
     })
   }, [data])
 
+  const aliasesByKind = useMemo(() => {
+    if (!data) return {}
+    const engines = data.engines ?? data.available ?? []
+    return Object.fromEntries(engines.map((engine) => [engine.kind, engine.envAliases ?? []]))
+  }, [data])
+
   async function create(kind: string) {
     setCreating(kind)
     setFeedback(null)
@@ -186,6 +192,7 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
           databases={model.activeDatabases}
           canManage={canManage}
           workingId={working}
+          aliasesByKind={aliasesByKind}
           onRefresh={() => void load()}
           onRequestAction={(database, action) => {
             if (action === 'start') void act(database, 'start')
