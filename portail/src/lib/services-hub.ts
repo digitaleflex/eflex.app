@@ -56,6 +56,14 @@ export interface RuntimeView {
   checkedAt?: number | null
 }
 
+export interface ActiveServiceView {
+  id: string
+  name: string
+  status: string | null
+  catalogId: string
+  label: string
+}
+
 export interface UnifiedService {
   key: string
   id: string
@@ -69,6 +77,7 @@ export interface UnifiedService {
   filterTags: ServiceFilterState[]
   availability: ServiceAvailability | null
   managedDatabaseKind: string | null
+  coolifyServiceType: string | null
   // runtime/capacités (moteurs)
   provisionSupported: boolean
   lifecycleSupported: boolean
@@ -79,6 +88,7 @@ export interface UnifiedService {
   notes: string[]
   created: boolean
   activeDatabase: ManagedDatabaseView | null
+  activeService: ActiveServiceView | null
   /** Capacité ajustée (politique/apprentissage) détectée via notes/raison. */
   adjusted: boolean
 }
@@ -198,11 +208,13 @@ export function buildServicesHubModel(input: {
   engines: EngineInfoView[]
   runtime: RuntimeView | null
   canManage: boolean
+  activeServices?: ActiveServiceView[]
   catalog?: readonly ManagedServiceEntry[]
 }): ServicesHubModel {
   const catalog = input.catalog ?? MANAGED_SERVICES_CATALOG
   const dbByKind = new Map(input.databases.map((d) => [d.kind, d]))
   const engineByKind = new Map(input.engines.map((e) => [e.kind, e]))
+  const serviceByCatalogId = new Map((input.activeServices ?? []).map((s) => [s.catalogId, s]))
   const services: UnifiedService[] = []
   const seen = new Set<string>()
 
@@ -216,21 +228,22 @@ export function buildServicesHubModel(input: {
     const kind = entry.managedDatabaseKind ?? null
     const engine = kind ? engineByKind.get(kind) : undefined
     const active = kind ? dbByKind.get(kind) : undefined
+    const activeService = serviceByCatalogId.get(entry.id) ?? null
     const notes = uniqueStrings([...(engine?.notes ?? []), ...(entry.notes ? [entry.notes] : [])])
     const reason = engine?.reason ?? null
-    const provider = engine?.provider === 'eflex' ? 'eflex' : engine ? 'coolify' : null
+    const provider = engine?.provider === 'eflex' ? 'eflex' : engine ? 'coolify' : entry.coolifyServiceType ? 'coolify' : null
+    const coolifyServiceType = entry.coolifyServiceType ?? null
 
     let state: ServiceDisplayState
-    if (active) state = 'active'
+    if (active || activeService) state = 'active'
     else if (engine) {
       if (engine.provisionSupported && engine.lifecycleSupported) state = 'creatable'
       else state = 'unavailable'
-    } else {
-      if (entry.availability === 'coolify-oneclick') state = 'coolify-oneclick'
-      else if (entry.availability === 'eflex-managed') state = 'eflex-managed'
-      else if (entry.availability === 'planned') state = 'planned'
-      else state = 'unavailable'
-    }
+    } else if (entry.availability === 'coolify-oneclick') {
+      state = coolifyServiceType ? 'creatable' : 'coolify-oneclick'
+    } else if (entry.availability === 'eflex-managed') state = 'eflex-managed'
+    else if (entry.availability === 'planned') state = 'planned'
+    else state = 'unavailable'
 
     const filterTags: ServiceFilterState[] = []
     if (state === 'active') filterTags.push('added')
@@ -251,15 +264,17 @@ export function buildServicesHubModel(input: {
       filterTags,
       availability: entry.availability,
       managedDatabaseKind: kind,
-      provisionSupported: engine?.provisionSupported ?? false,
-      lifecycleSupported: engine?.lifecycleSupported ?? false,
+      coolifyServiceType,
+      provisionSupported: engine?.provisionSupported ?? Boolean(coolifyServiceType),
+      lifecycleSupported: engine?.lifecycleSupported ?? Boolean(coolifyServiceType),
       backupSupported: engine?.backupSupported ?? false,
       restoreSupported: engine?.restoreSupported ?? false,
       provider,
       reason,
       notes,
-      created: Boolean(active || engine?.created),
+      created: Boolean(active || activeService || engine?.created),
       activeDatabase: active ?? null,
+      activeService,
       adjusted: engine ? isAdjusted(reason, notes) : false,
     })
   }
@@ -287,6 +302,7 @@ export function buildServicesHubModel(input: {
       filterTags: [state === 'active' ? 'added' : state === 'creatable' ? 'provisionable' : 'unavailable'],
       availability: null,
       managedDatabaseKind: engine.kind,
+      coolifyServiceType: null,
       provisionSupported: engine.provisionSupported ?? false,
       lifecycleSupported: engine.lifecycleSupported ?? false,
       backupSupported: engine.backupSupported ?? false,
@@ -296,6 +312,7 @@ export function buildServicesHubModel(input: {
       notes,
       created: Boolean(active || engine.created),
       activeDatabase: active ?? null,
+      activeService: null,
       adjusted: isAdjusted(reason, notes),
     })
   }

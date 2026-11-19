@@ -14,6 +14,8 @@ export interface ManagedServiceEntry {
   availability: ServiceAvailability
   /** Moteur/base déjà géré comme base managée EFLEX. */
   managedDatabaseKind?: string
+  /** Type de service one-click Coolify (`POST /services { type }`) quand provisionnable via Coolify. */
+  coolifyServiceType?: string
   /** Icône (clé simple-icons / ServiceIcon). */
   icon: string
   notes?: string
@@ -52,13 +54,13 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
   { id: 'pgvector', label: 'pgvector (PostgreSQL)', category: 'vector', description: 'Recherche vectorielle dans PostgreSQL (extension).', availability: 'planned', icon: 'postgresql', notes: 'Via PostgreSQL managé avec extension/config adaptée.' },
 
   // Observabilité
-  { id: 'prometheus', label: 'Prometheus', category: 'observability', description: 'Collecte de métriques et alerting.', availability: 'coolify-oneclick', icon: 'prometheus', notes: 'Exposable comme service Coolify/stack.' },
-  { id: 'grafana', label: 'Grafana', category: 'observability', description: 'Tableaux de bord et visualisation métriques/logs.', availability: 'coolify-oneclick', icon: 'grafana' },
+  { id: 'prometheus', label: 'Prometheus', category: 'observability', description: 'Collecte de métriques et alerting.', availability: 'coolify-oneclick', coolifyServiceType: 'prometheus', icon: 'prometheus', notes: 'Service one-click Coolify (provisionnement piloté par EFLEX).' },
+  { id: 'grafana', label: 'Grafana', category: 'observability', description: 'Tableaux de bord et visualisation métriques/logs.', availability: 'coolify-oneclick', coolifyServiceType: 'grafana', icon: 'grafana', notes: 'Service one-click Coolify (provisionnement piloté par EFLEX).' },
 
   // Backend / plateformes
-  { id: 'supabase', label: 'Supabase', category: 'backend', description: 'Backend open source (Postgres, auth, storage, realtime).', availability: 'coolify-oneclick', icon: 'supabase', notes: 'Stack one-click Coolify ; exposition/gestion EFLEX à cadrer.' },
-  { id: 'appwrite', label: 'Appwrite', category: 'backend', description: 'Backend platform (auth, DB, fonctions, storage).', availability: 'coolify-oneclick', icon: 'appwrite' },
-  { id: 'pocketbase', label: 'PocketBase', category: 'backend', description: 'Backend léger en un fichier (auth, DB, fichiers, realtime).', availability: 'coolify-oneclick', icon: 'pocketbase' },
+  { id: 'supabase', label: 'Supabase', category: 'backend', description: 'Backend open source (Postgres, auth, storage, realtime).', availability: 'coolify-oneclick', coolifyServiceType: 'supabase', icon: 'supabase', notes: 'Stack one-click Coolify ; le provisionnement dépend du support de l’instance.' },
+  { id: 'appwrite', label: 'Appwrite', category: 'backend', description: 'Backend platform (auth, DB, fonctions, storage).', availability: 'coolify-oneclick', coolifyServiceType: 'appwrite', icon: 'appwrite', notes: 'Service one-click Coolify (provisionnement piloté par EFLEX).' },
+  { id: 'pocketbase', label: 'PocketBase', category: 'backend', description: 'Backend léger en un fichier (auth, DB, fichiers, realtime).', availability: 'coolify-oneclick', coolifyServiceType: 'pocketbase', icon: 'pocketbase', notes: 'Service one-click Coolify (provisionnement piloté par EFLEX).' },
 ] as const
 
 export const SERVICE_CATEGORIES: Record<ServiceCategory, string> = {

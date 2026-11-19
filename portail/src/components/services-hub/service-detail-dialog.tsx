@@ -33,6 +33,7 @@ export function ServiceDetailDialog({
   creating,
   onClose,
   onCreate,
+  onCreateService,
   onViewActive,
 }: {
   service: UnifiedService | null
@@ -40,6 +41,7 @@ export function ServiceDetailDialog({
   creating: boolean
   onClose: () => void
   onCreate: (kind: string) => void
+  onCreateService?: (catalogId: string) => void
   onViewActive?: (kind: string) => void
 }) {
   const ref = useRef<HTMLDialogElement>(null)
@@ -59,7 +61,9 @@ export function ServiceDetailDialog({
   }, [service])
 
 
-  const creatable = service?.state === 'creatable' && canManage && Boolean(service.managedDatabaseKind)
+  const creatableDatabase = service?.state === 'creatable' && canManage && Boolean(service.managedDatabaseKind)
+  const creatableOneClick = service?.state === 'creatable' && canManage && Boolean(service.coolifyServiceType) && !service.managedDatabaseKind
+  const creatable = creatableDatabase || creatableOneClick
 
   return (
     <dialog
@@ -146,7 +150,7 @@ export function ServiceDetailDialog({
               )}
             </section>
 
-            {confirming && creatable && service.managedDatabaseKind && (
+            {confirming && creatableDatabase && service.managedDatabaseKind && (
               <section aria-label="Confirmation" className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-4">
                 <h3 className="text-sm font-medium">Confirmer la création</h3>
                 <p className="text-xs text-muted-foreground">
@@ -165,12 +169,20 @@ export function ServiceDetailDialog({
                 </p>
               </section>
             )}
+            {confirming && creatableOneClick && service.coolifyServiceType && (
+              <section aria-label="Confirmation" className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-4">
+                <h3 className="text-sm font-medium">Confirmer le provisionnement</h3>
+                <p className="text-xs text-muted-foreground">
+                  Le service <span className="font-medium text-foreground">{service.label}</span> sera créé via Coolify (modèle one-click <span className="font-mono">{service.coolifyServiceType}</span>) dans l’environnement d’hébergement du projet. Le démarrage et la configuration détaillée (domaines, variables, volumes) dépendront du modèle et pourront nécessiter des ajustements dans Coolify ou dans EFLEX selon les capacités exposées.
+                </p>
+              </section>
+            )}
           </div>
 
           <div className="flex flex-col-reverse gap-2 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-muted-foreground">
-              {service.state === 'active' && 'Cette ressource est déjà active pour le projet.'}
-              {service.state === 'creatable' && !canManage && 'Création réservée aux membres autorisés du projet.'}
+              {service.state === 'active' && (service.activeService ? 'Ce service Coolify est déjà provisionné pour le projet.' : 'Cette ressource est déjà active pour le projet.')}
+              {service.state === 'creatable' && !canManage && 'Provisionnement réservé aux membres autorisés du projet.'}
               {service.state === 'unavailable' && 'Non créable sur cette instance dans l’état actuel.'}
               {(service.state === 'coolify-oneclick' || service.state === 'eflex-managed' || service.state === 'planned') &&
                 'Service indexé, non provisionnable depuis EFLEX pour le moment.'}
@@ -184,14 +196,22 @@ export function ServiceDetailDialog({
                   Voir la ressource
                 </Button>
               )}
-              {creatable && service.managedDatabaseKind && !confirming && (
+              {service.state === 'active' && service.activeService && (
+                <span className="self-center text-xs text-muted-foreground">Service Coolify actif : <span className="font-mono">{service.activeService.name}</span></span>
+              )}
+              {creatable && !confirming && (
                 <Button type="button" onClick={() => setConfirming(true)}>
-                  Créer cette base
+                  {creatableOneClick ? 'Provisionner ce service' : 'Créer cette base'}
                 </Button>
               )}
-              {creatable && service.managedDatabaseKind && confirming && (
+              {creatableDatabase && confirming && (
                 <Button type="button" loading={creating} onClick={() => onCreate(service.managedDatabaseKind!)}>
                   Confirmer la création
+                </Button>
+              )}
+              {creatableOneClick && confirming && onCreateService && (
+                <Button type="button" loading={creating} onClick={() => onCreateService(service.id)}>
+                  Confirmer le provisionnement
                 </Button>
               )}
             </div>

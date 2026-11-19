@@ -483,6 +483,112 @@ export interface CoolifyApplicationDeployment {
   serverName?: string | null
 }
 
+export interface CoolifyServiceInstance {
+  id: string
+  name: string
+  status: string | null
+  type?: string | null
+  description?: string | null
+}
+
+function parseServiceInstance(raw: unknown): CoolifyServiceInstance | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as Record<string, unknown>
+  const id = typeof row.uuid === 'string' ? row.uuid : typeof row.id === 'string' ? row.id : null
+  if (!id) return null
+  const name = typeof row.name === 'string' && row.name ? row.name : id
+  const status = typeof row.status === 'string' ? row.status : null
+  const type =
+    typeof row.service_type === 'string'
+      ? row.service_type
+      : typeof row.type === 'string'
+        ? row.type
+        : typeof row.one_click_service === 'string'
+          ? row.one_click_service
+          : null
+  const description = typeof row.description === 'string' ? row.description : null
+  return { id, name, status, type, description }
+}
+
+/** Crée un service one-click Coolify (template `type`) dans l’environnement cible. */
+export async function createOneClickService(
+  type: string,
+  name: string,
+): Promise<{ id: string } | { error: string }> {
+  try {
+    const target = await resolveTarget()
+    const res = await coolifyFetch<{ uuid?: unknown; id?: unknown }>('/services', {
+      method: 'POST',
+      body: JSON.stringify({
+        type,
+        name,
+        description: 'Service provisionné par EFLEX',
+        server_uuid: target.serverUuid,
+        project_uuid: target.projectUuid,
+        environment_name: target.environmentName,
+        instant_deploy: true,
+      }),
+    })
+    if (res.error) return { error: res.error }
+    const id =
+      typeof res.data?.uuid === 'string'
+        ? res.data.uuid
+        : typeof res.data?.id === 'string'
+          ? res.data.id
+          : null
+    if (!id) return { error: "L'hébergement n'a pas renvoyé l'identifiant du service." }
+    return { id }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Création du service impossible.' }
+  }
+}
+
+/** Liste les services de l’environnement cible Coolify. */
+export async function listTargetServices(): Promise<{ services: CoolifyServiceInstance[] } | { error: string }> {
+  const res = await coolifyFetch<unknown>('/services')
+  if (res.error) return { error: res.error }
+  if (!Array.isArray(res.data)) return { services: [] }
+  return { services: res.data.map(parseServiceInstance).filter((item): item is CoolifyServiceInstance => item !== null) }
+}
+
+/** Détail/statut d’un service Coolify. */
+export async function getServiceInstance(
+  serviceId: string,
+): Promise<CoolifyServiceInstance | { error: string }> {
+  const res = await coolifyFetch<unknown>(`/services/${encodeURIComponent(serviceId)}`)
+  if (res.error) return { error: res.error }
+  const parsed = parseServiceInstance(res.data)
+  if (!parsed) return { error: 'Service introuvable ou réponse invalide.' }
+  return parsed
+}
+
+export async function startService(serviceId: string): Promise<{ ok: true } | { error: string }> {
+  const res = await coolifyFetch(`/services/${encodeURIComponent(serviceId)}/start`, { method: 'POST' })
+  if (res.error) return { error: res.error }
+  return { ok: true }
+}
+
+export async function stopService(serviceId: string): Promise<{ ok: true } | { error: string }> {
+  const res = await coolifyFetch(`/services/${encodeURIComponent(serviceId)}/stop`, { method: 'POST' })
+  if (res.error) return { error: res.error }
+  return { ok: true }
+}
+
+export async function restartService(serviceId: string): Promise<{ ok: true } | { error: string }> {
+  const res = await coolifyFetch(`/services/${encodeURIComponent(serviceId)}/restart`, { method: 'POST' })
+  if (res.error) return { error: res.error }
+  return { ok: true }
+}
+
+export async function deleteServiceInstance(serviceId: string): Promise<{ ok: true } | { error: string }> {
+  const res = await coolifyFetch(`/services/${encodeURIComponent(serviceId)}?delete_configurations=true&delete_volumes=false`, { method: 'DELETE' })
+  if (res.error) {
+    if (res.error.includes('Hébergement API 404')) return { ok: true }
+    return { error: res.error }
+  }
+  return { ok: true }
+}
+
 function normalizeApplicationDeployments(raw: unknown): CoolifyApplicationDeployment[] {
   if (!Array.isArray(raw)) return []
   const rows: CoolifyApplicationDeployment[] = []
