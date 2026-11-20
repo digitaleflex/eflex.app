@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -34,6 +34,7 @@ import { AppConfigPanel } from '@/components/project/app-config-panel'
 import { EnvEditor } from '@/components/env/env-editor'
 import { rowsToVars, type EnvRow } from '@/lib/env-parse'
 import { ProjectTransfer, type TransferTarget } from '@/components/project-transfer'
+import { DOCKER_IMAGE_REF_HINT, PRIVATE_REGISTRY_LIMITATION } from '@/lib/docker-image-ref'
 
 const NETWORK_ERROR = 'Impossible de contacter le serveur. Vérifiez votre connexion et réessayez.'
 
@@ -54,6 +55,14 @@ interface SettingsApp {
   deployed?: boolean
 }
 
+interface ImageAppSetting {
+  appId: string
+  appName: string
+  image: string
+  port: number
+  primary?: boolean
+}
+
 interface ProjectSettingsProps {
   project: {
     id: string
@@ -66,7 +75,9 @@ interface ProjectSettingsProps {
     hasHostedApp: boolean
   }
   apps?: SettingsApp[]
+  /** @deprecated Utiliser `imageApps`. */
   imageSource?: { image: string; port: number; appId: string | null } | null
+  imageApps?: ImageAppSetting[]
   envVars: EnvVarKey[]
   transferTargets: TransferTarget[]
 }
@@ -143,7 +154,7 @@ function sortEnvVars(list: EnvVarKey[]): EnvVarKey[] {
   })
 }
 
-export function ProjectSettings({ project, apps: initialApps = [], imageSource = null, envVars: initialEnvVars, transferTargets }: ProjectSettingsProps) {
+export function ProjectSettings({ project, apps: initialApps = [], imageSource = null, imageApps = [], envVars: initialEnvVars, transferTargets }: ProjectSettingsProps) {
   const router = useRouter()
   const [apps, setApps] = useState<SettingsApp[]>(initialApps)
   const appNameById = new Map(apps.map((app) => [app.id, app.name]))
@@ -157,10 +168,24 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
   const [savingBranch, setSavingBranch] = useState(false)
   const [branchFeedback, setBranchFeedback] = useState<Feedback>(null)
 
-  const [imageRef, setImageRef] = useState(imageSource?.image ?? '')
-  const [imagePort, setImagePort] = useState(String(imageSource?.port ?? 80))
-  const [savingImage, setSavingImage] = useState(false)
-  const [imageFeedback, setImageFeedback] = useState<Feedback>(null)
+  const resolvedImageApps: ImageAppSetting[] =
+    imageApps.length > 0
+      ? imageApps
+      : imageSource
+        ? [{ appId: imageSource.appId ?? '', appName: 'app', image: imageSource.image, port: imageSource.port, primary: true }]
+        : []
+  const hasImageSource = resolvedImageApps.length > 0
+  const [imageDrafts, setImageDrafts] = useState<Record<string, { image: string; port: string }>>(() =>
+    Object.fromEntries(resolvedImageApps.map((app) => [app.appId || 'primary', { image: app.image, port: String(app.port) }])),
+  )
+  const [savingImageAppId, setSavingImageAppId] = useState<string | null>(null)
+  const [imageFeedbacks, setImageFeedbacks] = useState<Record<string, Feedback>>({})
+  const imageAppsSignature = resolvedImageApps.map((app) => `${app.appId}|${app.image}|${app.port}`).join(';')
+  useEffect(() => {
+    setImageDrafts(Object.fromEntries(resolvedImageApps.map((app) => [app.appId || 'primary', { image: app.image, port: String(app.port) }])))
+    setImageFeedbacks({})
+  }, [imageAppsSignature]) // eslint-disable-line react-hooks/exhaustive-deps -- resynchronise quand la source serveur change
+
 
   const [envVars, setEnvVars] = useState<EnvVarKey[]>(initialEnvVars)
   const [envRows, setEnvRows] = useState<EnvRow[]>([{ key: '', value: '' }])
@@ -247,20 +272,21 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
     }
   }
 
-  async function saveImage(e: React.FormEvent) {
-    e.preventDefault()
-    setImageFeedback(null)
-    const image = imageRef.trim()
-    const port = Number(imagePort)
+  async function saveImage(app: ImageAppSetting) {
+    const key = app.appId || 'primary'
+    const draft = imageDrafts[key] ?? { image: app.image, port: String(app.port) }
+    setImageFeedbacks((current) => ({ ...current, [key]: null }))
+    const image = draft.image.trim()
+    const port = Number(draft.port)
     if (image === '') {
-      setImageFeedback({ tone: 'error', message: "Indiquez la référence de l'image Docker." })
+      setImageFeedbacks((current) => ({ ...current, [key]: { tone: 'error', message: "Indiquez la référence de l'image Docker." } }))
       return
     }
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      setImageFeedback({ tone: 'error', message: 'Le port doit être un entier compris entre 1 et 65535.' })
+      setImageFeedbacks((current) => ({ ...current, [key]: { tone: 'error', message: 'Le port doit être un entier compris entre 1 et 65535.' } }))
       return
     }
-    setSavingImage(true)
+    setSavingImageAppId(key)
     try {
       const response = await fetch(`/api/projects/${project.id}/image`, {
         method: 'PATCH',
@@ -268,25 +294,27 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
         body: JSON.stringify({
           image,
           port,
-          ...(imageSource?.appId ? { appId: imageSource.appId } : {}),
+          ...(app.appId ? { appId: app.appId } : {}),
         }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        setImageFeedback({ tone: 'error', message: data.error || "L'image n'a pas pu être mise à jour." })
+        setImageFeedbacks((current) => ({ ...current, [key]: { tone: 'error', message: data.error || "L'image n'a pas pu être mise à jour." } }))
         return
       }
-      setImageRef(data.image ?? image)
-      setImagePort(String(data.port ?? port))
-      setImageFeedback({
-        tone: 'success',
-        message: 'Image mise à jour. Lancez un redéploiement depuis la page du projet pour appliquer le changement.',
-      })
+      setImageDrafts((current) => ({ ...current, [key]: { image: data.image ?? image, port: String(data.port ?? port) } }))
+      setImageFeedbacks((current) => ({
+        ...current,
+        [key]: {
+          tone: 'success',
+          message: 'Image mise à jour. Lancez un redéploiement depuis la page du projet pour appliquer le changement au conteneur en cours d’exécution.',
+        },
+      }))
       router.refresh()
     } catch {
-      setImageFeedback({ tone: 'error', message: NETWORK_ERROR })
+      setImageFeedbacks((current) => ({ ...current, [key]: { tone: 'error', message: NETWORK_ERROR } }))
     } finally {
-      setSavingImage(false)
+      setSavingImageAppId(null)
     }
   }
 
@@ -459,7 +487,7 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
 
   const nav = [
     { href: '#general', label: 'Général' },
-    { href: '#branche-deploiement', label: imageSource ? 'Source et déploiement' : 'Branche et déploiement' },
+    { href: '#branche-deploiement', label: hasImageSource ? 'Source et déploiement' : 'Branche et déploiement' },
     { href: '#domaines', label: 'Domaines' },
     { href: '#bases', label: 'Bases de données' },
     { href: '#disponibilite', label: 'Disponibilité' },
@@ -581,54 +609,87 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
 
       <SettingsSection
         id="branche-deploiement"
-        title={imageSource ? 'Source et déploiement' : 'Branche et déploiement'}
-        icon={imageSource ? Box : GitBranch}
+        title={hasImageSource ? 'Source et déploiement' : 'Branche et déploiement'}
+        icon={hasImageSource ? Box : GitBranch}
         description={
-          imageSource
-            ? "Ce projet est déployé depuis une image Docker. Modifiez la référence ou le port, puis lancez un redéploiement pour appliquer les changements."
+          hasImageSource
+            ? "Ce projet est déployé depuis une image Docker. La référence et le port sont modifiables ; les changements sont appliqués au prochain redéploiement."
             : 'Les push sur la branche de production déclenchent un déploiement automatique.'
         }
       >
         <div className="space-y-4">
-          {imageSource ? (
-            <>
-              <FeedbackMessage feedback={imageFeedback} id="project-image-feedback" />
-              <form onSubmit={saveImage} className="space-y-4">
-                <Input
-                  id="project-image"
-                  label="Référence de l’image"
-                  value={imageRef}
-                  onChange={(e) => setImageRef(e.target.value)}
-                  hint="Nom d’image, tag et/ou digest (ex. nginx:1.27, ghcr.io/org/app:1.2.3, image@sha256:…). Les changements sont appliqués au prochain redéploiement."
-                  autoComplete="off"
-                  spellCheck={false}
-                  aria-invalid={imageFeedback?.tone === 'error' ? true : undefined}
-                  aria-describedby={imageFeedback?.tone === 'error' ? 'project-image-feedback' : undefined}
-                  required
-                />
-                <Input
-                  id="project-image-port"
-                  label="Port exposé"
-                  type="number"
-                  min={1}
-                  max={65535}
-                  value={imagePort}
-                  onChange={(e) => setImagePort(e.target.value)}
-                  hint="Port HTTP écouté par le conteneur."
-                  required
-                />
-                <div className="flex justify-end">
-                  <Button
-                    type="submit"
-                    loading={savingImage}
-                    disabled={imageRef.trim() === imageSource.image && Number(imagePort) === imageSource.port}
-                    disabledReason="Aucune modification à enregistrer"
+          {hasImageSource ? (
+            <div className="space-y-6">
+              <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">Source actuelle</p>
+                <ul className="mt-2 space-y-1">
+                  {resolvedImageApps.map((app) => (
+                    <li key={app.appId || 'primary'}>
+                      <span className="font-mono text-foreground">{app.image}</span>
+                      <span> · port {app.port}</span>
+                      {resolvedImageApps.length > 1 && <span> · application « {app.appName} »</span>}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2">{PRIVATE_REGISTRY_LIMITATION}</p>
+              </div>
+
+              {resolvedImageApps.map((app) => {
+                const key = app.appId || 'primary'
+                const draft = imageDrafts[key] ?? { image: app.image, port: String(app.port) }
+                const feedback = imageFeedbacks[key] ?? null
+                const feedbackId = `project-image-feedback-${key}`
+                const changed = draft.image.trim() !== app.image || Number(draft.port) !== app.port
+                return (
+                  <form
+                    key={key}
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      void saveImage(app)
+                    }}
+                    className="space-y-4 rounded-lg border border-border p-4"
                   >
-                    Enregistrer l’image
-                  </Button>
-                </div>
-              </form>
-            </>
+                    {resolvedImageApps.length > 1 && (
+                      <p className="text-sm font-medium">Application « {app.appName} »</p>
+                    )}
+                    <FeedbackMessage feedback={feedback} id={feedbackId} />
+                    <Input
+                      id={`project-image-${key}`}
+                      label="Référence de l’image"
+                      value={draft.image}
+                      onChange={(e) => setImageDrafts((current) => ({ ...current, [key]: { ...draft, image: e.target.value } }))}
+                      hint={`${DOCKER_IMAGE_REF_HINT} Les changements sont appliqués au prochain redéploiement.`}
+                      autoComplete="off"
+                      spellCheck={false}
+                      aria-invalid={feedback?.tone === 'error' ? true : undefined}
+                      aria-describedby={feedback?.tone === 'error' ? feedbackId : undefined}
+                      required
+                    />
+                    <Input
+                      id={`project-image-port-${key}`}
+                      label="Port exposé"
+                      type="number"
+                      min={1}
+                      max={65535}
+                      value={draft.port}
+                      onChange={(e) => setImageDrafts((current) => ({ ...current, [key]: { ...draft, port: e.target.value } }))}
+                      hint="Port HTTP écouté par le conteneur."
+                      required
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        type="submit"
+                        loading={savingImageAppId === key}
+                        disabled={!changed}
+                        disabledReason="Aucune modification à enregistrer"
+                      >
+                        Enregistrer l’image
+                      </Button>
+                    </div>
+                  </form>
+                )
+              })}
+            </div>
           ) : (
             <>
               <FeedbackMessage feedback={branchFeedback} id="project-branch-feedback" />

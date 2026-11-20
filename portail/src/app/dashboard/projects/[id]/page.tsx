@@ -33,6 +33,7 @@ import { nextProjectAction, projectSituation, type NextProjectAction } from '@/l
 import { getApplicationRuntime } from '@/lib/coolify'
 import { getPrimaryApp } from '@/lib/project-apps'
 import { repoLabel } from '@/lib/repo'
+import { dockerImageFromRepoUrl } from '@/lib/docker-image-ref'
 import { resolveProjectTab } from '@/lib/project-tabs'
 
 type StoredAnalysis = { confidence?: number; reasons: string[]; warnings: string[]; commitSha?: string }
@@ -173,8 +174,17 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const analysis = readAnalysis(project.detection)
   const primaryPlan = primaryApp?.plan as unknown as {
     framework?: string
+    source?: string
+    image?: string
+    port?: number
     compose?: { services?: unknown }
   } | null
+  const primaryImage =
+    primaryPlan?.source === 'docker-image' && typeof primaryPlan.image === 'string'
+      ? { image: primaryPlan.image, port: typeof primaryPlan.port === 'number' ? primaryPlan.port : (primaryApp?.port ?? project.port ?? 80) }
+      : dockerImageFromRepoUrl(project.repoUrl)
+        ? { image: dockerImageFromRepoUrl(project.repoUrl) as string, port: primaryApp?.port ?? project.port ?? 80 }
+        : null
   const composeServices =
     primaryPlan?.framework === 'compose' && Array.isArray(primaryPlan.compose?.services)
       ? primaryPlan.compose.services.filter((name): name is string => typeof name === 'string')
@@ -242,13 +252,23 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             ) : (
               <p className="text-sm text-muted-foreground">Pas encore de domaine public</p>
             )}
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <GithubMark className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{repoLabel(project.repoUrl)}</span>
-              <span aria-hidden="true">·</span>
-              <GitBranch className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              <span className="truncate font-mono">{project.branch}</span>
-            </p>
+            {primaryImage ? (
+              <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Image Docker</span>
+                <span aria-hidden="true">·</span>
+                <span className="truncate font-mono" title={primaryImage.image}>{primaryImage.image}</span>
+                <span aria-hidden="true">·</span>
+                <span>port {primaryImage.port}</span>
+              </p>
+            ) : (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <GithubMark className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{repoLabel(project.repoUrl)}</span>
+                <span aria-hidden="true">·</span>
+                <GitBranch className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="truncate font-mono">{project.branch}</span>
+              </p>
+            )}
           </div>
         </div>
 
@@ -259,10 +279,12 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           {canManage && last && statusInfo(last.status).inProgress && (
             <CancelDeploymentButton projectId={project.id} deploymentId={last.id} />
           )}
-          <a href={project.repoUrl} target="_blank" rel="noopener noreferrer" className={secondaryLinkClass}>
-            <GithubMark className="h-4 w-4" />
-            Dépôt<span className="sr-only"> (nouvel onglet)</span>
-          </a>
+          {!primaryImage && (
+            <a href={project.repoUrl} target="_blank" rel="noopener noreferrer" className={secondaryLinkClass}>
+              <GithubMark className="h-4 w-4" />
+              Dépôt<span className="sr-only"> (nouvel onglet)</span>
+            </a>
+          )}
           {canManage && (
             <Link href={`/dashboard/projects/${project.id}/settings`} className={secondaryLinkClass}>
               <Settings className="h-4 w-4" aria-hidden="true" />
@@ -328,6 +350,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           primaryDomain={primaryDomain}
           primaryFramework={primaryFramework}
           primaryRuntime={primaryRuntime}
+          primaryImage={primaryImage}
           deployments={deployments}
           last={last}
           production={production}

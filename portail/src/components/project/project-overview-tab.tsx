@@ -49,6 +49,7 @@ export function ProjectOverviewTab({
   primaryDomain,
   primaryFramework,
   primaryRuntime,
+  primaryImage,
   deployments,
   last,
   production,
@@ -68,6 +69,7 @@ export function ProjectOverviewTab({
   primaryDomain: string | null
   primaryFramework: string | null
   primaryRuntime: string | null
+  primaryImage?: { image: string; port: number } | null
   deployments: readonly OverviewDeployment[]
   last: OverviewDeployment | undefined
   production: { id: string; createdAt: Date; app: { name: string } | null } | null | undefined
@@ -143,22 +145,41 @@ export function ProjectOverviewTab({
           <dl className="grid grid-cols-1 gap-px bg-border sm:grid-cols-2">
             {[
               { icon: Globe, label: 'Statut', value: <StatusPill status={last?.status} /> },
-              { icon: GitBranch, label: 'Branche', value: <span className="font-mono text-sm">{branch}</span> },
+              primaryImage
+                ? {
+                    icon: Layers,
+                    label: 'Source',
+                    value: (
+                      <span className="min-w-0 text-sm">
+                        <span className="font-medium">Image Docker</span>
+                        <span className="block truncate font-mono text-xs text-muted-foreground" title={primaryImage.image}>
+                          {primaryImage.image}
+                        </span>
+                      </span>
+                    ),
+                  }
+                : { icon: GitBranch, label: 'Branche', value: <span className="font-mono text-sm">{branch}</span> },
               {
                 icon: GitCommitHorizontal,
                 label: 'Dernier déploiement',
                 value: last ? (
                   <span className="text-sm">
                     <time dateTime={last.createdAt.toISOString()} suppressHydrationWarning>{relativeTime(last.createdAt)}</time>
-                    {last.commitSha !== 'pending' && <span className="font-mono text-muted-foreground"> · {last.commitSha.slice(0, 7)}</span>}
+                    {!primaryImage && last.commitSha !== 'pending' && (
+                      <span className="font-mono text-muted-foreground"> · {last.commitSha.slice(0, 7)}</span>
+                    )}
                     {last.app && multiApp && <span className="text-muted-foreground"> · {last.app.name}</span>}
                   </span>
                 ) : <span className="text-sm text-muted-foreground">—</span>,
               },
               {
                 icon: Layers,
-                label: 'Stack',
-                value: (
+                label: primaryImage ? 'Exécution' : 'Stack',
+                value: primaryImage ? (
+                  <span className="text-sm">
+                    Image Docker <span className="text-muted-foreground">· port {primaryImage.port}</span>
+                  </span>
+                ) : (
                   <span className="text-sm">
                     {primaryFramework ? frameworkLabel(primaryFramework) : 'Détection automatique'}
                     {primaryRuntime && <span className="text-muted-foreground"> · {runtimeLabel(primaryRuntime)}</span>}
