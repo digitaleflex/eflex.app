@@ -518,6 +518,7 @@ interface CoolifyDeploymentRow {
   origin: 'webhook' | 'api' | 'interface'
   createdAt: string
   project: { id: string; name: string } | null
+  eflexDeploymentId: string | null
   eflexStatus: string | null
 }
 
@@ -525,35 +526,59 @@ const ORIGIN: Record<CoolifyDeploymentRow['origin'], string> = { webhook: 'Webho
 
 function DeploymentsTab() {
   const { data, error, loading, reload } = useLoad<{ deployments: CoolifyDeploymentRow[] }>('/deployments')
+  const matched = data ? data.deployments.filter((row) => row.project).length : 0
+  const unmatched = data ? data.deployments.length - matched : 0
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="max-w-3xl space-y-1 text-sm text-muted-foreground">
+          <p>
+            Vue de réconciliation : déploiements connus par Coolify (file/en cours/récents selon l’instance), rapprochés des
+            déploiements E-FLEX par identifiant Coolify.
+          </p>
+          <p className="text-xs">
+            Un élément « lancé hors d’E-FLEX » n’a pas de correspondance dans le portail (lancé depuis l’interface Coolify, une API
+            directe, ou un identifiant non enregistré). Pour l’historique détaillé par application, consultez l’onglet Déploiements
+            d’un projet (« Historique hébergement (Coolify) »).
+          </p>
+        </div>
         <Button type="button" variant="ghost" size="sm" onClick={() => void reload()}>
           <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
           Actualiser
         </Button>
       </div>
       <LoadState loading={loading} error={error} onRetry={() => void reload()} />
-      {data && data.deployments.length === 0 && <p className="text-sm text-muted-foreground">Aucun déploiement en file ou en cours dans Coolify.</p>}
+      {data && (
+        <div className="flex flex-wrap gap-2 text-xs tabular-nums">
+          <span className="rounded-full border border-border px-2 py-0.5">Total : {data.deployments.length}</span>
+          <span className="rounded-full border border-success/30 bg-success/10 px-2 py-0.5">Rapprochés E-FLEX : {matched}</span>
+          <span className="rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5">Hors E-FLEX : {unmatched}</span>
+        </div>
+      )}
+      {data && data.deployments.length === 0 && (
+        <p className="text-sm text-muted-foreground">Aucun déploiement en file ou en cours signalé par Coolify.</p>
+      )}
       {data && data.deployments.length > 0 && (
         <ul className="space-y-2">
           {data.deployments.map((row) => (
             <li key={row.id} className="rounded-lg border border-border p-3 text-sm">
               <p className="flex flex-wrap items-center gap-2 font-medium">
-                <Dot tone={row.status === 'failed' ? 'bad' : row.status === 'finished' ? 'ok' : 'warn'} />
+                <Dot tone={row.status === 'failed' ? 'bad' : row.status === 'finished' || row.status === 'success' ? 'ok' : 'warn'} />
                 {row.application}
                 <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{fr(row.status)}</span>
               </p>
               <p className="mt-1 text-xs text-muted-foreground tabular-nums">
                 {dateTime(row.createdAt)} · {ORIGIN[row.origin]}
-                {row.commit && ` · ${row.commit}`}
-                {row.server && ` · ${row.server}`}
+                {row.commit && ` · commit ${row.commit}`}
+                {row.server && ` · serveur ${row.server}`}
               </p>
+              <p className="mt-1 break-all font-mono text-[11px] text-muted-foreground">ID Coolify : {row.id}</p>
               <p className="mt-1 text-xs">
                 {row.project ? (
                   <a href={`/admin/projects/${row.project.id}`} className="font-medium text-primary hover:underline">
                     Projet E-FLEX : {row.project.name}
-                    {row.eflexStatus && ` (${row.eflexStatus})`}
+                    {row.eflexStatus && ` · statut E-FLEX ${row.eflexStatus}`}
+                    {row.eflexDeploymentId && ` · déploiement ${row.eflexDeploymentId.slice(0, 8)}`}
                   </a>
                 ) : (
                   <span className="text-warning">Lancé hors d’E-FLEX (aucun déploiement E-FLEX correspondant)</span>
@@ -886,11 +911,19 @@ interface EngineCapabilityRow {
   notes: string[]
 }
 
+interface OutgoingWebhookView {
+  supported: boolean
+  enabled: boolean | null
+  webhookUrl: string | null
+  fields: string[]
+}
+
 function CapabilitiesTab() {
   const [forceKey, setForceKey] = useState(0)
   const { data, error, loading, reload } = useLoad<{
     runtime: { version: string | null; reachable: boolean; databaseApiAvailable?: boolean | null; checkedAt: number }
     webhookReceiver?: { configured: boolean; endpoint: string }
+    outgoingWebhook?: OutgoingWebhookView
     engines: EngineCapabilityRow[]
   }>(forceKey > 0 ? '/capabilities?force=1' : '/capabilities')
 
@@ -915,11 +948,22 @@ function CapabilitiesTab() {
         ? 'API bases managées : indisponible'
         : 'API bases managées : non confirmée'
 
+  const outgoing = data?.outgoingWebhook
+  const outgoingTone = !outgoing
+    ? 'muted'
+    : !outgoing.supported
+      ? 'warn'
+      : outgoing.enabled === false
+        ? 'warn'
+        : outgoing.webhookUrl
+          ? 'ok'
+          : 'warn'
+
   return (
     <div className="space-y-4">
       <p className="max-w-3xl text-sm text-muted-foreground">
-        Version et capacités détectées de l’instance Coolify, et support par moteur de base managée (provisionnement,
-        cycle de vie, sauvegarde/restauration intégrés EFLEX). Ces informations pilotent ce qui est proposé aux projets.
+        Version et capacités détectées de l’instance Coolify, branchement des notifications, limites connues
+        (log drains) et support des moteurs de bases managées. Ces informations pilotent ce qui est proposé aux projets.
       </p>
       <LoadState loading={loading} error={error} onRetry={() => void refresh(false)} />
       {data && (
@@ -951,25 +995,81 @@ function CapabilitiesTab() {
           </Card>
 
           <Card>
-            <CardContent className="space-y-2 p-4">
-              <h2 className="font-semibold">Notifications Coolify → EFLEX (webhook entrant)</h2>
-              <p className="flex items-center gap-2 text-sm">
-                <Dot tone={data.webhookReceiver?.configured ? 'ok' : 'warn'} />
-                {data.webhookReceiver?.configured
-                  ? 'Récepteur configuré (secret partagé présent).'
-                  : 'Récepteur non configuré : définissez COOLIFY_WEBHOOK_INBOUND_SECRET pour activer la réception.'}
-              </p>
-              {data.webhookReceiver?.endpoint && (
-                <p className="text-sm text-muted-foreground">
-                  URL à déclarer dans Coolify :{' '}
-                  <code className="break-all rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">
-                    {data.webhookReceiver.endpoint}
-                  </code>
+            <CardContent className="space-y-3 p-4">
+              <h2 className="font-semibold">Notifications Coolify → E-FLEX</h2>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Récepteur entrant (côté E-FLEX)</p>
+                <p className="flex items-center gap-2 text-sm">
+                  <Dot tone={data.webhookReceiver?.configured ? 'ok' : 'warn'} />
+                  {data.webhookReceiver?.configured
+                    ? 'Configuré : le secret partagé COOLIFY_WEBHOOK_INBOUND_SECRET est présent.'
+                    : 'Non configuré : définissez COOLIFY_WEBHOOK_INBOUND_SECRET (variable d’environnement du portail) pour activer la réception.'}
                 </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Les notifications reçues sont dédupliquées, journalisées (audit) et publiées au flux admin. La configuration des notifications sortantes dans Coolify (canaux/webhook) se fait côté Coolify.
+                {data.webhookReceiver?.endpoint && (
+                  <p className="text-sm text-muted-foreground">
+                    URL à déclarer dans Coolify :{' '}
+                    <code className="break-all rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">
+                      {data.webhookReceiver.endpoint}
+                    </code>
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1 border-t border-border pt-3">
+                <p className="text-sm font-medium">Canal sortant (côté Coolify, lecture best-effort)</p>
+                <p className="flex items-center gap-2 text-sm">
+                  <Dot tone={outgoingTone} />
+                  {!outgoing || !outgoing.supported
+                    ? 'Configuration non exposée par l’API Coolify (route /notifications/webhook indisponible ou vide sur cette version) : à régler dans l’interface Coolify.'
+                    : outgoing.enabled === false
+                      ? 'Canal webhook détecté mais désactivé côté Coolify.'
+                      : outgoing.webhookUrl
+                        ? 'Canal webhook détecté et configuré côté Coolify.'
+                        : 'Canal webhook détecté (état partiel).'}
+                </p>
+                {outgoing?.supported && (
+                  <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
+                    <dt className="text-muted-foreground">Activé</dt>
+                    <dd>{outgoing.enabled === null ? 'Inconnu' : outgoing.enabled ? 'Oui' : 'Non'}</dd>
+                    <dt className="text-muted-foreground">URL configurée</dt>
+                    <dd className="break-all font-mono">{outgoing.webhookUrl ?? '—'}</dd>
+                  </dl>
+                )}
+              </div>
+
+              <div className="space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">Guide de branchement</p>
+                <ul className="list-disc space-y-1 pl-4">
+                  <li>Dans Coolify, configurez une notification de type « Webhook » vers l’URL ci-dessus.</li>
+                  <li>
+                    Secret attendu côté Coolify : la valeur de <code className="rounded bg-muted px-1 font-mono">COOLIFY_WEBHOOK_INBOUND_SECRET</code> (non affichée).
+                    Envoyez-la en en-tête <code className="rounded bg-muted px-1 font-mono">Authorization: Bearer &lt;secret&gt;</code> ou{' '}
+                    <code className="rounded bg-muted px-1 font-mono">x-coolify-webhook-secret: &lt;secret&gt;</code>.
+                  </li>
+                  <li>Les notifications reçues sont dédupliquées, journalisées (audit) et publiées au flux admin, sans exposer de secret.</li>
+                  <li>La modification des canaux sortants (e-mail, Telegram, Discord, etc.) reste à faire dans Coolify tant que l’API ne permet pas une gestion fiable depuis E-FLEX.</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="space-y-2 p-4">
+              <h2 className="font-semibold">Évacuation des journaux (log drains)</h2>
+              <p className="flex items-center gap-2 text-sm">
+                <Dot tone="warn" />
+                Non exposé dans E-FLEX pour l’instant.
               </p>
+              <p className="text-sm text-muted-foreground">
+                Coolify documente la possibilité d’évacuer les journaux vers un service externe, mais les routes d’API
+                correspondantes ne sont pas identifiées ni intégrées dans cette version d’E-FLEX (aucun point d’intégration
+                trouvé dans le code ou la documentation d’intégration actuelle).
+              </p>
+              <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+                <li>Aucune destination de log drain n’est configurable depuis l’administration E-FLEX.</li>
+                <li>Configurez un éventuel log drain directement dans Coolify si votre version le permet, en respectant vos contraintes de sécurité (destinations autorisées, secrets non exposés).</li>
+                <li>Référez-vous à <code className="rounded bg-muted px-1 font-mono">docs/architecture/coolify-api-capacites.md</code> pour le suivi des capacités.</li>
+              </ul>
             </CardContent>
           </Card>
 

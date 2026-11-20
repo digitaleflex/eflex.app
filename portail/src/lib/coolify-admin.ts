@@ -455,3 +455,56 @@ export async function setServiceVariables(serviceUuid: string, variables: Record
   if (res.error) return { error: res.error }
   return send(`/services/${enc(serviceUuid)}/restart`, 'POST')
 }
+
+/* ------------------------------------------------------------------ */
+/* Notifications sortantes de Coolify (webhook vers E-FLEX)            */
+/* ------------------------------------------------------------------ */
+
+export interface CoolifyWebhookNotificationView {
+  /** Coolify expose-t-il une configuration lisible (routes /notifications/webhook) ? */
+  supported: boolean
+  /** Canal webhook activé côté Coolify, si connu. */
+  enabled: boolean | null
+  /** URL de destination configurée côté Coolify, si connue (jamais de secret). */
+  webhookUrl: string | null
+  /** Champs sûrs détectés, pour diagnostic sans exposer de valeur sensible. */
+  fields: string[]
+}
+
+const WEBHOOK_ENABLED_KEYS = ['webhook_enabled', 'is_webhook_enabled', 'enabled', 'webhook_notifications', 'is_enabled']
+const WEBHOOK_URL_KEYS = ['webhook_url', 'url', 'endpoint', 'webhook_endpoint']
+
+function pickBool(data: Record<string, unknown>, keys: string[]): boolean | null {
+  for (const key of keys) {
+    const value = data[key]
+    if (typeof value === 'boolean') return value
+    if (value === 1 || value === '1' || value === 'true') return true
+    if (value === 0 || value === '0' || value === 'false') return false
+  }
+  return null
+}
+
+/**
+ * Lit la configuration du canal de notification webhook de Coolify (best-effort, sans secrets).
+ * Les routes `/notifications/webhook` ne sont pas garanties selon la version : en cas d'indisponibilité
+ * ou d'erreur, on renvoie `supported: false` avec une liste de champs vide (jamais de message brut sensible).
+ */
+export function parseWebhookNotification(raw: unknown): CoolifyWebhookNotificationView {
+  const data = obj(raw)
+  const fields = Object.keys(data).filter((key) => /[a-z]/i.test(key))
+  const webhookUrl = str(data[WEBHOOK_URL_KEYS.find((key) => typeof data[key] === 'string') ?? '']) ?? WEBHOOK_URL_KEYS.map((key) => str(data[key])).find((v): v is string => Boolean(v)) ?? null
+  return {
+    supported: fields.length > 0,
+    enabled: pickBool(data, WEBHOOK_ENABLED_KEYS),
+    webhookUrl,
+    fields: fields.sort(),
+  }
+}
+
+export async function getCoolifyWebhookNotification(): Promise<CoolifyWebhookNotificationView> {
+  const res = await coolifyFetch<unknown>('/notifications/webhook', { signal: AbortSignal.timeout(8_000) })
+  if (res.error) return { supported: false, enabled: null, webhookUrl: null, fields: [] }
+  const parsed = parseWebhookNotification(res.data)
+  // Un objet vide signifie que l'endpoint n'expose rien d'exploitable.
+  return parsed.fields.length === 0 ? { supported: false, enabled: null, webhookUrl: null, fields: [] } : parsed
+}

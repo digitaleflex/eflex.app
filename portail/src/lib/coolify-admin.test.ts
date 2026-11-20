@@ -8,6 +8,7 @@ import {
   parseProxy,
   parseS3Storages,
   parseVulnerabilities,
+  parseWebhookNotification,
 } from '@/lib/coolify-admin'
 
 afterEach(() => {
@@ -98,6 +99,28 @@ describe('lecteurs stricts des réponses Coolify', () => {
       { id: 'd1', application: 'boutique', server: null, status: 'in_progress', commit: 'abcdef1', origin: 'webhook', createdAt: '2026-11-16T10:00:00Z' },
     ])
     expect(JSON.stringify(rows)).not.toContain('SECRET')
+  })
+
+  it('lit la configuration webhook sortante sans exposer de secret', () => {
+    const view = parseWebhookNotification({
+      webhook_enabled: true,
+      webhook_url: 'https://eflex.app/api/webhooks/coolify',
+      webhook_secret: 'SUPER_SECRET',
+      token: 'TOPSECRET',
+    })
+    expect(view).toEqual({
+      supported: true,
+      enabled: true,
+      webhookUrl: 'https://eflex.app/api/webhooks/coolify',
+      fields: ['token', 'webhook_enabled', 'webhook_secret', 'webhook_url'],
+    })
+    expect(JSON.stringify({ enabled: view.enabled, webhookUrl: view.webhookUrl })).not.toContain('SUPER_SECRET')
+    expect(JSON.stringify({ enabled: view.enabled, webhookUrl: view.webhookUrl })).not.toContain('TOPSECRET')
+  })
+
+  it('considère une réponse vide de notification webhook comme non exposée', () => {
+    expect(parseWebhookNotification({})).toEqual({ supported: false, enabled: null, webhookUrl: null, fields: [] })
+    expect(parseWebhookNotification(null)).toEqual({ supported: false, enabled: null, webhookUrl: null, fields: [] })
   })
 })
 
