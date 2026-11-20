@@ -16,6 +16,7 @@ import { SectionCard } from '@/components/dashboard/section'
 import { Notice } from '@/components/dashboard/notice'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ProjectMetrics } from '@/components/project-metrics'
+import { SiteMonitoringPanel } from '@/components/project/site-monitoring'
 import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 import { projectTabHref } from '@/lib/project-tabs'
 import { relativeTime } from '@/lib/relative-time'
@@ -220,6 +221,8 @@ export function ProjectOverviewTab({
           </div>
         </dl>
       </SectionCard>
+
+      <SiteMonitoringPanel projectId={projectId} />
 
       {deployed ? (
         <ProjectMetrics projectId={projectId} apps={multiApp ? metricsApps : []} />
