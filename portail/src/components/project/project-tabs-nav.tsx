@@ -7,11 +7,13 @@ export function ProjectTabsNav({
   activeTab,
   deploymentCount,
   variableCount,
+  previewCount = 0,
 }: {
   projectId: string
   activeTab: ProjectTab
   deploymentCount: number
   variableCount: number
+  previewCount?: number
 }) {
   return (
     <nav
@@ -20,7 +22,14 @@ export function ProjectTabsNav({
     >
       {PROJECT_TABS.map((item) => {
         const active = activeTab === item.id
-        const count = item.id === 'deployments' ? deploymentCount : item.id === 'variables' ? variableCount : null
+        const count =
+          item.id === 'deployments'
+            ? deploymentCount
+            : item.id === 'variables'
+              ? variableCount
+              : item.id === 'previews'
+                ? previewCount
+                : null
         return (
           <Link
             key={item.id}
@@ -35,7 +44,7 @@ export function ProjectTabsNav({
           >
             <span className="sm:hidden">{item.short}</span>
             <span className="hidden sm:inline">{item.label}</span>
-            {count !== null && (
+            {count !== null && count > 0 && (
               <span className="rounded-full bg-muted px-1.5 text-xs font-normal tabular-nums text-muted-foreground">
                 {count}
               </span>

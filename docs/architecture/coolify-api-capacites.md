@@ -48,7 +48,7 @@ Classées par intérêt pour vos clients et pour votre temps.
 | **Limites de ressources** | champs `limits_memory`, `limits_cpus`, `limits_memory_swap`… de `PATCH /applications/{uuid}` | Un client ne peut plus faire tomber les autres ; base de la facturation par taille | Admin (taille choisie par le plan du client) |
 | **Contrôle de santé** | champs `health_check_*` | Coolify ne bascule sur la nouvelle version que si elle répond : moins de pannes au déploiement | Client (chemin de santé) |
 | **Applications en un clic (354 modèles)** | `POST /services` avec `type` : `wordpress-with-mariadb`, `ghost`, `strapi`, `directus`, `n8n`, `umami`, `uptime-kuma`, `metabase`, `supabase`… | **WordPress en un clic**, le besoin probable des agences ouest-africaines | Client (liste choisie, pas les 354) |
-| **Prévisualisation des pull requests** | `GET/POST/PATCH/DELETE /applications/{uuid}/previews`, champ `is_preview_deployments_enabled`, `preview_url_template` | Une URL par pull request, comme Vercel | Client |
+| **Prévisualisation des pull requests (MVP #185)** | `GET/POST/PATCH/DELETE /applications/{uuid}/previews`, `is_preview_deployments_enabled` | Une URL par pull request (GitHub, opt-in projet, PR du même dépôt hors fork, bornes/fermeture). Socle portail : client API, webhook `pull_request`, suivi en base, onglet projet. Le routage/TLS des conteneurs de preview dépend de la configuration proxy/réseau de l’instance Coolify (voir limites #185). | Client (**🟡 MVP**) |
 | **Images de retour arrière** | `GET /applications/{uuid}/rollback-images` | Liste des versions vraiment disponibles avant de proposer un retour arrière | Client |
 | **Historique des déploiements Coolify** | `GET /deployments/applications/{uuid}`, `GET /deployments` | Réconciliation : retrouver un déploiement lancé hors d'E-FLEX | Admin |
 | **Tâches planifiées (cron)** | `GET/POST/PATCH/DELETE /applications/{uuid}/scheduled-tasks`, `…/executions`, `…/execute` | `php artisan schedule:run`, nettoyages, envois d'e-mails : très demandé par Laravel et Symfony | Client |
@@ -74,7 +74,7 @@ Classées par intérêt pour vos clients et pour votre temps.
   autre serveur, **cloner** ⬜.
 - **Volumes** ✅ (création) · **sauvegarde des volumes** ⬜.
 - **Étiquettes** (tags) ⬜ · **Destinations** (réseaux Docker) ⬜.
-- **Prévisualisations** de pull request ⬜ · **retour arrière** ✅ · **images disponibles** ⬜.
+- **Prévisualisations** de pull request 🟡 (MVP #185 : client, webhook GitHub, suivi/UI, opt-in et garde-fous ; routage/TLS selon instance) · **retour arrière** ✅ · **images disponibles** ⬜.
 
 ### Bases de données (44 routes)
 - **Moteurs** : PostgreSQL ✅, Redis/Valkey ✅, MySQL, MariaDB, MongoDB, ClickHouse,
@@ -129,7 +129,7 @@ y compris la restauration de la base du service). ⬜ entièrement.
 
 | Niveau | Fonctions |
 |---|---|
-| **Console client** | Déployer, redéployer, annuler, retour arrière (avec la liste des images disponibles) ; journaux ; variables ; domaines ; santé ; bases (PostgreSQL, MySQL/MariaDB, Redis, MongoDB) avec sauvegardes **et restauration** ; sauvegarde des volumes ; tâches planifiées ; prévisualisations de pull request ; modèles en un clic sélectionnés (WordPress, Ghost, Strapi, Directus, n8n, Umami…) ; résumé des failles de sécurité. |
+| **Console client** | Déployer, redéployer, annuler, retour arrière (avec la liste des images disponibles) ; journaux ; variables ; domaines ; santé ; bases (PostgreSQL, MySQL/MariaDB, Redis, MongoDB) avec sauvegardes **et restauration** ; sauvegarde des volumes ; tâches planifiées ; prévisualisations de pull request (**MVP GitHub, opt-in, borné**) ; modèles en un clic sélectionnés (WordPress, Ghost, Strapi, Directus, n8n, Umami…) ; résumé des failles de sécurité. |
 | **Admin E-FLEX** | Serveurs (santé, ressources, nettoyage Docker, proxy, registres, analyse d'images) ; serveur de build ; limites par plan ; journal d'audit Coolify ; webhook de notifications Coolify vers E-FLEX ; version de Coolify ; ajout de serveurs chez un fournisseur ; réconciliation des déploiements. |
 | **⛔ Jamais exposé** | `POST /disable`, MCP, création de jetons Coolify, réglages e-mail de l'instance, accès public direct aux bases sans contrôle, `custom_docker_run_options` et labels bruts (permettraient à un client de s'échapper de son conteneur ou de détourner le trafic d'un autre). |
 
@@ -155,7 +155,7 @@ aujourd'hui pour les labels Traefik).
 4. **Tâches planifiées** et **MySQL/MariaDB** : débloquent Laravel, Symfony, WordPress.
 5. **WordPress en un clic** et quelques modèles choisis.
 6. **Notifications Coolify → E-FLEX** et **analyse de failles** : exploitation et veille.
-7. **Prévisualisations de pull request** : confort développeur, après le reste.
+7. **Prévisualisations de pull request** : socle MVP livré (#185, GitHub, opt-in et garde-fous) ; fiabiliser le routage/TLS des previews selon l’instance Coolify, étendre aux autres fournisseurs Git et affiner la gestion multi-app.
 
 ## 7. Garder cet inventaire à jour
 

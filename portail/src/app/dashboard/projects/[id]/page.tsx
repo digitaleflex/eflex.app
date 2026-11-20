@@ -27,6 +27,7 @@ import { ProjectVariablesTab } from '@/components/project/project-variables-tab'
 import { ProjectRuntimeLogsTab } from '@/components/project/project-runtime-logs-tab'
 import { ProjectAnalyticsTab } from '@/components/project/project-analytics-tab'
 import { ProjectTasksTab } from '@/components/project/project-tasks-tab'
+import { ProjectPreviewsTab } from '@/components/project/project-previews-tab'
 import { statusInfo } from '@/lib/project-status'
 import { runtimeHealth, tlsHealth } from '@/lib/project-health'
 import { nextProjectAction, projectSituation, type NextProjectAction } from '@/lib/project-actions'
@@ -92,7 +93,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const tab = resolveProjectTab(tabParam)
   const org = await resolveOrganization(session)
   if (!org) notFound()
-  const [project, latestLiveDeployment] = await Promise.all([
+  const [project, latestLiveDeployment, activePreviewCount] = await Promise.all([
     prisma.project.findFirst({
       where: { id, organizationId: org.organizationId },
       include: {
@@ -139,6 +140,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       where: { projectId: id, status: 'live', project: { organizationId: org.organizationId } },
       orderBy: { createdAt: 'desc' },
       select: { id: true, commitSha: true, createdAt: true, app: { select: { name: true } } },
+    }),
+    prisma.projectPreview.count({
+      where: { projectId: id, status: { in: ['active', 'updating'] } },
     }),
   ])
   if (!project) notFound()
@@ -277,6 +281,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         activeTab={tab}
         deploymentCount={deployments.length}
         variableCount={project.envVars.length}
+        previewCount={activePreviewCount}
       />
 
       <p role="status" aria-live="polite" className="sr-only">
@@ -373,6 +378,8 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           }))}
         />
       )}
+
+      {tab === 'previews' && <ProjectPreviewsTab projectId={project.id} canManage={canManage} />}
 
       {tab === 'analytics' && <ProjectAnalyticsTab projectId={project.id} canManage={canManage} />}
 
