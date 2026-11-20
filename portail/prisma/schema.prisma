@@ -165,6 +165,8 @@ model Project {
   plan                  Json? // BuildPlan retenu à la création (voir packages/detector)
   detection             Json? // résultat de l'analyse : confiance, raisons, avertissements, commit
   port                  Int               @default(80)
+  /// Prévisualisations PR/MR activées explicitement (MVP #185, désactivé par défaut).
+  previewsEnabled       Boolean           @default(false)
   envVars               EnvVar[]
   deployments           Deployment[]
   domains               ProjectDomain[]
@@ -177,6 +179,7 @@ model Project {
    * principale pendant la transition.
    */
   apps                  ProjectApp[]
+  previews              ProjectPreview[]
   supportTickets        SupportTicket[]
   analytics             ProjectAnalytics?
   trafficStats          TrafficDailyStat[]
@@ -203,9 +206,9 @@ model Project {
  * NULL) : une application interne non exposée n'a pas de domaine.
  */
 model ProjectApp {
-  id           String          @id @default(cuid())
+  id           String           @id @default(cuid())
   projectId    String
-  project      Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   /**
    * Nom court stable et unique dans le projet : "web", "api", "admin".
    */
@@ -213,19 +216,19 @@ model ProjectApp {
   /**
    * Dossier de l'application dans le dépôt ("" = racine).
    */
-  root         String          @default("")
+  root         String           @default("")
   /**
    * Ordre d'affichage déterministe (application principale = 0).
    */
-  position     Int             @default(0)
+  position     Int              @default(0)
   plan         Json
   framework    String
   runtime      String?
-  port         Int             @default(80)
+  port         Int              @default(80)
   /**
    * Domaine public de l'application. null = application non exposée.
    */
-  domain       String?         @unique
+  domain       String?          @unique
   coolifyAppId String?
   tlsValid     Boolean?
   tlsExpiresAt DateTime?
@@ -233,13 +236,48 @@ model ProjectApp {
   envVars      EnvVar[]
   deployments  Deployment[]
   domains      ProjectDomain[]
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  previews     ProjectPreview[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   @@unique([projectId, name])
   @@unique([projectId, root])
   @@index([projectId])
   @@index([coolifyAppId])
+}
+
+/**
+ * Prévisualisation de pull/merge request (#185, MVP). Une ligne par (app, PR).
+ * Les URL et statuts viennent de Coolify ; aucun secret n'est stocké. `active`
+ * = preview ouverte côté Coolify, `closed` = supprimée à la fermeture de la PR,
+ * `failed`/`unsupported` = création ou mise à jour impossible (instance Coolify
+ * sans previews, droits manquants, app non prête, etc.).
+ */
+model ProjectPreview {
+  id                   String     @id @default(cuid())
+  projectId            String
+  project              Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  appId                String
+  app                  ProjectApp @relation(fields: [appId], references: [id], onDelete: Cascade)
+  prNumber             Int
+  prTitle              String?
+  prUrl                String?
+  headRef              String
+  headSha              String?
+  baseRef              String?
+  authorLogin          String?
+  status               String     @default("active") // active | updating | closed | failed | unsupported
+  previewUrl           String?
+  coolifyDeploymentUuid String?
+  error                String?    @db.Text
+  lastDeployedAt       DateTime?
+  closedAt             DateTime?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@unique([projectId, appId, prNumber])
+  @@index([projectId, status])
+  @@index([appId])
 }
 
 /**
