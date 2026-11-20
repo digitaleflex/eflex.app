@@ -8,6 +8,7 @@ import {
   Activity,
   ArrowLeft,
   ArrowRightLeft,
+  Box,
   ChevronDown,
   Database,
   Download,
@@ -65,6 +66,7 @@ interface ProjectSettingsProps {
     hasHostedApp: boolean
   }
   apps?: SettingsApp[]
+  imageSource?: { image: string; port: number; appId: string | null } | null
   envVars: EnvVarKey[]
   transferTargets: TransferTarget[]
 }
@@ -141,7 +143,7 @@ function sortEnvVars(list: EnvVarKey[]): EnvVarKey[] {
   })
 }
 
-export function ProjectSettings({ project, apps: initialApps = [], envVars: initialEnvVars, transferTargets }: ProjectSettingsProps) {
+export function ProjectSettings({ project, apps: initialApps = [], imageSource = null, envVars: initialEnvVars, transferTargets }: ProjectSettingsProps) {
   const router = useRouter()
   const [apps, setApps] = useState<SettingsApp[]>(initialApps)
   const appNameById = new Map(apps.map((app) => [app.id, app.name]))
@@ -154,6 +156,11 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
   const [generalFeedback, setGeneralFeedback] = useState<Feedback>(null)
   const [savingBranch, setSavingBranch] = useState(false)
   const [branchFeedback, setBranchFeedback] = useState<Feedback>(null)
+
+  const [imageRef, setImageRef] = useState(imageSource?.image ?? '')
+  const [imagePort, setImagePort] = useState(String(imageSource?.port ?? 80))
+  const [savingImage, setSavingImage] = useState(false)
+  const [imageFeedback, setImageFeedback] = useState<Feedback>(null)
 
   const [envVars, setEnvVars] = useState<EnvVarKey[]>(initialEnvVars)
   const [envRows, setEnvRows] = useState<EnvRow[]>([{ key: '', value: '' }])
@@ -237,6 +244,49 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
       setBranchFeedback({ tone: 'error', message: NETWORK_ERROR })
     } finally {
       setSavingBranch(false)
+    }
+  }
+
+  async function saveImage(e: React.FormEvent) {
+    e.preventDefault()
+    setImageFeedback(null)
+    const image = imageRef.trim()
+    const port = Number(imagePort)
+    if (image === '') {
+      setImageFeedback({ tone: 'error', message: "Indiquez la référence de l'image Docker." })
+      return
+    }
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      setImageFeedback({ tone: 'error', message: 'Le port doit être un entier compris entre 1 et 65535.' })
+      return
+    }
+    setSavingImage(true)
+    try {
+      const response = await fetch(`/api/projects/${project.id}/image`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image,
+          port,
+          ...(imageSource?.appId ? { appId: imageSource.appId } : {}),
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setImageFeedback({ tone: 'error', message: data.error || "L'image n'a pas pu être mise à jour." })
+        return
+      }
+      setImageRef(data.image ?? image)
+      setImagePort(String(data.port ?? port))
+      setImageFeedback({
+        tone: 'success',
+        message: 'Image mise à jour. Lancez un redéploiement depuis la page du projet pour appliquer le changement.',
+      })
+      router.refresh()
+    } catch {
+      setImageFeedback({ tone: 'error', message: NETWORK_ERROR })
+    } finally {
+      setSavingImage(false)
     }
   }
 
@@ -409,7 +459,7 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
 
   const nav = [
     { href: '#general', label: 'Général' },
-    { href: '#branche-deploiement', label: 'Branche et déploiement' },
+    { href: '#branche-deploiement', label: imageSource ? 'Source et déploiement' : 'Branche et déploiement' },
     { href: '#domaines', label: 'Domaines' },
     { href: '#bases', label: 'Bases de données' },
     { href: '#disponibilite', label: 'Disponibilité' },
@@ -531,30 +581,77 @@ export function ProjectSettings({ project, apps: initialApps = [], envVars: init
 
       <SettingsSection
         id="branche-deploiement"
-        title="Branche et déploiement"
-        icon={GitBranch}
-        description="Les push sur la branche de production déclenchent un déploiement automatique."
+        title={imageSource ? 'Source et déploiement' : 'Branche et déploiement'}
+        icon={imageSource ? Box : GitBranch}
+        description={
+          imageSource
+            ? "Ce projet est déployé depuis une image Docker. Modifiez la référence ou le port, puis lancez un redéploiement pour appliquer les changements."
+            : 'Les push sur la branche de production déclenchent un déploiement automatique.'
+        }
       >
         <div className="space-y-4">
-          <FeedbackMessage feedback={branchFeedback} id="project-branch-feedback" />
-          <form onSubmit={saveBranch} className="space-y-4">
-            <Input
-              id="project-branch"
-              label="Branche de production"
-              value={branch}
-              onChange={(e) => setBranch(e.target.value)}
-              hint="Utilisée pour les déploiements automatiques déclenchés par les push."
-              spellCheck={false}
-              aria-invalid={branchFeedback?.tone === 'error' ? true : undefined}
-              aria-describedby={branchFeedback?.tone === 'error' ? 'project-branch-feedback' : undefined}
-              required
-            />
-            <div className="flex justify-end">
-              <Button type="submit" loading={savingBranch} disabled={branch.trim() === project.branch} disabledReason="Aucune modification à enregistrer">
-                Enregistrer la branche
-              </Button>
-            </div>
-          </form>
+          {imageSource ? (
+            <>
+              <FeedbackMessage feedback={imageFeedback} id="project-image-feedback" />
+              <form onSubmit={saveImage} className="space-y-4">
+                <Input
+                  id="project-image"
+                  label="Référence de l’image"
+                  value={imageRef}
+                  onChange={(e) => setImageRef(e.target.value)}
+                  hint="Nom d’image, tag et/ou digest (ex. nginx:1.27, ghcr.io/org/app:1.2.3, image@sha256:…). Les changements sont appliqués au prochain redéploiement."
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-invalid={imageFeedback?.tone === 'error' ? true : undefined}
+                  aria-describedby={imageFeedback?.tone === 'error' ? 'project-image-feedback' : undefined}
+                  required
+                />
+                <Input
+                  id="project-image-port"
+                  label="Port exposé"
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={imagePort}
+                  onChange={(e) => setImagePort(e.target.value)}
+                  hint="Port HTTP écouté par le conteneur."
+                  required
+                />
+                <div className="flex justify-end">
+                  <Button
+                    type="submit"
+                    loading={savingImage}
+                    disabled={imageRef.trim() === imageSource.image && Number(imagePort) === imageSource.port}
+                    disabledReason="Aucune modification à enregistrer"
+                  >
+                    Enregistrer l’image
+                  </Button>
+                </div>
+              </form>
+            </>
+          ) : (
+            <>
+              <FeedbackMessage feedback={branchFeedback} id="project-branch-feedback" />
+              <form onSubmit={saveBranch} className="space-y-4">
+                <Input
+                  id="project-branch"
+                  label="Branche de production"
+                  value={branch}
+                  onChange={(e) => setBranch(e.target.value)}
+                  hint="Utilisée pour les déploiements automatiques déclenchés par les push."
+                  spellCheck={false}
+                  aria-invalid={branchFeedback?.tone === 'error' ? true : undefined}
+                  aria-describedby={branchFeedback?.tone === 'error' ? 'project-branch-feedback' : undefined}
+                  required
+                />
+                <div className="flex justify-end">
+                  <Button type="submit" loading={savingBranch} disabled={branch.trim() === project.branch} disabledReason="Aucune modification à enregistrer">
+                    Enregistrer la branche
+                  </Button>
+                </div>
+              </form>
+            </>
+          )}
         </div>
       </SettingsSection>
 

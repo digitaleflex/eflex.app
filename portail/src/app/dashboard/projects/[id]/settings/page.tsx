@@ -26,6 +26,11 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
         name: true,
         branch: true,
         slug: true,
+        repoUrl: true,
+        plan: true,
+        port: true,
+        framework: true,
+        runtime: true,
         // Les valeurs ne quittent jamais le serveur : on n'envoie que les noms.
         envVars: { select: { key: true, updatedAt: true, appId: true }, orderBy: { key: 'asc' } },
         apps: {
@@ -36,6 +41,9 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
             root: true,
             domain: true,
             framework: true,
+            runtime: true,
+            port: true,
+            plan: true,
             coolifyAppId: true,
             position: true,
           },
@@ -58,6 +66,22 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
   const primaryApp = project.apps.find((app) => app.position === 0) ?? project.apps[0] ?? null
   const primaryDomain = primaryApp?.domain ?? null
   const hasHostedApp = project.apps.some((app) => Boolean(app.coolifyAppId))
+
+  const primaryPlan = (primaryApp?.plan ?? project.plan) as { source?: string; image?: string; port?: number } | null
+  const imageSource =
+    primaryPlan?.source === 'docker-image' && typeof primaryPlan.image === 'string'
+      ? {
+          image: primaryPlan.image,
+          port: typeof primaryPlan.port === 'number' ? primaryPlan.port : (primaryApp?.port ?? project.port ?? 80),
+          appId: primaryApp?.id ?? null,
+        }
+      : project.repoUrl?.startsWith('docker-image://')
+        ? {
+            image: project.repoUrl.slice('docker-image://'.length),
+            port: primaryApp?.port ?? project.port ?? 80,
+            appId: primaryApp?.id ?? null,
+          }
+        : null
 
   const transferTargets = transferMemberships
     .map((membership) => membership.organization)
@@ -82,6 +106,7 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
           framework: app.framework,
           deployed: Boolean(app.coolifyAppId),
         }))}
+        imageSource={imageSource}
         transferTargets={transferTargets}
         envVars={project.envVars.map((item) => ({
           key: item.key,
