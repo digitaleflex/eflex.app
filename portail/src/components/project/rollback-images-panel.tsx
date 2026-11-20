@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import { History, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 type RollbackImage = { commit: string; image?: string | null; createdAt?: string | null }
 type AppImages = { id: string; name: string; images: RollbackImage[]; error?: string }
 
 const short = (commit: string) => (commit.length > 12 ? commit.slice(0, 7) : commit)
+const formatDate = (iso: string | null | undefined) =>
+  iso ? new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : null
 
 export function RollbackImagesPanel({ projectId, multiApp }: { projectId: string; multiApp: boolean }) {
   const [apps, setApps] = useState<AppImages[] | null>(null)
@@ -62,42 +63,53 @@ export function RollbackImagesPanel({ projectId, multiApp }: { projectId: string
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-xs font-medium text-foreground">
           <History className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-          Versions disponibles pour retour arrière (côté hébergement)
+          Versions valides pour retour arrière (images conservées par l’hébergement)
         </p>
         <Button type="button" variant="ghost" size="sm" onClick={() => void load()} className="h-7 px-2 text-xs">
           <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" /> Actualiser
         </Button>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        Seuls les commits ayant une image/version conservée par l’hébergement peuvent être restaurés. La liste ci-dessous reflète ce que Coolify expose.
+        Cette liste provient de Coolify (<code className="rounded bg-muted px-1 font-mono">rollback-images</code>) : elle indique les
+        commits/images réellement restaurables. Pour revenir à une version, privilégiez « Redéployer cette version » sur un
+        déploiement réussi dont le commit apparaît ici ; un commit absent peut être refusé par l’hébergement.
       </p>
-      <div className={cn('mt-2 space-y-2', multiApp ? '' : '')}>
+      <div className="mt-2 space-y-3">
         {apps.map((app) => (
           <div key={app.id}>
             {multiApp && <p className="text-xs font-medium text-foreground">{app.name}</p>}
             {app.error ? (
               <p className="text-xs text-warning">Indisponible : {app.error}</p>
             ) : app.images.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Aucune image de retour arrière signalée.</p>
+              <p className="text-xs text-muted-foreground">Aucune image de retour arrière signalée pour cette application.</p>
             ) : (
-              <ul className="mt-1 flex flex-wrap gap-1.5">
-                {app.images.slice(0, 12).map((image, index) => (
-                  <li key={`${image.commit}-${index}`}>
-                    <span className="inline-flex items-center rounded-md border border-border bg-muted/40 px-2 py-0.5 font-mono text-xs tabular-nums text-foreground" title={image.commit}>
-                      {short(image.commit)}
-                    </span>
-                  </li>
-                ))}
-                {app.images.length > 12 && (
-                  <li className="text-xs text-muted-foreground">+{app.images.length - 12} autres</li>
-                )}
+              <ul className="mt-1 space-y-1">
+                {app.images.slice(0, 12).map((image, index) => {
+                  const date = formatDate(image.createdAt)
+                  return (
+                    <li key={`${image.commit}-${index}`} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                      <span
+                        className="inline-flex items-center rounded-md border border-border bg-muted/40 px-2 py-0.5 font-mono tabular-nums text-foreground"
+                        title={image.commit}
+                      >
+                        {short(image.commit)}
+                      </span>
+                      {image.image && <span className="break-all font-mono text-[11px] text-muted-foreground">{image.image}</span>}
+                      {date && <span className="text-muted-foreground tabular-nums">{date}</span>}
+                    </li>
+                  )
+                })}
+                {app.images.length > 12 && <li className="text-xs text-muted-foreground">+{app.images.length - 12} autres</li>}
               </ul>
             )}
           </div>
         ))}
       </div>
       {total === 0 && (
-        <p className="mt-1 text-xs text-muted-foreground">Si aucune image n’apparaît, l’hébergement n’a peut-être pas conservé d’image de retour ou ne l’expose pas pour cette application.</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Si aucune image n’apparaît, l’hébergement n’a peut-être pas conservé d’image de retour, ou ne l’expose pas. Vérifiez aussi
+          l’historique hébergement ci-dessous pour la réconciliation.
+        </p>
       )}
     </div>
   )
