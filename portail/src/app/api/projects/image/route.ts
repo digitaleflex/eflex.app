@@ -12,21 +12,12 @@ import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { MAINTENANCE_DEPLOYMENT_MESSAGE, isMaintenanceActive } from '@/lib/platform-settings'
 import { assertDeploymentAllowed, assertProjectQuota } from '@/lib/billing'
 import { publish } from '@/lib/event-bus'
-
-const IMAGE_REF_RE = /^[a-z0-9][a-z0-9._\-\/]*(:[A-Za-z0-9_][A-Za-z0-9._\-]{0,127})?(@sha256:[a-f0-9]{64})?$/
-const IMAGE_REF_HOST_RE = /^[a-z0-9][a-z0-9.\-]*(?::[0-9]{2,5})?(?:\/[a-z0-9][a-z0-9._\-\/]*)?(?::[A-Za-z0-9_][A-Za-z0-9._\-]{0,127})?(?:@sha256:[a-f0-9]{64})?$/
-
-function isValidImageRef(value: string): boolean {
-  const ref = value.trim()
-  if (ref.length === 0 || ref.length > 255) return false
-  if (/[\s'"`$\\<>|;&]/.test(ref)) return false
-  return IMAGE_REF_RE.test(ref) || IMAGE_REF_HOST_RE.test(ref)
-}
+import { DOCKER_IMAGE_REF_ERROR, isValidDockerImageRef } from '@/lib/docker-image-ref'
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Donnez un nom au projet.').max(60, 'Le nom du projet est trop long (60 caractères maximum).'),
-  image: z.string().trim().min(1, "Indiquez la référence de l'image Docker.").max(255),
-  port: z.coerce.number().int().min(1).max(65535).default(80),
+  image: z.string().trim().min(1, "Indiquez la référence de l'image Docker.").max(255, "La référence de l'image est trop longue."),
+  port: z.coerce.number().int('Le port doit être un entier.').min(1, 'Le port doit être compris entre 1 et 65535.').max(65535, 'Le port doit être compris entre 1 et 65535.').default(80),
   envVars: z
     .array(
       z.object({
@@ -94,11 +85,8 @@ export async function POST(request: NextRequest) {
   const input = parsed.data
 
   const image = input.image.trim()
-  if (!isValidImageRef(image)) {
-    return NextResponse.json(
-      { error: "Référence d'image Docker invalide. Utilisez un nom d'image, un tag et/ou un digest valides (ex. nginx:1.27, ghcr.io/org/app:latest, image@sha256:…)." },
-      { status: 400 },
-    )
+  if (!isValidDockerImageRef(image)) {
+    return NextResponse.json({ error: DOCKER_IMAGE_REF_ERROR }, { status: 400 })
   }
 
   const keys = input.envVars.map((v) => v.key)
