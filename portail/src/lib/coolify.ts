@@ -1750,3 +1750,155 @@ export async function checkConnection(): Promise<boolean> {
     return false
   }
 }
+
+// ─── Prévisualisations de pull requests (MVP #185) ──────────────────────────
+
+export interface CoolifyApplicationPreview {
+  uuid?: string | null
+  pullRequestId: number
+  pullRequestHtmlUrl: string | null
+  gitType: string | null
+  status: string
+  domains: string | null
+  dockerComposeDomains: Array<{ name: string; domain: string | null; redirect?: string | null }> | null
+  dockerRegistryImageTag: string | null
+  lastOnlineAt: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+function parsePreview(raw: unknown): CoolifyApplicationPreview | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as Record<string, unknown>
+  const pr =
+    typeof row.pull_request_id === 'number'
+      ? row.pull_request_id
+      : typeof row.pull_request_id === 'string' && /^\d+$/.test(row.pull_request_id)
+        ? Number(row.pull_request_id)
+        : null
+  if (pr === null) return null
+  const composeDomains = Array.isArray(row.docker_compose_domains)
+    ? row.docker_compose_domains
+        .map((item) => {
+          if (!item || typeof item !== 'object') return null
+          const d = item as Record<string, unknown>
+          const name = typeof d.name === 'string' ? d.name : null
+          if (!name) return null
+          return {
+            name,
+            domain: typeof d.domain === 'string' ? d.domain : null,
+            redirect: typeof d.redirect === 'string' ? d.redirect : null,
+          }
+        })
+        .filter((item): item is { name: string; domain: string | null; redirect: string | null } => item !== null)
+    : null
+  return {
+    uuid: typeof row.uuid === 'string' ? row.uuid : null,
+    pullRequestId: pr,
+    pullRequestHtmlUrl: typeof row.pull_request_html_url === 'string' ? row.pull_request_html_url : null,
+    gitType: typeof row.git_type === 'string' ? row.git_type : null,
+    status: typeof row.status === 'string' ? row.status : 'unknown',
+    domains: typeof row.domains === 'string' ? row.domains : null,
+    dockerComposeDomains: composeDomains,
+    dockerRegistryImageTag: typeof row.docker_registry_image_tag === 'string' ? row.docker_registry_image_tag : null,
+    lastOnlineAt: typeof row.last_online_at === 'string' ? row.last_online_at : null,
+    createdAt: typeof row.created_at === 'string' ? row.created_at : null,
+    updatedAt: typeof row.updated_at === 'string' ? row.updated_at : null,
+  }
+}
+
+export interface CreatePreviewInput {
+  pullRequestId: number
+  pullRequestHtmlUrl?: string
+  gitType?: 'github' | 'gitlab' | 'gitea' | 'bitbucket'
+  commit?: string
+  force?: boolean
+  instantDeploy?: boolean
+}
+
+export interface PreviewDeploymentResult {
+  message: string
+  deploymentUuid: string | null
+  preview: CoolifyApplicationPreview | null
+}
+
+/** Active les prévisualisations sur l'application (modèle d'URL optionnel). */
+export async function enableApplicationPreviews(
+  appId: string,
+  options: { enabled?: boolean; previewUrlTemplate?: string } = {},
+): Promise<{ ok: true } | { error: string }> {
+  const payload: Record<string, unknown> = {
+    is_preview_deployments_enabled: options.enabled ?? true,
+  }
+  if (options.previewUrlTemplate !== undefined) {
+    payload.preview_url_template = options.previewUrlTemplate
+  }
+  const res = await coolifyFetch(`/applications/${encodeURIComponent(appId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+  if (res.error) return { error: res.error }
+  return { ok: true }
+}
+
+export async function listApplicationPreviews(
+  appId: string,
+): Promise<{ previews: CoolifyApplicationPreview[] } | { error: string }> {
+  const res = await coolifyFetch<unknown>(`/applications/${encodeURIComponent(appId)}/previews`)
+  if (res.error) return { error: res.error }
+  if (!Array.isArray(res.data)) return { previews: [] }
+  return { previews: res.data.map(parsePreview).filter((item): item is CoolifyApplicationPreview => item !== null) }
+}
+
+export async function getApplicationPreview(
+  appId: string,
+  pullRequestId: number,
+): Promise<CoolifyApplicationPreview | { error: string }> {
+  const res = await coolifyFetch<unknown>(
+    `/applications/${encodeURIComponent(appId)}/previews/${encodeURIComponent(String(pullRequestId))}`,
+  )
+  if (res.error) return { error: res.error }
+  const preview = parsePreview(res.data)
+  if (!preview) return { error: 'Prévisualisation introuvable ou réponse invalide.' }
+  return preview
+}
+
+export async function createOrRedeployApplicationPreview(
+  appId: string,
+  input: CreatePreviewInput,
+): Promise<PreviewDeploymentResult | { error: string }> {
+  const payload: Record<string, unknown> = {
+    pull_request_id: input.pullRequestId,
+    instant_deploy: input.instantDeploy ?? true,
+  }
+  if (input.pullRequestHtmlUrl) payload.pull_request_html_url = input.pullRequestHtmlUrl
+  if (input.gitType) payload.git_type = input.gitType
+  if (input.commit) payload.commit = input.commit
+  if (input.force) payload.force = true
+  const res = await coolifyFetch<Record<string, unknown>>(
+    `/applications/${encodeURIComponent(appId)}/previews`,
+    { method: 'POST', body: JSON.stringify(payload) },
+  )
+  if (res.error) return { error: res.error }
+  const data = res.data ?? {}
+  return {
+    message: typeof data.message === 'string' ? data.message : 'Prévisualisation demandée.',
+    deploymentUuid: typeof data.deployment_uuid === 'string' ? data.deployment_uuid : null,
+    preview: parsePreview(data.preview),
+  }
+}
+
+export async function deleteApplicationPreview(
+  appId: string,
+  pullRequestId: number,
+): Promise<{ ok: true; message?: string } | { error: string }> {
+  const res = await coolifyFetch<{ message?: unknown }>(
+    `/applications/${encodeURIComponent(appId)}/previews/${encodeURIComponent(String(pullRequestId))}`,
+    { method: 'DELETE' },
+  )
+  if (res.error) {
+    if (res.error.includes('Hébergement API 404')) return { ok: true }
+    return { error: res.error }
+  }
+  return { ok: true, message: typeof res.data?.message === 'string' ? res.data.message : undefined }
+}

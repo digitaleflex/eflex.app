@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
 import { multiAppEnabled } from '@/lib/multi-app'
 import { getPrimaryApp, normalizeAppRoot } from '@/lib/project-apps'
+import { handlePullRequestEvent, parsePullRequestEvent } from '@/lib/project-previews'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -193,7 +194,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, queued, skipped })
   }
 
-  // pull_request / installation_repositories : enregistrés pour l'idempotence,
-  // traités en phase 2 (previews).
+  if (event === 'pull_request') {
+    const prEvent = parsePullRequestEvent(payload)
+    if (!prEvent) {
+      return NextResponse.json({ received: true, ignored: true })
+    }
+    try {
+      const results = await handlePullRequestEvent(prEvent)
+      const handled = results.filter((r) => !['skipped'].includes(r.status)).length
+      console.info(
+        `[eflex/webhook/github] pull_request ${prEvent.repositoryFullName}#${prEvent.number} ${prEvent.action} -> ${handled} action(s)`,
+      )
+      return NextResponse.json({ received: true, previews: results })
+    } catch (error) {
+      console.error('[eflex/webhook/github] prévisualisation impossible :', error)
+      // 2xx pour ne pas déclencher des retries agressifs GitHub sur une erreur métier ; l'état est traçable en base/logs.
+      return NextResponse.json({ received: true, error: 'preview_failed' })
+    }
+  }
+
+  // installation_repositories et autres événements : enregistrés pour l'idempotence.
   return NextResponse.json({ received: true, ignored: true })
 }
