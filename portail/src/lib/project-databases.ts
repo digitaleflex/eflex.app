@@ -7,12 +7,11 @@ import {
   DATABASE_ENGINE_CATALOG,
   getDatabaseEngineCapabilities,
   isManagedDatabaseKind,
+  learnDatabaseEngineCapability,
   listDatabaseEngineCapabilities,
-  resolveDatabaseEngineCapabilities,
   type DatabaseEngineCapabilities,
 } from '@/lib/database-capabilities'
-import { getDatabaseProviderByKind, resolveDatabaseProvider } from '@/lib/database-provider'
-import { learnDatabaseEngineCapability } from '@/lib/database-capabilities'
+import { getProviderForStoredKind, resolveDatabaseProvider } from '@/lib/database-provider'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
 import { isAppDeployed } from '@/lib/project-primary'
 
@@ -38,6 +37,16 @@ export async function listManagedDatabaseCatalog() {
 
 export async function getManagedDatabaseCapabilities(kind: ManagedDatabaseKind) {
   return getDatabaseEngineCapabilities(kind)
+}
+
+/**
+ * Quota de bases managées par projet (#184). Par défaut 5 (une par moteur possible de façon raisonnable
+ * sans duplication), borné pour éviter les abus ; surchargeable via EFLEX_MAX_DATABASES_PER_PROJECT.
+ */
+export function maxDatabasesPerProject(): number {
+  const raw = Number.parseInt(process.env.EFLEX_MAX_DATABASES_PER_PROJECT ?? '', 10)
+  if (Number.isFinite(raw)) return Math.min(20, Math.max(1, raw))
+  return 5
 }
 
 const internalAad = (projectId: string, kind: string) => `project-db:${projectId}:${kind}`
@@ -76,7 +85,7 @@ async function managedEnvKeysForDatabase(
 async function providerForKind(
   kind: ManagedDatabaseKind,
 ): Promise<
-  | { ok: true; provider: ReturnType<typeof getDatabaseProviderByKind>; capabilities: DatabaseEngineCapabilities }
+  | { ok: true; provider: Awaited<ReturnType<typeof resolveDatabaseProvider>> & { provider: any }; capabilities: DatabaseEngineCapabilities }
   | { ok: false; error: string; status: number }
 > {
   const resolved = await resolveDatabaseProvider(kind)
@@ -90,7 +99,7 @@ async function providerForKind(
       status: 400,
     }
   }
-  return { ok: true, provider: resolved.provider, capabilities: resolved.capabilities }
+  return { ok: true, provider: resolved as any, capabilities: resolved.capabilities }
 }
 
 /** Attend que le provider ait démarré la base (création asynchrone). */
@@ -120,7 +129,8 @@ export async function createProjectDatabase(
 ): Promise<{ database: ProjectDatabase; deploymentId: string | null; ready: boolean } | { error: string; status: number }> {
   const selection = await providerForKind(kind)
   if (!selection.ok) return { error: selection.error, status: selection.status }
-  const { provider } = selection
+  const { provider: resolved } = selection
+  const provider = resolved.provider
   const config = DATABASE_KINDS[kind]
   const keys = managedKeys(kind)
 
@@ -130,6 +140,15 @@ export async function createProjectDatabase(
   })
   if (existing) {
     return { error: `Une base ${config.label} existe déjà pour ce projet.`, status: 409 }
+  }
+
+  const count = await prisma.projectDatabase.count({ where: { projectId: project.id } })
+  const limit = maxDatabasesPerProject()
+  if (count >= limit) {
+    return {
+      error: `Limite atteinte : ${limit} base(s) managée(s) maximum par projet. Supprimez une base existante avant d’en créer une nouvelle.`,
+      status: 409,
+    }
   }
 
   const primaryEnvExists = await prisma.envVar.findUnique({
@@ -145,10 +164,12 @@ export async function createProjectDatabase(
 
   const created = await provider.createManagedDatabase(kind, `eflex-${project.slug}-${kind}`)
   if ('error' in created) {
+    // Apprentissage réactif (#183) : un refus explicite de l'instance invalide le provisionnement en cache.
     if (/H[ée]bergement API (404|405)\b/i.test(created.error) || /not found|not supported|unsupported/i.test(created.error)) {
       learnDatabaseEngineCapability(kind, {
-        provisionSupported: false,
-        reason: `Le moteur ${config.label} n’est pas supporté par cette instance Coolify.`,
+        operation: 'provision',
+        supported: false,
+        reason: `Le moteur ${config.label} n’est pas supporté ou provisionnable par cette instance/provider.`,
       })
     }
     return { error: created.error, status: 502 }
@@ -214,9 +235,7 @@ export async function createProjectDatabase(
 
 function providerForStoredDatabase(kind: string) {
   if (!isDatabaseKind(kind)) return null
-  return getDatabaseProviderByKind(
-    resolveDatabaseEngineCapabilities(kind, { version: null, reachable: true, databaseApiAvailable: null, checkedAt: 0 }).provider,
-  )
+  return getProviderForStoredKind(kind)
 }
 
 /** Supprime la base et les variables d'environnement gérées (principale + alias) associées. */
@@ -224,7 +243,7 @@ export async function deleteProjectDatabase(
   project: DeployableProject,
   database: Pick<ProjectDatabase, 'id' | 'projectId' | 'kind' | 'coolifyId' | 'internalUrl'>,
 ): Promise<{ deploymentId: string | null } | { error: string; status: number }> {
-  const provider = providerForStoredDatabase(database.kind) ?? getDatabaseProviderByKind('coolify')
+  const provider = providerForStoredDatabase(database.kind) ?? getProviderForStoredKind('postgresql')
   const keysToDelete = await managedEnvKeysForDatabase(database).catch(() => {
     const primary = isDatabaseKind(database.kind) ? managedKeys(database.kind).primary : null
     return primary ? [primary] : []
@@ -252,7 +271,7 @@ export async function deleteProjectDatabase(
 export async function refreshProjectDatabase(
   database: Pick<ProjectDatabase, 'id' | 'projectId' | 'kind' | 'coolifyId' | 'internalUrl'>,
 ): Promise<{ status: string; internalUrl: string } | { error: string }> {
-  const provider = providerForStoredDatabase(database.kind) ?? getDatabaseProviderByKind('coolify')
+  const provider = providerForStoredDatabase(database.kind) ?? getProviderForStoredKind('postgresql')
   const info = await provider.getManagedDatabase(database.coolifyId)
   if ('error' in info) return { error: info.error }
 
@@ -314,7 +333,7 @@ export async function projectDatabaseAction(
   database: Pick<ProjectDatabase, 'id' | 'kind' | 'coolifyId'>,
   action: 'start' | 'stop' | 'restart',
 ): Promise<{ ok: true } | { error: string }> {
-  const provider = providerForStoredDatabase(database.kind) ?? getDatabaseProviderByKind('coolify')
+  const provider = providerForStoredDatabase(database.kind) ?? getProviderForStoredKind('postgresql')
   const result = await provider.managedDatabaseAction(database.coolifyId, action)
   if ('error' in result) return result
   await prisma.projectDatabase.update({
