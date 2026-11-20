@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
+  Activity,
   ArrowLeft,
   Building2,
   CreditCard,
@@ -35,6 +36,7 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
     items: [
       { label: "Vue d'ensemble", href: '/admin', icon: LayoutDashboard, exact: true },
       { label: 'Activité en direct', href: '/admin/live', icon: Radio },
+      { label: 'Surveillance des sites', href: '/admin/monitoring', icon: Activity },
       { label: "Journal d'audit", href: '/admin/audit', icon: ScrollText },
     ],
   },
