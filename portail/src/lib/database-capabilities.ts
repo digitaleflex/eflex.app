@@ -152,59 +152,75 @@ export function isManagedDatabaseKind(value: unknown): value is ManagedDatabaseK
 /** Moteurs dont l'API Coolify `/databases/{kind}` est connue (inventaire v4.7.5). */
 const COOLIFY_KNOWN_DB_KINDS = new Set<ManagedDatabaseKind>(DATABASE_ENGINE_CATALOG.map((entry) => entry.kind))
 
+/** Moteurs pour lesquels Coolify expose des sauvegardes planifiées exploitables via l'API générique. */
+const COOLIFY_GENERIC_BACKUP_KINDS = new Set<ManagedDatabaseKind>(['postgresql', 'mysql', 'mariadb', 'mongodb'])
+
 function baseNotes(kind: ManagedDatabaseKind): string[] {
   if (kind === 'postgresql') {
     return [
       'Variable injectée : DATABASE_URL.',
-      'Sauvegardes planifiées et restauration assistée prises en charge par EFLEX (selon configuration).',
+      'Sauvegardes planifiées et restauration assistée prises en charge par EFLEX (selon configuration Coolify).',
       'Copie hors site possible via stockage S3 Coolify si configuré.',
-    ]
-  }
-  if (kind === 'redis') {
-    return [
-      'Variable injectée : REDIS_URL (certaines apps attendent aussi CACHE_URL/QUEUE_URL).',
-      'Aucune sauvegarde/restauration intégrée EFLEX : à utiliser comme cache/file sauf stratégie dédiée.',
-    ]
-  }
-  if (kind === 'dragonfly' || kind === 'keydb') {
-    return [
-      `Variable injectée : ${kind === 'dragonfly' ? 'DRAGONFLY_URL' : 'KEYDB_URL'} (compatible Redis ; certaines apps attendent REDIS_URL).`,
-      'Aucune sauvegarde/restauration intégrée EFLEX : à utiliser comme cache/file sauf stratégie dédiée.',
+      'RPO sans archivage WAL : perte possible des données écrites depuis la dernière sauvegarde réussie.',
     ]
   }
   if (kind === 'mysql') {
     return [
       'Variable injectée : MYSQL_URL (certaines apps attendent DATABASE_URL ou DB_*).',
-      'Sauvegardes/restauration intégrées EFLEX non disponibles pour ce moteur (à gérer selon ses outils natifs).',
+      'Sauvegardes/restauration via l’adaptateur Coolify générique (outils natifs du moteur). À valider sur votre instance Coolify.',
+      'Copie hors site possible via stockage S3 Coolify si configuré.',
+      'Vérifiez régulièrement la restaurabilité dans un environnement isolé avant de considérer une sauvegarde comme garantie.',
     ]
   }
   if (kind === 'mariadb') {
     return [
       'Variable injectée : MARIADB_URL (compatible MySQL ; certaines apps attendent DATABASE_URL/MYSQL_URL).',
-      'Sauvegardes/restauration intégrées EFLEX non disponibles pour ce moteur (à gérer selon ses outils natifs).',
+      'Sauvegardes/restauration via l’adaptateur Coolify générique (outils natifs du moteur). À valider sur votre instance Coolify.',
+      'Copie hors site possible via stockage S3 Coolify si configuré.',
+      'Vérifiez régulièrement la restaurabilité dans un environnement isolé avant de considérer une sauvegarde comme garantie.',
     ]
   }
   if (kind === 'mongodb') {
     return [
       'Variable injectée : MONGODB_URL (certaines apps attendent MONGO_URL ou DATABASE_URL).',
-      'Sauvegardes/restauration intégrées EFLEX non disponibles pour ce moteur (à gérer selon ses outils natifs).',
+      'Sauvegardes/restauration via l’adaptateur Coolify générique (outils natifs du moteur, ex. dump). À valider sur votre instance Coolify.',
+      'Copie hors site possible via stockage S3 Coolify si configuré.',
+      'Le format et la restaurabilité dépendent du moteur/outillage de l’instance : testez la restauration en environnement isolé.',
+    ]
+  }
+  if (kind === 'redis') {
+    return [
+      'Variable injectée : REDIS_URL (certaines apps attendent aussi CACHE_URL/QUEUE_URL).',
+      'Aucune sauvegarde/restauration intégrée EFLEX : Coolify ne sauvegarde pas Redis.',
+      'Recommandé comme cache/file éphémère. Si des données durables sont stockées, configurez la persistance Redis (AOF/RDB) côté service et une stratégie de sauvegarde dédiée ; aucune garantie de restauration n’est fournie par EFLEX.',
+    ]
+  }
+  if (kind === 'dragonfly' || kind === 'keydb') {
+    return [
+      `Variable injectée : ${kind === 'dragonfly' ? 'DRAGONFLY_URL' : 'KEYDB_URL'} (compatible Redis ; certaines apps attendent REDIS_URL).`,
+      'Aucune sauvegarde/restauration intégrée EFLEX pour ce moteur en mémoire.',
+      'À utiliser comme cache/file sauf configuration de persistance et stratégie de sauvegarde propres au moteur, validées et testées.',
     ]
   }
   if (kind === 'clickhouse') {
     return [
       'Variable injectée : CLICKHOUSE_URL.',
       'Base analytique : vérifier le driver/protocole attendu par l’application.',
-      'Sauvegardes/restauration intégrées EFLEX non disponibles pour ce moteur (à gérer selon ses outils natifs).',
+      'Sauvegardes/restauration intégrées EFLEX non disponibles. Utilisez les mécanismes natifs ClickHouse (BACKUP/RESTORE, snapshots, exports) et testez la restauration.',
     ]
   }
   if (kind === 'sqlite') {
     return [
       'Variable injectée : SQLITE_URL (format/chemin dépendant de Coolify et du runtime applicatif).',
       'Support à valider sur l’instance Coolify : provisionnement, URL/chemin, persistance et cycle de vie peuvent varier.',
-      'Sauvegardes/restauration intégrées EFLEX non disponibles.',
+      'Sauvegardes/restauration intégrées EFLEX non disponibles. Sauvegardez le fichier de base selon le stockage/volume réel et testez la restauration.',
     ]
   }
   return ['Sauvegardes/restauration intégrées EFLEX non disponibles pour ce moteur (à gérer selon ses outils natifs).']
+}
+
+export function supportsCoolifyGenericBackup(kind: ManagedDatabaseKind): boolean {
+  return COOLIFY_GENERIC_BACKUP_KINDS.has(kind)
 }
 
 /**
@@ -252,8 +268,11 @@ export function resolveDatabaseEngineCapabilities(
   const apiCompatible = runtime.databaseApiAvailable !== false
   let provisionSupported = knownByCoolify && apiCompatible
   let lifecycleSupported = knownByCoolify && apiCompatible
-  const backupSupported = kind === 'postgresql'
-  const restoreSupported = kind === 'postgresql'
+  // Sauvegardes/restauration via l'adaptateur Coolify générique : disponibles pour les moteurs
+  // pris en charge par Coolify quand l'API est compatible. La restaurabilité effective dépend de
+  // l'instance/outillage et doit être vérifiée (preuve de restauration).
+  const backupSupported = COOLIFY_GENERIC_BACKUP_KINDS.has(kind) && apiCompatible
+  const restoreSupported = COOLIFY_GENERIC_BACKUP_KINDS.has(kind) && apiCompatible
 
   let reason: string | undefined
   if (!apiCompatible) {

@@ -15,6 +15,7 @@ const coolify = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/coolify', () => ({
+  coolifyFetch: async () => ({ data: null }),
   listDatabaseBackups: async (databaseId: string) => coolify.schedules.get(databaseId) ?? [],
   createDatabaseBackup: async (databaseId: string, options: unknown) => {
     if (coolify.failCreate) return { error: 'Hébergement API 404' }
@@ -35,6 +36,16 @@ vi.mock('@/lib/coolify', () => ({
     return { id: '99' }
   },
   getDatabaseImportStatus: async () => ({ state: 'finished', finishedAt: null }),
+}))
+
+vi.mock('@/lib/coolify-capabilities', () => ({
+  getCoolifyRuntimeCapabilities: async () => ({
+    version: '4.7.5',
+    reachable: true,
+    databaseApiAvailable: true,
+    checkedAt: Date.now(),
+  }),
+  resetCoolifyCapabilitiesCache: () => undefined,
 }))
 
 const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`

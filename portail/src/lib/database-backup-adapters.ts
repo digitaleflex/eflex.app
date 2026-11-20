@@ -11,14 +11,18 @@ import {
   type DatabaseImportSource,
   type DatabaseImportState,
 } from '@/lib/coolify'
-import { getDatabaseEngineCapabilities, getDatabaseEngineCatalog } from '@/lib/database-capabilities'
+import {
+  getDatabaseEngineCapabilities,
+  getDatabaseEngineCatalog,
+  supportsCoolifyGenericBackup,
+} from '@/lib/database-capabilities'
 
 /**
  * Adaptateurs des opérations de sauvegarde/restauration par moteur/provider.
  *
- * PostgreSQL est implémenté via Coolify (planification, exécutions, import/restauration, preuve).
- * Les autres moteurs doivent recevoir une stratégie dédiée (outils natifs, capacités Coolify
- * spécifiques, ou provider EFLEX-géré) et être activés uniquement après validation de restauration.
+ * Implémentation actuelle : Coolify (API générique /databases/{uuid}/backups et /imports) pour les
+ * moteurs pris en charge par Coolify (PostgreSQL, MySQL, MariaDB, MongoDB selon les capacités/outils
+ * de l'instance). Les autres moteurs exposent une dégradation explicite avec raison.
  */
 
 export interface DatabaseBackupAdapter {
@@ -58,23 +62,17 @@ const unsupported = (kind: ManagedDatabaseKind, reason: string): DatabaseBackupA
   }
 }
 
-const postgresqlCoolifyAdapter: DatabaseBackupAdapter = {
-  kind: 'postgresql',
-  supported: true,
-  listSchedules: listDatabaseBackups,
-  createSchedule: createDatabaseBackup,
-  updateSchedule: updateDatabaseBackup,
-  runSchedule: runDatabaseBackup,
-  startRestore: startDatabaseImport,
-  getRestoreStatus: getDatabaseImportStatus,
-}
-
-type AdapterFactory = () => DatabaseBackupAdapter
-
-const ADAPTER_FACTORIES: Partial<Record<ManagedDatabaseKind, AdapterFactory>> = {
-  postgresql: () => postgresqlCoolifyAdapter,
-  // mysql/mariadb/mongodb/clickhouse/redis/dragonfly/keydb/sqlite : à implémenter par moteur
-  // (stratégie et validation spécifiques) avant activation.
+function coolifyGenericAdapter(kind: ManagedDatabaseKind): DatabaseBackupAdapter {
+  return {
+    kind,
+    supported: true,
+    listSchedules: listDatabaseBackups,
+    createSchedule: createDatabaseBackup,
+    updateSchedule: updateDatabaseBackup,
+    runSchedule: runDatabaseBackup,
+    startRestore: startDatabaseImport,
+    getRestoreStatus: getDatabaseImportStatus,
+  }
 }
 
 function engineLabel(kind: ManagedDatabaseKind): string {
@@ -91,18 +89,19 @@ export async function getDatabaseBackupAdapter(kind: string): Promise<DatabaseBa
     )
   }
 
-  const factory = ADAPTER_FACTORIES[engine]
-  if (!factory) {
-    return unsupported(
-      engine,
-      `Aucun adaptateur de sauvegarde/restauration n’est encore implémenté pour ${engineLabel(engine)}.`,
-    )
+  if (supportsCoolifyGenericBackup(engine)) {
+    return coolifyGenericAdapter(engine)
   }
 
-  return factory()
+  return unsupported(
+    engine,
+    `Aucun adaptateur de sauvegarde/restauration n’est encore implémenté pour ${engineLabel(engine)}.`,
+  )
 }
 
-/** Moteurs pour lesquels une implémentation d’adaptateur backup/restore existe. */
+/** Moteurs pour lesquels une implémentation d’adaptateur backup/restore Coolify générique existe. */
 export function implementedBackupAdapterKinds(): ManagedDatabaseKind[] {
-  return (Object.keys(ADAPTER_FACTORIES) as ManagedDatabaseKind[]).filter(Boolean)
+  return (['postgresql', 'mysql', 'mariadb', 'mongodb'] as ManagedDatabaseKind[]).filter((kind) =>
+    supportsCoolifyGenericBackup(kind),
+  )
 }

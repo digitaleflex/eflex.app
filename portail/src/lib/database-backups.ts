@@ -7,25 +7,43 @@ import type {
   DatabaseImportState,
 } from '@/lib/coolify'
 import { getDatabaseBackupAdapter } from '@/lib/database-backup-adapters'
-import { getDatabaseEngineCapabilities, isManagedDatabaseKind } from '@/lib/database-capabilities'
+import {
+  getDatabaseEngineCapabilities,
+  getDatabaseEngineCatalog,
+  isManagedDatabaseKind,
+  supportsCoolifyGenericBackup,
+  type ManagedDatabaseKind,
+} from '@/lib/database-capabilities'
 import { memberIds, notify } from '@/lib/notifications'
 
 /**
  * Sauvegardes des bases managées.
  *
- * Aujourd'hui : intégration Coolify pour PostgreSQL (planification, exécutions, copie S3 optionnelle,
- * restauration assistée). Les autres moteurs ne bénéficient pas encore d'un parcours intégré EFLEX :
- * le support est piloté par le registre de capacités (`database-capabilities.ts`) afin d'étendre
- * proprement par moteur/provider (outils natifs, adaptateurs EFLEX) sans généralisation implicite.
+ * Intégration Coolify générique (planification, exécutions, copie S3 optionnelle, restauration assistée,
+ * preuve de restauration consignée) pour les moteurs exposés par le registre de capacités/adaptateurs
+ * (aujourd'hui PostgreSQL, MySQL, MariaDB, MongoDB selon l'instance). Les autres moteurs ne bénéficient
+ * pas d'un parcours intégré EFLEX : dégradation explicite pilotée par `database-capabilities.ts` (Redis
+ * traité comme cache/file sans sauvegarde Coolify, etc.) sans généralisation implicite.
  */
 
-export const BACKUP_SUPPORTED_KINDS = ['postgresql'] as const
+/** Moteurs candidats au parcours de sauvegarde Coolify générique (filtre de surveillance). */
+export const BACKUP_CANDIDATE_KINDS = ['postgresql', 'mysql', 'mariadb', 'mongodb'] as const
+/** @deprecated utiliser la capacité réelle via `backupSupported()` / `database-capabilities`. */
+export const BACKUP_SUPPORTED_KINDS = BACKUP_CANDIDATE_KINDS
 
 /** Support sauvegarde intégrée EFLEX, piloté par les capacités du moteur. */
 export async function backupSupported(kind: string): Promise<boolean> {
   if (!isManagedDatabaseKind(kind)) return false
   const { capabilities } = await getDatabaseEngineCapabilities(kind)
   return capabilities.backupSupported
+}
+
+export async function listBackupCandidateKinds(): Promise<ManagedDatabaseKind[]> {
+  const kinds: ManagedDatabaseKind[] = []
+  for (const kind of BACKUP_CANDIDATE_KINDS) {
+    if (await backupSupported(kind)) kinds.push(kind)
+  }
+  return kinds
 }
 
 export interface BackupSettings {
@@ -203,7 +221,9 @@ export async function ensureDatabaseBackup(
   settings = backupSettings(),
 ): Promise<{ backupId: string; created: boolean; reconciled?: boolean } | { error: string }> {
   const adapter = await getDatabaseBackupAdapter(database.kind)
-  if (!adapter.supported) return { error: 'Les sauvegardes ne sont disponibles que pour PostgreSQL.' }
+  if (!adapter.supported) {
+    return { error: adapter.reason ?? 'Les sauvegardes intégrées ne sont pas disponibles pour ce moteur.' }
+  }
 
   const schedules = await adapter.listSchedules(database.coolifyId)
   if ('error' in schedules) return { error: schedules.error }
@@ -230,6 +250,8 @@ export async function ensureDatabaseBackup(
 
 export interface DatabaseBackupStatus {
   supported: boolean
+  kind: string
+  engineLabel: string
   scheduled: boolean
   /** Copie hors serveur configurée sur la plateforme (variable d'environnement). */
   offsiteConfigured: boolean
@@ -239,6 +261,10 @@ export interface DatabaseBackupStatus {
   summary: (Omit<BackupSummary, 'recent' | 'offsite'> & { recent: PublicBackupExecution[] }) | null
   /** Dernière restauration consignée (preuve exploitable). */
   restore: RestoreProof | null
+  /** Raison lisible quand les sauvegardes intégrées ne sont pas disponibles. */
+  unsupportedReason: string | null
+  /** Notes/capacités réelles du moteur (stratégie, limites). */
+  notes: string[]
   error: string | null
 }
 
@@ -250,6 +276,8 @@ export interface PublicBackupExecution {
   createdAt: string
   /** Un fichier est encore disponible pour la restaurer. */
   restorable: boolean
+  /** Copie hors serveur (S3) confirmée pour cette exécution, quand l'information est disponible. */
+  offsiteCopied: boolean | null
 }
 
 /**
@@ -273,6 +301,7 @@ export function toPublicExecution(execution: DatabaseBackupExecution, s3StorageU
     size: execution.size,
     createdAt: execution.createdAt,
     restorable: restoreSourceFor(execution, s3StorageUuid) !== null,
+    offsiteCopied: execution.status === 'success' ? execution.s3Uploaded : null,
   }
 }
 
@@ -282,12 +311,20 @@ export async function getDatabaseBackupStatus(
   settings = backupSettings(),
 ): Promise<DatabaseBackupStatus> {
   const adapter = await getDatabaseBackupAdapter(database.kind)
+  const cap = isManagedDatabaseKind(database.kind)
+    ? (await getDatabaseEngineCapabilities(database.kind)).capabilities
+    : null
+  const engineLabel = cap?.label ?? getDatabaseEngineCatalog(database.kind as ManagedDatabaseKind)?.label ?? database.kind
   const base = {
     supported: adapter.supported,
+    kind: database.kind,
+    engineLabel,
     scheduled: Boolean(database.backupId),
     offsiteConfigured: Boolean(settings.s3StorageUuid),
     frequency: settings.frequency,
     restore: toRestoreProof(database),
+    unsupportedReason: adapter.supported ? null : (adapter.reason ?? cap?.reason ?? null),
+    notes: cap?.notes ?? [],
   }
   if (!base.supported || !database.backupId) {
     return { ...base, scheduleOffsite: null, summary: null, error: null }
@@ -316,7 +353,11 @@ export async function restoreDatabaseBackup(
 ): Promise<{ importId: string; backupCreatedAt: string } | { error: string; status: number }> {
   const adapter = await getDatabaseBackupAdapter(database.kind)
   if (!adapter.supported) {
-    return { error: 'La restauration n’est disponible que pour PostgreSQL.', status: 400 }
+    return {
+      error:
+        adapter.reason ?? 'La restauration intégrée n’est pas disponible pour ce moteur sur cette instance.',
+      status: 400,
+    }
   }
   const schedules = await adapter.listSchedules(database.coolifyId)
   if ('error' in schedules) return { error: schedules.error, status: 502 }
@@ -408,8 +449,10 @@ export async function runDatabaseBackupNow(database: BackupTarget): Promise<{ ok
  * ou date trop. Une alerte par base et par jour au plus (`dedupeKey`).
  */
 export async function evaluateDatabaseBackups(now = new Date(), settings = backupSettings()): Promise<number> {
+  // Candidats élargis : le support réel est validé par moteur (capacités/adaptateur) afin de couvrir
+  // les extensions multi-moteurs sans promesse implicite pour les moteurs non supportés.
   const databases = await prisma.projectDatabase.findMany({
-    where: { kind: { in: [...BACKUP_SUPPORTED_KINDS] } },
+    where: { kind: { in: [...BACKUP_CANDIDATE_KINDS] } },
     select: {
       id: true,
       kind: true,
@@ -423,6 +466,9 @@ export async function evaluateDatabaseBackups(now = new Date(), settings = backu
   let alerts = 0
   for (const database of databases) {
     try {
+      const adapter = await getDatabaseBackupAdapter(database.kind)
+      if (!adapter.supported) continue
+
       let backupId = database.backupId
       let scheduledAt = database.backupScheduledAt
       if (!backupId) {
@@ -434,7 +480,6 @@ export async function evaluateDatabaseBackups(now = new Date(), settings = backu
         backupId = ensured.backupId
         scheduledAt = now
       }
-      const adapter = await getDatabaseBackupAdapter(database.kind)
       const schedules = await adapter.listSchedules(database.coolifyId)
       if ('error' in schedules) {
         console.error('[backups] lecture impossible', database.id, schedules.error)
