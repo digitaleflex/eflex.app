@@ -890,6 +890,7 @@ function CapabilitiesTab() {
   const [forceKey, setForceKey] = useState(0)
   const { data, error, loading, reload } = useLoad<{
     runtime: { version: string | null; reachable: boolean; databaseApiAvailable?: boolean | null; checkedAt: number }
+    webhookReceiver?: { configured: boolean; endpoint: string }
     engines: EngineCapabilityRow[]
   }>(forceKey > 0 ? '/capabilities?force=1' : '/capabilities')
 
@@ -946,6 +947,29 @@ function CapabilitiesTab() {
                   Re-sonder
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="space-y-2 p-4">
+              <h2 className="font-semibold">Notifications Coolify → EFLEX (webhook entrant)</h2>
+              <p className="flex items-center gap-2 text-sm">
+                <Dot tone={data.webhookReceiver?.configured ? 'ok' : 'warn'} />
+                {data.webhookReceiver?.configured
+                  ? 'Récepteur configuré (secret partagé présent).'
+                  : 'Récepteur non configuré : définissez COOLIFY_WEBHOOK_INBOUND_SECRET pour activer la réception.'}
+              </p>
+              {data.webhookReceiver?.endpoint && (
+                <p className="text-sm text-muted-foreground">
+                  URL à déclarer dans Coolify :{' '}
+                  <code className="break-all rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">
+                    {data.webhookReceiver.endpoint}
+                  </code>
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Les notifications reçues sont dédupliquées, journalisées (audit) et publiées au flux admin. La configuration des notifications sortantes dans Coolify (canaux/webhook) se fait côté Coolify.
+              </p>
             </CardContent>
           </Card>
 

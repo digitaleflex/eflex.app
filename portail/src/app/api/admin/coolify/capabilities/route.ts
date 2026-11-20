@@ -13,9 +13,14 @@ export async function GET(request: NextRequest) {
 
   const force = request.nextUrl.searchParams.get('force') === '1'
   const { runtime, engines } = await listDatabaseEngineCapabilities({ force })
+  const webhookEndpoint = new URL('/api/webhooks/coolify', request.url).toString()
   return NextResponse.json(
     {
       runtime,
+      webhookReceiver: {
+        configured: Boolean(process.env.COOLIFY_WEBHOOK_INBOUND_SECRET?.trim()),
+        endpoint: webhookEndpoint,
+      },
       engines: engines.map((engine) => ({
         kind: engine.kind,
         label: engine.label,
