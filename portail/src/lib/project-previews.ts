@@ -36,7 +36,7 @@ export function parsePullRequestEvent(payload: unknown): PullRequestEvent | null
   const pr = p.pull_request && typeof p.pull_request === 'object' ? (p.pull_request as Record<string, unknown>) : null
   const repositoryFullName = repo && typeof repo.full_name === 'string' ? repo.full_name : null
   const number = pr && typeof pr.number === 'number' ? pr.number : null
-  if (!action || !repositoryFullName || !number) return null
+  if (!action || !repositoryFullName || !number || !pr) return null
   const head = pr.head && typeof pr.head === 'object' ? (pr.head as Record<string, unknown>) : null
   const headRepo = head && head.repo && typeof head.repo === 'object' ? (head.repo as Record<string, unknown>) : null
   const base = pr.base && typeof pr.base === 'object' ? (pr.base as Record<string, unknown>) : null

@@ -128,7 +128,7 @@ export function ProjectPreviewsTab({ projectId, canManage }: { projectId: string
       }
     >
       <div className="space-y-4 p-4 sm:p-5">
-        {error && <Notice tone="error">{error}</Notice>}
+        {error && <Notice tone="danger" title="Impossible de charger les prévisualisations">{error}</Notice>}
 
         {loading && !data ? (
           <p className="text-sm text-muted-foreground">Chargement des prévisualisations…</p>
@@ -151,7 +151,7 @@ export function ProjectPreviewsTab({ projectId, canManage }: { projectId: string
               {canManage && (
                 <Button
                   type="button"
-                  variant={data.enabled ? 'outline' : 'default'}
+                  variant={data.enabled ? 'outline' : 'primary'}
                   onClick={() => void toggle(!data.enabled)}
                   disabled={saving}
                 >
@@ -160,7 +160,7 @@ export function ProjectPreviewsTab({ projectId, canManage }: { projectId: string
               )}
             </div>
 
-            <Notice tone="warning">
+            <Notice tone="warning" title="Garde-fous de sécurité et limites">
               <span className="inline-flex items-start gap-2">
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>
