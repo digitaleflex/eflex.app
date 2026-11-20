@@ -43,6 +43,15 @@ function once(host: string, timeoutMs: number): Promise<TlsCheck> {
   })
 }
 
+/** Contrôle TLS ponctuel (une tentative), utilisé par la surveillance continue. */
+export async function checkTls(host: string, timeoutMs = 8_000): Promise<TlsCheck> {
+  const clean = host.trim().toLowerCase()
+  if (!HOST_RE.test(clean)) {
+    return { ok: false, expiresAt: null, reason: 'nom d’hôte invalide' }
+  }
+  return once(clean, timeoutMs)
+}
+
 /**
  * Attend qu'un certificat TLS valide soit servi pour `host`. Let's Encrypt peut
  * mettre quelques dizaines de secondes après la publication du conteneur.
