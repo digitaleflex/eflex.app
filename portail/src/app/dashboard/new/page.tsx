@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { GitBranch, Search, TriangleAlert } from 'lucide-react'
+import { Box, GitBranch, Search, TriangleAlert } from 'lucide-react'
 import type { BuildPlan } from '@eflex/detector'
 import type { RepoAnalysis } from '@/lib/repo-analysis'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,10 @@ const NETWORK_ERROR = 'Impossible de contacter le serveur. Vérifiez votre conne
 export default function NewProjectPage() {
   const router = useRouter()
   const resultHeading = useRef<HTMLHeadingElement>(null)
+
+  const [sourceMode, setSourceMode] = useState<'git' | 'image'>('git')
+  const [imageRef, setImageRef] = useState('')
+  const [imagePort, setImagePort] = useState('80')
 
   const [repoUrl, setRepoUrl] = useState('')
   const [branch, setBranch] = useState('')
@@ -186,16 +190,150 @@ export default function NewProjectPage() {
     }
   }
 
+  async function createImageProject(e: React.FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    setSubmitError('')
+    try {
+      const res = await fetch('/api/projects/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          image: imageRef,
+          port: Number(imagePort) || 80,
+          envVars: rowsToVars(envVars),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || data.error) {
+        setSubmitError(data.error || "Le projet n'a pas pu être créé. Vérifiez les champs et réessayez.")
+        return
+      }
+      router.push(`/dashboard/projects/${data.project.id}`)
+      router.refresh()
+    } catch {
+      setSubmitError(NETWORK_ERROR)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
 
   return (
     <div className="max-w-3xl space-y-8 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Nouveau projet</h1>
         <p className="text-muted-foreground">
-          Indiquez votre dépôt GitHub : EFLEX reconnaît la stack et prépare le déploiement.
+          Déployez depuis un dépôt GitHub (détection automatique) ou depuis une image Docker.
         </p>
       </div>
 
+      <Card>
+        <CardHeader>
+          <h2 className="font-semibold">Source du déploiement</h2>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => { setSourceMode('git'); setSubmitError('') }}
+              className={`flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${sourceMode === 'git' ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'}`}
+              aria-pressed={sourceMode === 'git'}
+            >
+              <GitBranch className="h-4 w-4" aria-hidden="true" />
+              <span>
+                <span className="block font-medium">Dépôt GitHub</span>
+                <span className="block text-muted-foreground">Analyse du dépôt, build et déploiement automatiques</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSourceMode('image'); setSubmitError(''); resetAnalysis() }}
+              className={`flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${sourceMode === 'image' ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'}`}
+              aria-pressed={sourceMode === 'image'}
+            >
+              <Box className="h-4 w-4" aria-hidden="true" />
+              <span>
+                <span className="block font-medium">Image Docker</span>
+                <span className="block text-muted-foreground">Déployer une image de registre (tag ou digest)</span>
+              </span>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {sourceMode === 'image' ? (
+        <form onSubmit={createImageProject} className="space-y-6">
+          <Card>
+            <CardHeader>
+              <h2 className="font-semibold">Image à déployer</h2>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Input
+                id="image-ref"
+                label="Référence de l'image"
+                placeholder="ghcr.io/organisation/app:latest"
+                hint="Nom d’image, tag et/ou digest (ex. nginx:1.27, ghcr.io/org/app:1.2.3, image@sha256:…)."
+                autoComplete="off"
+                spellCheck={false}
+                value={imageRef}
+                onChange={(e) => { setImageRef(e.target.value); if (!nameEdited) { const guess = e.target.value.split('/').pop()?.split(':')[0]?.split('@')[0]; if (guess) setName(guess); } }}
+                required
+              />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  id="image-port"
+                  label="Port exposé"
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={imagePort}
+                  onChange={(e) => setImagePort(e.target.value)}
+                  hint="Port HTTP écouté par le conteneur (80 par défaut)."
+                  required
+                />
+                <Input
+                  id="image-name"
+                  label="Nom du projet"
+                  hint="Il sert à construire l'adresse de votre application."
+                  value={name}
+                  onChange={(e) => { setName(e.target.value); setNameEdited(true) }}
+                  required
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <h2 className="font-semibold">Variables d&apos;environnement</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Injectées au conteneur au déploiement. Elles ne sont jamais écrites dans un dépôt.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <EnvEditor rows={envVars} onChange={setEnvVars} disabled={submitting} />
+            </CardContent>
+          </Card>
+
+          {submitError && (
+            <div role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+              {submitError}
+            </div>
+          )}
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <Button type="submit" size="lg" loading={submitting} disabled={name.trim() === '' || imageRef.trim() === ''}>
+              Démarrer le déploiement
+            </Button>
+            <Button variant="ghost" type="button" size="lg" onClick={() => router.push('/dashboard')}>
+              Annuler
+            </Button>
+          </div>
+        </form>
+      ) : (
+      <>
       {/* 1. Le dépôt */}
       <form
         onSubmit={(e) => {
@@ -489,7 +627,9 @@ export default function NewProjectPage() {
             </form>
           </>
         )}
+          </div>
+          </>
+        )}
       </div>
-    </div>
   )
 }
