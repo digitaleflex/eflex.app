@@ -267,10 +267,10 @@ main() {
   local status_file="$BACKUP_DIR/restore-test.status"
   local now
   now="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-  printf 'last_success_at=%s\nlast_file=%s\nsource_db=%s\ntarget_db=%s\ntables=%s\nusers=%s\nprojects=%s\nmigrations=%s\n' \
+  printf 'status=success\nlast_success_at=%s\nlast_file=%s\nsource_db=%s\ntarget_db=%s\ntables=%s\nusers=%s\nprojects=%s\nmigrations=%s\nproof_scope=isolated_restore_test\n' \
     "$now" "$(basename "$DUMP_FILE")" "$PG_DB" "$TARGET_DB" "$tables" "$users" "$projects" "$migrations" >"$status_file"
   chmod 600 "$status_file"
-  log "preuve consignée : restore-test.status"
+  log "preuve consignée : restore-test.status (restauration testée en environnement isolé)"
 
   log "=== fin test de restauration : OK ==="
 }

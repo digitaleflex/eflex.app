@@ -29,6 +29,11 @@
 #   ALERT_EMAIL               destinataire e-mail (facultatif)
 #   RESEND_API_KEY            clé Resend (lue dans .env.prod, jamais affichée)
 #   EFLEX_ENV_FILE            fichier de variables (déf. <repo>/.env.prod)
+#   EFLEX_BACKUP_HEALTHCHECK=1  active la vérification des statuts backup/restore portail
+#   EFLEX_BACKUP_DIR          dossier des statuts backup/restore (déf. /home/fantome/backups/eflex)
+#   EFLEX_BACKUP_MAX_AGE_HOURS      âge max sauvegarde locale (déf. 26)
+#   EFLEX_RESTORE_TEST_MAX_AGE_DAYS âge max preuve de restauration (déf. 35)
+#   EFLEX_BACKUP_REQUIRE_OFFSITE=1  traite l’absence de copie hors site comme anomalie
 #
 # Code de sortie : 0 si tout est sain, 1 si au moins une anomalie est détectée.
 # ═══════════════════════════════════════════════════════════════════════════
@@ -111,6 +116,20 @@ json_escape() {
   s="${s//$'\r'/\\r}"
   s="${s//$'\t'/\\t}"
   printf '%s' "$s"
+}
+
+read_status_value() {
+  local file="$1" key="$2"
+  [ -r "$file" ] || return 0
+  awk -F= -v k="$key" '$1 == k { sub(/^[^=]*=/, ""); print; exit }' "$file" 2>/dev/null || true
+}
+
+iso_age_hours() {
+  local iso="$1" epoch now
+  [ -n "$iso" ] || { printf '%s' ""; return 0; }
+  epoch="$(date -u -d "$iso" +%s 2>/dev/null)" || { printf '%s' ""; return 0; }
+  now="$(date -u +%s)"
+  printf '%s' "$(( (now - epoch) / 3600 ))"
 }
 
 http_check() {
@@ -237,6 +256,75 @@ tls_checks() {
   done <<<"$domains"
 }
 
+# Vérification optionnelle des preuves de sauvegarde/restauration du portail (backup.status,
+# restore-test.status). Activée par EFLEX_BACKUP_HEALTHCHECK=1 ou si un fichier de statut existe
+# dans EFLEX_BACKUP_DIR. Ne lit aucun secret : uniquement horodatages et résultats.
+backup_status_checks() {
+  local dir="${EFLEX_BACKUP_DIR:-/home/fantome/backups/eflex}"
+  local backup_file="$dir/backup.status"
+  local restore_file="$dir/restore-test.status"
+  local enabled="${EFLEX_BACKUP_HEALTHCHECK:-}"
+  local max_backup_h="${EFLEX_BACKUP_MAX_AGE_HOURS:-26}"
+  local max_restore_days="${EFLEX_RESTORE_TEST_MAX_AGE_DAYS:-35}"
+  local require_offsite="${EFLEX_BACKUP_REQUIRE_OFFSITE:-0}"
+
+  if [ "$enabled" != "1" ] && [ "$enabled" != "true" ] && [ ! -f "$backup_file" ] && [ ! -f "$restore_file" ]; then
+    return
+  fi
+
+  if [ -f "$backup_file" ]; then
+    local local_at overall_at offsite age
+    local_at="$(read_status_value "$backup_file" local_success_at)"
+    [ -n "$local_at" ] || local_at="$(read_status_value "$backup_file" last_success_at)"
+    overall_at="$(read_status_value "$backup_file" last_success_at)"
+    offsite="$(read_status_value "$backup_file" offsite)"
+    age="$(iso_age_hours "$local_at")"
+    if [ -z "$local_at" ] || [ -z "$age" ]; then
+      record_fail "Sauvegarde portail : statut illisible ($backup_file)"
+    elif [ "$age" -gt "$max_backup_h" ]; then
+      record_fail "Sauvegarde portail : dernière sauvegarde locale trop ancienne (${age} h > ${max_backup_h} h)"
+    else
+      ok "Sauvegarde portail : locale OK il y a ${age} h (fichier $(read_status_value "$backup_file" last_file))"
+    fi
+    case "$offsite" in
+      ok) ok "Sauvegarde portail : copie hors site OK" ;;
+      skipped)
+        if [ "$require_offsite" = "1" ] || [ "$require_offsite" = "true" ]; then
+          record_fail "Sauvegarde portail : copie hors site non configurée (requise)"
+        else
+          warn "Sauvegarde portail : copie hors site non configurée (recommandée)"
+        fi
+        ;;
+      error)
+        record_fail "Sauvegarde portail : dernière copie hors site en échec (preuve locale conservée)"
+        ;;
+      *) warn "Sauvegarde portail : état de copie hors site inconnu (${offsite:-vide})" ;;
+    esac
+    if [ -n "$overall_at" ]; then
+      ok "Sauvegarde portail : succès global consigné"
+    elif [ "$offsite" = "error" ]; then
+      log "INFO" "Sauvegarde portail : pas de succès global (copie hors site en échec) — restauration locale possible"
+    fi
+  else
+    warn "Sauvegarde portail : aucun backup.status trouvé dans $dir"
+  fi
+
+  if [ -f "$restore_file" ]; then
+    local restore_at restore_age_h
+    restore_at="$(read_status_value "$restore_file" last_success_at)"
+    restore_age_h="$(iso_age_hours "$restore_at")"
+    if [ -z "$restore_at" ] || [ -z "$restore_age_h" ]; then
+      record_fail "Restauration portail : statut illisible ($restore_file)"
+    elif [ "$restore_age_h" -gt $((max_restore_days * 24)) ]; then
+      record_fail "Restauration portail : dernière preuve trop ancienne (${restore_age_h} h > $((max_restore_days * 24)) h)"
+    else
+      ok "Restauration portail : restauration testée il y a ${restore_age_h} h (preuve $(read_status_value "$restore_file" last_file))"
+    fi
+  else
+    warn "Restauration portail : aucun restore-test.status trouvé dans $dir"
+  fi
+}
+
 send_webhook() {
   local message="$1" payload response code
   payload="{\"text\":\"$(json_escape "$message")\"}"
@@ -325,6 +413,7 @@ main() {
   http_check
   service_checks
   tls_checks
+  backup_status_checks
 
   if [ "$FAILED" -eq 0 ]; then
     log "INFO" "=== healthcheck : OK ==="

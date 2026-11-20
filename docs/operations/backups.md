@@ -17,9 +17,9 @@
 
 | Composant | Rôle | Fréquence | État |
 |---|---|---|---|
-| `backup-db.sh` | `pg_dump` custom + gzip, vérifications, rétention, copie hors site optionnelle, statut | quotidien 03:30 | à installer (§5) |
-| `restore-test.sh` | restaure la dernière sauvegarde dans `eflex_restore_test`, vérifie, supprime, consigne une preuve | dimanche 05:15 | à installer (§5) |
-| `healthcheck.sh` | HTTP, TLS, Docker, PostgreSQL, Redis + alertes | toutes les 15 min | à installer (§5) |
+| `backup-db.sh` | `pg_dump` custom + gzip, vérifications, rétention, copie hors site optionnelle, statut distingué (locale / hors site) | quotidien 03:30 | à installer (§5) |
+| `restore-test.sh` | restaure la dernière sauvegarde dans `eflex_restore_test`, vérifie, supprime, consigne une preuve de restauration testée | dimanche 05:15 | à installer (§5) |
+| `healthcheck.sh` | HTTP, TLS, Docker, PostgreSQL, Redis, alertes, et (optionnel) vérification des preuves backup/restore | toutes les 15 min | à installer (§5) |
 
 Les scripts sont indépendants : ils peuvent être lancés à la main sans systemd.
 Tous écrivent un journal lisible sur stdout (capturé par journald) **et** dans
@@ -33,6 +33,14 @@ encore déployé (DNS absent) fait échouer le healthcheck : c'est volontaire,
 utiliser `EFLEX_HEALTHCHECK_SKIP_PROJECT_DOMAINS=1` pour ne contrôler que
 l'apex pendant la mise en place.
 
+Le healthcheck peut aussi contrôler la fraîcheur des preuves du portail
+(`backup.status`, `restore-test.status`) quand `EFLEX_BACKUP_HEALTHCHECK=1` ou
+quand des fichiers de statut sont présents dans `EFLEX_BACKUP_DIR` (seuils :
+`EFLEX_BACKUP_MAX_AGE_HOURS`, `EFLEX_RESTORE_TEST_MAX_AGE_DAYS`,
+`EFLEX_BACKUP_REQUIRE_OFFSITE`). Cela permet d’alerter sur une sauvegarde
+absente/trop ancienne, une copie hors site manquante ou en échec, ou une preuve
+de restauration trop ancienne, sans exposer de secret.
+
 ## 2. Emplacement, nommage, permissions
 
 - Dossier par défaut : **`/home/fantome/backups/eflex`** (surchargeable par
@@ -43,9 +51,16 @@ l'apex pendant la mise en place.
   dimanche comme **lien dur** vers la quotidienne : aucun espace supplémentaire)
 - Format : `pg_dump --format=custom --compress=0` puis `gzip -9`. Restauration :
   `gunzip -c fichier.dump.gz | pg_restore …`.
-- Statuts/preuves locaux : `backup.status` (dernière sauvegarde locale réussie,
-  fichier, base, résultat de copie hors site) et `restore-test.status`
-  (dernier test de restauration réussi consigné).
+- Statuts/preuves locaux (sans secret, lisibles par les outils d’exploitation) :
+  - `backup.status` distingue **sauvegarde locale réussie** (`local_success_at`,
+    `last_file`, `last_db`) et **copie hors site** (`offsite=skipped|ok|error`,
+    `offsite_at`). `last_success_at` n’est renseigné qu’en cas de succès global
+    (locale OK et copie hors site OK ou non configurée). En cas d’échec de copie
+    hors site, la preuve locale est conservée mais le script sort en erreur afin
+    que l’absence de garantie hors site soit visible.
+  - `restore-test.status` consigne la **dernière restauration testée en
+    environnement isolé** (`status=success`, `last_success_at`, `last_file`,
+    compteurs, `proof_scope=isolated_restore_test`).
 - Une exécution le même jour **remplace** la quotidienne du jour (pas de
   doublons).
 
@@ -318,8 +333,11 @@ EFLEX_BACKUP_OFFSITE_CMD='rsync -a --delete "$EFLEX_BACKUP_DIR"/ backup@autre-ho
   bash scripts/backup-db.sh
 ```
 
-Si la commande échoue, le script échoue (et `backup.status` n’est pas marqué en
-succès) afin que l’absence de copie hors site soit visible (journald / timer).
+Si la commande échoue, le script sort en erreur pour que l’absence de copie hors
+site soit visible (journald / timer), mais `backup.status` conserve la preuve
+de la **sauvegarde locale réussie** (`local_success_at`) avec
+`offsite=error` et `last_success_at` vide (pas de succès global). Corrigez la
+copie hors site puis relancez.
 
 ### Bonnes pratiques
 
@@ -327,8 +345,14 @@ succès) afin que l’absence de copie hors site soit visible (journald / timer)
   surveiller.
 - Vérifier périodiquement `gzip -t` et un `restore-test.sh --file` sur la copie
   distante/isolée.
+- Activer la vérification des preuves dans `healthcheck.sh`
+  (`EFLEX_BACKUP_HEALTHCHECK=1`, seuils `EFLEX_BACKUP_MAX_AGE_HOURS` /
+  `EFLEX_RESTORE_TEST_MAX_AGE_DAYS`, `EFLEX_BACKUP_REQUIRE_OFFSITE=1` si la
+  copie hors site est obligatoire) pour rendre l’absence de preuve actionnable.
 - Une copie hors site non testée n’est pas une garantie : conserver les preuves
-  (`backup.status`, `restore-test.status`, journaux).
+  (`backup.status`, `restore-test.status`, journaux). Exécuter `restore-test.sh`
+  régulièrement (timer hebdomadaire + vérification mensuelle manuelle) et
+  archiver les résultats.
 
 ## 11. Sécurité
 
