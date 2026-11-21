@@ -15,7 +15,7 @@ import { LinkButton } from '@/components/link-button'
 const faqs = [
   {
     q: 'Quelles technologies sont prises en charge ?',
-    a: "Next.js, Nuxt, Astro, Vite, SvelteKit, Remix, SolidStart, RedwoodJS, Node.js (Express, Fastify, NestJS…), PHP, Python (Django, FastAPI, Flask) et les sites HTML statiques. Laravel est reconnu ; si votre application nécessite plusieurs services (par exemple web, file d’attente, planificateur), ajoutez un fichier `docker-compose.yml` ou `compose.yaml` à la racine de l’application. Un Dockerfile existant est aussi utilisé tel quel.",
+    a: "Next.js, Nuxt, Astro, Vite, SvelteKit, Remix, SolidStart, RedwoodJS, Node.js (Express, Fastify, NestJS…), PHP, Python (Django, FastAPI, Flask) et les sites HTML statiques. Laravel est reconnu ; si votre application nécessite plusieurs services (par exemple web, file d’attente, planificateur), ajoutez un fichier `docker-compose.yml` ou `compose.yaml` à la racine. Un Dockerfile existant est aussi utilisé tel quel.",
   },
   {
     q: 'Dois-je écrire un Dockerfile ?',
@@ -26,36 +26,59 @@ const faqs = [
     a: "Dans EFLEX, jamais dans votre dépôt. Elles sont chiffrées en base (AES-256-GCM), transmises à l'application au démarrage et ne s'affichent plus une fois enregistrées.",
   },
   {
-    q: 'Mes dépôts privés sont-ils compatibles ?',
-    a: "Oui. Connectez la GitHub App (recommandée) ou ajoutez un jeton personnel dans Paramètres → Connexion GitHub. EFLEX lit le dépôt avec un accès à durée limitée et crée une clé de déploiement en lecture seule.",
-  },
-  {
     q: "Qu'est-ce qui n'est pas encore pris en charge ?",
-    a: "Les applications qui nécessitent plusieurs services sans fichier `docker-compose.yml`/`compose.yaml` fourni ne peuvent pas encore être déployées automatiquement. La conservation garantie des données stockées sur disque entre déploiements (fichiers uploadés, certains stockages locaux) dépend de la configuration de l’infrastructure et peut ne pas être disponible. Les métriques détaillées (CPU/mémoire dans le temps, stockage, bande passante) ne sont pas toutes disponibles pour l’instant.",
+    a: "Les applications qui nécessitent plusieurs services sans fichier `docker-compose.yml`/`compose.yaml` fourni ne peuvent pas encore être déployées automatiquement. La conservation garantie des données stockées sur disque entre déploiements dépend de la configuration de l’infrastructure et peut ne pas être disponible. Les métriques détaillées (CPU/mémoire dans le temps, stockage, bande passante) ne sont pas toutes disponibles pour l’instant.",
   },
 ]
 
-
-
-function SectionHeading({ id, title, lead }: { id?: string; title: ReactNode; lead?: string }) {
+function SectionHeading({
+  id,
+  title,
+  lead,
+  align = 'center',
+}: {
+  id?: string
+  title: ReactNode
+  lead?: string
+  align?: 'center' | 'left'
+}) {
+  const centered = align === 'center'
   return (
-    <div className="mx-auto max-w-3xl space-y-4 text-center">
+    <div className={centered ? 'mx-auto max-w-3xl space-y-4 text-center' : 'max-w-3xl space-y-4'}>
       <h2 id={id} className="text-display-sm font-extrabold tracking-tight text-balance">
         {title}
       </h2>
-      {lead && <p className="mx-auto max-w-2xl text-lead-lg text-muted-foreground text-pretty">{lead}</p>}
+      {lead && (
+        <p className={cnLead(centered, 'max-w-2xl text-lead-lg text-muted-foreground text-pretty')}>
+          {lead}
+        </p>
+      )}
     </div>
   )
 }
 
-/** Carte d'étape : une petite scène décorative en haut, le texte en bas. */
-function StepCard({ index, title, text, children }: { index: number; title: string; text: string; children: ReactNode }) {
+function cnLead(centered: boolean, base: string) {
+  return centered ? `mx-auto ${base}` : base
+}
+
+/** Étape principale : grande carte avec une scène décorative, hiérarchie forte. */
+function StepCard({
+  index,
+  title,
+  text,
+  children,
+}: {
+  index: number
+  title: string
+  text: string
+  children: ReactNode
+}) {
   return (
     <li
       className="reveal-on-view flex flex-col overflow-hidden rounded-3xl border border-border bg-card transition-[transform,box-shadow,border-color] duration-300 ease-out-expo hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg"
       style={{ '--i': index } as CSSProperties}
     >
-      <div aria-hidden="true" className="flex h-52 flex-col justify-center gap-2.5 border-b border-border bg-muted/60 p-6">
+      <div aria-hidden="true" className="flex h-48 flex-col justify-center gap-2.5 border-b border-border bg-muted/60 p-6 sm:h-52">
         {children}
       </div>
       <div className="p-6 pb-7">
@@ -99,12 +122,11 @@ function DetectedRow({ label, value }: { label: string; value: string }) {
 
 const proofPoints = [
   'HTTPS et certificats automatiques',
-  'Journaux de build et d’exécution en direct',
+  'Journaux de build et d’exécution',
   'Variables chiffrées (AES-256-GCM)',
-  'PostgreSQL et Redis en un clic',
 ]
 
-const features: { icon: LucideIcon; title: string; text: string }[] = [
+const capabilities: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: GitBranch,
     title: 'Déploiement à chaque push',
@@ -128,15 +150,14 @@ const features: { icon: LucideIcon; title: string; text: string }[] = [
 ]
 
 export default function HomePage() {
-  // Même source que le pied de page : une seule adresse de contact à maintenir.
   const { email: contactEmail } = getLegalCompanyInfo()
   return (
     <div className="homepage-light flex min-h-screen flex-col">
       <SiteHeader />
 
       <main id="contenu" tabIndex={-1} className="flex-1">
-        {/* ─── Hero : promesse forte, preuves concrètes, démonstration de la console ─── */}
-        <section className="container pb-16 pt-14 text-center md:pb-24 md:pt-20">
+        {/* ─── Hero : un argument principal, une preuve visuelle, des preuves secondaires légères ─── */}
+        <section className="container pb-14 pt-14 text-center md:pb-20 md:pt-20">
           <h1 className="mx-auto max-w-4xl animate-reveal text-display font-extrabold tracking-tight text-balance">
             Déployez votre application depuis GitHub, sans gérer de serveur.
           </h1>
@@ -144,8 +165,8 @@ export default function HomePage() {
             className="mx-auto mt-6 max-w-2xl animate-reveal text-lead-lg text-muted-foreground text-pretty"
             style={{ '--d': '80ms' } as CSSProperties}
           >
-            EFLEX détecte votre stack, construit votre projet et le met en ligne avec HTTPS. Vous suivez le build
-            et l’exécution depuis la console.
+            EFLEX détecte votre stack, construit votre projet et le met en ligne avec HTTPS. Vous suivez le build et
+            l’exécution depuis la console.
           </p>
           <div
             className="mt-9 flex animate-reveal flex-col justify-center gap-3 sm:flex-row"
@@ -159,11 +180,11 @@ export default function HomePage() {
               href="#fonctionnement"
               className="inline-flex h-12 items-center justify-center rounded-xl border border-border bg-card px-6 text-base font-semibold transition-[background-color,transform] duration-200 ease-out-expo hover:bg-secondary active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              Voir un déploiement
+              Voir comment ça marche
             </Link>
           </div>
           <ul
-            className="mx-auto mt-7 flex max-w-4xl animate-reveal flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-muted-foreground"
+            className="mx-auto mt-7 flex max-w-4xl animate-reveal flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-muted-foreground"
             style={{ '--d': '220ms' } as CSSProperties}
             aria-label="Ce qu’EFLEX prend en charge"
           >
@@ -183,154 +204,174 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ─── Technologies : défilé continu ─── */}
+        {/* ─── Fonctionnement : l'argument principal, visuellement dominant ─── */}
+        <section
+          id="fonctionnement"
+          aria-labelledby="fonctionnement-titre"
+          className="scroll-mt-20 border-y border-border bg-muted/50 py-16 md:py-24"
+        >
+          <div className="container">
+            <SectionHeading
+              id="fonctionnement-titre"
+              title="Du dépôt à la production, en trois étapes"
+              lead="Vous gardez votre code et votre dépôt. EFLEX s’occupe de la configuration, du build et de la mise en ligne."
+            />
+            <ol className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-3 md:mt-14">
+              <StepCard
+                index={0}
+                title="Connectez votre dépôt"
+                text="Autorisez GitHub une fois, puis choisissez le dépôt à mettre en ligne, public ou privé."
+              >
+                <RepoRow name="mon-equipe/boutique" selected />
+                <RepoRow name="mon-equipe/api" />
+                <RepoRow name="mon-equipe/blog" />
+              </StepCard>
+              <StepCard
+                index={1}
+                title="EFLEX configure pour vous"
+                text="La stack, les commandes et le port sont reconnus automatiquement. Vous vérifiez avant de lancer."
+              >
+                <span className="inline-flex items-center gap-2 self-start rounded-full border border-border bg-card px-3 py-1.5 text-sm font-bold">
+                  <FrameworkIcon framework="nextjs" alt="" className="h-5 w-5" />
+                  Next.js détecté
+                </span>
+                <DetectedRow label="Installation" value="pnpm install" />
+                <DetectedRow label="Build" value="pnpm build" />
+                <DetectedRow label="Démarrage" value="pnpm start · 3000" />
+              </StepCard>
+              <StepCard
+                index={2}
+                title="Votre application est en ligne"
+                text="Une adresse sécurisée en HTTPS, prête à partager. Chaque push publie automatiquement la nouvelle version."
+              >
+                <span className="inline-flex items-center gap-2.5 self-start rounded-xl border border-border bg-card px-4 py-3 shadow-md">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="demo-ping absolute inline-flex h-full w-full rounded-full bg-success/60" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success" />
+                  </span>
+                  <span className="font-mono text-sm">boutique.exemple.app</span>
+                </span>
+                <span className="flex flex-wrap gap-2 text-xs font-semibold">
+                  <span className="rounded-full bg-success/10 px-2.5 py-1 text-success">HTTPS actif</span>
+                  <span className="rounded-full bg-primary/10 px-2.5 py-1 text-primary">Mis à jour à chaque push</span>
+                </span>
+              </StepCard>
+            </ol>
+          </div>
+        </section>
+
+        {/* ─── Capacités : secondaires, plus légères que le parcours ─── */}
+        <section id="fonctionnalites" aria-labelledby="fonctionnalites-titre" className="scroll-mt-20 container py-16 md:py-24">
+          <SectionHeading
+            id="fonctionnalites-titre"
+            title="Les capacités utiles une fois en ligne"
+            lead="Pas de promesse vague : ce que EFLEX fait déjà pour chaque projet."
+          />
+          <ul className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
+            {capabilities.map((item) => (
+              <li key={item.title} className="flex gap-4 border-t border-border pt-6">
+                <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <item.icon className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div>
+                  <h3 className="text-base font-semibold">{item.title}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.text}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {/* ─── Technologies : preuve de compatibilité, plus compacte ─── */}
         <section
           id="technologies"
           aria-labelledby="technologies-titre"
-          className="scroll-mt-20 overflow-hidden border-y border-border bg-muted/50 py-16 md:py-24"
+          className="scroll-mt-20 overflow-hidden border-y border-border bg-muted/50 py-14 md:py-20"
         >
-          <div className="container mb-10">
+          <div className="container mb-8">
             <SectionHeading
               id="technologies-titre"
-              title="Votre stack est reconnue, sans configuration"
-              lead="EFLEX lit votre dépôt et propose la commande de build, le démarrage et le port. Vous relisez, c’est tout."
+              title="Votre stack est reconnue"
+              lead="EFLEX lit votre dépôt et propose la configuration. Vous relisez avant de déployer."
             />
           </div>
           <TechMarquee />
-          <p className="container mt-8 max-w-3xl text-center text-sm text-muted-foreground text-pretty">
+          <p className="container mt-6 max-w-3xl text-center text-sm text-muted-foreground text-pretty">
             Un Dockerfile, un <code className="font-mono">docker-compose.yml</code> ou un{' '}
             <code className="font-mono">eflex.json</code> dans votre dépôt ? EFLEX l’utilise tel quel. Les technologies
             marquées « Bientôt » arrivent prochainement.
           </p>
         </section>
 
-        {/* ─── Fonctionnement : trois cartes, chacune montre ce qui se passe ─── */}
-        <section id="fonctionnement" aria-labelledby="fonctionnement-titre" className="scroll-mt-20 container py-20 md:py-28">
-          <SectionHeading
-            id="fonctionnement-titre"
-            title="De votre dépôt à la production, sans friction."
-            lead="Pas de serveur à configurer, pas de pipeline à écrire. Vous gardez votre code, EFLEX s’occupe de l’infrastructure."
-          />
-          <ol className="mt-14 grid grid-cols-1 gap-5 md:grid-cols-3">
-            <StepCard
-              index={0}
-              title="Connectez votre dépôt"
-              text="Autorisez GitHub une fois, puis choisissez le dépôt à mettre en ligne, public ou privé."
-            >
-              <RepoRow name="mon-equipe/boutique" selected />
-              <RepoRow name="mon-equipe/api" />
-              <RepoRow name="mon-equipe/blog" />
-            </StepCard>
-            <StepCard
-              index={1}
-              title="EFLEX configure pour vous"
-              text="La stack, les commandes et le port sont reconnus automatiquement. Vous vérifiez, ajoutez vos variables, c’est prêt."
-            >
-              <span className="inline-flex items-center gap-2 self-start rounded-full border border-border bg-card px-3 py-1.5 text-sm font-bold">
-                <FrameworkIcon framework="nextjs" alt="" className="h-5 w-5" />
-                Next.js détecté
-              </span>
-              <DetectedRow label="Installation" value="pnpm install" />
-              <DetectedRow label="Build" value="pnpm build" />
-              <DetectedRow label="Démarrage" value="pnpm start · 3000" />
-            </StepCard>
-            <StepCard
-              index={2}
-              title="Votre application est en ligne"
-              text="Une adresse sécurisée en HTTPS, prête à partager. Chaque push publie automatiquement la nouvelle version."
-            >
-              <span className="inline-flex items-center gap-2.5 self-start rounded-xl border border-border bg-card px-4 py-3 shadow-md">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="demo-ping absolute inline-flex h-full w-full rounded-full bg-success/60" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success" />
-                </span>
-                <span className="font-mono text-sm">boutique.exemple.app</span>
-              </span>
-              <span className="flex flex-wrap gap-2 text-xs font-semibold">
-                <span className="rounded-full bg-success/10 px-2.5 py-1 text-success">HTTPS actif</span>
-                <span className="rounded-full bg-primary/10 px-2.5 py-1 text-primary">Mis à jour à chaque push</span>
-              </span>
-            </StepCard>
-          </ol>
-        </section>
-
-        {/* ─── Fonctionnalités : points clés, visuellement plus légers que le parcours ─── */}
-        <section
-          id="fonctionnalites"
-          aria-labelledby="fonctionnalites-titre"
-          className="scroll-mt-20 border-y border-border bg-muted/50"
-        >
-          <div className="container py-16 md:py-24">
-            <SectionHeading
-              id="fonctionnalites-titre"
-              title="L’essentiel pour la mise en production"
-              lead="Le parcours de déploiement reste au centre ; ces capacités sont prêtes pour chaque projet."
-            />
-            <ul className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-4 sm:grid-cols-2">
-              {features.map((item, i) => (
-                <li
-                  key={item.title}
-                  className="reveal-on-view flex gap-4 rounded-2xl border border-border bg-card p-5"
-                  style={{ '--i': i % 2 } as CSSProperties}
-                >
-                  <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <item.icon className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                  <div>
-                    <h3 className="text-base font-semibold">{item.title}</h3>
-                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.text}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        {/* ─── Migration Center : annonce « Bientôt » (MIG-0, #148) ─── */}
+        {/* ─── Migration Center : annonce « Bientôt », clairement séparée ─── */}
         <MigrationTeaser contactEmail={contactEmail} />
 
-        {/* ─── FAQ ─── */}
-        <section id="questions" aria-labelledby="questions-titre" className="scroll-mt-20 container py-20 md:py-28">
-          <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1fr_1.6fr]">
-            <div className="space-y-8">
-              <SectionHeading
-                id="questions-titre"
-                title="Questions fréquentes"
-                lead="Tout ce qu'il faut savoir avant de déployer votre premier projet."
-              />
-              <div className="max-w-sm space-y-3 rounded-2xl border border-border bg-card p-5">
-                <h3 className="text-lg font-semibold">Vous ne trouvez pas votre réponse ?</h3>
-                <p className="text-sm text-muted-foreground">Écrivez-nous : nous vous aidons.</p>
-                <a
-                  href={`mailto:${contactEmail}?subject=Question%20sur%20Eflex`}
-                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-input bg-background px-4 text-sm font-semibold transition-colors hover:bg-secondary hover:text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  Contacter le support
-                </a>
-              </div>
+        {/* ─── Tarifs : lien clair, sans prix affichés sur l'accueil ─── */}
+        <section aria-labelledby="tarifs-titre" className="container py-14 md:py-20">
+          <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-6 rounded-3xl border border-border bg-card p-6 sm:flex-row sm:items-center sm:p-8">
+            <div className="max-w-2xl">
+              <h2 id="tarifs-titre" className="text-2xl font-extrabold tracking-tight text-balance sm:text-3xl">
+                Des offres adaptées à votre usage
+              </h2>
+              <p className="mt-2 text-base leading-relaxed text-muted-foreground text-pretty">
+                Commencez gratuitement, puis choisissez l’offre qui correspond à vos applications, vos membres et vos domaines.
+              </p>
             </div>
-            <div className="divide-y divide-border rounded-2xl border border-border bg-card">
-              {faqs.map((item) => (
-                <details key={item.q} className="group px-6 [&_summary::-webkit-details-marker]:hidden">
-                  <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-4 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    <h3 className="text-base font-medium text-balance">{item.q}</h3>
-                    <span
-                      aria-hidden="true"
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-transform group-open:rotate-45"
-                    >
-                      +
-                    </span>
-                  </summary>
-                  <p className="pb-5 text-muted-foreground">{item.a}</p>
-                </details>
-              ))}
+            <Link
+              href="/tarifs"
+              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-border bg-background px-5 text-sm font-semibold transition-[background-color,transform] duration-200 ease-out-expo hover:bg-secondary active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              Consulter les tarifs
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
+        </section>
+
+        {/* ─── FAQ : compacte, réponses utiles avant le premier déploiement ─── */}
+        <section id="questions" aria-labelledby="questions-titre" className="scroll-mt-20 border-t border-border bg-muted/50">
+          <div className="container py-16 md:py-24">
+            <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_1.6fr] lg:gap-12">
+              <div className="space-y-6">
+                <SectionHeading
+                  id="questions-titre"
+                  title="Questions fréquentes"
+                  lead="L’essentiel avant de déployer votre premier projet."
+                  align="left"
+                />
+                <div className="max-w-sm space-y-3 rounded-2xl border border-border bg-card p-5">
+                  <h3 className="text-base font-semibold">Une question précise ?</h3>
+                  <p className="text-sm text-muted-foreground">Écrivez-nous, nous vous répondons.</p>
+                  <a
+                    href={`mailto:${contactEmail}?subject=Question%20sur%20Eflex`}
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-input bg-background px-4 text-sm font-semibold transition-colors hover:bg-secondary hover:text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Contacter le support
+                  </a>
+                </div>
+              </div>
+              <div className="divide-y divide-border rounded-2xl border border-border bg-card">
+                {faqs.map((item) => (
+                  <details key={item.q} className="group px-5 sm:px-6 [&_summary::-webkit-details-marker]:hidden">
+                    <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-4 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <h3 className="text-base font-medium text-balance">{item.q}</h3>
+                      <span
+                        aria-hidden="true"
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-transform group-open:rotate-45"
+                      >
+                        +
+                      </span>
+                    </summary>
+                    <p className="pb-5 text-sm leading-relaxed text-muted-foreground sm:text-base">{item.a}</p>
+                  </details>
+                ))}
+              </div>
             </div>
           </div>
         </section>
 
-        {/* ─── Appel final : bande navy ─── */}
-        <section aria-labelledby="appel-titre" className="container pb-20 md:pb-28">
-          <div className="surface-navy rounded-3xl bg-eflexnavy px-6 py-16 text-center text-white sm:px-12 md:py-20">
+        {/* ─── Appel final ─── */}
+        <section aria-labelledby="appel-titre" className="container py-16 md:py-24">
+          <div className="surface-navy rounded-3xl bg-eflexnavy px-6 py-14 text-center text-white sm:px-12 md:py-20">
             <h2 id="appel-titre" className="mx-auto max-w-3xl text-display-sm font-extrabold tracking-tight text-balance text-white">
               Mettez votre projet en ligne aujourd’hui.
             </h2>
