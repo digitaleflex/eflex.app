@@ -185,6 +185,8 @@ model Project {
   analyticsDailyVisitors AnalyticsDailyVisitor[]
   trafficDimensions     TrafficDailyDimension[]
   analyticsDimensionVisitors AnalyticsDailyDimensionVisitor[]
+  siteMonitors          ProjectSiteMonitor[]
+  siteIncidents         ProjectSiteIncident[]
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 
@@ -517,24 +519,26 @@ model StatusIncident {
 // Tout projet appartient à une organisation. Chaque utilisateur a une organisation
 // personnelle créée à l'inscription. Rôles : owner, admin, member.
 model Organization {
-  id               String        @id @default(cuid())
+  id               String               @id @default(cuid())
   name             String
-  slug             String        @unique
+  slug             String               @unique
   logo             String?
-  metadata         String?       @db.Text
+  metadata         String?              @db.Text
   /**
    * Suspension administrative : gèle la création de projets et les nouveaux
    * déploiements. Aucune donnée ni application en ligne n'est supprimée.
    */
   suspendedAt      DateTime?
-  suspensionReason String?       @db.Text
-  createdAt        DateTime      @default(now())
+  suspensionReason String?              @db.Text
+  createdAt        DateTime             @default(now())
   members          Member[]
   invitations      Invitation[]
   projects         Project[]
   subscription     Subscription?
   payments         Payment[]
   supportTickets   SupportTicket[]
+  siteMonitors     ProjectSiteMonitor[]
+  siteIncidents    ProjectSiteIncident[]
 
   @@index([suspendedAt])
 }
@@ -830,4 +834,72 @@ model SupportTicket {
   @@index([status, createdAt])
   @@index([projectId])
   @@index([deploymentId])
+}
+
+// ─── Surveillance continue des sites clients (#177) ──────────────────────────
+// Sondes HTTP/DNS/TLS sur les domaines connus du projet, incidents avec
+// confirmation/dédoublonnage/cooldown et historique. Aucune donnée inter-locataire.
+// Pas de secrets dans les erreurs ni les détails.
+model ProjectSiteMonitor {
+  id                  String                @id @default(cuid())
+  projectId           String
+  project             Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organizationId      String
+  organization        Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Hôte public surveillé (domaine d'application ou domaine personnalisé vérifié), normalisé.
+  host                String
+  /// Libellé d'affichage (ex. "Application principale", "Domaine personnalisé").
+  label               String?
+  enabled             Boolean               @default(true)
+  /// Dernier contrôle réalisé.
+  lastCheckedAt       DateTime?
+  /// Synthèse du dernier contrôle : unknown | up | down
+  lastStatus          String                @default("unknown")
+  lastHttpStatus      Int?
+  lastLatencyMs       Int?
+  lastDnsOk           Boolean?
+  lastTlsOk           Boolean?
+  lastTlsExpiresAt    DateTime?
+  /// Dernière erreur expurgée (jamais de secret, jamais de corps de réponse).
+  lastError           String?               @db.Text
+  /// Échecs / réussites consécutifs pour la confirmation et la détection du rétablissement.
+  consecutiveFailures  Int                   @default(0)
+  consecutiveSuccesses Int                   @default(0)
+  incidents           ProjectSiteIncident[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@unique([projectId, host])
+  @@index([projectId, lastCheckedAt])
+  @@index([organizationId, lastStatus])
+  @@index([enabled, lastCheckedAt])
+}
+
+model ProjectSiteIncident {
+  id                 String             @id @default(cuid())
+  monitorId          String
+  monitor            ProjectSiteMonitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  projectId          String
+  project            Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organizationId     String
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  host               String
+  /// État de l'incident : open | resolved
+  status             String             @default("open")
+  /// Cause dominante : http | dns | tls | timeout | network
+  cause              String?
+  summary            String
+  details            String?            @db.Text
+  openedAt           DateTime           @default(now())
+  resolvedAt         DateTime?
+  /// Horodatages des notifications envoyées (dédoublonnage/cooldown).
+  openedNotifiedAt   DateTime?
+  resolvedNotifiedAt DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([projectId, openedAt(sort: Desc)])
+  @@index([organizationId, status, openedAt(sort: Desc)])
+  @@index([monitorId, status, openedAt(sort: Desc)])
+  @@index([status, openedAt(sort: Desc)])
 }

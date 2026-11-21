@@ -29,6 +29,7 @@ import { expireStaleDeployments, WATCHDOG_INTERVAL_MS } from '@/lib/deployment-w
 import { startBillingMaintenance } from '@/lib/billing-renewal'
 import { startAnalyticsAlertsMaintenance } from '@/lib/analytics-alerts'
 import { startDatabaseBackupMaintenance } from '@/lib/database-backups'
+import { startSiteMonitoringMaintenance } from '@/lib/site-monitoring'
 import { DEPLOYMENT_QUEUE, redisConnection } from '@/lib/queue'
 import { COOLIFY_FAILED, COOLIFY_LIVE } from '@/lib/coolify-status'
 import { announceDeploymentStatus } from '@/lib/deployment-events'
@@ -953,6 +954,9 @@ export function startDeploymentWorker(): Worker {
   startBillingMaintenance()
   startAnalyticsAlertsMaintenance()
   startDatabaseBackupMaintenance()
+  // Surveillance continue des sites clients (#177) : sondes HTTP/DNS/TLS,
+  // incidents avec confirmation/dédoublonnage et rétablissement.
+  startSiteMonitoringMaintenance()
 
   worker.on('completed', (job) => {
     console.info(`[eflex/worker] déploiement ${job.id} traité`)

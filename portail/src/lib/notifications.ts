@@ -17,6 +17,8 @@ export const NOTIFICATION_TYPES = {
   'database.backup_failed': { label: 'Sauvegarde de base en défaut', description: 'Quand la sauvegarde d’une base managée échoue ou n’a pas réussi depuis trop longtemps (propriétaires et administrateurs).' },
   'analytics.traffic_spike': { label: 'Pic de trafic détecté', description: 'Quand le trafic mesuré d’une application dépasse le seuil configuré par rapport à la période précédente.' },
   'analytics.traffic_drop': { label: 'Chute de trafic détectée', description: 'Quand le trafic mesuré d’une application baisse sous le seuil configuré par rapport à la période précédente.' },
+  'site_monitor.down': { label: 'Site indisponible', description: 'Quand un site client surveillé devient indisponible de façon persistante (propriétaires et administrateurs).' },
+  'site_monitor.recovered': { label: 'Site rétabli', description: 'Quand un site client surveillé redevient disponible après un incident (propriétaires et administrateurs).' },
 } as const
 
 export type NotificationType = keyof typeof NOTIFICATION_TYPES
