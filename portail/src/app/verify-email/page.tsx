@@ -26,7 +26,11 @@ export default function VerifyEmailPage() {
       footer={
         <>
           Déjà vérifié ?{' '}
-          <Link suppressHydrationWarning href={withNext('/login')} className="font-medium text-primary hover:underline">
+          <Link
+            suppressHydrationWarning
+            href={withNext('/login')}
+            className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
             Se connecter
           </Link>
         </>

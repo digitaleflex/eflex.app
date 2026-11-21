@@ -23,7 +23,11 @@ export default function ResetPasswordPage() {
       title="Nouveau mot de passe"
       description="Idéalement 4 à 5 mots sans lien entre eux ni avec vos informations personnelles."
       footer={
-        <Link suppressHydrationWarning href={withNext('/login')} className="font-medium text-primary hover:underline">
+        <Link
+          suppressHydrationWarning
+          href={withNext('/login')}
+          className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
           Retour à la connexion
         </Link>
       }
@@ -113,7 +117,10 @@ function ResetPasswordForm() {
       ) : !token ? (
         <div role="alert" className="space-y-4 text-sm">
           <p className="text-destructive">Ce lien est invalide ou expiré.</p>
-          <Link href="/forgot-password" className="font-medium text-primary hover:underline">
+          <Link
+            href="/forgot-password"
+            className="inline-flex min-h-11 items-center rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
             Demander un nouveau lien
           </Link>
         </div>

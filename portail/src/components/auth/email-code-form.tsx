@@ -147,7 +147,7 @@ export function EmailCodeForm({
               setStep('email')
               setError('')
             }}
-            className="-ml-1 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="-ml-1 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             Changer d’adresse
@@ -205,7 +205,7 @@ export function EmailCodeForm({
                     setStep('email')
                   } else void sendCode()
                 }}
-                className="min-h-11 font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="min-h-11 rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 disabled={loading}
               >
                 Renvoyer le code
@@ -259,7 +259,7 @@ export function EmailCodeForm({
           <button
             type="button"
             onClick={() => onUsePassword(email.value.trim())}
-            className="min-h-11 font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="min-h-11 rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             Utiliser un mot de passe
           </button>

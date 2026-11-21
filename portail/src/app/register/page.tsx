@@ -133,7 +133,11 @@ export default function RegisterPage() {
       footer={
         <>
           Déjà un compte ?{' '}
-          <Link suppressHydrationWarning href={withNext('/login')} className="font-medium text-primary hover:underline">
+          <Link
+            suppressHydrationWarning
+            href={withNext('/login')}
+            className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
             Se connecter
           </Link>
         </>
@@ -171,7 +175,11 @@ export default function RegisterPage() {
         {config?.emailCodeEnabled && (
           <p className="rounded-lg bg-muted/60 px-3 py-2.5 text-sm text-muted-foreground">
             Plus simple :{' '}
-            <Link suppressHydrationWarning href={withNext('/login')} className="font-medium text-primary hover:underline">
+            <Link
+              suppressHydrationWarning
+              href={withNext('/login')}
+              className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
               recevez un code par e-mail
             </Link>
             , sans mot de passe à retenir.
