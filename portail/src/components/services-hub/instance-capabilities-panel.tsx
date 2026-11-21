@@ -32,7 +32,7 @@ export function InstanceCapabilitiesPanel({ runtime }: { runtime: RuntimeView | 
         <div>
           <h3 className="text-sm font-semibold">Capacités de l’instance</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Disponibilité détectée sur l’hébergement (Coolify) : elle détermine ce qui est créable et supporté ici.
+            Disponibilité détectée sur l’hébergement : elle détermine ce qui est créable et supporté ici.
           </p>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">

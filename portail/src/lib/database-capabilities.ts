@@ -235,8 +235,8 @@ function baseNotes(kind: ManagedDatabaseKind): string[] {
   if (kind === 'postgresql') {
     return [
       'Variable injectée : DATABASE_URL (alias possibles : POSTGRES_URL, POSTGRESQL_URL).',
-      'Sauvegardes planifiées et restauration assistée prises en charge par EFLEX (selon configuration Coolify).',
-      'Copie hors site possible via stockage S3 Coolify si configuré.',
+      'Sauvegardes planifiées et restauration assistée prises en charge par EFLEX (selon la configuration de l’hébergement).',
+      'Copie hors site possible via stockage S3 si configuré.',
       'RPO sans archivage WAL : perte possible des données écrites depuis la dernière sauvegarde réussie.',
       'Base privée : accessible uniquement depuis le réseau interne de l’application.',
     ]
@@ -244,7 +244,7 @@ function baseNotes(kind: ManagedDatabaseKind): string[] {
   if (kind === 'redis') {
     return [
       'Variable injectée : REDIS_URL (alias possible : CACHE_URL).',
-      'Aucune sauvegarde/restauration intégrée EFLEX : Coolify ne sauvegarde pas Redis.',
+      'Aucune sauvegarde/restauration intégrée EFLEX : l’hébergement ne sauvegarde pas Redis.',
       'Recommandé comme cache/file éphémère. Si des données durables sont stockées, configurez la persistance Redis (AOF/RDB) côté service et une stratégie de sauvegarde dédiée ; aucune garantie de restauration n’est fournie par EFLEX.',
       'Base privée : accessible uniquement depuis le réseau interne de l’application.',
     ]
@@ -254,30 +254,30 @@ function baseNotes(kind: ManagedDatabaseKind): string[] {
       `Variable injectée : ${kind === 'dragonfly' ? 'DRAGONFLY_URL' : 'KEYDB_URL'} (alias Redis compatibles possibles).`,
       'Aucune sauvegarde/restauration intégrée EFLEX pour ce moteur en mémoire.',
       'À utiliser comme cache/file sauf configuration de persistance et stratégie de sauvegarde propres au moteur, validées et testées.',
-      'Moteur exposé selon le support réel de l’instance Coolify.',
+      'Moteur exposé selon le support réel de l’hébergement.',
     ]
   }
   if (kind === 'mysql') {
     return [
       'Variable injectée : MYSQL_URL (certaines applications attendent DATABASE_URL ou DB_HOST/DB_*).',
-      'Sauvegardes/restauration via l’adaptateur Coolify générique (outils natifs du moteur) lorsque l’instance est compatible. À valider sur votre instance Coolify.',
-      'Copie hors site possible via stockage S3 Coolify si configuré.',
+      'Sauvegardes/restauration avec les outils natifs du moteur lorsque l’hébergement est compatible. À valider sur votre hébergement.',
+      'Copie hors site possible via stockage S3 si configuré.',
       'Vérifiez régulièrement la restaurabilité dans un environnement isolé avant de considérer une sauvegarde comme garantie.',
     ]
   }
   if (kind === 'mariadb') {
     return [
       'Variable injectée : MARIADB_URL (alias possible : MYSQL_URL ; certaines apps attendent DATABASE_URL).',
-      'Sauvegardes/restauration via l’adaptateur Coolify générique (outils natifs du moteur) lorsque l’instance est compatible. À valider sur votre instance Coolify.',
-      'Copie hors site possible via stockage S3 Coolify si configuré.',
+      'Sauvegardes/restauration avec les outils natifs du moteur lorsque l’hébergement est compatible. À valider sur votre hébergement.',
+      'Copie hors site possible via stockage S3 si configuré.',
       'Vérifiez régulièrement la restaurabilité dans un environnement isolé avant de considérer une sauvegarde comme garantie.',
     ]
   }
   if (kind === 'mongodb') {
     return [
       'Variable injectée : MONGODB_URL (alias possible : MONGO_URL ; certaines apps attendent DATABASE_URL).',
-      'Sauvegardes/restauration via l’adaptateur Coolify générique (outils natifs du moteur, ex. dump) lorsque l’instance est compatible. À valider sur votre instance Coolify.',
-      'Copie hors site possible via stockage S3 Coolify si configuré.',
+      'Sauvegardes/restauration avec les outils natifs du moteur (par exemple un dump) lorsque l’hébergement est compatible. À valider sur votre hébergement.',
+      'Copie hors site possible via stockage S3 si configuré.',
       'Le format et la restaurabilité dépendent du moteur/outillage de l’instance : testez la restauration en environnement isolé.',
     ]
   }
@@ -290,7 +290,7 @@ function baseNotes(kind: ManagedDatabaseKind): string[] {
   }
   if (kind === 'sqlite') {
     return [
-      'Variable injectée : SQLITE_URL (format/chemin dépendant de Coolify et du runtime applicatif).',
+      'Variable injectée : SQLITE_URL (format/chemin dépendant de l’hébergement et de l’application).',
       'Moteur expérimental : provisionnement, URL/chemin, persistance et cycle de vie doivent être validés sur l’instance avant usage en production.',
       'Aucune sauvegarde/restauration intégrée EFLEX. Ne pas utiliser comme base critique sans stratégie de sauvegarde validée.',
     ]
@@ -308,7 +308,7 @@ function opCap(
 }
 
 /**
- * Résout les capacités d'un moteur pour une instance Coolify donnée (#183) et applique la
+ * Résout les capacités d'un moteur pour une hébergement donnée (#183) et applique la
  * politique de sélection de provider (#181). Ne présente comme supporté que ce qui est réellement
  * pris en charge ou explicitement activé.
  */
@@ -350,9 +350,9 @@ export function resolveDatabaseEngineCapabilities(
   let probeSource: DatabaseEngineCapabilities['probeSource'] = 'runtime'
 
   if (!runtime.reachable) {
-    notes.push('Instance Coolify non joignable : la disponibilité réelle n’a pas pu être vérifiée (les opérations peuvent échouer).')
+    notes.push('Hébergement injoignable : la disponibilité réelle n’a pas pu être vérifiée (les opérations peuvent échouer).')
   } else if (runtime.databaseApiAvailable === false) {
-    notes.push('L’API de bases managées Coolify ne semble pas disponible sur cette instance.')
+    notes.push('L’API de bases managées ne semble pas disponible sur cet hébergement.')
   } else if (runtime.databaseApiAvailable === null) {
     notes.push('Disponibilité de l’API de bases managées non confirmée (sondage incomplet).')
   }
@@ -366,7 +366,7 @@ export function resolveDatabaseEngineCapabilities(
   let provisionReason: string | undefined
   let provisionCaveat: string | undefined
   if (!apiCompatible) {
-    provisionReason = 'L’API de bases managées n’est pas disponible sur cette instance Coolify.'
+    provisionReason = 'L’API de bases managées n’est pas disponible sur cet hébergement.'
   } else if (kind === 'sqlite' && !isExperimentalEnabled('sqlite')) {
     coolifyProvision = false
     provisionReason =
@@ -376,7 +376,7 @@ export function resolveDatabaseEngineCapabilities(
     provisionCaveat = 'SQLite activé en mode expérimental (EFLEX_DB_EXPERIMENTAL_SQLITE) : validez URL/persistance/cycle de vie avant usage critique.'
   } else if (maturity === 'experimental') {
     provisionCaveat = 'Moteur expérimental : support dépendant de la version/configuration de l’instance (à valider en conditions réelles).'
-    notes.push('Moteur exposé : support dépendant de la version/configuration Coolify (à valider en conditions réelles).')
+    notes.push('Moteur exposé : support dépendant de la version et de la configuration de l’hébergement (à valider en conditions réelles).')
   }
 
   let coolifyLifecycle = coolifyProvision || (kind === 'sqlite' && isExperimentalEnabled('sqlite') && coolifyDbApiUsable)
@@ -444,11 +444,11 @@ export function resolveDatabaseEngineCapabilities(
   ): { supported: boolean; provider: DatabaseProviderKind | null; reason?: string } => {
     if (preferred === 'eflex') {
       if (eflexOk) return { supported: true, provider: 'eflex' }
-      if (coolifyOk) return { supported: true, provider: 'coolify', reason: 'Provider EFLEX-géré indisponible : repli sur Coolify.' }
+      if (coolifyOk) return { supported: true, provider: 'coolify', reason: 'Option EFLEX indisponible : repli sur l’hébergement standard.' }
       return { supported: false, provider: null, reason: defaultReason ?? eflexProvisionReason ?? provisionReason }
     }
     if (coolifyOk) return { supported: true, provider: 'coolify' }
-    if (eflexOk) return { supported: true, provider: 'eflex', reason: 'Coolify indisponible : prise en charge par provider EFLEX-géré.' }
+    if (eflexOk) return { supported: true, provider: 'eflex', reason: 'Hébergement standard indisponible : prise en charge par l’option EFLEX.' }
     return { supported: false, provider: null, reason: defaultReason ?? provisionReason }
   }
 
@@ -472,7 +472,7 @@ export function resolveDatabaseEngineCapabilities(
     integratedRestore ? undefined : `Restauration intégrée non disponible pour ${entry.label} (procédure dédiée requise).`,
   )
   if (integratedBackup && kind !== 'postgresql') {
-    const caveat = `Sauvegarde via adaptateur Coolify générique : validez la restaurabilité sur cette instance.`
+    const caveat = `Sauvegarde avec les outils natifs du moteur : validez la restauration sur cet hébergement.`
     if (!backup.reason) backup.reason = caveat
     if (!restore.reason) restore.reason = caveat
   }

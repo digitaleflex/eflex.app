@@ -142,7 +142,7 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
       })
       const body = await response.json().catch(() => ({}))
       if (!response.ok) { setFeedback({ tone: 'error', message: body.error ?? 'Provisionnement impossible.' }); return }
-      setFeedback({ tone: 'success', message: 'Service Coolify en cours de provisionnement. Son état sera disponible après démarrage.' })
+      setFeedback({ tone: 'success', message: 'Service en cours de création. Son état sera disponible après démarrage.' })
       setSelected(null)
       await load()
     } catch {
@@ -244,13 +244,21 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
         </p>
       )}
 
+      {/* Détails de l'hébergement : utiles au diagnostic, repliés pour ne pas encombrer le parcours courant. */}
+      <details className="group rounded-lg border border-border">
+        <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-2 rounded-lg px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          Détails techniques de l’hébergement
+          <span className="text-xs font-normal text-muted-foreground group-open:hidden">Afficher</span>
+          <span className="hidden text-xs font-normal text-muted-foreground group-open:inline">Masquer</span>
+        </summary>
+        <div className="space-y-3 border-t border-border p-3">
       <InstanceCapabilitiesPanel runtime={model.runtime} />
 
       {serviceCapabilities && (
         <div className="rounded-lg border border-border bg-muted/20 p-3 text-xs">
           <p className="font-medium text-foreground">
-            Découverte des services one-click :{' '}
-            {serviceCapabilities.source === 'instance' ? 'types supportés détectés sur l’instance' : 'basée sur le catalogue EFLEX (support non confirmé)'}
+            Services prêts à l’emploi :{' '}
+            {serviceCapabilities.source === 'instance' ? 'types pris en charge détectés sur l’hébergement' : 'basée sur le catalogue EFLEX (support non confirmé)'}
           </p>
           {serviceCapabilities.message && (
             <p className="mt-1 text-muted-foreground">{serviceCapabilities.message}</p>
@@ -262,11 +270,13 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
           )}
         </div>
       )}
+        </div>
+      </details>
 
       <section aria-labelledby="services-active-title" className="space-y-3">
         <div>
-          <h3 id="services-active-title" className="text-sm font-semibold">Ressources actives</h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">Bases et services provisionnés pour ce projet.</p>
+          <h3 id="services-active-title" className="text-sm font-semibold">Vos bases de données et services</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">Ce qui est déjà actif pour ce projet.</p>
         </div>
         <ActiveResources
           projectId={projectId}
@@ -284,7 +294,7 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
 
         {activeServices.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Services Coolify</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Services</p>
             <ul className="space-y-2">
               {activeServices.map((service) => {
                 const view = svcStatus(service.status)
@@ -296,7 +306,7 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
                         <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
                           <ServiceIcon kind={service.catalogId} label={service.label} className="h-7 w-7" />
                           {service.label}
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Service Coolify</span>
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Service</span>
                         </p>
                         <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                           <span aria-hidden="true" className={cn('h-2 w-2 rounded-full', DOT[view.tone])} />
@@ -330,23 +340,36 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
                 )
               })}
             </ul>
-            <p className="text-xs text-muted-foreground">Les services one-click sont créés dans Coolify. Ouvrez « Configurer » pour gérer les variables d’environnement, les domaines/FQDN et consulter la configuration/les volumes exposés par l’API (selon les capacités de l’instance).</p>
+            <p className="text-xs text-muted-foreground">Ouvrez « Configurer » pour gérer les variables d’environnement, les domaines/FQDN et consulter la configuration/les volumes exposés par l’API (selon les capacités de l’instance).</p>
           </div>
         )}
       </section>
 
       <section aria-labelledby="services-catalog-title" className="space-y-3">
         <div>
-          <h3 id="services-catalog-title" className="text-sm font-semibold">Ajouter un service</h3>
+          <h3 id="services-catalog-title" className="text-sm font-semibold">Ajouter une base de données ou un service</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Catalogue unifié des bases et services : disponibilité réelle sur cette instance, capacités par opération (provisionnement, cycle de vie, sauvegarde, restauration), provider sélectionné par politique, prérequis et limites. Ouvrez un service pour voir sa compatibilité et, si possible, le provisionner (bases managées, services Coolify, candidats EFLEX-gérés).
+            Choisissez une base (PostgreSQL, Redis…) ou un service prêt à l’emploi. Ouvrez une carte pour voir ce qu’elle apporte avant de l’ajouter.
           </p>
         </div>
-        <ServicesBrowser services={model.services} canManage={canManage} onOpen={setSelected} />
+        {/* Le catalogue est long : replié dès qu'une ressource existe, ouvert pour un premier ajout. */}
+        <details
+          open={model.activeDatabases.length === 0 && activeServices.length === 0 ? true : undefined}
+          className="group rounded-lg border border-border"
+        >
+          <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-2 rounded-lg px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            Parcourir les bases et services disponibles ({model.services.length})
+            <span className="text-xs font-normal text-muted-foreground group-open:hidden">Afficher</span>
+            <span className="hidden text-xs font-normal text-muted-foreground group-open:inline">Masquer</span>
+          </summary>
+          <div className="border-t border-border p-3">
+            <ServicesBrowser services={model.services} canManage={canManage} onOpen={setSelected} />
+          </div>
+        </details>
       </section>
 
       <p className="text-xs text-muted-foreground">
-        Les ressources sont privées, accessibles depuis le réseau Docker de l’application. Les URLs/credentials sont chiffrés et injectés comme variables d’environnement au prochain déploiement lorsque nécessaire. Les capacités dépendent du moteur et de l’instance.
+        Les connexions sont privées : l’adresse et les identifiants sont chiffrés et ajoutés à vos variables au prochain déploiement.
       </p>
 
       <ServiceDetailDialog
@@ -368,7 +391,7 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
 
       <ConfirmDialog open={confirm?.kind === 'service-restart'} title={`Redémarrer ${confirm && 'service' in confirm ? confirm.service.label : 'le service'} ?`} description="Le service sera brièvement indisponible." confirmLabel="Redémarrer" onConfirm={() => (confirm && 'service' in confirm ? actService(confirm.service, 'restart') : undefined)} onCancel={() => setConfirm(null)} />
       <ConfirmDialog open={confirm?.kind === 'service-stop'} title={`Arrêter ${confirm && 'service' in confirm ? confirm.service.label : 'le service'} ?`} description="Le service sera arrêté jusqu’au redémarrage." confirmLabel="Arrêter le service" destructive onConfirm={() => (confirm && 'service' in confirm ? actService(confirm.service, 'stop') : undefined)} onCancel={() => setConfirm(null)} />
-      <ConfirmDialog open={confirm?.kind === 'service-delete'} title={`Supprimer ${confirm && 'service' in confirm ? confirm.service.label : 'le service'} ?`} description="Le service Coolify et ses configurations associées seront supprimés (les volumes ne sont pas supprimés automatiquement par cette action). Cette action est irréversible." confirmLabel="Supprimer le service" destructive onConfirm={() => (confirm && 'service' in confirm ? removeService(confirm.service) : undefined)} onCancel={() => setConfirm(null)} />
+      <ConfirmDialog open={confirm?.kind === 'service-delete'} title={`Supprimer ${confirm && 'service' in confirm ? confirm.service.label : 'le service'} ?`} description="Le service et ses configurations associées seront supprimés (les volumes ne sont pas supprimés automatiquement par cette action). Cette action est irréversible." confirmLabel="Supprimer le service" destructive onConfirm={() => (confirm && 'service' in confirm ? removeService(confirm.service) : undefined)} onCancel={() => setConfirm(null)} />
     </div>
   )
 }

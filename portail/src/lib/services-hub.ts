@@ -164,8 +164,8 @@ export const STATE_LABELS: Record<ServiceDisplayState, string> = {
   active: 'Active',
   creatable: 'Provisionnable',
   unavailable: 'Indisponible sur cette instance',
-  'coolify-oneclick': 'Via Coolify (one-click)',
-  'eflex-managed': 'EFLEX-géré (candidat)',
+  'coolify-oneclick': 'Prêt à l’emploi',
+  'eflex-managed': 'Bientôt géré par EFLEX',
   planned: 'À venir',
 }
 
@@ -182,7 +182,7 @@ export const FILTER_LABELS: Record<ServiceFilterState, string> = {
   provisionable: 'Provisionnable',
   added: 'Déjà ajouté',
   unavailable: 'Indisponible ici',
-  'coolify-oneclick': 'Via Coolify',
+  'coolify-oneclick': 'Prêt à l’emploi',
   'eflex-managed': 'EFLEX-géré',
   planned: 'À venir',
 }
@@ -320,7 +320,7 @@ export function buildServicesHubModel(input: {
       // Provisionnable via un template one-click Coolify (aligné sur les capacités de l’instance si connues).
       if (caps?.source === 'instance' && typeCap && !typeCap.provisionable) {
         state = 'unavailable'
-        reason = reason ?? typeCap.reason ?? 'Type de service non supporté par cette instance Coolify.'
+        reason = reason ?? typeCap.reason ?? 'Type de service non supporté par cet hébergement.'
       } else {
         state = 'creatable'
       }
@@ -337,7 +337,7 @@ export function buildServicesHubModel(input: {
     const notes = [...baseNotes]
     if (coolifyServiceType && !active && !activeService && !engine) {
       if (caps?.source === 'instance' && typeCap?.provisionable) {
-        notes.push('Type confirmé comme supporté par cette instance Coolify.')
+        notes.push('Type confirmé comme supporté par cet hébergement.')
       } else if (caps?.source === 'catalog' && caps.message) {
         notes.push(caps.message)
       } else if (typeCap?.reason && state === 'creatable') {

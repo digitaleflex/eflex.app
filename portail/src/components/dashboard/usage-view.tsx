@@ -299,8 +299,8 @@ export function UsageView({ projects, quota }: { projects: UsageProject[]; quota
           Sources et unités
         </h2>
         <ul className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-          <li><span className="font-medium text-foreground">CPU</span> : pourcentage d’utilisation instantané, source hébergement (Coolify), quand exposé.</li>
-          <li><span className="font-medium text-foreground">Mémoire</span> : mémoire utilisée (Mo/Go) et limite si connue, source hébergement (Coolify), quand exposé.</li>
+          <li><span className="font-medium text-foreground">CPU</span> : pourcentage d’utilisation instantané, source : hébergement, quand disponible.</li>
+          <li><span className="font-medium text-foreground">Mémoire</span> : mémoire utilisée (Mo/Go) et limite si connue, source : hébergement, quand disponible.</li>
           <li><span className="font-medium text-foreground">Stockage</span> : aucune source de mesure disponible pour le moment — aucune valeur affichée.</li>
           <li><span className="font-medium text-foreground">Bande passante</span> : aucune source de mesure disponible pour le moment — aucune valeur affichée.</li>
         </ul>
@@ -349,7 +349,7 @@ export function UsageView({ projects, quota }: { projects: UsageProject[]; quota
               </div>
               {!quota.perPlanExecutionEnforced && (
                 <p className="text-xs">
-                  Les profils de ressources différenciés par plan ne sont pas encore appliqués. L’application réelle des limites dépend de la configuration de l’hébergement (Coolify/infra).
+                  Les profils de ressources différenciés par plan ne sont pas encore appliqués. L’application réelle des limites dépend de la configuration de l’hébergement (hébergement).
                 </p>
               )}
             </div>

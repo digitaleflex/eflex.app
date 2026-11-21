@@ -37,10 +37,10 @@ export function CoolifyDeploymentsPanel({ projectId, multiApp }: { projectId: st
     return (
       <div className="border-b border-border px-4 py-3 sm:px-5">
         <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
-          <Server className="h-4 w-4" aria-hidden="true" /> Voir l’historique hébergement (Coolify)
+          <Server className="h-4 w-4" aria-hidden="true" /> Voir l’historique de l’hébergement
         </Button>
         <p className="mt-1 text-xs text-muted-foreground">
-          Affiche l’historique des déploiements connus par Coolify pour cette application. Utile pour la réconciliation en cas d’écart
+          Affiche l’historique des déploiements connus par l’hébergement pour cette application. Utile pour la réconciliation en cas d’écart
           avec l’historique E-FLEX ou de déploiement lancé hors portail.
         </p>
       </div>
@@ -51,7 +51,7 @@ export function CoolifyDeploymentsPanel({ projectId, multiApp }: { projectId: st
     <div className="border-b border-border px-4 py-3 sm:px-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-          <Server className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" /> Historique hébergement (Coolify)
+          <Server className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" /> Historique de l’hébergement
         </p>
         <div className="flex gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={() => void load()} disabled={loading} className="h-7 px-2 text-xs">
@@ -63,7 +63,7 @@ export function CoolifyDeploymentsPanel({ projectId, multiApp }: { projectId: st
         </div>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        Données lues depuis l’API Coolify (<code className="rounded-md bg-muted px-1 font-mono">/deployments/applications/&lbrace;uuid&rbrace;</code>).
+        Données lues depuis l’hébergement.
         Comparez les commits/statuts avec l’historique E-FLEX ci-dessous pour identifier un déploiement non suivi par le portail.
       </p>
       {loading && <p className="mt-2 text-xs text-muted-foreground">Chargement…</p>}

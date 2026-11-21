@@ -24,3 +24,13 @@ export function usageLabel(level: UsageLevel): string {
       return 'Dans la limite'
   }
 }
+
+/** Limite lisible : « illimité » quand le plan n'en a pas (`Infinity`), sinon le nombre. */
+export function formatLimit(limit: number): string {
+  return Number.isFinite(limit) ? limit.toLocaleString('fr-FR') : 'illimité'
+}
+
+/** « 1 / 5 » ou « 1 / illimité » ; l'utilisation reste un nombre. */
+export function formatUsageOf(used: number, limit: number): string {
+  return `${used.toLocaleString('fr-FR')} / ${formatLimit(limit)}`
+}

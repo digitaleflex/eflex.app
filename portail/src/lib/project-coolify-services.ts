@@ -178,7 +178,7 @@ function collectTypeStrings(raw: unknown, depth = 0): string[] {
   return []
 }
 
-/** Découvre les types/templates one-click supportés par l’instance Coolify. */
+/** Découvre les types/templates one-click supportés par l’hébergement. */
 export async function discoverServiceTypeCapabilities(): Promise<ServiceTypeCapabilities> {
   const catalogEntries = supportedServiceEntries()
 
@@ -194,7 +194,7 @@ export async function discoverServiceTypeCapabilities(): Promise<ServiceTypeCapa
         const ok = type.length > 0 && supportedSet.has(type)
         byCatalogId[entry.id] = ok
           ? { provisionable: true, reason: null }
-          : { provisionable: false, reason: 'Type non annoncé par cette instance Coolify.' }
+          : { provisionable: false, reason: 'Type non annoncé par cet hébergement.' }
         if (ok) provisionableCatalogIds.push(entry.id)
       }
       return {
@@ -273,7 +273,7 @@ export async function setServiceEnvVars(
   if (bulk.error) {
     // Certains environnements peuvent ne pas exposer le bulk : signaler clairement.
     if (bulk.error.includes('404') || bulk.error.includes('405')) {
-      return { error: "L’API Coolify de cette instance ne permet pas la modification en lot des variables de ce service." }
+      return { error: "L’hébergement ne permet pas la modification en lot des variables de ce service." }
     }
     return { error: bulk.error }
   }
@@ -450,7 +450,7 @@ export async function getProjectServiceConfig(serviceId: string): Promise<Servic
     notes.push(`Variables d’environnement non lisibles : ${envsRes.error}`)
   }
   // La possibilité d’écriture réelle dépend de l’instance ; on l’indique comme « à confirmer ».
-  notes.push('La modification des variables nécessite le support de l’API Coolify et redémarre le service.')
+  notes.push('La modification des variables nécessite le support de l’hébergement et redémarre le service.')
   const hasDomainComponents = domainTargets.length > 0 || asArray(raw.applications).length > 0
   if (!hasDomainComponents) {
     notes.push('Aucun composant configurable en domaine/FQDN n’est exposé par l’API pour ce service.')
@@ -546,7 +546,7 @@ export async function updateServiceComponentDomains(
   }
 
   if (lastUnsupported || attempts.length === 0) {
-    return { error: "La configuration des domaines/FQDN n’est pas supportée par l’API Coolify pour ce composant." }
+    return { error: "La configuration des domaines/FQDN n’est pas supportée par l’hébergement pour ce composant." }
   }
   return { error: 'Impossible de mettre à jour les domaines de ce service.' }
 }

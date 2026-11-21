@@ -144,7 +144,7 @@ export function ProjectPreviewsTab({ projectId, canManage }: { projectId: string
                 </p>
                 {!data.ready && data.enabled && (
                   <p className="text-xs text-warning">
-                    L’application principale doit être déployée sur Coolify avant la création d’une prévisualisation.
+                    L’application principale doit être déployée avant la création d’une prévisualisation.
                   </p>
                 )}
               </div>
@@ -164,7 +164,7 @@ export function ProjectPreviewsTab({ projectId, canManage }: { projectId: string
               <span className="inline-flex items-start gap-2">
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>
-                  {data.guards.secretsNote} Les PR de forks sont refusées. La disponibilité dépend du support des prévisualisations par l’instance Coolify et de sa configuration réseau/TLS.
+                  {data.guards.secretsNote} Les PR de forks sont refusées. La disponibilité dépend du support des prévisualisations par l’hébergement et de sa configuration réseau/TLS.
                 </span>
               </span>
             </Notice>

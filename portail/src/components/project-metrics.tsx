@@ -173,7 +173,7 @@ export function ProjectMetrics({
             Ressources et état
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Utilisation CPU/mémoire et état runtime rapportés par l’hébergement (Coolify), quand disponibles. Valeurs en échantillon instantané (non cumulé).
+            Utilisation CPU/mémoire et état runtime rapportés par l’hébergement, quand disponibles. Valeurs en échantillon instantané (non cumulé).
             {metrics?.sampledAt && metrics.available && (
               <span className="ml-1 tabular-nums">
                 Dernier échantillon : {new Date(metrics.sampledAt).toLocaleString('fr-FR')}.
