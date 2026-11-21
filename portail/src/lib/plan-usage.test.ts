@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { usageLabel, usageLevel, usagePercent } from '@/lib/plan-usage'
+import { formatLimit, formatUsageOf, usageLabel, usageLevel, usagePercent } from '@/lib/plan-usage'
 
 describe('plan-usage', () => {
   it('calcule le pourcentage borné', () => {
@@ -19,5 +19,18 @@ describe('plan-usage', () => {
   it('fournit un libellé', () => {
     expect(usageLabel('warning')).toBe('Proche de la limite')
     expect(usageLabel('full')).toBe('Quota atteint')
+  })
+})
+
+
+describe('formatLimit', () => {
+  it('affiche « illimité » plutôt que « Infinity »', () => {
+    expect(formatLimit(Number.POSITIVE_INFINITY)).toBe('illimité')
+    expect(formatUsageOf(1, Number.POSITIVE_INFINITY)).toBe('1 / illimité')
+  })
+
+  it('formate une limite finie à la française', () => {
+    expect(formatLimit(5)).toBe('5')
+    expect(formatUsageOf(1200, 5000).replace(/\s/g, ' ')).toBe('1 200 / 5 000')
   })
 })

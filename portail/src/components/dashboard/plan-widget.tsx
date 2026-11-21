@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import type { Plan } from '@/lib/plans'
-import { usageLabel, usageLevel, usagePercent } from '@/lib/plan-usage'
+import { formatLimit, usageLabel, usageLevel, usagePercent } from '@/lib/plan-usage'
 import { cn } from '@/lib/utils'
 
 type BillingLite = {
@@ -37,7 +37,7 @@ export function PlanWidget({ billing, className }: { billing: BillingLite; class
           </span>
         ) : null}
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={`${used} sur ${limit} applications utilisées`}>
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={`${used} application${used > 1 ? 's' : ''} utilisée${used > 1 ? 's' : ''} sur ${formatLimit(limit)}`}>
         <div
           className={cn(
             'h-full rounded-full transition-[width] duration-300 ease-out-expo',
@@ -47,7 +47,7 @@ export function PlanWidget({ billing, className }: { billing: BillingLite; class
         />
       </div>
       <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span className="tabular-nums">{used} / {limit} applications</span>
+        <span className="tabular-nums">{used} / {formatLimit(limit)} application{Number.isFinite(limit) && limit < 2 ? '' : 's'}</span>
         <span className="font-medium text-primary">{cta}</span>
       </div>
     </Link>

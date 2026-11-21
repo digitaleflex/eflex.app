@@ -114,11 +114,6 @@ export function ServiceDetailDialog({
                   {service.envKey && (
                     <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">{service.envKey}</span>
                   )}
-                  {service.provider && (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                      Fournisseur : {service.provider === 'coolify' ? 'Coolify' : 'EFLEX'}
-                    </span>
-                  )}
                   {service.adjusted && <Badge label="Capacité ajustée" tone="info" />}
                 </div>
               </div>
@@ -133,7 +128,7 @@ export function ServiceDetailDialog({
                       <CapabilityRow
                         key={op.operation}
                         label={OPERATION_LABELS[op.operation] ?? op.operation}
-                        value={op.supported ? `Pris en charge${op.provider ? ` (${op.provider === 'coolify' ? 'Coolify' : 'EFLEX'})` : ''}` : 'Non disponible'}
+                        value={op.supported ? `Pris en charge${op.provider ? '' : ''}` : 'Non disponible'}
                         tone={op.supported ? 'ok' : 'muted'}
                         reason={op.reason}
                       />
@@ -150,9 +145,9 @@ export function ServiceDetailDialog({
               ) : (
                 <p className="text-xs text-muted-foreground">
                   {service.coolifyServiceType && service.state === 'creatable' &&
-                    'Service provisionnable via un modèle one-click Coolify (si le modèle est disponible sur l’instance). La configuration détaillée peut nécessiter des ajustements après création.'}
+                    'Service provisionnable via un modèle prêt à l’emploi (si disponible sur l’hébergement). La configuration détaillée peut nécessiter des ajustements après création.'}
                   {service.state === 'coolify-oneclick' && !service.coolifyServiceType &&
-                    'Service référencé comme modèle Coolify : aucun parcours de provisionnement automatique n’est câblé dans le portail pour le moment.'}
+                    'Service référencé comme modèle prêt à l’emploi : aucun parcours de provisionnement automatique n’est câblé dans le portail pour le moment.'}
                   {service.state === 'eflex-managed' &&
                     'Candidat EFLEX-géré (réseau privé, persistance, secrets, healthcheck, supervision). Aucun provisionnement automatique : un adaptateur validé doit être activé avant toute promesse.'}
                   {service.state === 'planned' && 'Service indexé pour référence. Son intégration n’est pas encore disponible.'}
@@ -203,7 +198,7 @@ export function ServiceDetailDialog({
               <section aria-label="Confirmation" className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-4">
                 <h3 className="text-sm font-medium">Confirmer la création</h3>
                 <p className="text-xs text-muted-foreground">
-                  La base <span className="font-medium text-foreground">{service.label}</span> sera provisionnée pour ce projet via le provider sélectionné.
+                  La base <span className="font-medium text-foreground">{service.label}</span> sera créée pour ce projet.
                   {service.envKey && (
                     <> La variable <span className="font-mono text-foreground">{service.envKey}</span>{service.envAliases.length > 0 ? <> (et alias compatibles libres)</> : null} sera injectée (valeur chiffrée, réseau privé).</>
                   )}
@@ -221,7 +216,7 @@ export function ServiceDetailDialog({
               <section aria-label="Confirmation" className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-4">
                 <h3 className="text-sm font-medium">Confirmer le provisionnement</h3>
                 <p className="text-xs text-muted-foreground">
-                  Le service <span className="font-medium text-foreground">{service.label}</span> sera créé via Coolify (modèle one-click <span className="font-mono">{service.coolifyServiceType}</span>) dans l’environnement d’hébergement du projet. Le démarrage et la configuration détaillée (domaines, variables, volumes, exposition réseau) dépendront du modèle et des capacités de l’instance.
+                  Le service <span className="font-medium text-foreground">{service.label}</span> sera créé automatiquement dans l’environnement d’hébergement du projet. Le démarrage et la configuration détaillée (domaines, variables, volumes, exposition réseau) dépendront du modèle et des capacités de l’instance.
                 </p>
               </section>
             )}
@@ -229,7 +224,7 @@ export function ServiceDetailDialog({
 
           <div className="flex flex-col-reverse gap-2 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-muted-foreground">
-              {service.state === 'active' && (service.activeService ? 'Ce service Coolify est déjà provisionné pour le projet.' : 'Cette ressource est déjà active pour le projet.')}
+              {service.state === 'active' && (service.activeService ? 'Ce service est déjà actif pour le projet.' : 'Cette ressource est déjà active pour le projet.')}
               {service.state === 'creatable' && !canManage && 'Provisionnement réservé aux membres autorisés du projet.'}
               {service.state === 'unavailable' && 'Non créable sur cette instance dans l’état actuel.'}
               {(service.state === 'coolify-oneclick' || service.state === 'eflex-managed' || service.state === 'planned') &&
@@ -245,7 +240,7 @@ export function ServiceDetailDialog({
                 </Button>
               )}
               {service.state === 'active' && service.activeService && (
-                <span className="self-center text-xs text-muted-foreground">Service Coolify actif : <span className="font-mono">{service.activeService.name}</span></span>
+                <span className="self-center text-xs text-muted-foreground">Service actif : <span className="font-mono">{service.activeService.name}</span></span>
               )}
               {creatable && !confirming && (
                 <Button type="button" onClick={() => setConfirming(true)}>

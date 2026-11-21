@@ -203,11 +203,6 @@ export function ServicesBrowser({
                     {service.managedDatabaseKind && !service.backupSupported && service.state !== 'unavailable' && (
                       <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Sans sauvegarde intégrée</span>
                     )}
-                    {service.provider && (
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                        via {service.provider === 'coolify' ? 'Coolify' : 'EFLEX'}
-                      </span>
-                    )}
                   </div>
 
                   {service.reason && <p className="text-xs text-warning">{service.reason}</p>}

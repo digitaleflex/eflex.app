@@ -397,7 +397,7 @@ export function ActiveServiceManager({
               </div>
             ) : (
               <p className="rounded-md border border-border bg-background p-2 text-xs text-muted-foreground">
-                Aucune information de volume exposée par l’API pour ce service. Selon le modèle Coolify, les volumes peuvent être gérés dans la configuration interne du service.
+                Aucune information de volume exposée par l’API pour ce service. Selon le service, les volumes peuvent être gérés dans la configuration interne du service.
               </p>
             )}
             <p className="text-xs text-muted-foreground">Vue en lecture seule : les informations de configuration/volumes affichées sont celles exposées par l’API, sans secrets.</p>

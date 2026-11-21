@@ -22,6 +22,7 @@ import {
   Trash2,
   TriangleAlert,
   type LucideIcon,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -157,6 +158,15 @@ function sortEnvVars(list: EnvVarKey[]): EnvVarKey[] {
 export function ProjectSettings({ project, apps: initialApps = [], imageSource = null, imageApps = [], envVars: initialEnvVars, transferTargets }: ProjectSettingsProps) {
   const router = useRouter()
   const [apps, setApps] = useState<SettingsApp[]>(initialApps)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+
+  // Un lien vers une section avancée (#avance, #disponibilite, #applications, #fichiers) ouvre le groupe.
+  useEffect(() => {
+    if (['#avance', '#disponibilite', '#applications', '#fichiers'].includes(window.location.hash)) {
+      setAdvancedOpen(true)
+      requestAnimationFrame(() => document.getElementById(window.location.hash.slice(1))?.scrollIntoView())
+    }
+  }, [])
   const appNameById = new Map(apps.map((app) => [app.id, app.name]))
   const multiApp = apps.length > 1
   const showApplications = apps.length > 0
@@ -490,9 +500,8 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
     { href: '#branche-deploiement', label: hasImageSource ? 'Source et déploiement' : 'Branche et déploiement' },
     { href: '#domaines', label: 'Domaines' },
     { href: '#bases', label: 'Bases de données' },
-    { href: '#disponibilite', label: 'Disponibilité' },
     { href: '#variables', label: 'Variables' },
-    ...(showApplications ? [{ href: '#applications', label: 'Applications' }] : []),
+    { href: '#avance', label: 'Réglages avancés' },
     { href: '#support', label: 'Support' },
     { href: '#zone-dangereuse', label: 'Zone dangereuse' },
   ]
@@ -532,6 +541,7 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
             <li key={item.href}>
               <a
                 href={item.href}
+                onClick={item.href === '#avance' ? () => setAdvancedOpen(true) : undefined}
                 className={cn(
                   'inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:w-full',
                   item.href === '#zone-dangereuse' ? 'text-destructive hover:text-destructive' : 'text-muted-foreground hover:text-foreground',
@@ -716,80 +726,25 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
         </div>
       </SettingsSection>
 
-      <section id="execution" aria-labelledby="execution-title" className="scroll-mt-28 space-y-4">
-        <header className="space-y-1">
-          <h2 id="execution-title" className="flex items-center gap-2 text-lg font-semibold">
-            <Activity className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-            Exécution
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Domaines, bases de données et disponibilité de l’application hébergée.
-          </p>
-        </header>
+      <SettingsSection
+        id="domaines"
+        title="Domaines"
+        icon={Globe}
+        description="Le domaine EFLEX reste stable. Ajoutez vos propres domaines avec un CNAME ; le certificat SSL est émis automatiquement après vérification."
+      >
+        <ProjectDomains projectId={project.id} apps={apps.map((app) => ({ id: app.id, name: app.name }))} />
+      </SettingsSection>
+
+      <SettingsSection
+        id="bases"
+        title="Bases de données & services"
+        icon={Database}
+        description="Ajoutez une base de données ou un service. Les connexions sont privées et ajoutées automatiquement à votre application."
+      >
         <div className="space-y-6">
-          <SettingsSection
-            id="domaines"
-            title="Domaines"
-            icon={Globe}
-            description="Le domaine EFLEX reste stable. Ajoutez vos propres domaines avec un CNAME ; le certificat SSL est émis automatiquement après vérification."
-          >
-            <ProjectDomains projectId={project.id} apps={apps.map((app) => ({ id: app.id, name: app.name }))} />
-          </SettingsSection>
-
-          <SettingsSection
-            id="bases"
-            title="Bases de données & services"
-            icon={Database}
-            description="Gérez vos ressources actives et ajoutez des bases ou services depuis le catalogue unifié : disponibilité réelle de l’instance, capacités (sauvegarde, restauration, provider) et services référencés. Les connexions sont privées et injectées automatiquement."
-          >
-            <div className="space-y-6">
-              <ProjectDatabases projectId={project.id} />
-              <section aria-label="Volumes et fichiers persistants" className="space-y-2 border-t border-border pt-4">
-                <h4 className="text-sm font-semibold">Volumes et fichiers persistants (stratégie)</h4>
-                <p className="text-sm text-muted-foreground">
-                  Les volumes déclarés par le plan (ex. <code className="font-mono">VOLUME</code> Docker, stockage
-                  applicatif) contiennent des données clients distinctes des bases managées. EFLEX n’intègre pas encore de
-                  sauvegarde/restauration automatisée de ces volumes/fichiers.
-                </p>
-                <div className="rounded-lg border border-warning/20 bg-warning/10 p-3 text-xs space-y-2">
-                  <p className="font-medium text-foreground">Politique actuelle (sans fausse promesse)</p>
-                  <ul className="list-disc space-y-1 pl-4">
-                    <li><strong>Inventaire :</strong> volumes montés selon le plan/l’hébergement ; pas de catalogue de sauvegarde intégré.</li>
-                    <li><strong>Sauvegarde/restauration :</strong> à organiser selon l’infrastructure (export/copie de volume, stockage objet, sauvegardes Coolify si disponibles) et à <strong>tester régulièrement</strong> par restauration.</li>
-                    <li><strong>Redis/magasins en mémoire :</strong> aucun dump intégré ; à traiter comme cache/file sauf persistance et stratégie dédiée validée.</li>
-                    <li><strong>Suppression :</strong> la suppression d’un projet, d’une application ou d’un volume peut entraîner une perte de données ; sauvegardez avant toute action destructive.</li>
-                  </ul>
-                  <p className="text-muted-foreground">
-                    Références : <span className="font-mono">docs/operations/volumes.md</span>, <span className="font-mono">docs/operations/client-database-backups.md</span>, <span className="font-mono">docs/architecture/eflex/layers/11-backup-recovery.md</span>.
-                  </p>
-                </div>
-              </section>
-            </div>
-          </SettingsSection>
-
-          <SettingsSection
-            id="disponibilite"
-            title="Disponibilité & actions"
-            icon={Activity}
-            description="Statut du conteneur sur la plateforme et actions immédiates. Le redéploiement complet reste disponible depuis la page du projet."
-          >
-            <div className="space-y-6">
-              <ProjectRuntimeControls projectId={project.id} apps={apps.map((app) => ({ id: app.id, name: app.name }))} />
-              <div className="border-t border-border pt-6">
-                <h3 className="mb-1 text-sm font-medium">Configuration applicative (santé & déploiement)</h3>
-                <p className="mb-4 text-sm text-muted-foreground">
-                  Réglages contrôlés côté hébergement : contrôle de santé (healthcheck) et chemins surveillés (watch paths). Les options avancées non listées restent gérées côté plateforme.
-                </p>
-                <AppConfigPanel
-                  projectId={project.id}
-                  canManage={true}
-                  apps={apps.map((app) => ({ id: app.id, name: app.name, deployed: Boolean(app.deployed) }))}
-                />
-              </div>
-            </div>
-          </SettingsSection>
+          <ProjectDatabases projectId={project.id} />
         </div>
-      </section>
+      </SettingsSection>
 
       <SettingsSection
         id="variables"
@@ -893,6 +848,67 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
         </div>
       </SettingsSection>
 
+      <details
+        id="avance"
+        open={advancedOpen}
+        onToggle={(event) => setAdvancedOpen((event.currentTarget as HTMLDetailsElement).open)}
+        className="group scroll-mt-28"
+      >
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+          <span>
+            <span className="flex items-center gap-2 font-semibold">
+              <SlidersHorizontal className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              Réglages avancés
+            </span>
+            <span className="mt-0.5 block text-sm text-muted-foreground">
+              Disponibilité, contrôle de santé et limites, fichiers{showApplications ? ', applications du projet' : ''}. Vous n’en avez pas besoin pour un usage courant.
+            </span>
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+        </summary>
+        <div className="mt-6 space-y-6">
+          <SettingsSection
+            id="disponibilite"
+            title="Disponibilité & actions"
+            icon={Activity}
+            description="Statut de l’application et actions immédiates. Le redéploiement complet reste disponible depuis la page du projet."
+          >
+            <div className="space-y-6">
+              <ProjectRuntimeControls projectId={project.id} apps={apps.map((app) => ({ id: app.id, name: app.name }))} />
+              <div className="border-t border-border pt-6">
+                <h3 className="mb-1 text-sm font-medium">Configuration applicative (santé & déploiement)</h3>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  Contrôle de santé de l’application et dossiers qui déclenchent un redéploiement. Les autres options restent gérées par la plateforme.
+                </p>
+                <AppConfigPanel
+                  projectId={project.id}
+                  canManage={true}
+                  apps={apps.map((app) => ({ id: app.id, name: app.name, deployed: Boolean(app.deployed) }))}
+                />
+              </div>
+            </div>
+          </SettingsSection>
+          <SettingsSection
+            id="fichiers"
+            title="Fichiers et sauvegardes"
+            icon={Database}
+            description="Ce qui est sauvegardé automatiquement, et ce qui ne l’est pas encore."
+          >
+            <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+              <li>
+                <strong className="font-medium text-foreground">Fichiers enregistrés par votre application</strong> (images téléversées, documents…) :
+                EFLEX ne les sauvegarde pas encore automatiquement. Gardez une copie ailleurs et testez régulièrement sa restauration.
+              </li>
+              <li>
+                <strong className="font-medium text-foreground">Redis et autres magasins en mémoire</strong> : à traiter comme du cache,
+                sauf si vous avez configuré une persistance.
+              </li>
+              <li>
+                <strong className="font-medium text-foreground">Suppression</strong> : supprimer un projet, une application ou un volume peut entraîner une
+                perte de données. Sauvegardez avant toute action destructive.
+              </li>
+            </ul>
+          </SettingsSection>
       {showApplications && (
         <SettingsSection
           id="applications"
@@ -1003,6 +1019,8 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
           </div>
         </SettingsSection>
       )}
+        </div>
+      </details>
 
       <section id="support" aria-labelledby="support-title" className="scroll-mt-28">
         <Card>

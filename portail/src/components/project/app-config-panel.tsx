@@ -136,7 +136,7 @@ export function AppConfigPanel({
 
           <div className="space-y-2 rounded-lg border border-border p-4">
             <p className="text-sm font-medium">Chemins surveillés (watch paths)</p>
-            <p className="text-xs text-muted-foreground">Limite les redéploiements automatiques aux changements touchant ces chemins (séparés par des virgules ou retours à la ligne, selon support Coolify). Laisser vide pour le comportement par défaut.</p>
+            <p className="text-xs text-muted-foreground">Limite les redéploiements automatiques aux changements touchant ces chemins (séparés par des virgules ou retours à la ligne, selon l’hébergement). Laisser vide pour le comportement par défaut.</p>
             <textarea
               className="min-h-[88px] w-full rounded-lg border border-input bg-background p-3 font-mono text-xs"
               value={config.watchPaths}
@@ -148,7 +148,7 @@ export function AppConfigPanel({
 
           <div className="space-y-3 rounded-lg border border-border p-4">
             <p className="text-sm font-medium">Limites de ressources (conteneur)</p>
-            <p className="text-xs text-muted-foreground">Valeurs transmises à l’hébergement (Coolify/Docker), par ex. CPU <span className="font-mono">0.5</span> ou <span className="font-mono">2</span>, mémoire <span className="font-mono">512M</span> ou <span className="font-mono">1G</span>. Laisser vide pour ne pas imposer de limite. L’application effective dépend des capacités du serveur et des politiques de plan.</p>
+            <p className="text-xs text-muted-foreground">Valeurs transmises à l’hébergement, par ex. CPU <span className="font-mono">0.5</span> ou <span className="font-mono">2</span>, mémoire <span className="font-mono">512M</span> ou <span className="font-mono">1G</span>. Laisser vide pour ne pas imposer de limite. L’application effective dépend des capacités du serveur et des politiques de plan.</p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="space-y-1 text-sm"><span className="text-muted-foreground">CPU (limites)</span><Input value={config.limitsCpus} disabled={!canManage} onChange={(e) => setConfig({ ...config, limitsCpus: e.target.value })} placeholder="ex. 1" className="font-mono" /></label>
               <label className="space-y-1 text-sm"><span className="text-muted-foreground">Mémoire</span><Input value={config.limitsMemory} disabled={!canManage} onChange={(e) => setConfig({ ...config, limitsMemory: e.target.value })} placeholder="ex. 512M" className="font-mono" /></label>

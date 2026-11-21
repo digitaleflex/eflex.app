@@ -14,6 +14,7 @@ import { computeBillingState } from '@/lib/billing'
 import { OrganizationAdminActions } from '@/components/admin/organization-admin-actions'
 import { TimeFr } from '@/components/admin/time-fr'
 import { formatInteger } from '@/lib/table'
+import { formatLimit } from '@/lib/plan-usage'
 
 export const metadata = { title: 'Organisation — Administration EFLEX' }
 export const dynamic = 'force-dynamic'
@@ -199,14 +200,14 @@ export default async function AdminOrganizationPage({ params }: { params: Promis
         />
         <StatCard
           label="Applications"
-          value={`${formatInteger(usage.apps)} / ${formatInteger(state.limits.projects)}`}
+          value={`${formatInteger(usage.apps)} / ${formatLimit(state.limits.projects)}`}
           hint={usage.apps >= state.limits.projects ? 'Quota atteint' : `${formatInteger(usage.projects)} projet${usage.projects > 1 ? 's' : ''} réels`}
           icon={Gauge}
           tone={usage.apps >= state.limits.projects ? 'warning' : 'neutral'}
         />
         <StatCard
           label="Membres"
-          value={`${formatInteger(usage.members)} / ${formatInteger(state.limits.members)}`}
+          value={`${formatInteger(usage.members)} / ${formatLimit(state.limits.members)}`}
           hint={usage.members >= state.limits.members ? 'Quota atteint' : 'Dans la limite du plan'}
           icon={Users}
           tone={usage.members >= state.limits.members ? 'warning' : 'neutral'}
@@ -437,7 +438,7 @@ function Usage({ label, value, limit }: { label: string; value: number; limit: n
       <div className="flex items-center justify-between gap-2">
         <span className="text-muted-foreground">{label}</span>
         <span className={full ? 'font-medium text-warning tabular-nums' : 'font-medium tabular-nums'}>
-          {value} / {limit}
+          {value} / {formatLimit(limit)}
         </span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-muted" role="presentation">

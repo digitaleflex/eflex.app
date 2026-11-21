@@ -1187,14 +1187,42 @@ const TABS = [
   { id: 'audit', label: 'Journal Coolify', render: () => <AuditTab /> },
 ] as const
 
+/** Trois familles pour s'y retrouver : surveiller, configurer, consulter les journaux. */
+const FAMILIES: Array<{ id: string; label: string; hint: string; tabs: Array<(typeof TABS)[number]['id']> }> = [
+  { id: 'watch', label: 'Surveiller', hint: 'État des serveurs, outils de supervision, sécurité', tabs: ['servers', 'ops', 'security'] },
+  { id: 'configure', label: 'Configurer', hint: 'Capacités, stockages des sauvegardes, services', tabs: ['capabilities', 'storages', 'services'] },
+  { id: 'logs', label: 'Journaux', hint: 'Déploiements et événements de l’hébergement', tabs: ['deployments', 'audit'] },
+]
+
 export function CoolifyControl() {
   const [active, setActive] = useState<(typeof TABS)[number]['id']>('servers')
   const uid = useId()
   const current = TABS.find((tab) => tab.id === active) ?? TABS[0]
+  const family = FAMILIES.find((item) => item.tabs.includes(current.id)) ?? FAMILIES[0]!
+  const visibleTabs = family.tabs.map((id) => TABS.find((tab) => tab.id === id)!).filter(Boolean)
   return (
     <div className="space-y-4">
-      <div role="tablist" aria-label="Pilotage Coolify" className="flex gap-1 overflow-x-auto border-b border-border">
-        {TABS.map((tab) => (
+      <div role="group" aria-label="Catégories du pilotage" className="flex flex-wrap gap-2">
+        {FAMILIES.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-pressed={item.id === family.id}
+            onClick={() => setActive(item.tabs[0]!)}
+            className={cn(
+              'min-h-11 rounded-lg border px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              item.id === family.id
+                ? 'border-primary bg-primary/10 text-foreground'
+                : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
+            )}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <p className="text-sm text-muted-foreground">{family.hint}.</p>
+      <div role="tablist" aria-label={`Pilotage Coolify : ${family.label}`} className="flex gap-1 overflow-x-auto border-b border-border">
+        {visibleTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"

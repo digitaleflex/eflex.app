@@ -52,7 +52,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     managedDatabaseKind: 'postgresql',
     icon: 'postgresql',
     action: 'managed-database',
-    prerequisites: ['API bases managées Coolify disponible.'],
+    prerequisites: ['API des bases managées disponible sur l’hébergement.'],
     limits: ['Une instance par type de base et par projet.', 'Accès privé (réseau interne) ; URL chiffrée injectée.'],
   },
   {
@@ -64,7 +64,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     managedDatabaseKind: 'mysql',
     icon: 'mysql',
     action: 'managed-database',
-    prerequisites: ['API bases managées Coolify disponible.', 'Moteur supporté par la version/configuration de l’instance.'],
+    prerequisites: ['API des bases managées disponible sur l’hébergement.', 'Moteur supporté par la version/configuration de l’instance.'],
     limits: ['Sauvegarde/restauration intégrées EFLEX non disponibles (outils natifs requis).', 'Support dépendant de l’instance.'],
   },
   {
@@ -76,7 +76,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     managedDatabaseKind: 'mariadb',
     icon: 'mariadb',
     action: 'managed-database',
-    prerequisites: ['API bases managées Coolify disponible.', 'Moteur supporté par la version/configuration de l’instance.'],
+    prerequisites: ['API des bases managées disponible sur l’hébergement.', 'Moteur supporté par la version/configuration de l’instance.'],
     limits: ['Sauvegarde/restauration intégrées EFLEX non disponibles (outils natifs requis).', 'Support dépendant de l’instance.'],
   },
   {
@@ -88,7 +88,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     managedDatabaseKind: 'mongodb',
     icon: 'mongodb',
     action: 'managed-database',
-    prerequisites: ['API bases managées Coolify disponible.', 'Moteur supporté par la version/configuration de l’instance.'],
+    prerequisites: ['API des bases managées disponible sur l’hébergement.', 'Moteur supporté par la version/configuration de l’instance.'],
     limits: ['Sauvegarde/restauration intégrées EFLEX non disponibles (outils natifs requis).', 'Support dépendant de l’instance.'],
   },
   {
@@ -100,7 +100,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     managedDatabaseKind: 'clickhouse',
     icon: 'clickhouse',
     action: 'managed-database',
-    prerequisites: ['API bases managées Coolify disponible.', 'Driver/protocole compatible côté application.'],
+    prerequisites: ['API des bases managées disponible sur l’hébergement.', 'Driver/protocole compatible côté application.'],
     limits: ['Sauvegarde/restauration intégrées EFLEX non disponibles.', 'Support dépendant de l’instance.'],
   },
   {
@@ -138,7 +138,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     managedDatabaseKind: 'dragonfly',
     icon: 'dragonfly',
     action: 'managed-database',
-    prerequisites: ['Moteur supporté par l’instance Coolify.'],
+    prerequisites: ['Moteur supporté par l’hébergement.'],
     limits: ['Aucune sauvegarde/restauration intégrée EFLEX.', 'Support dépendant de l’instance.'],
   },
   {
@@ -150,7 +150,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     managedDatabaseKind: 'keydb',
     icon: 'keydb',
     action: 'managed-database',
-    prerequisites: ['Moteur supporté par l’instance Coolify.'],
+    prerequisites: ['Moteur supporté par l’hébergement.'],
     limits: ['Aucune sauvegarde/restauration intégrée EFLEX.', 'Support dépendant de l’instance.'],
   },
 
@@ -164,9 +164,9 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     coolifyServiceType: 'minio',
     icon: 'minio',
     action: 'coolify-service',
-    prerequisites: ['Modèle one-click « minio » disponible sur l’instance Coolify.', 'Configuration (clés, buckets, domaine) à valider après provisionnement.'],
-    limits: ['Cycle de vie/variables gérés comme service Coolify (configuration avancée hors flux simplifié).', 'Sécuriser l’exposition réseau et les identifiants.'],
-    notes: 'Provisionnable via Coolify (one-click). Un parcours EFLEX-géré dédié pourra compléter les garanties opérationnelles.',
+    prerequisites: ['Modèle prêt à l’emploi « minio » disponible sur l’hébergement.', 'Configuration (clés, buckets, domaine) à valider après provisionnement.'],
+    limits: ['Cycle de vie et variables gérés comme un service (configuration avancée hors parcours simplifié).', 'Sécuriser l’exposition réseau et les identifiants.'],
+    notes: 'Création automatique. Un parcours EFLEX-géré dédié pourra compléter les garanties opérationnelles.',
   },
 
   // Recherche
@@ -179,7 +179,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     coolifyServiceType: 'meilisearch',
     icon: 'meilisearch',
     action: 'coolify-service',
-    prerequisites: ['Modèle one-click disponible sur l’instance Coolify.'],
+    prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.'],
     limits: ['Variables/clés et exposition réseau à configurer selon les besoins.'],
   },
   {
@@ -191,7 +191,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     coolifyServiceType: 'typesense',
     icon: 'typesense',
     action: 'coolify-service',
-    prerequisites: ['Modèle one-click disponible sur l’instance Coolify.'],
+    prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.'],
     limits: ['Configuration et clés API à valider après provisionnement.'],
   },
   {
@@ -203,7 +203,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     coolifyServiceType: 'elasticsearch',
     icon: 'elasticsearch',
     action: 'coolify-service',
-    prerequisites: ['Modèle one-click disponible sur l’instance Coolify.', 'Ressources serveur suffisantes (mémoire/CPU).'],
+    prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.', 'Ressources serveur suffisantes (mémoire/CPU).'],
     limits: ['Service consommateur de ressources ; sécuriser l’accès et les identifiants.'],
   },
   {
@@ -214,7 +214,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     availability: 'coolify-oneclick',
     icon: 'opensearch',
     action: 'planned',
-    notes: 'Référencé ; modèle one-click non câblé dans le portail. Provisionnement manuel possible selon l’instance.',
+    notes: 'Référencé ; pas encore disponible dans le portail. Installation manuelle possible selon l’hébergement.',
     limits: ['Non provisionnable automatiquement depuis EFLEX pour le moment.'],
   },
 
@@ -228,7 +228,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     coolifyServiceType: 'rabbitmq',
     icon: 'rabbitmq',
     action: 'coolify-service',
-    prerequisites: ['Modèle one-click disponible sur l’instance Coolify.'],
+    prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.'],
     limits: ['Identifiants et accès réseau à sécuriser.'],
   },
   {
@@ -240,7 +240,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     coolifyServiceType: 'nats',
     icon: 'nats',
     action: 'coolify-service',
-    prerequisites: ['Modèle one-click disponible sur l’instance Coolify.'],
+    prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.'],
     limits: ['Configuration des sujets/authentification selon les besoins.'],
   },
   {
@@ -251,7 +251,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     availability: 'coolify-oneclick',
     icon: 'kafka',
     action: 'planned',
-    notes: 'Référencé ; modèle one-click non câblé dans le portail.',
+    notes: 'Référencé ; pas encore disponible dans le portail.',
     limits: ['Non provisionnable automatiquement depuis EFLEX pour le moment.', 'Exige des ressources et une exploitation dédiées.'],
   },
 
@@ -290,7 +290,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     coolifyServiceType: 'prometheus',
     icon: 'prometheus',
     action: 'coolify-service',
-    prerequisites: ['Modèle one-click disponible sur l’instance Coolify.'],
+    prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.'],
     limits: ['Configuration des cibles/rétention à adapter.'],
   },
   {
@@ -302,7 +302,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     coolifyServiceType: 'grafana',
     icon: 'grafana',
     action: 'coolify-service',
-    prerequisites: ['Modèle one-click disponible sur l’instance Coolify.'],
+    prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.'],
     limits: ['Sécuriser l’accès et les comptes administrateurs.'],
   },
 
@@ -316,7 +316,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     coolifyServiceType: 'supabase',
     icon: 'supabase',
     action: 'coolify-service',
-    prerequisites: ['Modèle one-click disponible sur l’instance Coolify.', 'Ressources serveur suffisantes.'],
+    prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.', 'Ressources serveur suffisantes.'],
     limits: ['Stack multi-composants : configuration et mises à jour à superviser.'],
   },
   {
@@ -328,7 +328,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     coolifyServiceType: 'appwrite',
     icon: 'appwrite',
     action: 'coolify-service',
-    prerequisites: ['Modèle one-click disponible sur l’instance Coolify.'],
+    prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.'],
     limits: ['Configuration initiale et sécurisation requises.'],
   },
   {
@@ -340,7 +340,7 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     coolifyServiceType: 'pocketbase',
     icon: 'pocketbase',
     action: 'coolify-service',
-    prerequisites: ['Modèle one-click disponible sur l’instance Coolify.'],
+    prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.'],
     limits: ['Persistance et sauvegardes à valider selon le volume de données.'],
   },
 ] as const
@@ -358,7 +358,7 @@ export const SERVICE_CATEGORIES: Record<ServiceCategory, string> = {
 
 export const SERVICE_AVAILABILITY: Record<ServiceAvailability, { label: string; tone: 'success' | 'info' | 'warning' | 'muted' }> = {
   available: { label: 'Base managée', tone: 'success' },
-  'coolify-oneclick': { label: 'Via Coolify (one-click)', tone: 'info' },
-  'eflex-managed': { label: 'EFLEX-géré (candidat)', tone: 'warning' },
+  'coolify-oneclick': { label: 'Prêt à l’emploi', tone: 'info' },
+  'eflex-managed': { label: 'Bientôt géré par EFLEX', tone: 'warning' },
   planned: { label: 'À venir', tone: 'muted' },
 }
