@@ -421,7 +421,9 @@ export function BillingCard() {
                   ) : requested ? (
                     <p className="text-xs font-medium text-warning">Demande en attente</p>
                   ) : !data.canManage ? (
-                    <p className="text-xs text-muted-foreground">Réservé aux administrateurs.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Réservé aux personnes autorisées à gérer la facturation (propriétaire, administrateur, facturation).
+                    </p>
                   ) : data.providers.kkiapay || data.providers.fedapay ? (
                     <div className="flex flex-wrap gap-2">
                       {data.providers.kkiapay && (

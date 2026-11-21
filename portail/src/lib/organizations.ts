@@ -54,6 +54,54 @@ export const ORGANIZATION_ROLE_DESCRIPTION: Record<OrganizationRole, string> = {
     "Consulte les projets de l'organisation. Ne peut ni créer, ni redéployer, ni modifier les paramètres, ni gérer la facturation.",
 }
 
+/** Capacité affichée dans la matrice UI : vraie, partielle ou absente pour un rôle. */
+export type RoleCapabilityLevel = 'yes' | 'no' | 'limited'
+
+export type OrganizationRoleCapability = {
+  id: string
+  label: string
+  hint: string
+  levels: Record<OrganizationRole, RoleCapabilityLevel>
+}
+
+/**
+ * Matrice lisible des capacités par rôle. Elle reflète les contrôles Better Auth
+ * et les gardes applicatives (`canManageProjects`, `canManageBilling`, routes API).
+ * Ne pas l'utiliser comme source d'autorisation : le serveur reste la source de vérité.
+ */
+export const ORGANIZATION_ROLE_CAPABILITIES: readonly OrganizationRoleCapability[] = [
+  {
+    id: 'projects-read',
+    label: 'Lecture des projets',
+    hint: 'Voir les projets, services et informations non sensibles de l’organisation.',
+    levels: { owner: 'yes', admin: 'yes', billing: 'no', member: 'yes' },
+  },
+  {
+    id: 'projects-manage',
+    label: 'Gestion des projets',
+    hint: 'Créer, redéployer, modifier les paramètres ou supprimer un projet.',
+    levels: { owner: 'yes', admin: 'yes', billing: 'no', member: 'no' },
+  },
+  {
+    id: 'billing',
+    label: 'Facturation',
+    hint: 'Consulter le plan, les paiements, les factures et demander un changement de plan.',
+    levels: { owner: 'yes', admin: 'yes', billing: 'yes', member: 'no' },
+  },
+  {
+    id: 'team',
+    label: 'Gestion de l’équipe',
+    hint: 'Inviter des personnes, modifier des rôles et retirer des membres.',
+    levels: { owner: 'yes', admin: 'yes', billing: 'no', member: 'no' },
+  },
+  {
+    id: 'org-delete',
+    label: 'Suppression de l’organisation',
+    hint: 'Action irréversible, réservée au propriétaire.',
+    levels: { owner: 'yes', admin: 'no', billing: 'no', member: 'no' },
+  },
+]
+
 /** Rôles autorisés à créer, redéployer, modifier ou supprimer des projets. */
 export const canManageProjects = (role: string): boolean => role === 'owner' || role === 'admin'
 
