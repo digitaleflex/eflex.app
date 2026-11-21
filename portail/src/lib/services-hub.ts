@@ -112,6 +112,8 @@ export interface UnifiedService {
   /** Métadonnées catalogue (#182) */
   prerequisites: string[]
   limits: string[]
+  costNote: string | null
+  connectionNote: string | null
   actionKind: ServiceActionKind | null
   maturity: 'stable' | 'experimental' | 'unsupported' | 'planned' | null
   operations: EngineOperationView[] | null
@@ -317,7 +319,7 @@ export function buildServicesHubModel(input: {
       if (engine.provisionSupported && engine.lifecycleSupported) state = 'creatable'
       else state = 'unavailable'
     } else if (coolifyServiceType) {
-      // Provisionnable via un template one-click Coolify (aligné sur les capacités de l’instance si connues).
+      // Provisionnable via un template Coolify prêt à l’emploi (aligné sur les capacités de l’instance si connues).
       if (caps?.source === 'instance' && typeCap && !typeCap.provisionable) {
         state = 'unavailable'
         reason = reason ?? typeCap.reason ?? 'Type de service non supporté par cet hébergement.'
@@ -325,7 +327,9 @@ export function buildServicesHubModel(input: {
         state = 'creatable'
       }
     } else if (entry.availability === 'coolify-oneclick') {
-      state = 'coolify-oneclick'
+      // Référencé comme template Coolify mais aucun type câblé dans EFLEX : ne jamais présenter comme provisionnable.
+      state = 'planned'
+      reason = reason ?? 'Modèle prêt à l’emploi connu, mais provisionnement automatique non câblé dans EFLEX pour le moment.'
     } else if (entry.availability === 'eflex-managed') {
       state = 'eflex-managed'
     } else if (entry.availability === 'planned') {
@@ -380,6 +384,8 @@ export function buildServicesHubModel(input: {
       adjusted: engine ? isAdjusted(reason, notes, selectionPolicy) : false,
       prerequisites,
       limits,
+      costNote: entry.costNote ?? null,
+      connectionNote: entry.connectionNote ?? null,
       actionKind: entry.action ?? (kind ? 'managed-database' : coolifyServiceType ? 'coolify-service' : 'planned'),
       maturity,
       operations,
@@ -426,6 +432,8 @@ export function buildServicesHubModel(input: {
       adjusted: isAdjusted(reason, notes, selectionPolicy),
       prerequisites: [],
       limits: [],
+      costNote: null,
+      connectionNote: null,
       actionKind: 'managed-database',
       maturity: engine.maturity ?? null,
       operations,

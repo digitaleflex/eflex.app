@@ -25,7 +25,7 @@ const BADGE_TONE: Record<string, string> = {
   muted: 'bg-muted text-muted-foreground border-border',
 }
 
-const FILTERS: ServiceFilterState[] = ['provisionable', 'added', 'unavailable', 'coolify-oneclick', 'eflex-managed', 'planned']
+const FILTERS: ServiceFilterState[] = ['provisionable', 'added', 'unavailable', 'eflex-managed', 'planned']
 
 function toggle<T>(set: Set<T>, value: T): Set<T> {
   const next = new Set(set)
@@ -215,7 +215,7 @@ export function ServicesBrowser({
                       {service.state === 'active' && 'Ressource active'}
                       {service.state === 'creatable' && !canManage && 'Lecture seule'}
                       {service.state === 'unavailable' && 'Non disponible ici'}
-                      {(service.state === 'coolify-oneclick' || service.state === 'eflex-managed' || service.state === 'planned') && 'Non provisionnable pour le moment'}
+                      {(service.state === 'eflex-managed' || service.state === 'planned') && 'Non provisionnable pour le moment'}
                     </p>
                     <Button type="button" variant={canProvision ? 'outline' : 'ghost'} size="sm" onClick={() => onOpen(service)}>
                       {actionableDb ? 'Configurer' : canProvision ? 'Provisionner' : service.state === 'active' ? 'Voir' : 'Détails'}

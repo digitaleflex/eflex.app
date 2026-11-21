@@ -228,6 +228,7 @@ export function ActiveServiceManager({
             </div>
             <p className="text-xs text-muted-foreground">
               Les valeurs existantes ne sont jamais affichées. Saisissez une nouvelle valeur pour définir ou remplacer une variable ; le service sera redémarré pour appliquer les changements.
+              Pour connecter ce service à votre application, ajoutez les variables nécessaires dans les paramètres du projet, puis redéployez.
             </p>
 
             {envFeedback && (

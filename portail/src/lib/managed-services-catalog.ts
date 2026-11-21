@@ -37,6 +37,10 @@ export interface ManagedServiceEntry {
   prerequisites?: string[]
   /** Limites connues (sécurité, sauvegardes, maturité, exploitation). */
   limits?: string[]
+  /** Coût/quota factuel (aucun prix inventé). */
+  costNote?: string
+  /** Variables générées ou à configurer pour connecter l’application. */
+  connectionNote?: string
   /** Parcours actionnable associé. */
   action?: ServiceActionKind
 }
@@ -54,6 +58,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'managed-database',
     prerequisites: ['API des bases managées disponible sur l’hébergement.'],
     limits: ['Une instance par type de base et par projet.', 'Accès privé (réseau interne) ; URL chiffrée injectée.'],
+    costNote: 'Inclus dans les ressources de votre serveur ; pas de surcoût EFLEX facturé par service.',
+    connectionNote: 'Variable DATABASE_URL injectée automatiquement (alias POSTGRES_URL, POSTGRESQL_URL si libres). Redéployez l’application pour appliquer la connexion.',
   },
   {
     id: 'mysql',
@@ -66,6 +72,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'managed-database',
     prerequisites: ['API des bases managées disponible sur l’hébergement.', 'Moteur supporté par la version/configuration de l’instance.'],
     limits: ['Sauvegarde/restauration intégrées EFLEX non disponibles (outils natifs requis).', 'Support dépendant de l’instance.'],
+    costNote: 'Inclus dans les ressources de votre serveur ; pas de surcoût EFLEX facturé par service.',
+    connectionNote: 'Variable MYSQL_URL injectée automatiquement. Redéployez l’application pour appliquer la connexion.',
   },
   {
     id: 'mariadb',
@@ -78,6 +86,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'managed-database',
     prerequisites: ['API des bases managées disponible sur l’hébergement.', 'Moteur supporté par la version/configuration de l’instance.'],
     limits: ['Sauvegarde/restauration intégrées EFLEX non disponibles (outils natifs requis).', 'Support dépendant de l’instance.'],
+    costNote: 'Inclus dans les ressources de votre serveur ; pas de surcoût EFLEX facturé par service.',
+    connectionNote: 'Variable MARIADB_URL injectée automatiquement (alias MYSQL_URL si libre). Redéployez l’application pour appliquer la connexion.',
   },
   {
     id: 'mongodb',
@@ -90,6 +100,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'managed-database',
     prerequisites: ['API des bases managées disponible sur l’hébergement.', 'Moteur supporté par la version/configuration de l’instance.'],
     limits: ['Sauvegarde/restauration intégrées EFLEX non disponibles (outils natifs requis).', 'Support dépendant de l’instance.'],
+    costNote: 'Inclus dans les ressources de votre serveur ; pas de surcoût EFLEX facturé par service.',
+    connectionNote: 'Variable MONGODB_URL injectée automatiquement (alias MONGO_URL si libre). Redéployez l’application pour appliquer la connexion.',
   },
   {
     id: 'clickhouse',
@@ -102,6 +114,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'managed-database',
     prerequisites: ['API des bases managées disponible sur l’hébergement.', 'Driver/protocole compatible côté application.'],
     limits: ['Sauvegarde/restauration intégrées EFLEX non disponibles.', 'Support dépendant de l’instance.'],
+    costNote: 'Inclus dans les ressources de votre serveur ; pas de surcoût EFLEX facturé par service.',
+    connectionNote: 'Variable CLICKHOUSE_URL injectée automatiquement. Redéployez l’application pour appliquer la connexion.',
   },
   {
     id: 'sqlite',
@@ -115,6 +129,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     notes: 'Expérimental : non activé par défaut, validation instance requise.',
     prerequisites: ['Validation explicite du comportement sur l’instance (URL, persistance, cycle de vie).', 'Activation expérimentale requise par la plateforme si applicable.'],
     limits: ['Aucune sauvegarde/restauration intégrée EFLEX.', 'Ne pas utiliser comme base critique sans stratégie validée.', 'Format/chemin dépendant de l’hébergement.'],
+    costNote: 'Aucun surcoût EFLEX ; stockage sur le serveur d’hébergement.',
+    connectionNote: 'Variable SQLITE_URL injectée automatiquement après création. Vérifiez le chemin/format attendu par votre application.',
   },
 
   // Cache / données en mémoire
@@ -128,6 +144,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     icon: 'redis',
     action: 'managed-database',
     limits: ['Aucune sauvegarde/restauration intégrée EFLEX : usage cache/file recommandé.', 'Accès privé (réseau interne).'],
+    costNote: 'Inclus dans les ressources de votre serveur ; pas de surcoût EFLEX facturé par service.',
+    connectionNote: 'Variable REDIS_URL injectée automatiquement (alias CACHE_URL si libre). Redéployez l’application pour appliquer la connexion.',
   },
   {
     id: 'dragonfly',
@@ -140,6 +158,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'managed-database',
     prerequisites: ['Moteur supporté par l’hébergement.'],
     limits: ['Aucune sauvegarde/restauration intégrée EFLEX.', 'Support dépendant de l’instance.'],
+    costNote: 'Inclus dans les ressources de votre serveur ; pas de surcoût EFLEX facturé par service.',
+    connectionNote: 'Variable DRAGONFLY_URL injectée automatiquement (alias Redis compatibles si libres). Redéployez l’application pour appliquer la connexion.',
   },
   {
     id: 'keydb',
@@ -152,6 +172,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'managed-database',
     prerequisites: ['Moteur supporté par l’hébergement.'],
     limits: ['Aucune sauvegarde/restauration intégrée EFLEX.', 'Support dépendant de l’instance.'],
+    costNote: 'Inclus dans les ressources de votre serveur ; pas de surcoût EFLEX facturé par service.',
+    connectionNote: 'Variable KEYDB_URL injectée automatiquement (alias Redis compatibles si libres). Redéployez l’application pour appliquer la connexion.',
   },
 
   // Stockage objet — provisionnable via template Coolify (one-click) quand disponible
@@ -166,6 +188,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'coolify-service',
     prerequisites: ['Modèle prêt à l’emploi « minio » disponible sur l’hébergement.', 'Configuration (clés, buckets, domaine) à valider après provisionnement.'],
     limits: ['Cycle de vie et variables gérés comme un service (configuration avancée hors parcours simplifié).', 'Sécuriser l’exposition réseau et les identifiants.'],
+    costNote: 'Consomme les ressources de votre serveur d’hébergement ; aucun surcoût EFLEX facturé par service.',
+    connectionNote: 'Après provisionnement, récupérez les identifiants/URL dans « Configurer » puis ajoutez-les aux variables de votre application. Redéployez l’application pour appliquer les changements.',
     notes: 'Création automatique. Un parcours EFLEX-géré dédié pourra compléter les garanties opérationnelles.',
   },
 
@@ -181,6 +205,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'coolify-service',
     prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.'],
     limits: ['Variables/clés et exposition réseau à configurer selon les besoins.'],
+    costNote: 'Consomme les ressources de votre serveur d’hébergement ; aucun surcoût EFLEX facturé par service.',
+    connectionNote: 'Après provisionnement, configurez la clé API et l’URL dans « Configurer », puis ajoutez-les aux variables de votre application.',
   },
   {
     id: 'typesense',
@@ -193,6 +219,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'coolify-service',
     prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.'],
     limits: ['Configuration et clés API à valider après provisionnement.'],
+    costNote: 'Consomme les ressources de votre serveur d’hébergement ; aucun surcoût EFLEX facturé par service.',
+    connectionNote: 'Après provisionnement, récupérez la clé API/URL dans « Configurer » et injectez-les dans les variables de votre application.',
   },
   {
     id: 'elasticsearch',
@@ -205,17 +233,21 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'coolify-service',
     prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.', 'Ressources serveur suffisantes (mémoire/CPU).'],
     limits: ['Service consommateur de ressources ; sécuriser l’accès et les identifiants.'],
+    costNote: 'Consomme les ressources de votre serveur d’hébergement ; aucun surcoût EFLEX facturé par service.',
+    connectionNote: 'Après provisionnement, configurez les identifiants/URL dans « Configurer » puis ajoutez-les aux variables de votre application.',
   },
   {
     id: 'opensearch',
     label: 'OpenSearch',
     category: 'search',
     description: 'Fork open source d’Elasticsearch pour recherche/observabilité.',
-    availability: 'coolify-oneclick',
+    availability: 'planned',
     icon: 'opensearch',
     action: 'planned',
-    notes: 'Référencé ; pas encore disponible dans le portail. Installation manuelle possible selon l’hébergement.',
+    notes: 'Référencé ; pas encore provisionnable automatiquement dans EFLEX. Installation manuelle possible selon l’hébergement.',
     limits: ['Non provisionnable automatiquement depuis EFLEX pour le moment.'],
+    costNote: 'Consomme les ressources de votre serveur d’hébergement si installé manuellement.',
+    connectionNote: 'Si installé manuellement, ajoutez l’URL/les identifiants aux variables de votre application.',
   },
 
   // Messagerie / streaming
@@ -230,6 +262,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'coolify-service',
     prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.'],
     limits: ['Identifiants et accès réseau à sécuriser.'],
+    costNote: 'Consomme les ressources de votre serveur d’hébergement ; aucun surcoût EFLEX facturé par service.',
+    connectionNote: 'Après provisionnement, récupérez l’URL/identifiants dans « Configurer » et ajoutez-les aux variables de votre application.',
   },
   {
     id: 'nats',
@@ -242,17 +276,21 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'coolify-service',
     prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.'],
     limits: ['Configuration des sujets/authentification selon les besoins.'],
+    costNote: 'Consomme les ressources de votre serveur d’hébergement ; aucun surcoût EFLEX facturé par service.',
+    connectionNote: 'Après provisionnement, configurez l’URL/identifiants dans « Configurer » puis ajoutez-les aux variables de votre application.',
   },
   {
     id: 'kafka',
     label: 'Kafka',
     category: 'messaging',
     description: 'Streaming d’événements distribué haute capacité.',
-    availability: 'coolify-oneclick',
+    availability: 'planned',
     icon: 'kafka',
     action: 'planned',
-    notes: 'Référencé ; pas encore disponible dans le portail.',
+    notes: 'Référencé ; pas encore provisionnable automatiquement dans EFLEX.',
     limits: ['Non provisionnable automatiquement depuis EFLEX pour le moment.', 'Exige des ressources et une exploitation dédiées.'],
+    costNote: 'Consomme des ressources serveur importantes si installé ; aucun surcoût EFLEX facturé par service.',
+    connectionNote: 'Si installé manuellement, ajoutez les points d’accès/identifiants aux variables de votre application.',
   },
 
   // Vector / IA — candidat EFLEX-géré (#181)
@@ -267,6 +305,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     notes: 'Candidat prioritaire de provider EFLEX-géré (persistance, réseau privé, healthcheck, secrets, sauvegardes) — non activé sans adaptateur validé.',
     prerequisites: ['Adaptateur/provider EFLEX-géré validé et activé (non livré par défaut).'],
     limits: ['Aucun provisionnement automatique tant que l’adaptateur concret n’est pas activé.'],
+    costNote: 'Coût dépendant du provider/adaptateur quand disponible ; aucun provisionnement automatique aujourd’hui.',
+    connectionNote: 'Non disponible : aucune variable générée automatiquement pour le moment.',
   },
   {
     id: 'pgvector',
@@ -278,6 +318,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'planned',
     notes: 'Via PostgreSQL managé avec extension/configuration adaptée (à valider par projet).',
     limits: ['Extension et configuration non gérées automatiquement.'],
+    costNote: 'Utilise les ressources de la base PostgreSQL associée ; aucun surcoût EFLEX facturé par service.',
+    connectionNote: 'Utilisez la connexion PostgreSQL du projet et activez/configurez l’extension pgvector selon les besoins de votre application.',
   },
 
   // Observabilité
@@ -292,6 +334,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'coolify-service',
     prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.'],
     limits: ['Configuration des cibles/rétention à adapter.'],
+    costNote: 'Consomme les ressources de votre serveur d’hébergement ; aucun surcoût EFLEX facturé par service.',
+    connectionNote: 'Après provisionnement, configurez les cibles et l’accès dans « Configurer ». Ajoutez l’URL aux variables de votre application si nécessaire.',
   },
   {
     id: 'grafana',
@@ -304,6 +348,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'coolify-service',
     prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.'],
     limits: ['Sécuriser l’accès et les comptes administrateurs.'],
+    costNote: 'Consomme les ressources de votre serveur d’hébergement ; aucun surcoût EFLEX facturé par service.',
+    connectionNote: 'Après provisionnement, sécurisez le compte administrateur dans « Configurer » et connectez vos sources de données.',
   },
 
   // Backend / plateformes
@@ -318,6 +364,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'coolify-service',
     prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.', 'Ressources serveur suffisantes.'],
     limits: ['Stack multi-composants : configuration et mises à jour à superviser.'],
+    costNote: 'Consomme les ressources de votre serveur d’hébergement ; aucun surcoût EFLEX facturé par service.',
+    connectionNote: 'Après provisionnement, récupérez les URL/clés dans « Configurer » puis ajoutez-les aux variables de votre application.',
   },
   {
     id: 'appwrite',
@@ -330,6 +378,8 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'coolify-service',
     prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.'],
     limits: ['Configuration initiale et sécurisation requises.'],
+    costNote: 'Consomme les ressources de votre serveur d’hébergement ; aucun surcoût EFLEX facturé par service.',
+    connectionNote: 'Après provisionnement, configurez les clés/points d’accès dans « Configurer » puis ajoutez-les aux variables de votre application.',
   },
   {
     id: 'pocketbase',
@@ -342,6 +392,34 @@ export const MANAGED_SERVICES_CATALOG: readonly ManagedServiceEntry[] = [
     action: 'coolify-service',
     prerequisites: ['Modèle prêt à l’emploi disponible sur l’hébergement.'],
     limits: ['Persistance et sauvegardes à valider selon le volume de données.'],
+    costNote: 'Consomme les ressources de votre serveur d’hébergement ; aucun surcoût EFLEX facturé par service.',
+    connectionNote: 'Après provisionnement, notez l’URL du service dans « Configurer » et ajoutez-la aux variables de votre application si nécessaire.',
+  },
+  {
+    id: 'uptime-kuma',
+    label: 'Uptime Kuma',
+    category: 'observability',
+    description: 'Surveillance de disponibilité et statuts (HTTP, TCP, etc.).',
+    availability: 'planned',
+    icon: 'uptimekuma',
+    action: 'planned',
+    notes: 'Référencé ; pas encore provisionnable automatiquement dans EFLEX. Peut être installé séparément selon l’hébergement.',
+    limits: ['Non provisionnable automatiquement depuis EFLEX pour le moment.'],
+    costNote: 'Consomme les ressources de votre serveur d’hébergement si installé.',
+    connectionNote: 'Si installé manuellement, configurez les URL de surveillance dans l’outil ; aucune variable injectée automatiquement par EFLEX.',
+  },
+  {
+    id: 'n8n',
+    label: 'n8n',
+    category: 'backend',
+    description: 'Automatisation de workflows (intégrations, webhooks, tâches).',
+    availability: 'planned',
+    icon: 'n8n',
+    action: 'planned',
+    notes: 'Référencé ; pas encore provisionnable automatiquement dans EFLEX.',
+    limits: ['Non provisionnable automatiquement depuis EFLEX pour le moment.', 'Nécessite une configuration de persistance/sécurité adaptée.'],
+    costNote: 'Consomme les ressources de votre serveur d’hébergement si installé.',
+    connectionNote: 'Si installé manuellement, ajoutez les URL/clés API nécessaires aux variables de votre application.',
   },
 ] as const
 
