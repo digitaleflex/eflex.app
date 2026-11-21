@@ -64,7 +64,9 @@ export function AppConfigPanel({
   }
 
   useEffect(() => { if (!appId && apps[0]) setAppId(apps[0].id) }, [appId, apps])
-  useEffect(() => { void load(appId) /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [appId, projectId])
+  // `load` ne dépend que de `appId` et `projectId` : volontairement hors des dépendances.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void load(appId) }, [appId, projectId])
 
   const save = async () => {
     if (!config) return

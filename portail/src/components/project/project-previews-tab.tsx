@@ -41,11 +41,11 @@ type Payload = {
 }
 
 const STATUS_META: Record<string, { label: string; tone: string }> = {
-  active: { label: 'Active', tone: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' },
-  updating: { label: 'Mise à jour', tone: 'bg-blue-500/10 text-blue-700 dark:text-blue-300' },
+  active: { label: 'Active', tone: 'bg-success/10 text-foreground' },
+  updating: { label: 'Mise à jour', tone: 'bg-primary/10 text-foreground' },
   closed: { label: 'Fermée', tone: 'bg-muted text-muted-foreground' },
-  failed: { label: 'Échec', tone: 'bg-red-500/10 text-red-700 dark:text-red-300' },
-  unsupported: { label: 'Non prise en charge', tone: 'bg-amber-500/10 text-amber-700 dark:text-amber-300' },
+  failed: { label: 'Échec', tone: 'bg-destructive/10 text-foreground' },
+  unsupported: { label: 'Non prise en charge', tone: 'bg-warning/10 text-foreground' },
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -143,7 +143,7 @@ export function ProjectPreviewsTab({ projectId, canManage }: { projectId: string
                   {data.maxActive} prévisualisation(s) active(s) maximum. Les PR issues d’un fork et les brouillons (avant passage en prêt) sont ignorés.
                 </p>
                 {!data.ready && data.enabled && (
-                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                  <p className="text-xs text-warning">
                     L’application principale doit être déployée sur Coolify avant la création d’une prévisualisation.
                   </p>
                 )}

@@ -75,6 +75,9 @@ services:
       - OPS_PRIVATE_NETWORK=${OPS_PRIVATE_NETWORK:-}
       - OPS_ALLOWED_IPS=${OPS_ALLOWED_IPS:-}
       - OPS_CERT_RESOLVER=${OPS_CERT_RESOLVER:-}
+      # Plafonds de ressources que le client peut se donner (docs/security/audit-2026-11-16.md, N1).
+      - APP_LIMIT_MAX_MEMORY_MB=${APP_LIMIT_MAX_MEMORY_MB:-}
+      - APP_LIMIT_MAX_CPUS=${APP_LIMIT_MAX_CPUS:-}
       - PORTAL_DOMAIN=${PORTAL_DOMAIN:?sourcer config/domains.sh}
       - PORTAL_URL=${PORTAL_URL:?sourcer config/domains.sh}
       # ─── Statut public et maintenance ─────────────────────────────────────

@@ -11,7 +11,7 @@ import {
   listDatabaseEngineCapabilities,
   type DatabaseEngineCapabilities,
 } from '@/lib/database-capabilities'
-import { getProviderForStoredKind, resolveDatabaseProvider } from '@/lib/database-provider'
+import { getProviderForStoredKind, resolveDatabaseProvider, type DatabaseProvider } from '@/lib/database-provider'
 import { enqueueProjectDeployment } from '@/lib/project-deployments'
 import { isAppDeployed } from '@/lib/project-primary'
 
@@ -85,7 +85,7 @@ async function managedEnvKeysForDatabase(
 async function providerForKind(
   kind: ManagedDatabaseKind,
 ): Promise<
-  | { ok: true; provider: Awaited<ReturnType<typeof resolveDatabaseProvider>> & { provider: any }; capabilities: DatabaseEngineCapabilities }
+  | { ok: true; provider: DatabaseProvider; capabilities: DatabaseEngineCapabilities }
   | { ok: false; error: string; status: number }
 > {
   const resolved = await resolveDatabaseProvider(kind)
@@ -99,7 +99,7 @@ async function providerForKind(
       status: 400,
     }
   }
-  return { ok: true, provider: resolved as any, capabilities: resolved.capabilities }
+  return { ok: true, provider: resolved.provider, capabilities: resolved.capabilities }
 }
 
 /** Attend que le provider ait démarré la base (création asynchrone). */
@@ -129,8 +129,7 @@ export async function createProjectDatabase(
 ): Promise<{ database: ProjectDatabase; deploymentId: string | null; ready: boolean } | { error: string; status: number }> {
   const selection = await providerForKind(kind)
   if (!selection.ok) return { error: selection.error, status: selection.status }
-  const { provider: resolved } = selection
-  const provider = resolved.provider
+  const provider = selection.provider
   const config = DATABASE_KINDS[kind]
   const keys = managedKeys(kind)
 

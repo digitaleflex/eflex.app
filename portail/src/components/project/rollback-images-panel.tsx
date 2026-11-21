@@ -70,7 +70,7 @@ export function RollbackImagesPanel({ projectId, multiApp }: { projectId: string
         </Button>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        Cette liste provient de Coolify (<code className="rounded bg-muted px-1 font-mono">rollback-images</code>) : elle indique les
+        Cette liste provient de Coolify (<code className="rounded-md bg-muted px-1 font-mono">rollback-images</code>) : elle indique les
         commits/images réellement restaurables. Pour revenir à une version, privilégiez « Redéployer cette version » sur un
         déploiement réussi dont le commit apparaît ici ; un commit absent peut être refusé par l’hébergement.
       </p>
@@ -94,7 +94,7 @@ export function RollbackImagesPanel({ projectId, multiApp }: { projectId: string
                       >
                         {short(image.commit)}
                       </span>
-                      {image.image && <span className="break-all font-mono text-[11px] text-muted-foreground">{image.image}</span>}
+                      {image.image && <span className="break-all font-mono text-xs text-muted-foreground">{image.image}</span>}
                       {date && <span className="text-muted-foreground tabular-nums">{date}</span>}
                     </li>
                   )

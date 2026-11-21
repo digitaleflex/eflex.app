@@ -338,7 +338,7 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
             </p>
           )}
           {status.error && <p className="text-xs text-warning">État indisponible : {status.error}</p>}
-          <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+          <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>
               « Sauvegarde réussie » signifie qu’un dump/exécution a abouti. « Copie hors serveur » dépend du stockage

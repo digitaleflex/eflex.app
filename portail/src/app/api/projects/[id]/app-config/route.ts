@@ -4,6 +4,16 @@ import { getApplicationAdvancedConfig, updateApplicationAdvancedConfig } from '@
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { requireManagedProject } from '@/lib/tenant'
 import { z } from 'zod'
+import {
+  HEALTH_HOST_PATTERN,
+  HEALTH_METHODS,
+  HEALTH_PATH_PATTERN,
+  HEALTH_TEXT_PATTERN,
+  WATCH_PATH_PATTERN,
+  checkLimit,
+  validatePort,
+  type LimitField,
+} from '@/lib/app-config-validation'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -20,18 +30,18 @@ const patchSchema = z.object({
   appId: z.string().min(1).optional(),
   config: z.object({
     healthCheckEnabled: z.boolean().optional(),
-    healthCheckPath: z.string().max(500).optional(),
-    healthCheckMethod: z.string().max(16).optional(),
-    healthCheckPort: z.string().max(10).optional(),
-    healthCheckHost: z.string().max(255).optional(),
+    healthCheckPath: z.string().max(500).refine((value) => value === '' || HEALTH_PATH_PATTERN.test(value), 'Chemin invalide : il doit commencer par « / » (caractères d’URL courants).').optional(),
+    healthCheckMethod: z.string().trim().toUpperCase().refine((value) => value === '' || (HEALTH_METHODS as readonly string[]).includes(value), 'Méthode invalide (GET, HEAD, POST ou OPTIONS).').optional(),
+    healthCheckPort: z.string().trim().refine((value) => value === '' || validatePort(value), 'Port invalide (1 à 65535).').optional(),
+    healthCheckHost: z.string().trim().max(255).refine((value) => value === '' || HEALTH_HOST_PATTERN.test(value), 'Hôte invalide (nom ou adresse, sans schéma ni port).').optional(),
     healthCheckScheme: z.enum(['http', 'https']).optional(),
     healthCheckReturnCode: z.number().int().min(100).max(599).optional(),
-    healthCheckResponseText: z.string().max(500).optional(),
+    healthCheckResponseText: z.string().max(500).regex(HEALTH_TEXT_PATTERN, 'Texte attendu invalide (sans guillemet, « $ », « ` » ni « \\ »).').optional(),
     healthCheckInterval: z.number().int().min(1).max(3600).optional(),
     healthCheckTimeout: z.number().int().min(1).max(3600).optional(),
     healthCheckRetries: z.number().int().min(1).max(100).optional(),
     healthCheckStartPeriod: z.number().int().min(0).max(3600).optional(),
-    watchPaths: z.string().max(2000).optional(),
+    watchPaths: z.string().max(2000).regex(WATCH_PATH_PATTERN, 'Chemins surveillés invalides (motifs de dossiers uniquement).').optional(),
     limitsCpus: z.string().max(32).optional(),
     limitsMemory: z.string().max(32).optional(),
     limitsMemorySwap: z.string().max(32).optional(),
@@ -80,18 +90,33 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!target?.coolifyAppId) return NextResponse.json({ error: 'Application non déployée sur l’hébergement.' }, { status: 409 })
 
   const c = parsed.data.config
+
+  // Limites de ressources : valeurs bornées, jamais « sans limite », et une valeur inchangée n'est pas renvoyée
+  // (un client dont la limite actuelle dépasse le plafond peut donc toujours enregistrer le reste).
+  const current = await getApplicationAdvancedConfig(target.coolifyAppId)
+  const limits: Partial<Record<LimitField, string>> = {}
+  for (const field of ['limitsCpus', 'limitsMemory', 'limitsMemorySwap', 'limitsMemoryReservation'] as const) {
+    const raw = c[field]
+    if (raw === undefined) continue
+    if (!('error' in current) && raw.trim() === (current[field] ?? '').trim()) continue
+    const checked = checkLimit(field, raw)
+    if (checked.kind === 'error') return NextResponse.json({ error: checked.message }, { status: 400 })
+    if (checked.kind === 'keep') limits[field] = checked.value
+  }
+
   const updated = await updateApplicationAdvancedConfig(target.coolifyAppId, {
     ...c,
+    limitsCpus: undefined,
+    limitsMemory: undefined,
+    limitsMemorySwap: undefined,
+    limitsMemoryReservation: undefined,
+    ...limits,
     healthCheckPath: c.healthCheckPath?.trim(),
     healthCheckMethod: c.healthCheckMethod?.trim().toUpperCase(),
     healthCheckPort: c.healthCheckPort?.trim(),
     healthCheckHost: c.healthCheckHost?.trim(),
     healthCheckResponseText: c.healthCheckResponseText ?? '',
     watchPaths: c.watchPaths?.trim(),
-    limitsCpus: c.limitsCpus?.trim(),
-    limitsMemory: c.limitsMemory?.trim(),
-    limitsMemorySwap: c.limitsMemorySwap?.trim(),
-    limitsMemoryReservation: c.limitsMemoryReservation?.trim(),
   })
   if ('error' in updated) return NextResponse.json({ error: updated.error }, { status: 502 })
   return NextResponse.json({ ok: true, appId: target.id })

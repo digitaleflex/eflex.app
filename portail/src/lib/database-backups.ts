@@ -11,7 +11,6 @@ import {
   getDatabaseEngineCapabilities,
   getDatabaseEngineCatalog,
   isManagedDatabaseKind,
-  supportsCoolifyGenericBackup,
   type ManagedDatabaseKind,
 } from '@/lib/database-capabilities'
 import { memberIds, notify } from '@/lib/notifications'
