@@ -2,14 +2,15 @@ import {
   MANAGED_SERVICES_CATALOG,
   SERVICE_CATEGORIES,
   type ManagedServiceEntry,
+  type ServiceActionKind,
   type ServiceAvailability,
   type ServiceCategory,
 } from '@/lib/managed-services-catalog'
 
 /**
- * Modèle UI unifié pour le hub « Bases de données & services ».
- * Fusionne les capacités runtime des moteurs (API /databases) et le catalogue statique
- * sans duplication : une entrée canonique par service.
+ * Modèle UI unifié pour le hub « Bases de données & services » (#182).
+ * Fusionne les capacités runtime des moteurs (#183) et le catalogue statique sans duplication :
+ * une entrée canonique par service, avec disponibilité/capacités/prérequis/limites fidèles.
  */
 
 export type ServiceDisplayState =
@@ -21,6 +22,20 @@ export type ServiceDisplayState =
   | 'planned'
 
 export type ServiceFilterState = 'provisionable' | 'added' | 'unavailable' | 'coolify-oneclick' | 'eflex-managed' | 'planned'
+
+export interface EngineOperationView {
+  operation: 'provision' | 'lifecycle' | 'backup' | 'restore'
+  supported: boolean
+  provider?: string | null
+  reason?: string
+}
+
+export interface EngineSelectionPolicyView {
+  preferred: string
+  selected: string
+  outcome: 'coolify' | 'eflex' | 'none'
+  reason?: string
+}
 
 export interface EngineInfoView {
   kind: string
@@ -36,6 +51,9 @@ export interface EngineInfoView {
   notes?: string[]
   reason?: string
   created?: boolean
+  maturity?: 'stable' | 'experimental' | 'unsupported' | 'planned'
+  operations?: Record<string, EngineOperationView>
+  selectionPolicy?: EngineSelectionPolicyView
 }
 
 export interface ManagedDatabaseView {
@@ -91,6 +109,13 @@ export interface UnifiedService {
   activeService: ActiveServiceView | null
   /** Capacité ajustée (politique/apprentissage) détectée via notes/raison. */
   adjusted: boolean
+  /** Métadonnées catalogue (#182) */
+  prerequisites: string[]
+  limits: string[]
+  actionKind: ServiceActionKind | null
+  maturity: 'stable' | 'experimental' | 'unsupported' | 'planned' | null
+  operations: EngineOperationView[] | null
+  selectionPolicy: EngineSelectionPolicyView | null
 }
 
 export interface CategoryAggregate {
@@ -130,10 +155,10 @@ export const CATEGORY_ORDER: ServiceCategory[] = [
 
 export const STATE_LABELS: Record<ServiceDisplayState, string> = {
   active: 'Active',
-  creatable: 'Créable maintenant',
+  creatable: 'Provisionnable',
   unavailable: 'Indisponible sur cette instance',
   'coolify-oneclick': 'Via Coolify (one-click)',
-  'eflex-managed': 'EFLEX-géré (planifié)',
+  'eflex-managed': 'EFLEX-géré (candidat)',
   planned: 'À venir',
 }
 
@@ -153,6 +178,20 @@ export const FILTER_LABELS: Record<ServiceFilterState, string> = {
   'coolify-oneclick': 'Via Coolify',
   'eflex-managed': 'EFLEX-géré',
   planned: 'À venir',
+}
+
+export const MATURITY_LABELS: Record<string, string> = {
+  stable: 'Support stable',
+  experimental: 'Support expérimental',
+  unsupported: 'Non supporté',
+  planned: 'Planifié',
+}
+
+export const OPERATION_LABELS: Record<string, string> = {
+  provision: 'Provisionnement',
+  lifecycle: 'Cycle de vie',
+  backup: 'Sauvegarde',
+  restore: 'Restauration',
 }
 
 function normalizeText(value: string): string {
@@ -193,14 +232,35 @@ function uniqueStrings(values: string[]): string[] {
   return out
 }
 
-function isAdjusted(reason: string | null, notes: string[]): boolean {
+function isAdjusted(reason: string | null, notes: string[], selectionPolicy?: EngineSelectionPolicyView | null): boolean {
+  if (selectionPolicy?.reason) return true
+  if (selectionPolicy && selectionPolicy.preferred !== selectionPolicy.selected) return true
   const text = [reason ?? '', ...notes].join(' ').toLowerCase()
-  return text.includes('ajustée') || text.includes('ajustee') || text.includes('politique') || text.includes('apprentissage') || text.includes('désactivé par la configuration') || text.includes('desactive par la configuration')
+  return (
+    text.includes('ajustée') ||
+    text.includes('ajustee') ||
+    text.includes('politique') ||
+    text.includes('apprentissage') ||
+    text.includes('désactivé par la configuration') ||
+    text.includes('desactive par la configuration') ||
+    text.includes('expérimental') ||
+    text.includes('experimental') ||
+    text.includes('non activé par défaut') ||
+    text.includes('repli')
+  )
 }
 
 function categoryForUnknownEngine(kind: string): ServiceCategory {
   if (kind === 'redis' || kind === 'dragonfly' || kind === 'keydb') return 'cache'
   return 'database'
+}
+
+function toOperationViews(operations?: Record<string, EngineOperationView>): EngineOperationView[] | null {
+  if (!operations) return null
+  const order = ['provision', 'lifecycle', 'backup', 'restore']
+  return order
+    .map((key) => operations[key])
+    .filter((op): op is EngineOperationView => Boolean(op))
 }
 
 export function buildServicesHubModel(input: {
@@ -229,30 +289,45 @@ export function buildServicesHubModel(input: {
     const engine = kind ? engineByKind.get(kind) : undefined
     const active = kind ? dbByKind.get(kind) : undefined
     const activeService = serviceByCatalogId.get(entry.id) ?? null
+    const prerequisites = uniqueStrings(entry.prerequisites ?? [])
+    const limits = uniqueStrings(entry.limits ?? [])
     const notes = uniqueStrings([...(engine?.notes ?? []), ...(entry.notes ? [entry.notes] : [])])
     const reason = engine?.reason ?? null
     const provider = engine?.provider === 'eflex' ? 'eflex' : engine ? 'coolify' : entry.coolifyServiceType ? 'coolify' : null
     const coolifyServiceType = entry.coolifyServiceType ?? null
+    const operations = toOperationViews(engine?.operations)
+    const selectionPolicy = engine?.selectionPolicy ?? null
+    const maturity = engine?.maturity ?? (entry.availability === 'planned' || entry.availability === 'eflex-managed' ? 'planned' : null)
 
     let state: ServiceDisplayState
-    if (active || activeService) state = 'active'
-    else if (engine) {
+    if (active || activeService) {
+      state = 'active'
+    } else if (engine) {
+      // Base managée : l'état dépend strictement des capacités réelles (#183/#184).
       if (engine.provisionSupported && engine.lifecycleSupported) state = 'creatable'
       else state = 'unavailable'
     } else if (coolifyServiceType) {
-      // Provisionnable via un template one-click Coolify (même si aussi référencé comme EFLEX-géré/à venir).
+      // Service provisionnable via template Coolify one-click (parcours câblé).
       state = 'creatable'
     } else if (entry.availability === 'coolify-oneclick') {
       state = 'coolify-oneclick'
-    } else if (entry.availability === 'eflex-managed') state = 'eflex-managed'
-    else if (entry.availability === 'planned') state = 'planned'
-    else state = 'unavailable'
+    } else if (entry.availability === 'eflex-managed') {
+      state = 'eflex-managed'
+    } else if (entry.availability === 'planned') {
+      state = 'planned'
+    } else {
+      state = 'unavailable'
+    }
 
     const filterTags: ServiceFilterState[] = []
     if (state === 'active') filterTags.push('added')
     else if (state === 'creatable') filterTags.push('provisionable')
     else if (state === 'unavailable') filterTags.push('unavailable')
     else filterTags.push(state)
+
+    // Pour les services one-click sans moteur DB, les capacités backup/restore intégrées EFLEX ne s'appliquent pas.
+    const provisionSupported = engine?.provisionSupported ?? Boolean(coolifyServiceType)
+    const lifecycleSupported = engine?.lifecycleSupported ?? Boolean(coolifyServiceType)
 
     pushService({
       key: kind ?? entry.id,
@@ -268,8 +343,8 @@ export function buildServicesHubModel(input: {
       availability: entry.availability,
       managedDatabaseKind: kind,
       coolifyServiceType,
-      provisionSupported: engine?.provisionSupported ?? Boolean(coolifyServiceType),
-      lifecycleSupported: engine?.lifecycleSupported ?? Boolean(coolifyServiceType),
+      provisionSupported,
+      lifecycleSupported,
       backupSupported: engine?.backupSupported ?? false,
       restoreSupported: engine?.restoreSupported ?? false,
       provider,
@@ -278,7 +353,13 @@ export function buildServicesHubModel(input: {
       created: Boolean(active || activeService || engine?.created),
       activeDatabase: active ?? null,
       activeService,
-      adjusted: engine ? isAdjusted(reason, notes) : false,
+      adjusted: engine ? isAdjusted(reason, notes, selectionPolicy) : false,
+      prerequisites,
+      limits,
+      actionKind: entry.action ?? (kind ? 'managed-database' : coolifyServiceType ? 'coolify-service' : 'planned'),
+      maturity,
+      operations,
+      selectionPolicy,
     })
   }
 
@@ -292,6 +373,8 @@ export function buildServicesHubModel(input: {
     else state = 'unavailable'
     const reason = engine.reason ?? null
     const notes = uniqueStrings(engine.notes ?? [])
+    const operations = toOperationViews(engine.operations)
+    const selectionPolicy = engine.selectionPolicy ?? null
     pushService({
       key: engine.kind,
       id: engine.kind,
@@ -316,7 +399,13 @@ export function buildServicesHubModel(input: {
       created: Boolean(active || engine.created),
       activeDatabase: active ?? null,
       activeService: null,
-      adjusted: isAdjusted(reason, notes),
+      adjusted: isAdjusted(reason, notes, selectionPolicy),
+      prerequisites: [],
+      limits: [],
+      actionKind: 'managed-database',
+      maturity: engine.maturity ?? null,
+      operations,
+      selectionPolicy,
     })
   }
 

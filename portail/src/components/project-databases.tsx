@@ -309,7 +309,7 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
         <div>
           <h3 id="services-catalog-title" className="text-sm font-semibold">Ajouter un service</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Catalogue unifié des bases et services : disponibilité réelle sur cette instance, capacités (sauvegarde, restauration, provider) et services référencés (Coolify one-click, EFLEX-géré, à venir). Ouvrez un service pour voir sa compatibilité et, si possible, le provisionner.
+            Catalogue unifié des bases et services : disponibilité réelle sur cette instance, capacités par opération (provisionnement, cycle de vie, sauvegarde, restauration), provider sélectionné par politique, prérequis et limites. Ouvrez un service pour voir sa compatibilité et, si possible, le provisionner (bases managées, services Coolify, candidats EFLEX-gérés).
           </p>
         </div>
         <ServicesBrowser services={model.services} canManage={canManage} onOpen={setSelected} />

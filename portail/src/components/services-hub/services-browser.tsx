@@ -193,6 +193,9 @@ export function ServicesBrowser({
                         +{service.envAliases.length} alias
                       </span>
                     )}
+                    {service.maturity === 'experimental' && (
+                      <span className="rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">Expérimental</span>
+                    )}
                     {service.managedDatabaseKind && service.backupSupported && (
                       <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">Sauvegarde intégrée</span>
                     )}
@@ -207,6 +210,9 @@ export function ServicesBrowser({
                   </div>
 
                   {service.reason && <p className="text-xs text-warning">{service.reason}</p>}
+                  {service.prerequisites.length > 0 && service.state !== 'active' && (
+                    <p className="text-xs text-muted-foreground">Prérequis : {service.prerequisites[0]}{service.prerequisites.length > 1 ? '…' : ''}</p>
+                  )}
 
                   <div className="mt-auto flex items-center justify-between gap-2 pt-1">
                     <p className="text-xs text-muted-foreground">

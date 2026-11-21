@@ -5,7 +5,7 @@ import { ServiceIcon } from '@/components/service-icon'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { SERVICE_CATEGORIES } from '@/lib/managed-services-catalog'
-import { STATE_LABELS, STATE_TONES, type UnifiedService } from '@/lib/services-hub'
+import { MATURITY_LABELS, OPERATION_LABELS, STATE_LABELS, STATE_TONES, type UnifiedService } from '@/lib/services-hub'
 
 const BADGE_TONE: Record<string, string> = {
   success: 'bg-success/10 text-success border-success/20',
@@ -18,11 +18,28 @@ function Badge({ label, tone }: { label: string; tone: string }) {
   return <span className={cn('rounded-full border px-2 py-0.5 text-xs font-medium', BADGE_TONE[tone] ?? BADGE_TONE.muted)}>{label}</span>
 }
 
-function CapabilityRow({ label, value, tone }: { label: string; value: string; tone?: 'ok' | 'muted' }) {
+function CapabilityRow({ label, value, tone, reason }: { label: string; value: string; tone?: 'ok' | 'muted'; reason?: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1 text-xs">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={cn('font-medium', tone === 'ok' ? 'text-foreground' : 'text-muted-foreground')}>{value}</span>
+    <div className="space-y-0.5 py-1.5">
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <span className="text-muted-foreground">{label}</span>
+        <span className={cn('font-medium', tone === 'ok' ? 'text-foreground' : 'text-muted-foreground')}>{value}</span>
+      </div>
+      {reason && <p className="text-[11px] leading-snug text-muted-foreground">{reason}</p>}
+    </div>
+  )
+}
+
+function BulletList({ title, items }: { title: string; items: string[] }) {
+  if (items.length === 0) return null
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-foreground">{title}</p>
+      <ul className="space-y-1 text-xs text-muted-foreground">
+        {items.map((item) => (
+          <li key={item}>• {item}</li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -60,10 +77,10 @@ export function ServiceDetailDialog({
     if (!service && dialog.open) dialog.close()
   }, [service])
 
-
   const creatableDatabase = service?.state === 'creatable' && canManage && Boolean(service.managedDatabaseKind)
   const creatableOneClick = service?.state === 'creatable' && canManage && Boolean(service.coolifyServiceType) && !service.managedDatabaseKind
   const creatable = creatableDatabase || creatableOneClick
+  const maturityTone = service?.maturity === 'stable' ? 'success' : service?.maturity === 'experimental' ? 'warning' : service?.maturity === 'planned' ? 'muted' : 'muted'
 
   return (
     <dialog
@@ -91,6 +108,9 @@ export function ServiceDetailDialog({
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <Badge label={STATE_LABELS[service.state]} tone={STATE_TONES[service.state]} />
+                  {service.maturity && service.maturity !== 'stable' && (
+                    <Badge label={MATURITY_LABELS[service.maturity] ?? service.maturity} tone={maturityTone} />
+                  )}
                   {service.envKey && (
                     <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">{service.envKey}</span>
                   )}
@@ -105,31 +125,55 @@ export function ServiceDetailDialog({
             </div>
 
             <section aria-label="Compatibilité et capacités" className="space-y-3 rounded-lg border border-border p-4">
-              <h3 className="text-sm font-medium">Compatibilité sur cette instance</h3>
-              {service.managedDatabaseKind ? (
+              <h3 className="text-sm font-medium">Compatibilité et capacités réelles</h3>
+              {service.managedDatabaseKind || service.operations ? (
                 <div className="divide-y divide-border">
-                  <CapabilityRow label="Provisionnement" value={service.provisionSupported ? 'Pris en charge' : 'Non disponible'} tone={service.provisionSupported ? 'ok' : 'muted'} />
-                  <CapabilityRow label="Cycle de vie (démarrage, arrêt, redémarrage)" value={service.lifecycleSupported ? 'Pris en charge' : 'Non disponible'} tone={service.lifecycleSupported ? 'ok' : 'muted'} />
-                  <CapabilityRow label="Sauvegarde intégrée EFLEX" value={service.backupSupported ? 'Disponible' : 'Non disponible'} tone={service.backupSupported ? 'ok' : 'muted'} />
-                  <CapabilityRow label="Restauration intégrée EFLEX" value={service.restoreSupported ? 'Disponible' : 'Non disponible'} tone={service.restoreSupported ? 'ok' : 'muted'} />
+                  {service.operations && service.operations.length > 0 ? (
+                    service.operations.map((op) => (
+                      <CapabilityRow
+                        key={op.operation}
+                        label={OPERATION_LABELS[op.operation] ?? op.operation}
+                        value={op.supported ? `Pris en charge${op.provider ? ` (${op.provider === 'coolify' ? 'Coolify' : 'EFLEX'})` : ''}` : 'Non disponible'}
+                        tone={op.supported ? 'ok' : 'muted'}
+                        reason={op.reason}
+                      />
+                    ))
+                  ) : (
+                    <>
+                      <CapabilityRow label="Provisionnement" value={service.provisionSupported ? 'Pris en charge' : 'Non disponible'} tone={service.provisionSupported ? 'ok' : 'muted'} />
+                      <CapabilityRow label="Cycle de vie (démarrage, arrêt, redémarrage)" value={service.lifecycleSupported ? 'Pris en charge' : 'Non disponible'} tone={service.lifecycleSupported ? 'ok' : 'muted'} />
+                      <CapabilityRow label="Sauvegarde intégrée EFLEX" value={service.backupSupported ? 'Disponible' : 'Non disponible'} tone={service.backupSupported ? 'ok' : 'muted'} />
+                      <CapabilityRow label="Restauration intégrée EFLEX" value={service.restoreSupported ? 'Disponible' : 'Non disponible'} tone={service.restoreSupported ? 'ok' : 'muted'} />
+                    </>
+                  )}
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  {service.state === 'coolify-oneclick' && 'Service référencé comme modèle one-click Coolify. L’activation et la gestion depuis EFLEX seront proposées ultérieurement.'}
-                  {service.state === 'eflex-managed' && 'Service prévu en gestion EFLEX (provisionnement, réseau privé, secrets, cycle de vie). Il n’est pas encore provisionnable depuis le portail.'}
+                  {service.coolifyServiceType && service.state === 'creatable' &&
+                    'Service provisionnable via un modèle one-click Coolify (si le modèle est disponible sur l’instance). La configuration détaillée peut nécessiter des ajustements après création.'}
+                  {service.state === 'coolify-oneclick' && !service.coolifyServiceType &&
+                    'Service référencé comme modèle Coolify : aucun parcours de provisionnement automatique n’est câblé dans le portail pour le moment.'}
+                  {service.state === 'eflex-managed' &&
+                    'Candidat EFLEX-géré (réseau privé, persistance, secrets, healthcheck, supervision). Aucun provisionnement automatique : un adaptateur validé doit être activé avant toute promesse.'}
                   {service.state === 'planned' && 'Service indexé pour référence. Son intégration n’est pas encore disponible.'}
+                </p>
+              )}
+
+              {service.selectionPolicy?.reason && (
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Politique de sélection :</span> {service.selectionPolicy.reason}
                 </p>
               )}
 
               {service.envKey && (
                 <div className="space-y-1 text-xs text-muted-foreground">
                   <p>
-                    Variable principale injectée : <span className="font-mono text-foreground">{service.envKey}</span>{' '}
-                    <span>(valeur chiffrée, réseau Docker privé).</span>
+                    Variable principale : <span className="font-mono text-foreground">{service.envKey}</span>{' '}
+                    <span>(valeur chiffrée, réseau privé).</span>
                   </p>
                   {service.envAliases.length > 0 && (
                     <p>
-                      Alias compatibles injectés si disponibles :{' '}
+                      Alias compatibles (si disponibles) :{' '}
                       <span className="font-mono text-foreground">{service.envAliases.join(', ')}</span>
                     </p>
                   )}
@@ -141,39 +185,43 @@ export function ServiceDetailDialog({
                   {service.reason}
                 </p>
               )}
-              {service.notes.length > 0 && (
-                <ul className="space-y-1 text-xs text-muted-foreground">
-                  {service.notes.map((note) => (
-                    <li key={note}>• {note}</li>
-                  ))}
-                </ul>
-              )}
             </section>
+
+            {(service.prerequisites.length > 0 || service.limits.length > 0 || service.notes.length > 0) && (
+              <section aria-label="Prérequis et limites" className="grid gap-4 rounded-lg border border-border p-4 sm:grid-cols-2">
+                <BulletList title="Prérequis" items={service.prerequisites} />
+                <BulletList title="Limites connues" items={service.limits} />
+                {service.notes.length > 0 && (
+                  <div className="sm:col-span-2">
+                    <BulletList title="Notes" items={service.notes} />
+                  </div>
+                )}
+              </section>
+            )}
 
             {confirming && creatableDatabase && service.managedDatabaseKind && (
               <section aria-label="Confirmation" className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-4">
                 <h3 className="text-sm font-medium">Confirmer la création</h3>
                 <p className="text-xs text-muted-foreground">
-                  La base <span className="font-medium text-foreground">{service.label}</span> sera provisionnée pour ce projet.
-                  La variable <span className="font-mono text-foreground">{service.envKey}</span>
-                  {service.envAliases.length > 0 ? (
-                    <>
-                      {' '}et les alias compatibles libres (<span className="font-mono text-foreground">{service.envAliases.join(', ')}</span>)
-                    </>
-                  ) : null}{' '}
-                  seront injectés (valeurs chiffrées).
+                  La base <span className="font-medium text-foreground">{service.label}</span> sera provisionnée pour ce projet via le provider sélectionné.
+                  {service.envKey && (
+                    <> La variable <span className="font-mono text-foreground">{service.envKey}</span>{service.envAliases.length > 0 ? <> (et alias compatibles libres)</> : null} sera injectée (valeur chiffrée, réseau privé).</>
+                  )}
                   {service.backupSupported
-                    ? ' Les sauvegardes intégrées pourront être configurées selon l’instance.'
-                    : ' Aucune sauvegarde intégrée EFLEX n’est prévue pour ce moteur.'}{' '}
-                  Un déploiement pourra être nécessaire pour appliquer la connexion.
+                    ? ' Des sauvegardes intégrées peuvent être configurées selon l’instance.'
+                    : ' Aucune sauvegarde intégrée EFLEX n’est disponible pour ce moteur.'}{' '}
+                  Un déploiement peut être nécessaire pour appliquer la connexion.
                 </p>
+                {service.maturity === 'experimental' && (
+                  <p className="text-xs text-warning">Moteur expérimental : validez le comportement (URL, persistance, cycle de vie) avant tout usage critique.</p>
+                )}
               </section>
             )}
             {confirming && creatableOneClick && service.coolifyServiceType && (
               <section aria-label="Confirmation" className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-4">
                 <h3 className="text-sm font-medium">Confirmer le provisionnement</h3>
                 <p className="text-xs text-muted-foreground">
-                  Le service <span className="font-medium text-foreground">{service.label}</span> sera créé via Coolify (modèle one-click <span className="font-mono">{service.coolifyServiceType}</span>) dans l’environnement d’hébergement du projet. Le démarrage et la configuration détaillée (domaines, variables, volumes) dépendront du modèle et pourront nécessiter des ajustements dans Coolify ou dans EFLEX selon les capacités exposées.
+                  Le service <span className="font-medium text-foreground">{service.label}</span> sera créé via Coolify (modèle one-click <span className="font-mono">{service.coolifyServiceType}</span>) dans l’environnement d’hébergement du projet. Le démarrage et la configuration détaillée (domaines, variables, volumes, exposition réseau) dépendront du modèle et des capacités de l’instance.
                 </p>
               </section>
             )}
@@ -185,7 +233,7 @@ export function ServiceDetailDialog({
               {service.state === 'creatable' && !canManage && 'Provisionnement réservé aux membres autorisés du projet.'}
               {service.state === 'unavailable' && 'Non créable sur cette instance dans l’état actuel.'}
               {(service.state === 'coolify-oneclick' || service.state === 'eflex-managed' || service.state === 'planned') &&
-                'Service indexé, non provisionnable depuis EFLEX pour le moment.'}
+                'Non provisionnable automatiquement depuis EFLEX dans l’état actuel.'}
             </p>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="ghost" onClick={confirming ? () => setConfirming(false) : onClose} disabled={creating}>
