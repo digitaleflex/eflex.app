@@ -25,7 +25,7 @@ function CapabilityRow({ label, value, tone, reason }: { label: string; value: s
         <span className="text-muted-foreground">{label}</span>
         <span className={cn('font-medium', tone === 'ok' ? 'text-foreground' : 'text-muted-foreground')}>{value}</span>
       </div>
-      {reason && <p className="text-[11px] leading-snug text-muted-foreground">{reason}</p>}
+      {reason && <p className="text-xs leading-snug text-muted-foreground">{reason}</p>}
     </div>
   )
 }

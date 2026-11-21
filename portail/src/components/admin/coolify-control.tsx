@@ -572,7 +572,7 @@ function DeploymentsTab() {
                 {row.commit && ` · commit ${row.commit}`}
                 {row.server && ` · serveur ${row.server}`}
               </p>
-              <p className="mt-1 break-all font-mono text-[11px] text-muted-foreground">ID Coolify : {row.id}</p>
+              <p className="mt-1 break-all font-mono text-xs text-muted-foreground">ID Coolify : {row.id}</p>
               <p className="mt-1 text-xs">
                 {row.project ? (
                   <a href={`/admin/projects/${row.project.id}`} className="font-medium text-primary hover:underline">
@@ -1008,7 +1008,7 @@ function CapabilitiesTab() {
                 {data.webhookReceiver?.endpoint && (
                   <p className="text-sm text-muted-foreground">
                     URL à déclarer dans Coolify :{' '}
-                    <code className="break-all rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">
+                    <code className="break-all rounded-md bg-muted px-1 py-0.5 font-mono text-xs text-foreground">
                       {data.webhookReceiver.endpoint}
                     </code>
                   </p>
@@ -1042,9 +1042,9 @@ function CapabilitiesTab() {
                 <ul className="list-disc space-y-1 pl-4">
                   <li>Dans Coolify, configurez une notification de type « Webhook » vers l’URL ci-dessus.</li>
                   <li>
-                    Secret attendu côté Coolify : la valeur de <code className="rounded bg-muted px-1 font-mono">COOLIFY_WEBHOOK_INBOUND_SECRET</code> (non affichée).
-                    Envoyez-la en en-tête <code className="rounded bg-muted px-1 font-mono">Authorization: Bearer &lt;secret&gt;</code> ou{' '}
-                    <code className="rounded bg-muted px-1 font-mono">x-coolify-webhook-secret: &lt;secret&gt;</code>.
+                    Secret attendu côté Coolify : la valeur de <code className="rounded-md bg-muted px-1 font-mono">COOLIFY_WEBHOOK_INBOUND_SECRET</code> (non affichée).
+                    Envoyez-la en en-tête <code className="rounded-md bg-muted px-1 font-mono">Authorization: Bearer &lt;secret&gt;</code> ou{' '}
+                    <code className="rounded-md bg-muted px-1 font-mono">x-coolify-webhook-secret: &lt;secret&gt;</code>.
                   </li>
                   <li>Les notifications reçues sont dédupliquées, journalisées (audit) et publiées au flux admin, sans exposer de secret.</li>
                   <li>La modification des canaux sortants (e-mail, Telegram, Discord, etc.) reste à faire dans Coolify tant que l’API ne permet pas une gestion fiable depuis E-FLEX.</li>
@@ -1068,7 +1068,7 @@ function CapabilitiesTab() {
               <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
                 <li>Aucune destination de log drain n’est configurable depuis l’administration E-FLEX.</li>
                 <li>Configurez un éventuel log drain directement dans Coolify si votre version le permet, en respectant vos contraintes de sécurité (destinations autorisées, secrets non exposés).</li>
-                <li>Référez-vous à <code className="rounded bg-muted px-1 font-mono">docs/architecture/coolify-api-capacites.md</code> pour le suivi des capacités.</li>
+                <li>Référez-vous à <code className="rounded-md bg-muted px-1 font-mono">docs/architecture/coolify-api-capacites.md</code> pour le suivi des capacités.</li>
               </ul>
             </CardContent>
           </Card>

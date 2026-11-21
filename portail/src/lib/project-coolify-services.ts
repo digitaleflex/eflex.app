@@ -37,15 +37,22 @@ export function projectServiceName(projectSlug: string, catalogId: string): stri
   return `${projectServicePrefix(projectSlug)}${sanitizeToken(catalogId)}-${suffix}`.slice(0, 60)
 }
 
-function detectCatalogId(name: string, prefix: string): string | null {
+/**
+ * Retrouve le service du catalogue d'après le nom Coolify. La reconnaissance est **stricte** : le nom doit être
+ * exactement `<préfixe><catalogue>` suivi, au plus, du suffixe aléatoire de 4 caractères posé à la création
+ * (`projectServiceName`, éventuellement tronqué). Un nom qui commence seulement par le préfixe ne suffit pas :
+ * avec un slug contenant `-svc-`, le service d'un autre projet pouvait sinon être pris pour celui-ci et devenir
+ * visible et pilotable par le mauvais client (audit de sécurité 2026-11, N2).
+ */
+export function detectCatalogId(name: string, prefix: string): string | null {
   if (!name.startsWith(prefix)) return null
   const rest = name.slice(prefix.length)
-  // rest is "<catalogId>-<rand>" or "<catalogId>"
   for (const catalogId of SUPPORTED.keys()) {
-    if (rest === catalogId || rest.startsWith(`${catalogId}-`)) return catalogId
+    const token = sanitizeToken(catalogId)
+    if (rest === token) return catalogId
+    if (rest.startsWith(`${token}-`) && /^[a-z0-9]{0,4}$/.test(rest.slice(token.length + 1))) return catalogId
   }
-  // fallback: strip trailing -xxxx
-  return rest.replace(/-[a-z0-9]{4}$/, '') || null
+  return null
 }
 
 export function isSupportedCatalogService(catalogId: string): boolean {
@@ -174,9 +181,6 @@ function collectTypeStrings(raw: unknown, depth = 0): string[] {
 /** Découvre les types/templates one-click supportés par l’instance Coolify. */
 export async function discoverServiceTypeCapabilities(): Promise<ServiceTypeCapabilities> {
   const catalogEntries = supportedServiceEntries()
-  const catalogTypes = catalogEntries
-    .map((e) => e.coolifyServiceType)
-    .filter((t): t is string => typeof t === 'string' && t.length > 0)
 
   const res = await coolifyFetch<unknown>('/services/types', { signal: AbortSignal.timeout(10_000) })
   if (!res.error && res.data != null) {

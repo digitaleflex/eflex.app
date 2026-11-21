@@ -53,17 +53,17 @@ function eflexUnavailableReason(label: string, capabilities: DatabaseEngineCapab
  */
 const eflexManagedProvider: DatabaseProvider = {
   kind: 'eflex',
-  async createManagedDatabase(kind, _name) {
+  async createManagedDatabase(kind) {
     const { capabilities } = await getDatabaseEngineCapabilities(kind)
     return { error: eflexUnavailableReason(capabilities.label, capabilities) }
   },
-  async getManagedDatabase(_id, _timeoutMs) {
+  async getManagedDatabase() {
     return { error: 'Ressource EFLEX-gérée introuvable ou adaptateur non activé sur cette instance.' }
   },
-  async deleteManagedDatabase(_id) {
+  async deleteManagedDatabase() {
     return { error: 'Suppression impossible : adaptateur EFLEX-géré non activé sur cette instance.' }
   },
-  async managedDatabaseAction(_id, _action) {
+  async managedDatabaseAction() {
     return { error: 'Action impossible : adaptateur EFLEX-géré non activé sur cette instance.' }
   },
 }

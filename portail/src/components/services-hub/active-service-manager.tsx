@@ -99,7 +99,7 @@ export function ActiveServiceManager({
     if (open) void load()
   }, [open, load])
 
-  const envKeys = config?.envKeys ?? []
+  const envKeys = useMemo(() => config?.envKeys ?? [], [config])
 
   const pendingEnvCount = useMemo(() => {
     let n = 0
@@ -252,7 +252,7 @@ export function ActiveServiceManager({
                     <li key={k.key} className="grid gap-2 rounded-md border border-border p-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] sm:items-center">
                       <div className="min-w-0">
                         <p className="truncate font-mono text-xs text-foreground">{k.key}</p>
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           {k.isBuildTime ? 'build' : 'runtime'}{k.isPreview ? ' · preview' : ''}
                         </p>
                       </div>

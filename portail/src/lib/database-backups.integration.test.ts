@@ -146,7 +146,7 @@ run('sauvegardes des bases (intégration)', () => {
   it('refuse Redis et ne touche pas la base en cas d’erreur de l’hébergement', async () => {
     const redis = await fixture('redis')
     expect(await backups.ensureDatabaseBackup(redis.database)).toEqual({
-      error: 'Les sauvegardes ne sont disponibles que pour PostgreSQL.',
+      error: 'Les sauvegardes/restaurations intégrées ne sont pas disponibles pour Redis.',
     })
     const pg = await fixture()
     coolify.failCreate = true
@@ -258,7 +258,12 @@ run('sauvegardes des bases (intégration)', () => {
     expect(stored.lastRestoreImportId).toBe('99')
     expect(stored.lastRestoreBackupCreatedAt?.toISOString()).toBe('2026-11-16T02:00:00.000Z')
 
-    const status = await backups.getDatabaseBackupStatus(stored, new Date('2026-11-16T12:00:00Z'), settings)
+    // La planification n'existe pas encore sur `stored` : on la simule pour lire l'historique.
+    const status = await backups.getDatabaseBackupStatus(
+      { ...stored, backupId: 'sched' },
+      new Date('2026-11-16T12:00:00Z'),
+      settings,
+    )
     expect(JSON.stringify(status)).not.toContain('/data/')
     expect(status.summary?.recent.map((item) => [item.id, item.restorable])).toEqual([
       ['ok', true],

@@ -29,7 +29,9 @@ export function CoolifyDeploymentsPanel({ projectId, multiApp }: { projectId: st
     }
   }
 
-  useEffect(() => { if (open && !apps && !loading) void load() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open])
+  // Chargement unique à l'ouverture du panneau.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (open && !apps && !loading) void load() }, [open])
 
   if (!open) {
     return (
@@ -61,7 +63,7 @@ export function CoolifyDeploymentsPanel({ projectId, multiApp }: { projectId: st
         </div>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        Données lues depuis l’API Coolify (<code className="rounded bg-muted px-1 font-mono">/deployments/applications/&lbrace;uuid&rbrace;</code>).
+        Données lues depuis l’API Coolify (<code className="rounded-md bg-muted px-1 font-mono">/deployments/applications/&lbrace;uuid&rbrace;</code>).
         Comparez les commits/statuts avec l’historique E-FLEX ci-dessous pour identifier un déploiement non suivi par le portail.
       </p>
       {loading && <p className="mt-2 text-xs text-muted-foreground">Chargement…</p>}
@@ -80,7 +82,7 @@ export function CoolifyDeploymentsPanel({ projectId, multiApp }: { projectId: st
                 <ul className="mt-1 space-y-1">
                   {app.deployments.slice(0, 10).map((d) => (
                     <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs tabular-nums">
-                      <span className="font-mono text-[11px] text-muted-foreground" title={d.id}>
+                      <span className="font-mono text-xs text-muted-foreground" title={d.id}>
                         {d.id.slice(0, 8)}
                       </span>
                       <span className="font-medium text-foreground">{d.status}</span>

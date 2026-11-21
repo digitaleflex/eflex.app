@@ -3,6 +3,21 @@ const TAG_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/
 const DIGEST_RE = /^sha256:[a-f0-9]{64}$/
 const HOST_RE = /^(?:localhost|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?|[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?::[0-9]{2,5})?$/
 
+const INTERNAL_SUFFIXES = ['.local', '.localhost', '.internal', '.lan', '.home.arpa', '.intranet', '.corp']
+
+/**
+ * Le registre doit être un nom de domaine public : jamais `localhost`, un nom sans point (réseau Docker ou
+ * serveur), une adresse IP ni un suffixe interne. Sinon un client pourrait tirer une image depuis un registre
+ * interne de la plateforme (par exemple celui du serveur de build) et déployer l'image d'un autre client
+ * (audit de sécurité 2026-11, N3). Les images du Docker Hub (sans hôte) et des registres publics restent permises.
+ */
+export function isPublicRegistryHost(hostWithPort: string): boolean {
+  const host = hostWithPort.replace(/:\d{2,5}$/, '').toLowerCase()
+  if (host === 'localhost' || !host.includes('.')) return false
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return false
+  return !INTERNAL_SUFFIXES.some((suffix) => host.endsWith(suffix))
+}
+
 /**
  * Valide une référence d'image Docker saisie par un utilisateur.
  * Accepte `nom[:tag][@digest]`, avec registre/hôte optionnel.
@@ -38,6 +53,7 @@ export function isValidDockerImageRef(value: string): boolean {
     const first = remainder.slice(0, firstSlash)
     if (first === 'localhost' || first.includes('.') || first.includes(':')) {
       if (!HOST_RE.test(first)) return false
+      if (!isPublicRegistryHost(first)) return false
       const path = remainder.slice(firstSlash + 1)
       return path.length > 0 && NAME_RE.test(path)
     }

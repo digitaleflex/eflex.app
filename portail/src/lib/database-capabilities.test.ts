@@ -73,7 +73,9 @@ describe('database-capabilities (#183/#184)', () => {
     const result = await listDatabaseEngineCapabilities()
     expect(result.engines).toHaveLength(9)
     expect(result.engines.find((engine) => engine.kind === 'postgresql')?.backupSupported).toBe(true)
-    expect(result.engines.find((engine) => engine.kind === 'mysql')?.backupSupported).toBe(false)
+    // Les sauvegardes planifiées de Coolify couvrent PostgreSQL, MySQL, MariaDB et MongoDB (#180) ; pas Redis.
+    expect(result.engines.find((engine) => engine.kind === 'mysql')?.backupSupported).toBe(true)
+    expect(result.engines.find((engine) => engine.kind === 'redis')?.backupSupported).toBe(false)
   })
 
   it('refuse le provisionnement si l’API bases managées est indisponible', () => {
