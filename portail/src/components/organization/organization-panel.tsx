@@ -6,12 +6,14 @@ import { Activity, Copy, LogOut, ShieldCheck, Trash2, UserPlus, Users } from 'lu
 import { authClient, authErrorMessage } from '@/lib/auth-client'
 import { slugify } from '@/lib/slug'
 import {
+  ORGANIZATION_ROLE_CAPABILITIES,
   ORGANIZATION_ROLE_DESCRIPTION,
   ORGANIZATION_ROLES,
   canManageBilling,
   canManageMembers,
   organizationActionImpact,
   organizationRoleLabel,
+  type RoleCapabilityLevel,
 } from '@/lib/organizations'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -184,11 +186,44 @@ export function OrganizationPanel({
             Rôles et permissions
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Ces rôles sont ceux de Better Auth : cette page les rend lisibles, elle ne les modifie pas.
+            Capacités réelles des rôles d’organisation. Le contrôle d’accès est appliqué côté serveur ; cette
+            matrice sert à comprendre l’impact d’un rôle avant d’inviter ou de modifier un membre.
           </p>
         </CardHeader>
-        <CardContent>
-          <dl className="divide-y divide-border">
+        <CardContent className="space-y-5">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[36rem] border-collapse text-sm">
+              <caption className="sr-only">Matrice des capacités par rôle d’organisation</caption>
+              <thead>
+                <tr className="border-b border-border text-left">
+                  <th scope="col" className="py-2 pr-3 font-medium text-muted-foreground">
+                    Capacité
+                  </th>
+                  {ORGANIZATION_ROLES.map((role) => (
+                    <th key={role} scope="col" className="px-2 py-2 text-center font-medium text-muted-foreground">
+                      {organizationRoleLabel(role)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {ORGANIZATION_ROLE_CAPABILITIES.map((capability) => (
+                  <tr key={capability.id}>
+                    <th scope="row" className="py-3 pr-3 text-left font-normal">
+                      <span className="block font-medium text-foreground">{capability.label}</span>
+                      <span className="block text-xs text-muted-foreground">{capability.hint}</span>
+                    </th>
+                    {ORGANIZATION_ROLES.map((role) => (
+                      <td key={role} className="px-2 py-3 text-center">
+                        <CapabilityMark level={capability.levels[role]} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <dl className="divide-y divide-border border-t border-border pt-1">
             {ORGANIZATION_ROLES.map((role) => (
               <div key={role} className="grid gap-1 py-3 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-4">
                 <dt className="text-sm font-medium">{organizationRoleLabel(role)}</dt>
@@ -521,6 +556,21 @@ export function OrganizationPanel({
   )
 }
 
+function CapabilityMark({ level }: { level: RoleCapabilityLevel }) {
+  const config = {
+    yes: { label: 'Oui', className: 'bg-success/10 text-foreground border-success/25' },
+    no: { label: 'Non', className: 'bg-muted text-muted-foreground border-border' },
+    limited: { label: 'Partiel', className: 'bg-warning/10 text-foreground border-warning/25' },
+  }[level]
+  return (
+    <span
+      className={`inline-flex min-w-[3.5rem] items-center justify-center rounded-md border px-2 py-1 text-xs font-medium ${config.className}`}
+    >
+      {config.label}
+    </span>
+  )
+}
+
 function Message({ kind, text }: { kind: 'error' | 'ok'; text: string }) {
   return (
     <p
@@ -637,7 +687,7 @@ function InviteForm({
           required
         />
       </div>
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 sm:max-w-xs">
         <label htmlFor="invite-role" className="text-sm font-medium">
           Rôle proposé
         </label>
@@ -645,13 +695,16 @@ function InviteForm({
           id="invite-role"
           value={role}
           onChange={(e) => setRole(e.target.value as InviteRole)}
-          aria-describedby={hasError ? 'organization-feedback' : undefined}
+          aria-describedby={[hasError ? 'organization-feedback' : null, 'invite-role-hint'].filter(Boolean).join(' ')}
           className="flex h-11 w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <option value="member">Membre</option>
           {canGiveAdmin ? <option value="admin">Administrateur</option> : null}
           {canGiveAdmin ? <option value="billing">Facturation</option> : null}
         </select>
+        <p id="invite-role-hint" className="text-xs text-muted-foreground">
+          {ORGANIZATION_ROLE_DESCRIPTION[role]}
+        </p>
       </div>
       <Button type="submit" loading={loading}>
         <UserPlus className="h-4 w-4" aria-hidden="true" />
