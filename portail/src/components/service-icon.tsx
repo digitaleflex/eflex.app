@@ -29,12 +29,16 @@ const ICONS: Record<string, IconData | undefined> = {
   pocketbase: simpleIcons.siPocketbase,
   kafka: simpleIcons.siApachekafka,
   typesense: undefined,
+  uptimekuma: (simpleIcons as Record<string, IconData | undefined>).siUptimekuma,
+  n8n: (simpleIcons as Record<string, IconData | undefined>).siN8n,
 }
 
 const FALLBACK_COLORS: Record<string, string> = {
   dragonfly: 'D9272E',
   keydb: 'D82C20',
   typesense: '2B2D42',
+  uptimekuma: '5CDD8B',
+  n8n: 'EA4B71',
 }
 
 function hexToRgb(hex: string): string {

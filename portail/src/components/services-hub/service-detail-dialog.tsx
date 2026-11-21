@@ -146,11 +146,12 @@ export function ServiceDetailDialog({
                 <p className="text-xs text-muted-foreground">
                   {service.coolifyServiceType && service.state === 'creatable' &&
                     'Service provisionnable via un modèle prêt à l’emploi (si disponible sur l’hébergement). La configuration détaillée peut nécessiter des ajustements après création.'}
-                  {service.state === 'coolify-oneclick' && !service.coolifyServiceType &&
-                    'Service référencé comme modèle prêt à l’emploi : aucun parcours de provisionnement automatique n’est câblé dans le portail pour le moment.'}
                   {service.state === 'eflex-managed' &&
                     'Candidat EFLEX-géré (réseau privé, persistance, secrets, healthcheck, supervision). Aucun provisionnement automatique : un adaptateur validé doit être activé avant toute promesse.'}
-                  {service.state === 'planned' && 'Service indexé pour référence. Son intégration n’est pas encore disponible.'}
+                  {service.state === 'planned' && !service.managedDatabaseKind &&
+                    'Service indexé pour référence. Aucun provisionnement automatique n’est disponible dans EFLEX dans l’état actuel ; ne pas le considérer comme disponible sur cette instance.'}
+                  {service.state === 'planned' && service.managedDatabaseKind &&
+                    'Moteur référencé, mais non provisionnable automatiquement dans l’état actuel.'}
                 </p>
               )}
 
@@ -173,6 +174,18 @@ export function ServiceDetailDialog({
                     </p>
                   )}
                 </div>
+              )}
+
+              {service.connectionNote && (
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Connexion à l’application :</span> {service.connectionNote}
+                </p>
+              )}
+
+              {service.costNote && (
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Coût / quota :</span> {service.costNote}
+                </p>
               )}
 
               {service.reason && (
@@ -227,7 +240,7 @@ export function ServiceDetailDialog({
               {service.state === 'active' && (service.activeService ? 'Ce service est déjà actif pour le projet.' : 'Cette ressource est déjà active pour le projet.')}
               {service.state === 'creatable' && !canManage && 'Provisionnement réservé aux membres autorisés du projet.'}
               {service.state === 'unavailable' && 'Non créable sur cette instance dans l’état actuel.'}
-              {(service.state === 'coolify-oneclick' || service.state === 'eflex-managed' || service.state === 'planned') &&
+              {(service.state === 'eflex-managed' || service.state === 'planned') &&
                 'Non provisionnable automatiquement depuis EFLEX dans l’état actuel.'}
             </p>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

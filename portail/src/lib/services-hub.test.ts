@@ -14,7 +14,8 @@ const catalog: readonly ManagedServiceEntry[] = [
   { id: 'redis', label: 'Redis', category: 'cache', description: 'Cache en mémoire', availability: 'available', managedDatabaseKind: 'redis', icon: 'redis' },
   { id: 'mysql', label: 'MySQL', category: 'database', description: 'Base relationnelle MySQL', availability: 'available', managedDatabaseKind: 'mysql', icon: 'mysql' },
   { id: 'minio', label: 'MinIO', category: 'storage', description: 'Stockage objet S3', availability: 'eflex-managed', icon: 'minio' },
-  { id: 'meilisearch', label: 'Meilisearch', category: 'search', description: 'Recherche full-text', availability: 'coolify-oneclick', icon: 'meilisearch' },
+  { id: 'meilisearch', label: 'Meilisearch', category: 'search', description: 'Recherche full-text', availability: 'coolify-oneclick', coolifyServiceType: 'meilisearch', icon: 'meilisearch', action: 'coolify-service' },
+  { id: 'opensearch', label: 'OpenSearch', category: 'search', description: 'Recherche', availability: 'coolify-oneclick', icon: 'opensearch', action: 'planned' },
   { id: 'qdrant', label: 'Qdrant', category: 'vector', description: 'Base vectorielle', availability: 'planned', icon: 'qdrant' },
 ]
 
@@ -81,7 +82,10 @@ describe('buildServicesHubModel', () => {
     expect(redis.filterTags).toContain('provisionable')
 
     expect(byKey(model.services, 'minio').state).toBe('eflex-managed')
-    expect(byKey(model.services, 'meilisearch').state).toBe('coolify-oneclick')
+    expect(byKey(model.services, 'meilisearch').state).toBe('creatable')
+    // Entrée catalogue "coolify-oneclick" sans type câblé : jamais présentée comme disponible.
+    expect(byKey(model.services, 'opensearch').state).toBe('planned')
+    expect(byKey(model.services, 'opensearch').reason).toContain('non câblé')
     expect(byKey(model.services, 'qdrant').state).toBe('planned')
   })
 
