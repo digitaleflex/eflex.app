@@ -1,6 +1,8 @@
 import type { ManagedDatabaseKind } from '@/lib/coolify'
 import { getCoolifyRuntimeCapabilities, type CoolifyRuntimeCapabilities } from '@/lib/coolify-capabilities'
 
+export type { ManagedDatabaseKind }
+
 /**
  * Registre de capacités des moteurs de bases managées (#183) et politique de sélection (#181/#184).
  *
