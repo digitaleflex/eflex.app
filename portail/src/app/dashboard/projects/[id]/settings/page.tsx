@@ -67,21 +67,44 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
   const primaryDomain = primaryApp?.domain ?? null
   const hasHostedApp = project.apps.some((app) => Boolean(app.coolifyAppId))
 
-  const primaryPlan = (primaryApp?.plan ?? project.plan) as { source?: string; image?: string; port?: number } | null
-  const imageSource =
-    primaryPlan?.source === 'docker-image' && typeof primaryPlan.image === 'string'
-      ? {
-          image: primaryPlan.image,
-          port: typeof primaryPlan.port === 'number' ? primaryPlan.port : (primaryApp?.port ?? project.port ?? 80),
-          appId: primaryApp?.id ?? null,
-        }
-      : project.repoUrl?.startsWith('docker-image://')
-        ? {
-            image: project.repoUrl.slice('docker-image://'.length),
-            port: primaryApp?.port ?? project.port ?? 80,
-            appId: primaryApp?.id ?? null,
-          }
-        : null
+  const imageApps = project.apps.flatMap((app) => {
+    const plan = app.plan as { source?: string; image?: string; port?: number } | null
+    if (plan?.source === 'docker-image' && typeof plan.image === 'string') {
+      return [
+        {
+          appId: app.id,
+          appName: app.name,
+          image: plan.image,
+          port: typeof plan.port === 'number' ? plan.port : app.port,
+          primary: app.position === 0,
+        },
+      ]
+    }
+    return []
+  })
+
+  // Repli legacy : projet image sans plan explicite sur l'application chargée.
+  if (imageApps.length === 0) {
+    const projectPlan = project.plan as { source?: string; image?: string; port?: number } | null
+    const legacyImage =
+      projectPlan?.source === 'docker-image' && typeof projectPlan.image === 'string'
+        ? projectPlan.image
+        : project.repoUrl?.startsWith('docker-image://')
+          ? project.repoUrl.slice('docker-image://'.length)
+          : null
+    if (legacyImage) {
+      imageApps.push({
+        appId: primaryApp?.id ?? '',
+        appName: primaryApp?.name ?? 'app',
+        image: legacyImage,
+        port:
+          typeof projectPlan?.port === 'number'
+            ? projectPlan.port
+            : (primaryApp?.port ?? project.port ?? 80),
+        primary: true,
+      })
+    }
+  }
 
   const transferTargets = transferMemberships
     .map((membership) => membership.organization)
@@ -106,7 +129,7 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
           framework: app.framework,
           deployed: Boolean(app.coolifyAppId),
         }))}
-        imageSource={imageSource}
+        imageApps={imageApps}
         transferTargets={transferTargets}
         envVars={project.envVars.map((item) => ({
           key: item.key,

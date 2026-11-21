@@ -113,12 +113,23 @@ const RULES: Rule[] = [
     action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
   },
   {
+    id: 'image-registry-auth',
+    test: (t) =>
+      /unauthorized:?\s*(authentication required|incorrect username or password)|requested access to the resource is denied|access forbidden/i.test(
+        t,
+      ) ||
+      (/\bpull access denied\b/i.test(t) && !/repository does not exist/i.test(t)),
+    cause:
+      "L’accès à l’image du registre a été refusé. Vérifiez que l’image et le tag existent ; pour un registre privé, les identifiants doivent être configurés sur le serveur d’hébergement (registre Docker du serveur) par un administrateur.",
+    action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
     id: 'base-image-missing',
     test: (t) =>
       /manifest unknown|failed to resolve source metadata|pull access denied.*repository does not exist/i.test(t) ||
       /not found: manifest unknown|repository .* not found/i.test(t) ||
       /ERROR \[internal\] load metadata for/i.test(t),
-    cause: "L'image de base du conteneur est introuvable ou inaccessible.",
+    cause: "L'image de base ou de déploiement est introuvable ou inaccessible. Vérifiez le nom, le tag/digest et l’existence de l’image sur le registre.",
     action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
   },
   {

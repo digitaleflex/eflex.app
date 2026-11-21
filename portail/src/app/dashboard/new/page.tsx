@@ -17,6 +17,7 @@ import { VercelImport } from '@/components/new-project/vercel-import'
 import { EnvEditor } from '@/components/env/env-editor'
 import { mergeEnvRows, rowsToVars } from '@/lib/env-parse'
 import { frameworkLabel, runtimeLabel } from '@/lib/frameworks'
+import { DOCKER_IMAGE_REF_HINT, PRIVATE_REGISTRY_LIMITATION, UNSUPPORTED_SOURCES_NOTE } from '@/lib/docker-image-ref'
 
 interface EnvVar {
   key: string
@@ -233,7 +234,7 @@ export default function NewProjectPage() {
         <CardHeader>
           <h2 className="font-semibold">Source du déploiement</h2>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <div className="grid gap-2 sm:grid-cols-2">
             <button
               type="button"
@@ -260,6 +261,7 @@ export default function NewProjectPage() {
               </span>
             </button>
           </div>
+          <p className="text-xs text-muted-foreground">{UNSUPPORTED_SOURCES_NOTE}</p>
         </CardContent>
       </Card>
 
@@ -274,13 +276,16 @@ export default function NewProjectPage() {
                 id="image-ref"
                 label="Référence de l'image"
                 placeholder="ghcr.io/organisation/app:latest"
-                hint="Nom d’image, tag et/ou digest (ex. nginx:1.27, ghcr.io/org/app:1.2.3, image@sha256:…)."
+                hint={DOCKER_IMAGE_REF_HINT}
                 autoComplete="off"
                 spellCheck={false}
                 value={imageRef}
                 onChange={(e) => { setImageRef(e.target.value); if (!nameEdited) { const guess = e.target.value.split('/').pop()?.split(':')[0]?.split('@')[0]; if (guess) setName(guess); } }}
                 required
               />
+              <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                <p>{PRIVATE_REGISTRY_LIMITATION}</p>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
                   id="image-port"

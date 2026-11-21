@@ -6,19 +6,10 @@ import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { publish } from '@/lib/event-bus'
 import { getPrimaryApp } from '@/lib/project-apps'
 import { requireManagedProjectForMutation, requireProjectApp, tenantNotFound } from '@/lib/tenant'
+import { DOCKER_IMAGE_REF_ERROR, isValidDockerImageRef } from '@/lib/docker-image-ref'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-
-const IMAGE_REF_RE = /^[a-z0-9][a-z0-9._\-\/]*(:[A-Za-z0-9_][A-Za-z0-9._\-]{0,127})?(@sha256:[a-f0-9]{64})?$/
-const IMAGE_REF_HOST_RE = /^[a-z0-9][a-z0-9.\-]*(?::[0-9]{2,5})?(?:\/[a-z0-9][a-z0-9._\-\/]*)?(?::[A-Za-z0-9_][A-Za-z0-9._\-]{0,127})?(?:@sha256:[a-f0-9]{64})?$/
-
-function isValidDockerImageRef(ref: string): boolean {
-  if (ref.includes(' ') || /[;&|`$<>\\]/.test(ref)) return false
-  if (IMAGE_REF_RE.test(ref)) return true
-  if (IMAGE_REF_HOST_RE.test(ref)) return true
-  return false
-}
 
 function isDockerImagePlan(value: unknown): value is { source: 'docker-image'; image: string; port?: number } {
   if (typeof value !== 'object' || value === null) return false
@@ -29,8 +20,8 @@ function isDockerImagePlan(value: unknown): value is { source: 'docker-image'; i
 const patchSchema = z
   .object({
     appId: z.string().trim().min(1).optional(),
-    image: z.string().trim().min(1, "Indiquez la référence de l'image Docker.").max(255).optional(),
-    port: z.number().int('Le port doit être un entier.').min(1).max(65535).optional(),
+    image: z.string().trim().min(1, "Indiquez la référence de l'image Docker.").max(255, "La référence de l'image est trop longue.").optional(),
+    port: z.number().int('Le port doit être un entier.').min(1, 'Le port doit être compris entre 1 et 65535.').max(65535, 'Le port doit être compris entre 1 et 65535.').optional(),
   })
   .refine((value) => value.image !== undefined || value.port !== undefined, {
     message: 'Aucune modification fournie.',
@@ -61,10 +52,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Données invalides.' }, { status: 400 })
   }
   if (parsed.data.image !== undefined && !isValidDockerImageRef(parsed.data.image)) {
-    return NextResponse.json(
-      { error: "Référence d'image Docker invalide. Utilisez un nom d'image, un tag et/ou un digest valides (ex. nginx:1.27, ghcr.io/org/app:latest, image@sha256:…)." },
-      { status: 400 },
-    )
+    return NextResponse.json({ error: DOCKER_IMAGE_REF_ERROR }, { status: 400 })
   }
 
   const scoped = await requireManagedProjectForMutation(session, id, {

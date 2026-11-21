@@ -205,9 +205,29 @@ npm ERR! network request to https://registry.npmjs.org/react/-/react-18.3.1.tgz 
       projectId: 'p1',
     })
     expect(d).toEqual({
-      cause: "L'image de base du conteneur est introuvable ou inaccessible.",
+      cause: "L'image de base ou de déploiement est introuvable ou inaccessible. Vérifiez le nom, le tag/digest et l’existence de l’image sur le registre.",
       action: { label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' },
     })
+  })
+
+  it("détecte un accès refusé au registre d'images (registre privé sans identifiants)", () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'Error response from daemon: pull access denied for ghcr.io/acme/app, repository does not exist or may require \'docker login\': denied: requested access to the resource is denied',
+      projectId: 'p1',
+    })
+    expect(d?.cause).toContain('accès à l’image du registre a été refusé')
+    expect(d?.cause).toContain('registre privé')
+    expect(d?.action).toEqual({ label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' })
+  })
+
+  it('détecte une authentification registre requise', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'unauthorized: authentication required',
+      projectId: 'p1',
+    })
+    expect(d?.cause).toContain('accès à l’image du registre a été refusé')
   })
 
   it('détecte un échec de chargement des métadonnées d’image (BuildKit)', () => {
