@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
-import { getServiceInstance, listProjectCoolifyServices, listServiceEnvKeys } from '@/lib/project-coolify-services'
+import { getProjectServiceConfig, listProjectCoolifyServices } from '@/lib/project-coolify-services'
 import { requireManagedProject } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
@@ -21,18 +21,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!(await ensureOwned(result.project.slug, serviceId))) {
     return NextResponse.json({ error: 'Service introuvable.' }, { status: 404 })
   }
-  const service = await getServiceInstance(serviceId)
-  if ('error' in service) return NextResponse.json({ error: service.error }, { status: 502 })
-  const envs = await listServiceEnvKeys(serviceId)
-  // Ne renvoyer que des champs non sensibles (aucune valeur de variable).
-  return NextResponse.json({
-    service: {
-      id: service.id,
-      name: service.name,
-      status: service.status,
-      type: service.type ?? null,
-      description: service.description ?? null,
-      envKeys: 'error' in envs ? [] : envs.keys,
-    },
-  })
+
+  const config = await getProjectServiceConfig(serviceId)
+  if ('error' in config) return NextResponse.json({ error: config.error }, { status: 502 })
+
+  // Ne renvoyer que des champs non sensibles (aucune valeur de variable, aucun secret).
+  return NextResponse.json({ service: config })
 }

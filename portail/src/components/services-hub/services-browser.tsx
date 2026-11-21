@@ -166,7 +166,8 @@ export function ServicesBrowser({
       ) : (
         <ul className="grid gap-2 sm:grid-cols-2">
           {filtered.map((service) => {
-            const actionable = service.state === 'creatable' && canManage && service.managedDatabaseKind
+            const canProvision = service.state === 'creatable' && canManage
+            const actionableDb = canProvision && Boolean(service.managedDatabaseKind)
             return (
               <li key={service.key} className="rounded-lg border border-border p-3">
                 <div className="flex h-full flex-col gap-3">
@@ -221,8 +222,8 @@ export function ServicesBrowser({
                       {service.state === 'unavailable' && 'Non disponible ici'}
                       {(service.state === 'coolify-oneclick' || service.state === 'eflex-managed' || service.state === 'planned') && 'Non provisionnable pour le moment'}
                     </p>
-                    <Button type="button" variant={actionable ? 'outline' : 'ghost'} size="sm" onClick={() => onOpen(service)}>
-                      {actionable ? 'Configurer' : service.state === 'active' ? 'Voir' : 'Détails'}
+                    <Button type="button" variant={canProvision ? 'outline' : 'ghost'} size="sm" onClick={() => onOpen(service)}>
+                      {actionableDb ? 'Configurer' : canProvision ? 'Provisionner' : service.state === 'active' ? 'Voir' : 'Détails'}
                     </Button>
                   </div>
                 </div>

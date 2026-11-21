@@ -9,6 +9,7 @@ import { ServiceIcon } from '@/components/service-icon'
 import { cn } from '@/lib/utils'
 import { InstanceCapabilitiesPanel } from '@/components/services-hub/instance-capabilities-panel'
 import { ActiveResources, type ResourceAction } from '@/components/services-hub/active-resources'
+import { ActiveServiceManager } from '@/components/services-hub/active-service-manager'
 import { ServicesBrowser } from '@/components/services-hub/services-browser'
 import { ServiceDetailDialog } from '@/components/services-hub/service-detail-dialog'
 import {
@@ -17,6 +18,7 @@ import {
   type EngineInfoView,
   type ManagedDatabaseView,
   type RuntimeView,
+  type ServiceTypeCapabilitiesView,
   type UnifiedService,
 } from '@/lib/services-hub'
 
@@ -51,6 +53,7 @@ const DOT: Record<string, string> = { success: 'bg-success', warning: 'bg-warnin
 export function ProjectDatabases({ projectId }: { projectId: string }) {
   const [data, setData] = useState<DatabasesResponse | null>(null)
   const [activeServices, setActiveServices] = useState<ActiveServiceView[]>([])
+  const [serviceCapabilities, setServiceCapabilities] = useState<ServiceTypeCapabilitiesView | null>(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState<string | null>(null)
   const [working, setWorking] = useState<string | null>(null)
@@ -72,10 +75,12 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
       }
       setData(body as DatabasesResponse)
       if (svcRes?.ok) {
-        const svcBody = (await svcRes.json().catch(() => ({}))) as { services?: ActiveServiceView[] }
+        const svcBody = (await svcRes.json().catch(() => ({}))) as { services?: ActiveServiceView[]; capabilities?: ServiceTypeCapabilitiesView }
         setActiveServices(Array.isArray(svcBody.services) ? svcBody.services : [])
+        setServiceCapabilities(svcBody.capabilities ?? null)
       } else {
         setActiveServices([])
+        setServiceCapabilities(null)
       }
     } catch {
       setFeedback({ tone: 'error', message: 'Impossible de contacter le serveur.' })
@@ -94,8 +99,9 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
       runtime: data.runtime ?? null,
       canManage: data.canManage,
       activeServices,
+      serviceTypeCapabilities: serviceCapabilities,
     })
-  }, [data, activeServices])
+  }, [data, activeServices, serviceCapabilities])
 
   const aliasesByKind = useMemo(() => {
     if (!data) return {}
@@ -240,6 +246,23 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
 
       <InstanceCapabilitiesPanel runtime={model.runtime} />
 
+      {serviceCapabilities && (
+        <div className="rounded-lg border border-border bg-muted/20 p-3 text-xs">
+          <p className="font-medium text-foreground">
+            Découverte des services one-click :{' '}
+            {serviceCapabilities.source === 'instance' ? 'types supportés détectés sur l’instance' : 'basée sur le catalogue EFLEX (support non confirmé)'}
+          </p>
+          {serviceCapabilities.message && (
+            <p className="mt-1 text-muted-foreground">{serviceCapabilities.message}</p>
+          )}
+          {serviceCapabilities.source === 'instance' && serviceCapabilities.instanceTypes && (
+            <p className="mt-1 text-muted-foreground">
+              Types annoncés : <span className="font-mono text-foreground">{serviceCapabilities.instanceTypes.slice(0, 20).join(', ')}{serviceCapabilities.instanceTypes.length > 20 ? '…' : ''}</span>
+            </p>
+          )}
+        </div>
+      )}
+
       <section aria-labelledby="services-active-title" className="space-y-3">
         <div>
           <h3 id="services-active-title" className="text-sm font-semibold">Ressources actives</h3>
@@ -296,11 +319,18 @@ export function ProjectDatabases({ projectId }: { projectId: string }) {
                         </div>
                       )}
                     </div>
+                    <ActiveServiceManager
+                      projectId={projectId}
+                      serviceId={service.id}
+                      serviceLabel={service.label}
+                      canManage={canManage}
+                      onChanged={() => void load()}
+                    />
                   </li>
                 )
               })}
             </ul>
-            <p className="text-xs text-muted-foreground">Les services one-click sont créés dans Coolify. La configuration avancée (domaines, variables, volumes) peut nécessiter un ajustement selon le modèle et les capacités exposées.</p>
+            <p className="text-xs text-muted-foreground">Les services one-click sont créés dans Coolify. Ouvrez « Configurer » pour gérer les variables d’environnement, les domaines/FQDN et consulter la configuration/les volumes exposés par l’API (selon les capacités de l’instance).</p>
           </div>
         )}
       </section>

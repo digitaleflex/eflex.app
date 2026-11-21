@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getSession } from '@/lib/session'
+import { z } from 'zod'
+import { audit } from '@/lib/audit'
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
+import { getSession } from '@/lib/session'
 import { deleteServiceInstance, listProjectCoolifyServices, serviceAction } from '@/lib/project-coolify-services'
 import { requireManagedProject } from '@/lib/tenant'
-import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -31,10 +32,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!parsed.success) return NextResponse.json({ error: 'Action invalide.' }, { status: 400 })
   const acted = await serviceAction(serviceId, parsed.data.action)
   if ('error' in acted) return NextResponse.json({ error: acted.error }, { status: 502 })
+  await audit({
+    actor: { id: session.user.id, email: session.user.email },
+    action: 'project.coolify_service.action',
+    target: { type: 'coolify_service', id: serviceId },
+    organizationId: org.organizationId,
+    details: { projectId: id, serviceAction: parsed.data.action },
+    request,
+  })
   return NextResponse.json({ ok: true })
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string; serviceId: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string; serviceId: string }> }) {
   const session = await getSession()
   if (!session?.user?.id) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   const { id, serviceId } = await params
@@ -45,5 +54,13 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (!(await ensureOwned(result.project.slug, serviceId))) return NextResponse.json({ error: 'Service introuvable.' }, { status: 404 })
   const deleted = await deleteServiceInstance(serviceId)
   if ('error' in deleted) return NextResponse.json({ error: deleted.error }, { status: 502 })
+  await audit({
+    actor: { id: session.user.id, email: session.user.email },
+    action: 'project.coolify_service.delete',
+    target: { type: 'coolify_service', id: serviceId },
+    organizationId: org.organizationId,
+    details: { projectId: id },
+    request,
+  })
   return NextResponse.json({ ok: true })
 }
