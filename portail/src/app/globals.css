@@ -441,9 +441,11 @@
 /* Icônes de services/bases : plaque teintée par la couleur de marque (cohérent avec .framework-icon) */
 .service-icon {
   background-color: rgb(var(--brand-rgb) / 0.12);
-  color: rgb(var(--brand-rgb));
+  /* Teinte de marque assombrie : contraste AA garanti quelle que soit la couleur du logo. */
+  color: color-mix(in srgb, rgb(var(--brand-rgb)) 45%, black);
 }
 .dark .service-icon {
   background-color: rgb(var(--brand-rgb) / 0.18);
-  color: rgb(var(--brand-rgb));
+  /* Teinte de marque éclaircie pour le thème sombre. */
+  color: color-mix(in srgb, rgb(var(--brand-rgb)) 40%, white);
 }
