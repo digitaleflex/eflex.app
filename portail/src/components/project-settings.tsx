@@ -742,7 +742,29 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
             icon={Database}
             description="Gérez vos ressources actives et ajoutez des bases ou services depuis le catalogue unifié : disponibilité réelle de l’instance, capacités (sauvegarde, restauration, provider) et services référencés. Les connexions sont privées et injectées automatiquement."
           >
-            <ProjectDatabases projectId={project.id} />
+            <div className="space-y-6">
+              <ProjectDatabases projectId={project.id} />
+              <section aria-label="Volumes et fichiers persistants" className="space-y-2 border-t border-border pt-4">
+                <h4 className="text-sm font-semibold">Volumes et fichiers persistants (stratégie)</h4>
+                <p className="text-sm text-muted-foreground">
+                  Les volumes déclarés par le plan (ex. <code className="font-mono">VOLUME</code> Docker, stockage
+                  applicatif) contiennent des données clients distinctes des bases managées. EFLEX n’intègre pas encore de
+                  sauvegarde/restauration automatisée de ces volumes/fichiers.
+                </p>
+                <div className="rounded-lg border border-warning/20 bg-warning/10 p-3 text-xs space-y-2">
+                  <p className="font-medium text-foreground">Politique actuelle (sans fausse promesse)</p>
+                  <ul className="list-disc space-y-1 pl-4">
+                    <li><strong>Inventaire :</strong> volumes montés selon le plan/l’hébergement ; pas de catalogue de sauvegarde intégré.</li>
+                    <li><strong>Sauvegarde/restauration :</strong> à organiser selon l’infrastructure (export/copie de volume, stockage objet, sauvegardes Coolify si disponibles) et à <strong>tester régulièrement</strong> par restauration.</li>
+                    <li><strong>Redis/magasins en mémoire :</strong> aucun dump intégré ; à traiter comme cache/file sauf persistance et stratégie dédiée validée.</li>
+                    <li><strong>Suppression :</strong> la suppression d’un projet, d’une application ou d’un volume peut entraîner une perte de données ; sauvegardez avant toute action destructive.</li>
+                  </ul>
+                  <p className="text-muted-foreground">
+                    Références : <span className="font-mono">docs/operations/volumes.md</span>, <span className="font-mono">docs/operations/client-database-backups.md</span>, <span className="font-mono">docs/architecture/eflex/layers/11-backup-recovery.md</span>.
+                  </p>
+                </div>
+              </section>
+            </div>
           </SettingsSection>
 
           <SettingsSection
@@ -1049,7 +1071,7 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
                 <p className="mt-1 text-sm text-muted-foreground">
                   Le projet, ses variables chiffrées et son historique de déploiements seront supprimés définitivement.
                   {project.hasHostedApp
-                    ? ' L’application hébergée et ses conteneurs seront arrêtés au passage.'
+                    ? ' L’application hébergée et ses conteneurs seront arrêtés. Les volumes persistants, bases managées et fichiers de l’application peuvent être supprimés ou devenir irrécupérables selon l’hébergement : sauvegardez les données importantes avant de continuer.'
                     : ' Aucune application n’a encore été déployée.'}
                 </p>
               </div>
@@ -1111,7 +1133,10 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
         description={
           <>
             Le projet <span className="font-medium text-foreground">« {project.name} »</span>, ses variables chiffrées et son historique de déploiements seront supprimés.
-            {project.hasHostedApp ? ' L’application hébergée et ses conteneurs seront arrêtés.' : ''} Cette action est irréversible.
+            {project.hasHostedApp
+              ? ' L’application hébergée sera arrêtée. Les données persistantes (volumes/fichiers, bases managées, sauvegardes côté hébergement) peuvent être perdues : vérifiez qu’une sauvegarde exploitable et, si nécessaire, une copie hors site existent avant de confirmer.'
+              : ''}{' '}
+            Cette action est irréversible.
           </>
         }
         confirmLabel="Supprimer le projet"

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ArchiveRestore, CloudUpload, History, ShieldCheck } from 'lucide-react'
+import { ArchiveRestore, CloudUpload, Database, History, Info, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
@@ -14,6 +14,7 @@ interface Execution {
   size: number | null
   createdAt: string
   restorable: boolean
+  offsiteCopied: boolean | null
 }
 
 type RestoreState = { importId: string; backupCreatedAt: string; state: 'running' | 'finished' | 'failed' }
@@ -30,6 +31,8 @@ interface RestoreProof {
 
 interface BackupStatus {
   supported: boolean
+  kind: string
+  engineLabel?: string
   scheduled: boolean
   offsiteConfigured: boolean
   scheduleOffsite: boolean | null
@@ -41,6 +44,8 @@ interface BackupStatus {
     recent: Execution[]
   } | null
   restore: RestoreProof | null
+  unsupportedReason?: string | null
+  notes?: string[]
   error: string | null
   canManage: boolean
 }
@@ -98,17 +103,17 @@ const formatDate = (iso: string) =>
   new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
 
 function offsiteLabel(status: BackupStatus): { text: string; tone: 'muted' | 'warning' } {
-  if (status.scheduleOffsite) return { text: 'copie hors serveur (S3)', tone: 'muted' }
+  if (status.scheduleOffsite) return { text: 'copie hors serveur planifiée (S3)', tone: 'muted' }
   if (status.offsiteConfigured && status.scheduled) {
     return {
-      text: 'copies sur le serveur de la base uniquement (S3 configuré, à activer sur la planification dans Coolify)',
+      text: 'copies sur le serveur de la base uniquement (S3 configuré, à activer/vérifier sur la planification)',
       tone: 'warning',
     }
   }
   if (status.offsiteConfigured) {
     return { text: 'copie hors serveur possible (S3 configuré)', tone: 'muted' }
   }
-  return { text: 'copies sur le serveur de la base uniquement', tone: 'warning' }
+  return { text: 'copies sur le serveur de la base uniquement (pas de copie hors site)', tone: 'warning' }
 }
 
 function restoreProofText(restore: RestoreProof | null): string | null {
@@ -117,21 +122,61 @@ function restoreProofText(restore: RestoreProof | null): string | null {
     return `Restauration en cours (sauvegarde du ${formatDate(restore.backupCreatedAt)})`
   }
   if (restore.status === 'failed' && restore.finishedAt) {
-    return `Dernière restauration : échec le ${formatDate(restore.finishedAt)}`
+    return `Dernière restauration consignée : échec le ${formatDate(restore.finishedAt)}`
   }
   if (restore.lastSuccessfulAt) {
     const from = restore.lastSuccessfulBackupCreatedAt
       ? `, depuis la sauvegarde du ${formatDate(restore.lastSuccessfulBackupCreatedAt)}`
       : ''
-    return `Dernière restauration réussie le ${formatDate(restore.lastSuccessfulAt)}${from} (preuve consignée)`
+    return `Dernière restauration réussie consignée le ${formatDate(restore.lastSuccessfulAt)}${from}`
   }
   if (restore.status === 'finished' && restore.finishedAt) {
-    return `Dernière restauration terminée le ${formatDate(restore.finishedAt)}`
+    return `Dernière restauration consignée le ${formatDate(restore.finishedAt)}`
   }
   return null
 }
 
-/** Sauvegardes d'une base PostgreSQL managée : état, historique, sauvegarde immédiate, restauration. */
+function executionOffsiteText(execution: Execution, scheduleOffsite: boolean | null): string {
+  if (execution.status !== 'success') return '—'
+  if (execution.offsiteCopied === true) return 'Copie hors serveur (S3)'
+  if (scheduleOffsite) return 'Hors serveur non confirmé'
+  return 'Serveur uniquement'
+}
+
+function UnsupportedBackupPolicy({ status }: { status: BackupStatus }) {
+  const label = status.engineLabel ?? status.kind
+  return (
+    <section aria-label="Sauvegardes" className="mt-3 space-y-2 border-t border-border pt-3">
+      <p className="flex items-center gap-2 text-sm font-medium">
+        <ShieldAlert className="h-4 w-4 text-warning" aria-hidden="true" />
+        Sauvegardes et restauration
+      </p>
+      <div className="rounded-lg border border-warning/20 bg-warning/10 p-3 text-xs space-y-2">
+        <p className="font-medium text-foreground">
+          Aucun parcours de sauvegarde/restauration intégré EFLEX pour {label}.
+        </p>
+        {status.unsupportedReason && <p>{status.unsupportedReason}</p>}
+        {status.notes && status.notes.length > 0 && (
+          <ul className="list-disc space-y-1 pl-4">
+            {status.notes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        )}
+        <p className="text-muted-foreground">
+          Aucune sauvegarde automatique ni restauration assistée n’est garantie pour cette ressource. Si des
+          données durables sont stockées, mettez en place une stratégie adaptée au moteur (outils natifs,
+          export/volume, réplication) et testez régulièrement la restauration dans un environnement isolé.
+        </p>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * Sauvegardes/restauration d'une base managée : état, historique, actions et preuves.
+ * Dégradation explicite pour les moteurs sans parcours intégré (ex. Redis/cache).
+ */
 export function DatabaseBackups({ projectId, databaseId }: { projectId: string; databaseId: string }) {
   const [status, setStatus] = useState<BackupStatus | null>(null)
   const [loading, setLoading] = useState(true)
@@ -162,15 +207,11 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
     void load()
   }, [load])
 
-  // Si une restauration est en cours côté serveur (preuve), reprendre le suivi au chargement.
   useEffect(() => {
     if (!status?.restore || status.restore.status !== 'running' || restore) return
     if (!status.restore.backupCreatedAt) return
-    // L'importId n'est pas exposé dans le statut public ; on recharge simplement l'état.
-    // Le suivi actif (après clic) est géré ci-dessous via `restore`.
   }, [status, restore])
 
-  // Suivi de la restauration en cours, toutes les 3 s, jusqu'à son issue.
   useEffect(() => {
     if (!restore || restore.state !== 'running') return
     const timer = window.setTimeout(async () => {
@@ -250,7 +291,8 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
   }
 
   if (loading) return <p className="text-xs text-muted-foreground">Chargement des sauvegardes…</p>
-  if (!status?.supported) return null
+  if (!status) return null
+  if (!status.supported) return <UnsupportedBackupPolicy status={status} />
 
   const summary = status.summary
   const health = summary ? HEALTH[summary.health] : null
@@ -264,10 +306,12 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
         <div className="min-w-0 space-y-1">
           <p className="flex items-center gap-2 text-sm font-medium">
             <ShieldCheck className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            Sauvegardes
+            Sauvegardes et restauration
           </p>
           {!status.scheduled ? (
-            <p className="text-xs text-muted-foreground">Aucune sauvegarde planifiée pour cette base.</p>
+            <p className="text-xs text-muted-foreground">
+              Aucune sauvegarde planifiée pour cette base {status.engineLabel ? `(${status.engineLabel})` : ''}.
+            </p>
           ) : (
             <>
               {health && (
@@ -278,7 +322,7 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
               )}
               <p className="text-xs text-muted-foreground">
                 {summary?.lastSuccessAt
-                  ? `Dernière réussie le ${formatDate(summary.lastSuccessAt)}`
+                  ? `Dernière sauvegarde réussie le ${formatDate(summary.lastSuccessAt)}`
                   : 'Aucune sauvegarde réussie pour l’instant'}
                 {' · '}
                 {describeFrequency(status.frequency)}
@@ -287,8 +331,21 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
               </p>
             </>
           )}
-          {proof && <p className="text-xs text-muted-foreground">{proof}</p>}
+          {proof && (
+            <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+              <Database className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>{proof}</span>
+            </p>
+          )}
           {status.error && <p className="text-xs text-warning">État indisponible : {status.error}</p>}
+          <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>
+              « Sauvegarde réussie » signifie qu’un dump/exécution a abouti. « Copie hors serveur » dépend du stockage
+              S3 configuré. « Restauration consignée » prouve une restauration effectuée ; un test régulier en
+              environnement isolé reste recommandé.
+            </span>
+          </p>
         </div>
         {status.canManage && (
           <Button
@@ -334,7 +391,8 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
             <thead className="text-muted-foreground">
               <tr>
                 <th scope="col" className="py-1 pr-3 font-medium">Date</th>
-                <th scope="col" className="py-1 pr-3 font-medium">Résultat</th>
+                <th scope="col" className="py-1 pr-3 font-medium">Sauvegarde</th>
+                <th scope="col" className="py-1 pr-3 font-medium">Copie</th>
                 <th scope="col" className="py-1 pr-3 font-medium">Taille</th>
                 {status.canManage && (
                   <th scope="col" className="py-1 font-medium">
@@ -349,6 +407,9 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
                   <td className="py-1 pr-3">{execution.createdAt ? formatDate(execution.createdAt) : '—'}</td>
                   <td className={cn('py-1 pr-3', execution.status === 'failed' && 'text-destructive')}>
                     {EXECUTION[execution.status]}
+                  </td>
+                  <td className={cn('py-1 pr-3', execution.offsiteCopied === true ? 'text-foreground' : 'text-muted-foreground')}>
+                    {executionOffsiteText(execution, status.scheduleOffsite)}
                   </td>
                   <td className="py-1 pr-3">{formatBytes(execution.size)}</td>
                   {status.canManage && (
@@ -379,7 +440,7 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
         title="Restaurer cette sauvegarde ?"
         description={
           confirmRestore
-            ? `Les données actuelles de la base seront remplacées par celles du ${formatDate(confirmRestore.createdAt)}. Tout ce qui a été écrit depuis sera perdu. Conseil : lancez d’abord « Sauvegarder maintenant ».`
+            ? `Les données actuelles de la base seront remplacées par celles du ${formatDate(confirmRestore.createdAt)}. Tout ce qui a été écrit depuis sera perdu. Conseil : lancez d’abord « Sauvegarder maintenant ». Une restauration réussie sera consignée comme preuve, mais ne remplace pas un test régulier en environnement isolé.`
             : ''
         }
         confirmLabel="Restaurer"

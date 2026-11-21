@@ -51,6 +51,8 @@ WEEKLY_NAME="${WEEKLY_PREFIX}$(date +%G-W%V).dump.gz" # ISO : 2026-W45
 LOG="$BACKUP_DIR/backup.log"
 TMP=""
 OFFSITE_RESULT="skipped"
+OFFSITE_AT=""
+LOCAL_SUCCESS_AT=""
 
 log() {
   local line
@@ -215,25 +217,44 @@ prune() {
 
 run_offsite() {
   OFFSITE_RESULT="skipped"
+  OFFSITE_AT=""
   local cmd="${EFLEX_BACKUP_OFFSITE_CMD:-}"
   [ -n "$cmd" ] || return 0
   log "copie hors site : exécution de la commande configurée"
   export EFLEX_BACKUP_DIR EFLEX_BACKUP_FILE="$BACKUP_DIR/$DAILY_NAME" EFLEX_BACKUP_DB="$PG_DB"
   if bash -lc "$cmd" >>"$LOG" 2>&1; then
     OFFSITE_RESULT="ok"
+    OFFSITE_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     log "copie hors site : OK"
     return 0
   fi
   OFFSITE_RESULT="error"
-  fail "copie hors site : la commande configurée a échoué (voir $LOG)"
+  OFFSITE_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  log "[ERREUR] copie hors site : la commande configurée a échoué (voir $LOG)"
+  return 1
 }
 
+# Écrit backup.status. Distingue explicitement :
+# - sauvegarde locale réussie (archive vérifiée sur ce disque) : local_success_at / last_file
+# - copie hors site : offsite=skipped|ok|error (+ offsite_at)
+# - succès global : last_success_at n'est renseigné que si la sauvegarde est complète
+#   (locale OK et copie hors site OK ou non configurée). En cas d'échec de copie hors site,
+#   last_success_at est vidé pour refléter l'absence de garantie hors site, tout en conservant
+#   la preuve locale (local_success_at).
 write_status() {
   local status_file="$BACKUP_DIR/backup.status"
-  local now
-  now="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-  printf 'last_success_at=%s\nlast_file=%s\nlast_db=%s\noffsite=%s\n' \
-    "$now" "$DAILY_NAME" "$PG_DB" "$OFFSITE_RESULT" >"$status_file"
+  local overall_at=""
+  if [ -n "$LOCAL_SUCCESS_AT" ] && [ "$OFFSITE_RESULT" != "error" ]; then
+    overall_at="$LOCAL_SUCCESS_AT"
+  fi
+  {
+    printf 'local_success_at=%s\n' "${LOCAL_SUCCESS_AT}"
+    printf 'last_file=%s\n' "${DAILY_NAME}"
+    printf 'last_db=%s\n' "${PG_DB}"
+    printf 'offsite=%s\n' "${OFFSITE_RESULT}"
+    printf 'offsite_at=%s\n' "${OFFSITE_AT}"
+    printf 'last_success_at=%s\n' "${overall_at}"
+  } >"$status_file"
   chmod 600 "$status_file"
 }
 
@@ -249,12 +270,23 @@ main() {
   publish
   prune "$DAILY_PREFIX" "$DAILY_KEEP"
   prune "$WEEKLY_PREFIX" "$WEEKLY_KEEP"
-  run_offsite
+
+  # À ce stade la sauvegarde locale est vérifiée et publiée : preuve locale exploitable.
+  LOCAL_SUCCESS_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  write_status
+
+  local offsite_rc=0
+  run_offsite || offsite_rc=$?
   write_status
 
   local count size_total
   count="$(find "$BACKUP_DIR" -maxdepth 1 -type f \( -name "${DAILY_PREFIX}*" -o -name "${WEEKLY_PREFIX}*" \) | wc -l)"
   size_total="$(du -sh -- "$BACKUP_DIR" 2>/dev/null | cut -f1)"
+
+  if [ "$offsite_rc" -ne 0 ]; then
+    log "=== fin sauvegarde : ÉCHEC partiel (locale OK, copie hors site en erreur ; ${count} archive(s), ${size_total}) ==="
+    exit 1
+  fi
   log "=== fin sauvegarde : OK (${count} archive(s), ${size_total} au total, copie hors site=${OFFSITE_RESULT}) ==="
 }
 

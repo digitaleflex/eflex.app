@@ -1,5 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { DatabaseBackupSchedule } from '@/lib/coolify'
+
+vi.mock('@/lib/coolify-capabilities', () => ({
+  getCoolifyRuntimeCapabilities: async () => ({
+    version: '4.7.5',
+    reachable: true,
+    databaseApiAvailable: true,
+    checkedAt: Date.now(),
+  }),
+  resetCoolifyCapabilitiesCache: () => undefined,
+}))
+
 import {
   DEFAULT_BACKUP_FREQUENCY,
   backupNeedsAlert,
@@ -60,9 +71,18 @@ describe('backupSettings', () => {
 })
 
 describe('backupSupported', () => {
-  it('ne concerne que PostgreSQL (Coolify ne sauvegarde pas Redis)', async () => {
+  it('reflète les capacités réelles par moteur (sans promesse implicite)', async () => {
+    // PostgreSQL, MySQL, MariaDB, MongoDB : candidats à l’adaptateur Coolify générique (instance joignable).
     await expect(backupSupported('postgresql')).resolves.toBe(true)
+    await expect(backupSupported('mysql')).resolves.toBe(true)
+    await expect(backupSupported('mariadb')).resolves.toBe(true)
+    await expect(backupSupported('mongodb')).resolves.toBe(true)
+    // Redis/magasins en mémoire et moteurs sans parcours intégré : non supportés.
     await expect(backupSupported('redis')).resolves.toBe(false)
+    await expect(backupSupported('dragonfly')).resolves.toBe(false)
+    await expect(backupSupported('keydb')).resolves.toBe(false)
+    await expect(backupSupported('clickhouse')).resolves.toBe(false)
+    await expect(backupSupported('sqlite')).resolves.toBe(false)
   })
 })
 
@@ -229,7 +249,7 @@ describe('restoreSourceFor', () => {
     expect(restoreSourceFor({ status: 'success', filename: null, localDeleted: false, s3Uploaded: false })).toBeNull()
   })
 
-  it('ne renvoie jamais le chemin du fichier à l’interface', () => {
+  it('ne renvoie jamais le chemin du fichier à l’interface et expose le statut de copie hors serveur', () => {
     const view = toPublicExecution({
       id: 'e1',
       status: 'success',
@@ -237,9 +257,38 @@ describe('restoreSourceFor', () => {
       createdAt: '2026-11-16T02:00:00Z',
       ...base,
       localDeleted: false,
+      s3Uploaded: true,
+    })
+    expect(view).toEqual({
+      id: 'e1',
+      status: 'success',
+      size: 10,
+      createdAt: '2026-11-16T02:00:00Z',
+      restorable: true,
+      offsiteCopied: true,
+    })
+    expect(JSON.stringify(view)).not.toContain('/data/')
+
+    const localOnly = toPublicExecution({
+      id: 'e2',
+      status: 'success',
+      size: 10,
+      createdAt: '2026-11-16T02:00:00Z',
+      ...base,
+      localDeleted: false,
       s3Uploaded: false,
     })
-    expect(view).toEqual({ id: 'e1', status: 'success', size: 10, createdAt: '2026-11-16T02:00:00Z', restorable: true })
-    expect(JSON.stringify(view)).not.toContain('/data/')
+    expect(localOnly.offsiteCopied).toBe(false)
+
+    const failed = toPublicExecution({
+      id: 'e3',
+      status: 'failed',
+      size: null,
+      createdAt: '2026-11-16T02:00:00Z',
+      filename: null,
+      localDeleted: false,
+      s3Uploaded: false,
+    })
+    expect(failed.offsiteCopied).toBeNull()
   })
 })

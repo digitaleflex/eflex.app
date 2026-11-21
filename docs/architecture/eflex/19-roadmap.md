@@ -16,13 +16,13 @@ La roadmap privilégie la protection des clients existants, la réduction du tra
 
 ## Phase 1 — Backup & Recovery (P0)
 
-- Externaliser la sauvegarde de la base E-FLEX ; vérifier les clés et la procédure de reconstruction.
-- Bases clientes PostgreSQL (#130) : planification, UI, restauration assistée et alertes en place ; généraliser la copie hors site (S3) et les tests réguliers de restauration.
-- Définir une stratégie distincte pour volumes/fichiers (et Redis si données durables).
+- Externaliser la sauvegarde de la base E-FLEX ; configurer la copie hors site, la vérification des preuves (`healthcheck.sh`) et des tests de restauration réguliers archivés ; vérifier les clés et la procédure de reconstruction.
+- Bases clientes : parcours intégré (planification, UI, alertes, restauration assistée, preuves consignées) étendu aux moteurs supportés via Coolify/adaptateur générique quand les capacités le permettent ; généraliser la copie hors site (S3) vérifiée et les tests réguliers de restauration en environnement isolé par moteur.
+- Volumes/fichiers clients et Redis durable : politique/inventaire explicites et garde-fous en place ; mettre en œuvre des sauvegardes/restaurations automatisées ou procédures outillées là où l’infrastructure le permet, avec preuves.
 - Ajouter statut, rétention et preuves de restauration par ressource.
-- Protéger les suppressions d'applications/volumes/bases.
+- Renforcer les garde-fous de suppressions d'applications/volumes/bases (sauvegarde préalable, confirmations).
 
-**Sortie :** sauvegarde hors site et restauration réellement testée pour les ressources annoncées.
+**Sortie :** sauvegarde hors site vérifiée et restauration réellement testée pour les ressources annoncées.
 
 ## Phase 2 — Observability des sites clients (P0/P1)
 
