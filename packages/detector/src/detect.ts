@@ -27,7 +27,7 @@ import { detectSolidStart } from './detectors/solidstart.js';
 import { detectRedwoodjs } from './detectors/redwoodjs.js';
 import { detectNest, detectNodeFallback, detectServerFramework } from './detectors/node.js';
 import { detectPython } from './detectors/python.js';
-import { detectStaticBuild, detectStaticIndex } from './detectors/static.js';
+import { detectStaticBuild, detectStaticIndex, hasRootHtmlFiles } from './detectors/static.js';
 
 /** Path segments that never participate in detection. */
 export const IGNORED_SEGMENTS = new Set([
@@ -508,7 +508,75 @@ export function detectAt(view: RepoView, root: string, allowMonorepo: boolean): 
   // Step 3: manifest-based detection, first match wins.
   const candidates = collectCandidates(ctx);
   const primary = candidates[0];
-  if (!primary) return unknownResult();
+  if (!primary) {
+    const htmlFiles = hasRootHtmlFiles(ctx);
+    if (htmlFiles.length > 0) {
+      if (htmlFiles.length === 1) {
+        const only = htmlFiles[0] ?? 'index.html';
+        return {
+          plan: {
+            version: 1,
+            framework: 'static',
+            runtime: 'static@1',
+            root: '',
+            port: 80,
+          },
+          confidence: 0.7,
+          framework: 'static',
+          reasons: [
+            `Un seul fichier HTML a été détecté à la racine (\`${only}\`) : site statique probable.`,
+          ],
+          warnings: [
+            `Aucun \`index.html\` n'a été trouvé. Le fichier \`${only}\` sera servi comme page d'accueil lors du déploiement.`,
+          ],
+          questions: [],
+          alternatives: [],
+        };
+      }
+
+      const listed = htmlFiles.slice(0, 5).map((file) => `\`${file}\``).join(', ');
+      const extra = htmlFiles.length > 5 ? ` (+${htmlFiles.length - 5} autre${htmlFiles.length - 5 > 1 ? 's' : ''})` : '';
+      return {
+        plan: null,
+        confidence: 0.4,
+        framework: null,
+        reasons: [
+          `Des fichiers HTML ont été détectés à la racine (${listed}${extra}), mais aucun \`index.html\` ou \`index.htm\` n'a été trouvé.`,
+        ],
+        warnings: [
+          'Un site statique doit avoir un fichier `index.html` à la racine pour être servi correctement. Renommez votre page d\'accueil en `index.html`, ou ajoutez un `Dockerfile` / `eflex.json`.',
+        ],
+        questions: [stackQuestion()],
+        alternatives: [],
+      };
+    }
+
+    const rootFiles = ctx.list().filter((file) => !file.includes('/'));
+    const webAssets = rootFiles.filter((file) => /\.(css|js|mjs|cjs|png|jpe?g|gif|svg|ico|webp|avif|woff2?|ttf|eot)$/i.test(file));
+    const hostingSignals = ['_redirects', '_headers', 'netlify.toml', 'vercel.json', 'staticwebapp.config.json', 'CNAME', '.nojekyll'].filter((file) => ctx.has(file));
+    if (webAssets.length > 0 || hostingSignals.length > 0) {
+      const reasons = webAssets.length > 0
+        ? ['Des fichiers web (CSS/JS/images) ont été détectés à la racine, mais aucun fichier HTML n’a été trouvé.']
+        : [`Des signaux d'hébergement statique ont été détectés (${hostingSignals.map((f) => `\`${f}\``).join(', ')}), mais aucun fichier HTML n'a été trouvé.`];
+      const warnings = [
+        'Pour un site statique, ajoutez un fichier `index.html` à la racine. S’il s’agit d’une application avec build, ajoutez son manifeste ou un `Dockerfile`.',
+      ];
+      if (hostingSignals.length > 0 && webAssets.length > 0) {
+        warnings.push(`Signaux d'hébergement statique détectés : ${hostingSignals.map((f) => `\`${f}\``).join(', ')}.`);
+      }
+      return {
+        plan: null,
+        confidence: hostingSignals.length > 0 ? 0.45 : 0.35,
+        framework: null,
+        reasons,
+        warnings,
+        questions: [stackQuestion()],
+        alternatives: [],
+      };
+    }
+
+    return unknownResult();
+  }
 
   return finalizeCandidate(primary, candidates.slice(1).map((candidate) => candidate.plan));
 }

@@ -88,8 +88,16 @@ export function generateDockerfile(plan: BuildPlan): string | null {
     lines.push('');
     lines.push('FROM nginx:1.27-alpine');
     // Sans build, ce sont les fichiers du dépôt qui sont publiés tels quels.
-    const publishDir = plan.build ? 'dist' : '.';
+    const publishDir = plan.publish ?? (plan.build ? 'dist' : '.');
     lines.push(`COPY --from=assets /app/${publishDir} /usr/share/nginx/html`);
+    lines.push(
+      "RUN if [ ! -e /usr/share/nginx/html/index.html ] && [ ! -e /usr/share/nginx/html/index.htm ]; then " +
+        "f=$(find /usr/share/nginx/html -maxdepth 1 -type f \\( -iname 'index.html' -o -iname 'index.htm' -o -iname 'index.xhtml' \\) | head -n 1); " +
+        'if [ -z "$f" ]; then c=$(find /usr/share/nginx/html -maxdepth 1 -type f \\( -iname \'*.html\' -o -iname \'*.htm\' -o -iname \'*.xhtml\' \\) | wc -l); ' +
+        "if [ \"$c\" -eq 1 ]; then f=$(find /usr/share/nginx/html -maxdepth 1 -type f \\( -iname '*.html' -o -iname '*.htm' -o -iname '*.xhtml' \\) | head -n 1); fi; fi; " +
+        'if [ -n "$f" ]; then cp "$f" /usr/share/nginx/html/index.html; fi; ' +
+        'fi',
+    );
     lines.push('EXPOSE 80');
     lines.push('');
     return lines.join('\n') + '\n';

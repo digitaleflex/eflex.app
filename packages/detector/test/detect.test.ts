@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { detect, detectApplication, scoreConfidence } from '../src/index.js';
 import {
   allFixtures,
+  makeSnapshot,
   astro,
   composeMonorepoApp,
   composeRoot,
@@ -218,6 +219,77 @@ describe('detect', () => {
     expect(result.plan?.runtime).toBe('static@1');
     expect(result.plan?.port).toBe(80);
     expect(result.confidence).toBe(0.8);
+  });
+
+  it('detects a static site with index.htm', () => {
+    const result = detect(makeSnapshot({ 'index.htm': '<!doctype html><h1>Bonjour</h1>\n' }));
+
+    expect(result.framework).toBe('static');
+    expect(result.plan?.runtime).toBe('static@1');
+    expect(result.plan?.port).toBe(80);
+    expect(result.confidence).toBe(0.8);
+  });
+
+  it('detects a static site with case-insensitive index filename', () => {
+    const result = detect(makeSnapshot({ 'Index.html': '<!doctype html><h1>Bonjour</h1>\n' }));
+
+    expect(result.framework).toBe('static');
+    expect(result.plan?.runtime).toBe('static@1');
+    expect(result.confidence).toBe(0.8);
+    expect(result.warnings.join(' ')).toContain('sensible à la casse');
+  });
+
+  it('detects a static site in a common public subdirectory', () => {
+    const result = detect(
+      makeSnapshot({
+        'public/index.html': '<!doctype html><h1>Bonjour</h1>\n',
+        'public/style.css': 'body { color: red; }\n',
+      }),
+    );
+
+    expect(result.framework).toBe('static');
+    expect(result.plan?.runtime).toBe('static@1');
+    expect(result.plan?.publish).toBe('public');
+    expect(result.confidence).toBe(0.75);
+    expect(result.warnings.join(' ')).toContain('public/');
+  });
+
+  it('detects a static site in a docs subdirectory', () => {
+    const result = detect(makeSnapshot({ 'docs/index.html': '<!doctype html><h1>Docs</h1>\n' }));
+
+    expect(result.framework).toBe('static');
+    expect(result.plan?.publish).toBe('docs');
+  });
+
+  it('detects index.xhtml as a static site', () => {
+    const result = detect(makeSnapshot({ 'index.xhtml': '<!doctype html><h1>Bonjour</h1>\n' }));
+
+    expect(result.framework).toBe('static');
+    expect(result.plan?.runtime).toBe('static@1');
+  });
+
+  it('detects a single non-index HTML file as a static site', () => {
+    const result = detect(makeSnapshot({ 'home.html': '<!doctype html><h1>Accueil</h1>\n' }));
+
+    expect(result.framework).toBe('static');
+    expect(result.plan?.runtime).toBe('static@1');
+    expect(result.plan?.port).toBe(80);
+    expect(result.confidence).toBe(0.7);
+    expect(result.warnings.join(' ')).toContain('home.html');
+  });
+
+  it('reports a helpful reason when multiple HTML files exist without index.html', () => {
+    const result = detect(
+      makeSnapshot({
+        'home.html': '<!doctype html><h1>Accueil</h1>\n',
+        'contact.html': '<!doctype html><h1>Contact</h1>\n',
+      }),
+    );
+
+    expect(result.plan).toBeNull();
+    expect(result.framework).toBeNull();
+    expect(result.reasons.join(' ')).toContain('home.html');
+    expect(result.warnings.join(' ')).toContain('index.html');
   });
 
   it('detects a Dockerfile with confidence 0.99 and default port 3000', () => {

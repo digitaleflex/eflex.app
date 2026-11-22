@@ -112,6 +112,21 @@ describe('buildDeploymentArtifacts', () => {
     expect(artifacts.portsExposes).toBe(80);
     expect(artifacts.services).toContain('web');
     expect(artifacts.buildPack).toBe('dockercompose');
+    expect(artifacts.dockerfile).toContain('index.html');
+    expect(artifacts.dockerfile).toContain('find /usr/share/nginx/html');
+  });
+
+  it('Site statique sans build : respecte publish', () => {
+    const plan: BuildPlan = {
+      version: 1,
+      framework: 'static',
+      runtime: 'static@1',
+      root: '',
+      publish: 'docs',
+      port: 80,
+    };
+    const artifacts = buildDeploymentArtifacts(plan, { projectId: 'site-proj' });
+    expect(artifacts.dockerfile).toContain('COPY --from=assets /app/docs /usr/share/nginx/html');
   });
 
   it('framework docker : build pack dockerfile, aucun Dockerfile généré', () => {

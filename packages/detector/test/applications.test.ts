@@ -3,6 +3,7 @@ import { detectApplications, normalizeApplicationName } from '../src/index.js';
 import {
   composeMonorepoApp,
   composeRoot,
+  makeSnapshot,
   monorepoDeepApp,
   monorepoDuplicateNames,
   monorepoMultiple,
@@ -134,6 +135,44 @@ describe('detectApplications', () => {
     };
 
     expect(detectApplications(reversed)).toEqual(detectApplications(monorepoNx));
+  });
+
+  it('découvre une application statique simple dans un monorepo', () => {
+    const apps = detectApplications(
+      makeSnapshot({
+        'pnpm-workspace.yaml': 'packages:\n  - "apps/*"\n',
+        'apps/landing/index.html': '<!doctype html><h1>Landing</h1>\n',
+        'apps/landing/style.css': 'body{}',
+        'apps/web/package.json': JSON.stringify({
+          name: 'web',
+          scripts: { build: 'next build', start: 'next start' },
+          dependencies: { next: '14.2.0' },
+        }),
+        'apps/web/next.config.js': 'module.exports = {};\n',
+      }),
+    );
+
+    expect(summary(apps)).toEqual([
+      { root: 'apps/landing', name: 'landing', framework: 'static' },
+      { root: 'apps/web', name: 'web', framework: 'nextjs' },
+    ]);
+  });
+
+  it('n’interprète pas un dossier public d’assets comme une application statique', () => {
+    const apps = detectApplications(
+      makeSnapshot({
+        'pnpm-workspace.yaml': 'packages:\n  - "apps/*"\n',
+        'apps/web/package.json': JSON.stringify({
+          name: 'web',
+          scripts: { build: 'next build', start: 'next start' },
+          dependencies: { next: '14.2.0' },
+        }),
+        'apps/web/next.config.js': 'module.exports = {};\n',
+        'apps/web/public/index.html': '<!doctype html><h1>Asset</h1>\n',
+      }),
+    );
+
+    expect(summary(apps)).toEqual([{ root: 'apps/web', name: 'web', framework: 'nextjs' }]);
   });
 });
 

@@ -15,6 +15,8 @@ export const APP_MANIFESTS = [
   'compose.yaml',
 ];
 
+const STATIC_INDEX_MANIFESTS = new Set(['index.html', 'index.htm']);
+
 export function isMonorepo(ctx: DetectionContext): boolean {
   if (MONOREPO_MARKERS.some((file) => ctx.hasRepo(file))) return true;
 
@@ -61,21 +63,56 @@ export function discoverApps(
 ): string[] {
   const prefix = root === '' ? '' : `${root}/`;
   const maxDepth = normalizeDepth(options.maxDepth);
-  const apps = new Set<string>();
+  const dirsWithRealManifest = new Set<string>();
+  const dirsWithIndex = new Set<string>();
 
   for (const file of files) {
     if (!file.startsWith(prefix)) continue;
     const relative = file.slice(prefix.length);
     const parts = relative.split('/');
     const basename = parts[parts.length - 1];
-    if (!basename || !APP_MANIFESTS.includes(basename)) continue;
+    if (!basename) continue;
 
     const directoryParts = parts.slice(0, -1);
     if (directoryParts.length < 1 || directoryParts.length > maxDepth) continue;
-
     const directory = directoryParts.join('/');
     if (directory === '') continue;
-    apps.add(root === '' ? directory : `${root}/${directory}`);
+    const fullDir = root === '' ? directory : `${root}/${directory}`;
+
+    if (APP_MANIFESTS.includes(basename)) {
+      dirsWithRealManifest.add(fullDir);
+    } else if (STATIC_INDEX_MANIFESTS.has(basename.toLowerCase())) {
+      dirsWithIndex.add(fullDir);
+    }
+  }
+
+  const IGNORED_INDEX_ONLY_DIRS = new Set([
+    'public',
+    'assets',
+    'asset',
+    'images',
+    'img',
+    'icons',
+    'icon',
+    'css',
+    'styles',
+    'style',
+    'js',
+    'scripts',
+    'script',
+    'fonts',
+    'font',
+    'media',
+    'vendor',
+    'node_modules',
+  ]);
+
+  const apps = new Set<string>(dirsWithRealManifest);
+  for (const dir of dirsWithIndex) {
+    if (dirsWithRealManifest.has(dir)) continue;
+    const base = dir.split('/').pop()?.toLowerCase() ?? '';
+    if (IGNORED_INDEX_ONLY_DIRS.has(base)) continue;
+    apps.add(dir);
   }
 
   return [...apps].sort((a, b) => a.localeCompare(b));
