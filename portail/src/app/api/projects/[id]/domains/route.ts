@@ -4,7 +4,7 @@ import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { audit } from '@/lib/audit'
 import { canManageProjects } from '@/lib/organizations'
-import { platformDomain, validateCustomDomain } from '@/lib/custom-domain'
+import { dnsInstruction, platformDomain, validateCustomDomain } from '@/lib/custom-domain'
 import { effectivePlan } from '@/lib/billing'
 import { getPrimaryApp, resolveEffectiveApp } from '@/lib/project-primary'
 import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
@@ -192,7 +192,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       {
         domain: serialize(domain),
         target: platformDomain(),
-        instructions: `Créez un enregistrement CNAME « ${hostname} » vers « ${platformDomain() ?? 'eflex.app'} », puis cliquez sur Vérifier.`,
+        instructions: `${dnsInstruction(hostname, platformDomain() ?? 'eflex.app')} Puis cliquez sur Vérifier.`,
       },
       { status: 201 },
     )

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { Prisma } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { projectDeleteBlockedReason } from '@/lib/project-delete-guard'
 import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { publish } from '@/lib/event-bus'
 import { audit } from '@/lib/audit'
@@ -246,6 +247,11 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   })
   if ('response' in projectResult) return projectResult.response
   const project = projectResult.project
+
+  // Garde-fou serveur (#175) : un projet qui porte des bases managées ne se supprime pas sur un simple appel d'API.
+  // L'interface demande déjà de saisir le nom ; ici on exige la même confirmation côté serveur.
+  const blocked = projectDeleteBlockedReason(project, await request.json().catch(() => null))
+  if (blocked) return NextResponse.json({ error: blocked, code: 'confirmation_required' }, { status: 409 })
 
   // Applications Coolify du projet (D2) : une par `ProjectApp`, avec repli sur
   // le miroir `Project.coolifyAppId` pendant la transition. Un échec annule la

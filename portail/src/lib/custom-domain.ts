@@ -47,6 +47,28 @@ export function validateCustomDomain(input: string): CustomDomainValidation {
   return { hostname }
 }
 
+const SECOND_LEVEL_LABELS = new Set(['co', 'com', 'org', 'net', 'gov', 'edu', 'ac', 'or', 'ne'])
+
+/**
+ * Le nom est-il un domaine racine (apex) ? Un CNAME y est interdit par le DNS chez la plupart des fournisseurs.
+ * Approximation sans liste des suffixes publics : `exemple.com` et `exemple.co.uk` sont des racines, `app.exemple.com` non.
+ */
+export function isLikelyApexDomain(hostname: string): boolean {
+  const labels = hostname.trim().toLowerCase().replace(/\.$/, '').split('.').filter(Boolean)
+  if (labels.length <= 2) return true
+  return labels.length === 3 && labels[2]!.length === 2 && SECOND_LEVEL_LABELS.has(labels[1]!)
+}
+
+/** Consigne DNS en français adaptée au nom : CNAME pour un sous-domaine, enregistrement A pour la racine. */
+export function dnsInstruction(hostname: string, target: string, platformIps: string[] = []): string {
+  const proxyNote = ' Si votre DNS passe par Cloudflare, laissez le proxy désactivé (nuage gris) jusqu’à la validation du domaine.'
+  if (isLikelyApexDomain(hostname)) {
+    const ips = platformIps.length > 0 ? ` vers ${platformIps.join(', ')}` : ' vers l’adresse de la plateforme affichée dans l’assistant DNS'
+    return `« ${hostname} » est un domaine racine : un CNAME y est le plus souvent refusé. Créez un enregistrement A${ips} (et AAAA seulement si une adresse IPv6 est indiquée).${proxyNote} Si votre fournisseur propose un CNAME aplati ou ALIAS, vous pouvez le diriger vers ${target}.`
+  }
+  return `Créez un enregistrement CNAME « ${hostname} » vers « ${target} ». À défaut, un enregistrement A vers l’adresse de la plateforme fonctionne aussi, mais devra être mis à jour si elle change.${proxyNote}`
+}
+
 export interface DnsCheck {
   ok: boolean
   target: string | null
@@ -92,7 +114,7 @@ export async function checkDomainDns(hostname: string): Promise<DnsCheck> {
       cname: null,
       ips,
       platformIps,
-      error: `Aucune adresse DNS pour ${hostname}. Créez un CNAME vers ${target}.`,
+      error: `Aucune adresse DNS pour ${hostname}. ${dnsInstruction(hostname, target, platformIps)}`,
     }
   }
 
@@ -103,6 +125,6 @@ export async function checkDomainDns(hostname: string): Promise<DnsCheck> {
     cname: null,
     ips,
     platformIps,
-    error: ok ? null : `Le domaine ne pointe pas vers ${target}. Créez un CNAME vers ${target}.`,
+    error: ok ? null : `Le domaine ne pointe pas vers la plateforme. ${dnsInstruction(hostname, target, platformIps)}`,
   }
 }
