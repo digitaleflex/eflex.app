@@ -87,3 +87,25 @@ describe('contrôle de santé', () => {
     for (const bad of ['a;b', 'a$(id)', 'a"b', 'a`b', 'a|b', 'a&b']) expect(WATCH_PATH_PATTERN.test(bad)).toBe(false)
   })
 })
+
+describe('plafonds par plan (#131)', () => {
+  it('chaque plan a son plafond, croissant', async () => {
+    const { resourceCapsForPlan } = await import('./app-config-validation')
+    expect(resourceCapsForPlan('free', {})).toEqual({ maxMemoryMb: 512, maxCpus: 0.5 })
+    expect(resourceCapsForPlan('agency', {})).toEqual({ maxMemoryMb: 4096, maxCpus: 4 })
+    expect(resourceCapsForPlan('inconnu', {})).toEqual({ maxMemoryMb: 512, maxCpus: 0.5 })
+  })
+  it('le plafond global de l’opérateur reste prioritaire quand il est plus bas', async () => {
+    const { resourceCapsForPlan } = await import('./app-config-validation')
+    expect(resourceCapsForPlan('agency', { APP_LIMIT_MAX_MEMORY_MB: '1024', APP_LIMIT_MAX_CPUS: '1' })).toEqual({
+      maxMemoryMb: 1024,
+      maxCpus: 1,
+    })
+  })
+  it('refuse une mémoire au-dessus du plan', async () => {
+    const { resourceCapsForPlan, checkLimit } = await import('./app-config-validation')
+    const caps = resourceCapsForPlan('free', {})
+    expect(checkLimit('limitsMemory', '1g', caps).kind).toBe('error')
+    expect(checkLimit('limitsMemory', '256m', caps).kind).toBe('keep')
+  })
+})
