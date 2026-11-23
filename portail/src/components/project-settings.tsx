@@ -730,7 +730,7 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
         id="domaines"
         title="Domaines"
         icon={Globe}
-        description="Le domaine EFLEX reste stable. Ajoutez vos propres domaines avec un CNAME ; le certificat SSL est émis automatiquement après vérification."
+        description="Le domaine EFLEX reste stable. Ajoutez vos propres domaines : un CNAME pour un sous-domaine, un enregistrement A pour un domaine racine. Le certificat SSL est émis automatiquement après vérification."
       >
         <ProjectDomains projectId={project.id} apps={apps.map((app) => ({ id: app.id, name: app.name }))} />
       </SettingsSection>
