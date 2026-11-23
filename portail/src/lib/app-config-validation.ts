@@ -27,6 +27,29 @@ const floatFromEnv = (raw: string | undefined, fallback: number, min: number, ma
   return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback
 }
 
+/**
+ * Plafonds par plan (issue #131). `APP_LIMIT_MAX_MEMORY_MB` / `APP_LIMIT_MAX_CPUS`, quand ils sont définis,
+ * restent un plafond global que l'opérateur peut imposer au-dessus de tous les plans.
+ */
+export const PLAN_RESOURCE_CAPS: Record<'free' | 'starter' | 'pro' | 'agency', ResourceCaps> = {
+  free: { maxMemoryMb: 512, maxCpus: 0.5 },
+  starter: { maxMemoryMb: 1024, maxCpus: 1 },
+  pro: { maxMemoryMb: 2048, maxCpus: 2 },
+  agency: { maxMemoryMb: 4096, maxCpus: 4 },
+}
+
+export function resourceCapsForPlan(
+  planId: string | null | undefined,
+  env: Record<string, string | undefined> = process.env,
+): ResourceCaps {
+  const plan = PLAN_RESOURCE_CAPS[(planId as keyof typeof PLAN_RESOURCE_CAPS) ?? 'free'] ?? PLAN_RESOURCE_CAPS.free
+  const global = resourceCaps(env)
+  return {
+    maxMemoryMb: env.APP_LIMIT_MAX_MEMORY_MB ? Math.min(plan.maxMemoryMb, global.maxMemoryMb) : plan.maxMemoryMb,
+    maxCpus: env.APP_LIMIT_MAX_CPUS ? Math.min(plan.maxCpus, global.maxCpus) : plan.maxCpus,
+  }
+}
+
 export function resourceCaps(env: Record<string, string | undefined> = process.env): ResourceCaps {
   return {
     maxMemoryMb: intFromEnv(env.APP_LIMIT_MAX_MEMORY_MB, 2048, 64, 1_048_576),

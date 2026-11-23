@@ -40,3 +40,21 @@ Ces comportements sont décrits comme des possibilités dépendantes de l’infr
 5. **Validation en environnement réel** : vérifier le comportement au dépassement (throttling/OOM/disque plein) sur l’infrastructure cible et documenter les résultats observés.
 
 Tant que ces points ne sont pas réalisés, le portail doit continuer à présenter les ressources d’exécution comme **non imposées par le plan** et à décrire les dépassements comme dépendants de l’hébergement.
+
+## Mise à jour du 23/11 — plafonds par plan (incrément #131)
+
+Quand un client saisit une limite CPU/mémoire dans la configuration applicative, E-FLEX la **refuse** au-delà du plafond de son plan
+(`PLAN_RESOURCE_CAPS`, `lib/app-config-validation.ts`) :
+
+| Plan | Mémoire max | CPU max |
+|---|---|---|
+| Découverte | 512 Mo | 0,5 |
+| Starter | 1 024 Mo | 1 |
+| Pro | 2 048 Mo | 2 |
+| Agence | 4 096 Mo | 4 |
+
+`APP_LIMIT_MAX_MEMORY_MB` et `APP_LIMIT_MAX_CPUS`, s'ils sont définis, restent un plafond global qui l'emporte quand il est plus bas.
+
+**Ce que cela ne fait pas** : une application qui n'a *aucune* limite configurée reste sans limite côté Coolify (valeur par défaut). Le plafond
+borne ce que le client peut saisir ; il n'applique pas de limite à sa place. Appliquer le plafond du plan par défaut au déploiement demande une
+validation sur un vrai Coolify (effets sur les builds, redémarrages OOM) et n'est pas fait ici. Le statut `perPlanExecutionEnforced` reste donc `false`.
