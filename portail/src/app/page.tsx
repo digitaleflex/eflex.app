@@ -49,9 +49,9 @@ export default function HomePage() {
                 className="mt-7 animate-reveal text-balance font-extrabold tracking-tight text-foreground [font-size:clamp(2.75rem,7vw,5.5rem)] [line-height:1.02]"
                 style={{ '--d': '70ms' } as CSSProperties}
               >
-                <span className="block">Connectez votre code.</span>
+                <span className="block">Concentrez-vous sur votre code.</span>
                 <span className="mt-1 block sm:mt-2">
-                  <span className="text-primary">EFLEX</span> s’occupe du reste.
+                  <span className="text-primary">EFLEX</span> s’occupe du déploiement.
                 </span>
               </h1>
 
