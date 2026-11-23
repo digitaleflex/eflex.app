@@ -568,6 +568,8 @@ model Organization {
    */
   suspendedAt      DateTime?
   suspensionReason String?              @db.Text
+  /// Réseau Docker dédié (destination Coolify), créé à la demande quand EFLEX_ORG_NETWORKS=1 (S5, #171).
+  coolifyDestinationUuid String?
   createdAt        DateTime             @default(now())
   members          Member[]
   invitations      Invitation[]

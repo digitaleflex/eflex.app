@@ -1,3 +1,4 @@
+import { inOrganizationNetwork } from '@/lib/org-network'
 import type { Project, ProjectDatabase } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { decrypt, encrypt } from '@/lib/crypto'
@@ -161,7 +162,9 @@ export async function createProjectDatabase(
     }
   }
 
-  const created = await provider.createManagedDatabase(kind, `eflex-${project.slug}-${kind}`)
+  const created = await inOrganizationNetwork(project.organizationId, () =>
+    provider.createManagedDatabase(kind, `eflex-${project.slug}-${kind}`),
+  )
   if ('error' in created) {
     // Apprentissage réactif (#183) : un refus explicite de l'instance invalide le provisionnement en cache.
     if (/H[ée]bergement API (404|405)\b/i.test(created.error) || /not found|not supported|unsupported/i.test(created.error)) {

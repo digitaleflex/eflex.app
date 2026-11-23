@@ -56,7 +56,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }, { status: 400 })
   }
 
-  const created = await createProjectCoolifyService(result.project.slug, parsed.data.catalogId)
+  const created = await createProjectCoolifyService(result.project.slug, parsed.data.catalogId, org.organizationId)
   if ('error' in created) return NextResponse.json({ error: created.error, capabilities }, { status: created.status ?? 502 })
 
   await audit({

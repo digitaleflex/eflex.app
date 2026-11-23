@@ -7,6 +7,7 @@
  * Chaque étape est **reprenable** : `coolifyAppId` est stocké dès sa création,
  * donc une reprise ne provoque jamais de doublon côté Coolify.
  */
+import { inOrganizationNetwork } from '@/lib/org-network'
 import { Worker, type Job } from 'bullmq'
 import { prisma } from '@/lib/prisma'
 import { decrypt } from '@/lib/crypto'
@@ -302,13 +303,13 @@ export async function processDeployment(
 
     const portsExposes = String((plan as { port?: number }).port ?? 80)
     if (!appId) {
-      const created = await createDockerImageApplication({
+      const created = await inOrganizationNetwork(project.organizationId, () => createDockerImageApplication({
         name: context.deployKey,
         dockerRegistryImageName: image,
         portsExposes,
         domains: hosts,
         customLabels: hosts.length > 0 ? buildApplicationLabels(context.deployKey, hosts, Number(portsExposes) || 80) : undefined,
-      })
+      }))
       if ('error' in created) {
         await fail(deploymentId, `Préparation de l'hébergement (image Docker) impossible : ${created.error}`)
         return
@@ -512,7 +513,7 @@ export async function processDeployment(
   }
 
   if (!appId) {
-    const created = await createApplication({
+    const created = await inOrganizationNetwork(project.organizationId, () => createApplication({
       name: context.deployKey,
       // Une deploy key ne fonctionne qu'avec l'URL SSH.
       gitRepository:
@@ -549,7 +550,7 @@ export async function processDeployment(
             postDeploymentCommand:
               artifacts.postDeploy.length > 0 ? artifacts.postDeploy.join(' && ') : undefined,
           }),
-    })
+    }))
     if ('error' in created) {
       await fail(deploymentId, `Préparation de l'hébergement impossible : ${created.error}`)
       return

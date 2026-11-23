@@ -1,3 +1,4 @@
+import { inOrganizationNetwork } from '@/lib/org-network'
 import { z } from 'zod'
 import {
   coolifyFetch,
@@ -86,6 +87,7 @@ export async function listProjectCoolifyServices(projectSlug: string): Promise<{
 export async function createProjectCoolifyService(
   projectSlug: string,
   catalogId: string,
+  organizationId?: string,
 ): Promise<{ service: { id: string; catalogId: string } } | { error: string; status?: number }> {
   const entry = SUPPORTED.get(catalogId)
   if (!entry) return { error: 'Ce service n’est pas disponible au provisionnement automatique pour le moment.', status: 400 }
@@ -93,7 +95,8 @@ export async function createProjectCoolifyService(
   if (!('error' in existing) && existing.services.some((s) => s.catalogId === catalogId)) {
     return { error: 'Ce service est déjà provisionné pour ce projet.', status: 409 }
   }
-  const created = await createOneClickService(entry.type, projectServiceName(projectSlug, catalogId))
+  const create = () => createOneClickService(entry.type, projectServiceName(projectSlug, catalogId))
+  const created = organizationId ? await inOrganizationNetwork(organizationId, create) : await create()
   if ('error' in created) return { error: created.error, status: 502 }
   return { service: { id: created.id, catalogId } }
 }
