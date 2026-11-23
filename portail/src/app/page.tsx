@@ -50,7 +50,7 @@ export default function HomePage() {
               >
                 <span className="block">Concentrez-vous sur votre code.</span>
                 <span className="mt-1 block sm:mt-2">
-                  <span className="text-primary">EFLEX</span> s’occupe du déploiement.
+                  <span className="text-primary">EFLEX</span> simplifie le reste.
                 </span>
               </h1>
 
