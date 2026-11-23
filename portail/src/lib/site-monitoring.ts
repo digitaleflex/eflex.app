@@ -222,6 +222,39 @@ async function notifyRecovery(
   await prisma.projectSiteIncident.update({ where: { id: incident.id }, data: { resolvedNotifiedAt: new Date() } }).catch(() => undefined)
 }
 
+/** Seuils d'alerte d'expiration du certificat TLS, en jours restants (#177). */
+export const TLS_EXPIRY_THRESHOLDS_DAYS = [14, 7, 3, 1] as const
+
+/** Plus petit seuil franchi (14, 7, 3 ou 1 jour), ou null si le certificat est loin d'expirer ou déjà expiré. */
+export function tlsExpiryThreshold(expiresAt: Date | null | undefined, now: Date): number | null {
+  if (!expiresAt) return null
+  const days = (expiresAt.getTime() - now.getTime()) / 86_400_000
+  if (days <= 0) return null // déjà expiré : la sonde TLS ouvre un incident, pas une alerte d'anticipation
+  for (const threshold of [...TLS_EXPIRY_THRESHOLDS_DAYS].reverse()) {
+    if (days <= threshold) return threshold
+  }
+  return null
+}
+
+async function notifyTlsExpiry(
+  project: { id: string; name: string; organizationId: string },
+  monitor: { id: string; host: string },
+  expiresAt: Date,
+  threshold: number,
+): Promise<void> {
+  const recipients = await memberIds(project.organizationId, ['owner', 'admin'])
+  await notify({
+    userIds: recipients,
+    organizationId: project.organizationId,
+    type: 'site_monitor.tls_expiring',
+    title: `Certificat bientôt expiré : ${project.name}`,
+    body: `Le certificat de ${monitor.host} expire le ${expiresAt.toISOString().slice(0, 10)} (moins de ${threshold} jour${threshold > 1 ? 's' : ''}). Vérifiez le renouvellement automatique et le DNS du domaine.`,
+    href: `/dashboard/projects/${project.id}`,
+    // Une alerte par certificat et par seuil : un renouvellement change la date, donc la clé.
+    dedupeKey: `site-tls-expiry:${monitor.id}:${expiresAt.toISOString().slice(0, 10)}:${threshold}`,
+  })
+}
+
 async function publishMonitorEvent(projectId: string, organizationId: string, host: string, status: MonitorStatus): Promise<void> {
   await publish({
     type: 'site_monitor.status',
@@ -270,7 +303,7 @@ export async function syncProjectMonitors(projectId: string): Promise<number> {
   return targets.length
 }
 
-async function evaluateMonitor(monitor: {
+export async function evaluateMonitor(monitor: {
   id: string
   projectId: string
   organizationId: string
@@ -288,6 +321,13 @@ async function evaluateMonitor(monitor: {
     lastTlsOk: probe.tlsOk,
     lastTlsExpiresAt: probe.tlsExpiresAt,
     lastError: probe.error,
+  }
+
+  const tlsThreshold = tlsExpiryThreshold(probe.tlsExpiresAt, now)
+  if (tlsThreshold !== null && probe.tlsExpiresAt) {
+    await notifyTlsExpiry(monitor.project, { id: monitor.id, host: monitor.host }, probe.tlsExpiresAt, tlsThreshold).catch(
+      () => undefined,
+    )
   }
 
   const openIncident = await prisma.projectSiteIncident.findFirst({
