@@ -1,9 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-// En-tête marketing (`site-header.tsx`) : destinations, accessibilité clavier/mobile,
-// cibles tactiles, focus visible et lisibilité AA sur fond clair (homepage forcée en clair).
-// Méthode de contraste : WCAG 2.1 AA (texte ≥ 4,5:1, indicateur non textuel ≥ 3:1).
+// En-tête marketing Zone 1 : navigation, thème clair/sombre, accessibilité.
 
 const css = readFileSync(new URL('../../app/globals.css', import.meta.url), 'utf8')
 const header = readFileSync(new URL('./site-header.tsx', import.meta.url), 'utf8')
@@ -21,6 +19,7 @@ function tokens(block: string): Record<string, Hsl> {
 }
 
 const light = tokens(css.slice(css.indexOf(':root'), css.indexOf(':root.dark')))
+const dark = tokens(css.slice(css.indexOf(':root.dark'), css.indexOf('}', css.indexOf(':root.dark'))))
 
 function hsl([h, s, l]: Hsl): Rgb {
   const sat = s / 100
@@ -43,38 +42,46 @@ const ratio = (a: Rgb, b: Rgb) => {
   return (hi + 0.05) / (lo + 0.05)
 }
 
-const over = (fg: Rgb, bg: Rgb, alpha: number): Rgb =>
-  fg.map((v, i) => alpha * v + (1 - alpha) * bg[i]!) as Rgb
-
-const bg = hsl(light.background)
-const fg = hsl(light.foreground)
-const ring = hsl(light.ring)
-
-describe('en-tête lisible — fond clair', () => {
-  it('texte plein sur fond ≥ 4,5:1', () => {
-    expect(ratio(fg, bg)).toBeGreaterThanOrEqual(4.5)
+describe('lisibilité AA des contrôles de navigation', () => {
+  it('texte/fond en thème clair ≥ 4,5:1', () => {
+    expect(ratio(hsl(light.foreground), hsl(light.background))).toBeGreaterThanOrEqual(4.5)
+    expect(ratio(hsl(light['muted-foreground']), hsl(light.background))).toBeGreaterThanOrEqual(4.5)
   })
 
-  it('liens de navigation au repos (foreground/75) ≥ 4,5:1', () => {
-    expect(ratio(over(fg, bg, 0.75), bg)).toBeGreaterThanOrEqual(4.5)
+  it('texte/fond en thème sombre ≥ 4,5:1', () => {
+    expect(ratio(hsl(dark.foreground), hsl(dark.background))).toBeGreaterThanOrEqual(4.5)
+    expect(ratio(hsl(dark['muted-foreground']), hsl(dark.background))).toBeGreaterThanOrEqual(4.5)
   })
 
-  it('anneau de focus sur fond ≥ 3:1', () => {
-    expect(ratio(ring, bg)).toBeGreaterThanOrEqual(3)
+  it('anneau de focus visible sur les deux thèmes ≥ 3:1', () => {
+    expect(ratio(hsl(light.ring), hsl(light.background))).toBeGreaterThanOrEqual(3)
+    expect(ratio(hsl(dark.ring), hsl(dark.background))).toBeGreaterThanOrEqual(3)
   })
 })
 
-describe('comportement conservé', () => {
-  it('conserve les destinations de navigation', () => {
-    for (const href of ['/#fonctionnement', '/#fonctionnalites', '/#technologies', '/docs', '/status', '/login', '/register']) {
+describe('Zone 1 - navigation', () => {
+  it('contient les destinations de la spec', () => {
+    for (const href of ['href="/"', '/#fonctionnalites', '/tarifs', '/docs', '/login', '/register']) {
       expect(header, `lien ${href}`).toContain(href)
     }
-    expect(header).toContain('href="/"')
+    expect(header).toContain('Accueil')
+    expect(header).toContain('Fonctionnalités')
+    expect(header).toContain('Tarifs')
+    expect(header).toContain('Ressources')
+    expect(header).toContain('Se connecter')
+    expect(header).toContain('Créer un compte')
+  })
+
+  it('utilise le logo officiel EFLEX', () => {
     expect(header).toContain('<BrandLogo')
-    expect(header).not.toMatch(/variant="mark"/)
+    expect(header).toContain('alt="EFLEX — accueil"')
     expect(brandLogo).toContain("light: '/logo-horizontal.webp'")
     expect(brandLogo).toContain("dark: '/logo-horizontal-inverse.webp'")
-    expect(header).toContain('alt="EFLEX — accueil"')
+  })
+
+  it('intègre le sélecteur de thème', () => {
+    expect(header).toContain('ThemeToggle')
+    expect(header).toContain("from '@/components/theme-switcher'")
   })
 
   it('reste collant et identifié comme navigation de site', () => {
@@ -82,43 +89,34 @@ describe('comportement conservé', () => {
     expect(header).toContain('aria-label="Navigation du site"')
   })
 
-  it('annonce la page courante aux technologies d’assistance', () => {
+  it('annonce la page courante', () => {
     expect(header).toContain('aria-current')
     expect(header).toContain('usePathname')
   })
 
-  it('garde des cibles d’au moins 44 px', () => {
+  it('garde des cibles tactiles >= 44px et focus visible', () => {
     expect(header).toContain('min-h-11')
     expect((header.match(/h-11/g) ?? []).length).toBeGreaterThanOrEqual(4)
-  })
-
-  it('garde un focus visible sur chaque lien du composant', () => {
     expect((header.match(/focus-visible:ring-2/g) ?? []).length).toBeGreaterThanOrEqual(4)
   })
 
-  it('bureau : la liste de liens reste visible dès lg et masquée en dessous', () => {
+  it('desktop visible dès lg, menu mobile accessible', () => {
     expect(header).toContain('hidden items-center gap-1 lg:flex')
-  })
-
-  it('mobile : un bouton de menu accessible, masqué dès lg, avec les mêmes destinations', () => {
-    expect(header).toMatch(/<button/)
     expect(header).toContain('aria-expanded={open}')
     expect(header).toContain('aria-controls={panelId}')
     expect((header.match(/lg:hidden/g) ?? []).length).toBeGreaterThanOrEqual(2)
-    expect((header.match(/links\.map\(/g) ?? []).length).toBeGreaterThanOrEqual(2)
   })
 
-  it('menu mobile : boîte de dialogue modale, Échap, piège de focus et défilement bloqué', () => {
+  it('menu mobile: dialog modale, Échap, piège de focus, défilement bloqué', () => {
     expect(header).toContain('role="dialog"')
     expect(header).toContain('aria-modal="true"')
     expect(header).toContain("event.key === 'Escape'")
     expect(header).toContain("event.key === 'Tab'")
     expect(header).toContain('buttonRef.current?.focus()')
     expect(header).toContain("document.body.style.overflow = 'hidden'")
-    expect(header).toContain('document.body.style.overflow = previousOverflow')
   })
 
-  it('reste sobre au plan des animations (pas de transition-all)', () => {
+  it('pas de transition-all', () => {
     expect(header).not.toContain('transition-all')
   })
 })

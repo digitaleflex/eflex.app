@@ -1,10 +1,8 @@
 import type { CSSProperties } from 'react'
 import Link from 'next/link'
-import { ArrowRight, GitBranch, Globe, Rocket, ShieldCheck } from 'lucide-react'
+import { ArrowRight, PlayCircle } from 'lucide-react'
 import { SiteHeader } from '@/components/marketing/site-header'
 import { SiteFooter } from '@/components/marketing/site-footer'
-import { DeployDemo } from '@/components/marketing/deploy-demo'
-import { HeroProof } from '@/components/marketing/hero-proof'
 import { TechStack } from '@/components/marketing/tech-stack'
 import { DetectionShowcase } from '@/components/marketing/detection-showcase'
 import { DeploymentPipeline } from '@/components/marketing/deployment-pipeline'
@@ -16,113 +14,105 @@ import { FaqSection } from '@/components/marketing/faq-section'
 import { FinalCta } from '@/components/marketing/final-cta'
 import { getLegalCompanyInfo } from '@/lib/legal-info'
 
-const heroProofItems = [
-  { icon: GitBranch, label: 'Connexion GitHub' },
-  { icon: ShieldCheck, label: 'Analyse automatisée des dépôts' },
-  { icon: Rocket, label: 'Gestion des déploiements' },
-  { icon: Globe, label: 'Domaines et HTTPS' },
-]
-
 export default function HomePage() {
   const { email: contactEmail } = getLegalCompanyInfo()
 
   return (
-    <div className="homepage-light flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      {/* ─── ZONE 1 : Navigation + Hero (thème clair/sombre) ─── */}
       <SiteHeader />
 
       <main id="contenu" tabIndex={-1} className="flex-1">
-        {/* ─── 01. Hero ─── */}
-        <section className="surface-navy relative overflow-hidden bg-eflexnavy text-white">
+        <section
+          aria-labelledby="hero-titre"
+          className="relative overflow-hidden border-b border-border/60 bg-background"
+        >
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,hsl(var(--eflex-royalblue)/0.35),transparent)]"
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,hsl(var(--primary)/0.10),transparent_70%)] dark:bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,hsl(var(--primary)/0.18),transparent_72%)]"
           />
-          <div className="container relative pb-14 pt-14 sm:pb-18 sm:pt-18 md:pb-22 md:pt-20">
-            <div className="mx-auto max-w-4xl text-center">
-              <p className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm font-medium text-white/90">
-                Déploiement continu simplifié
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute left-1/2 top-0 h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-primary/5 blur-3xl dark:bg-primary/10"
+          />
+
+          <div className="container relative flex min-h-[calc(100svh-4rem)] items-center justify-center py-16 sm:py-20 md:py-24">
+            <div className="mx-auto w-full max-w-[980px] text-center">
+              <p className="animate-reveal inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-primary sm:text-[13px]">
+                <span aria-hidden="true" className="h-px w-6 bg-primary/60 sm:w-8" />
+                Plateforme de déploiement et d’exploitation
+                <span aria-hidden="true" className="h-px w-6 bg-primary/60 sm:w-8" />
               </p>
-              <h1 className="mt-6 animate-reveal text-display font-extrabold tracking-tight text-balance text-white">
-                Du code à la production.
-                <span className="block">Sans complexité.</span>
-              </h1>
-              <p
-                className="mx-auto mt-6 max-w-2xl animate-reveal text-lead-lg text-white/75 text-pretty"
-                style={{ '--d': '80ms' } as CSSProperties}
+
+              <h1
+                id="hero-titre"
+                className="mt-7 animate-reveal text-balance font-extrabold tracking-tight text-foreground [font-size:clamp(2.75rem,7vw,5.5rem)] [line-height:1.02]"
+                style={{ '--d': '70ms' } as CSSProperties}
               >
-                Connectez votre dépôt GitHub, laissez EFLEX analyser, construire et déployer votre application, puis suivez son
-                exploitation depuis un même espace.
+                <span className="block">Connectez votre code.</span>
+                <span className="mt-1 block sm:mt-2">
+                  <span className="text-primary">EFLEX</span> s’occupe du reste.
+                </span>
+              </h1>
+
+              <p
+                className="mx-auto mt-7 max-w-2xl animate-reveal text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg md:text-xl"
+                style={{ '--d': '140ms' } as CSSProperties}
+              >
+                Déployez vos applications et centralisez leur gestion depuis une seule plateforme.
               </p>
+
               <div
-                className="mt-9 flex animate-reveal flex-col justify-center gap-3 sm:flex-row"
-                style={{ '--d': '160ms' } as CSSProperties}
+                className="mt-10 flex animate-reveal flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4"
+                style={{ '--d': '210ms' } as CSSProperties}
               >
                 <Link
                   href="/register"
-                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-6 text-base font-semibold text-eflexnavy transition-[background-color,transform] duration-200 ease-out-expo hover:bg-white/92 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-eflexnavy"
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-7 text-base font-semibold text-primary-foreground shadow-primary transition-[background-color,box-shadow,transform] duration-200 ease-out-expo hover:bg-primary/90 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto"
                 >
-                  Déployer mon projet
+                  Découvrir EFLEX
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
                 <Link
                   href="#fonctionnement"
-                  className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/30 px-6 text-base font-semibold text-white transition-[background-color,border-color,transform] duration-200 ease-out-expo hover:bg-white/10 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-eflexnavy"
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-input bg-background/60 px-7 text-base font-semibold text-foreground transition-[background-color,border-color,color,transform] duration-200 ease-out-expo hover:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto"
                 >
-                  Découvrir la plateforme
+                  <PlayCircle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  Voir comment ça fonctionne
                 </Link>
               </div>
+            </div>
+          </div>
+        </section>
 
-              <div className="mt-8 animate-reveal" style={{ '--d': '220ms' } as CSSProperties}>
-                <HeroProof items={heroProofItems} className="text-white/75" iconClassName="text-eflexsky" />
+        {/* ─── Zones suivantes (périmètre Zone 1 terminé, contenu existant conservé) ─── */}
+        <div className="homepage-light">
+          <section id="technologies" aria-labelledby="technologies-titre" className="scroll-mt-20 py-16 md:py-24">
+            <div className="container">
+              <div className="mx-auto max-w-3xl space-y-4 text-center">
+                <h2 id="technologies-titre" className="text-display-sm font-extrabold tracking-tight text-balance text-foreground">
+                  Votre stack. Votre workflow. EFLEX.
+                </h2>
+                <p className="mx-auto max-w-2xl text-lead-lg text-muted-foreground text-pretty">
+                  EFLEX analyse vos projets et prépare leur déploiement selon leur configuration.
+                </p>
               </div>
+              <TechStack />
             </div>
+          </section>
 
-            <div className="animate-reveal" style={{ '--d': '300ms' } as CSSProperties}>
-              <DeployDemo />
-            </div>
-          </div>
-        </section>
+          <DetectionShowcase />
+          <DeploymentPipeline />
+          <InfrastructureDiagram />
+          <OperationsBento />
+          <AgencyOverview />
+          <MigrationTeaser contactEmail={contactEmail} />
+          <FaqSection contactEmail={contactEmail} />
+          <FinalCta />
 
-        {/* ─── 02. Technologies ─── */}
-        <section id="technologies" aria-labelledby="technologies-titre" className="scroll-mt-20 py-16 md:py-24">
-          <div className="container">
-            <div className="mx-auto max-w-3xl space-y-4 text-center">
-              <h2 id="technologies-titre" className="text-display-sm font-extrabold tracking-tight text-balance text-foreground">
-                Votre stack. Votre workflow. EFLEX.
-              </h2>
-              <p className="mx-auto max-w-2xl text-lead-lg text-muted-foreground text-pretty">
-                EFLEX analyse vos projets et prépare leur déploiement selon leur configuration.
-              </p>
-            </div>
-            <TechStack />
-          </div>
-        </section>
-
-        {/* ─── 03. Intelligence ─── */}
-        <DetectionShowcase />
-
-        {/* ─── 04. Déploiement / Fonctionnement ─── */}
-        <DeploymentPipeline />
-
-        {/* ─── 05. Infrastructure ─── */}
-        <InfrastructureDiagram />
-
-        {/* ─── 06. Operations / Fonctionnalités ─── */}
-        <OperationsBento />
-
-        {/* ─── 07. Agences ─── */}
-        <AgencyOverview />
-
-        <MigrationTeaser contactEmail={contactEmail} />
-
-        {/* ─── 08. FAQ ─── */}
-        <FaqSection contactEmail={contactEmail} />
-
-        {/* ─── 09. CTA final ─── */}
-        <FinalCta />
+          <SiteFooter />
+        </div>
       </main>
-
-      <SiteFooter />
     </div>
   )
 }

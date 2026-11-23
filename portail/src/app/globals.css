@@ -385,8 +385,7 @@
    (bg-eflexnavy / text-white dans page.tsx).
    ───────────────────────────────────────────────────────────────────────────── */
 @layer base {
-  .homepage-light,
-  body:has(.homepage-light) {
+  .homepage-light {
     --background: 220 20% 98%;
     --foreground: 215 45% 11%;
     --card: 0 0% 100%;
