@@ -130,21 +130,37 @@ describe('rate-limit (mémoire, sans Redis)', () => {
 })
 
 describe('withTrustedClientIp', () => {
-  it('remplace X-Forwarded-For par l’adresse du proxy de confiance et garde le reste de la requête', async () => {
+  it('remplace X-Forwarded-For par l’adresse du proxy de confiance sur la même requête, corps intact', async () => {
     const req = new Request('https://example.test/api/auth/sign-in/email', {
       method: 'POST',
       headers: { 'x-forwarded-for': '1.1.1.1, 203.0.113.7', 'content-type': 'application/json' },
       body: JSON.stringify({ a: 1 }),
     })
     const out = withTrustedClientIp(req)
+    expect(out).toBe(req) // aucune reconstruction de Request (cassait sous Node 24)
     expect(out.headers.get('x-forwarded-for')).toBe('203.0.113.7')
     expect(out.headers.get('content-type')).toBe('application/json')
-    expect(out.method).toBe('POST')
     expect(await out.json()).toEqual({ a: 1 })
+  })
+
+  it('fonctionne avec la NextRequest de Next', async () => {
+    const { NextRequest } = await import('next/server')
+    const req = new NextRequest('https://example.test/api/auth/sign-in/email', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': '9.9.9.9, 203.0.113.7' },
+      body: 'x',
+    })
+    expect(withTrustedClientIp(req).headers.get('x-forwarded-for')).toBe('203.0.113.7')
   })
 
   it('laisse la requête intacte sans adresse identifiable', () => {
     const req = new Request('https://example.test')
     expect(withTrustedClientIp(req)).toBe(req)
+  })
+
+  it('ne casse pas la requête si les en-têtes sont en lecture seule', () => {
+    const req = new Request('https://example.test', { headers: { 'x-forwarded-for': '203.0.113.7' } })
+    const frozen = { url: req.url, headers: { get: (name: string) => req.headers.get(name), set: () => { throw new TypeError('immutable') } } } as unknown as Request
+    expect(() => withTrustedClientIp(frozen)).not.toThrow()
   })
 })
