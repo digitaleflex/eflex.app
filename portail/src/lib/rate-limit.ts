@@ -269,14 +269,21 @@ export function rateLimitedResponse(
 }
 
 /**
- * Copie de la requête dont `X-Forwarded-For` ne contient plus que l'adresse retenue par `getClientIp`.
- * Better Auth lit la première entrée de cet en-tête, que le client contrôle : on la remplace par celle
- * ajoutée par le proxy de confiance, sans changer le reste de la requête (issue #172, S6).
+ * Remplace `X-Forwarded-For` par l'adresse retenue par `getClientIp` (dernière entrée, `TRUSTED_PROXY_HOPS`).
+ * Better Auth lit la première entrée de cet en-tête, que le client contrôle (issue #172, S6).
+ *
+ * On modifie les en-têtes **en place** et on renvoie la même requête : reconstruire une `Request` à partir de la
+ * `NextRequest` de Next échoue sous Node 24 (« Cannot read private member #state ») et casse la connexion.
+ * Si les en-têtes sont en lecture seule, la requête passe telle quelle : mieux vaut une limite de débit
+ * contournable qu'une connexion impossible.
  */
 export function withTrustedClientIp(request: Request): Request {
   const ip = getClientIp(request)
   if (ip === 'unknown') return request
-  const headers = new Headers(request.headers)
-  headers.set('x-forwarded-for', ip)
-  return new Request(request, { headers })
+  try {
+    request.headers.set('x-forwarded-for', ip)
+  } catch (error) {
+    console.error('[eflex/auth] en-têtes en lecture seule : adresse du proxy non appliquée', error instanceof Error ? error.message : error)
+  }
+  return request
 }
