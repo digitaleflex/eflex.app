@@ -289,6 +289,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
               Dépôt<span className="sr-only"> (nouvel onglet)</span>
             </a>
           )}
+          <Link href={`/dashboard/projects/${project.id}/report`} className={secondaryLinkClass}>
+            Rapport
+          </Link>
           {canManage && (
             <Link href={`/dashboard/projects/${project.id}/settings`} className={secondaryLinkClass}>
               <Settings className="h-4 w-4" aria-hidden="true" />
