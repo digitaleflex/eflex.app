@@ -481,7 +481,11 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
   async function deleteProject() {
     setDeleteError('')
     try {
-      const response = await fetch(`/api/projects/${project.id}`, { method: 'DELETE' })
+      const response = await fetch(`/api/projects/${project.id}`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ confirmName: project.name }),
+      })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
         setDeleteError(data.error || 'Le projet n’a pas pu être supprimé.')
