@@ -270,7 +270,7 @@ export async function syncProjectMonitors(projectId: string): Promise<number> {
   return targets.length
 }
 
-async function evaluateMonitor(monitor: {
+export async function evaluateMonitor(monitor: {
   id: string
   projectId: string
   organizationId: string
