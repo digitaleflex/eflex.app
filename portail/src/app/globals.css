@@ -277,7 +277,7 @@
   to { opacity: 1; transform: none; }
 }
 /* ─── Démonstration de déploiement (accueil, `components/marketing/deploy-demo.tsx`) ───
-   Boucle de 10 s : chaque étape s’allume à son tour, puis l’adresse en ligne apparaît.
+   Boucle de 10 s : états documentés, étapes et journal fictifs s’allument progressivement.
    Opacité minimale 0.7 : le texte « en attente » garde un contraste AA sur le navy. */
 .deploy-demo .dd-step { opacity: 0.7; animation: 10s ease infinite both; }
 .deploy-demo .dd-1 { animation-name: dd-1; }
@@ -287,6 +287,13 @@
 .deploy-demo .dd-5 { animation-name: dd-5; }
 .deploy-demo .dd-url { opacity: 0; animation: dd-url 10s var(--ease-out-expo) infinite both; }
 .deploy-demo .dd-bar { width: 0; animation: dd-bar 10s cubic-bezier(0.4, 0, 0.2, 1) infinite both; }
+.deploy-demo .dd-state { opacity: 0.72; animation: 10s ease infinite both; }
+.deploy-demo .dd-state-1 { animation-name: dd-state-1; }
+.deploy-demo .dd-state-2 { animation-name: dd-state-2; }
+.deploy-demo .dd-state-3 { animation-name: dd-state-3; }
+.deploy-demo .dd-state-4 { animation-name: dd-state-4; }
+.deploy-demo .dd-state-5 { animation-name: dd-state-5; }
+.deploy-demo .dd-state-6 { animation-name: dd-state-6; }
 .deploy-demo[data-paused='true'] * { animation-play-state: paused !important; }
 @keyframes dd-1 { 0%, 6% { opacity: 0.7; } 10%, 94% { opacity: 1; } 100% { opacity: 0.7; } }
 @keyframes dd-2 { 0%, 18% { opacity: 0.7; } 22%, 94% { opacity: 1; } 100% { opacity: 0.7; } }
@@ -299,6 +306,12 @@
   100% { opacity: 0; }
 }
 @keyframes dd-bar { 0% { width: 0; } 66%, 94% { width: 100%; } 100% { width: 0; } }
+@keyframes dd-state-1 { 0%, 4% { opacity: 0.72; } 8%, 94% { opacity: 1; background-color: hsl(var(--eflex-sky) / 0.16); border-color: hsl(var(--eflex-sky) / 0.35); color: hsl(var(--eflex-sky)); } 100% { opacity: 0.72; } }
+@keyframes dd-state-2 { 0%, 16% { opacity: 0.72; } 20%, 94% { opacity: 1; background-color: hsl(var(--eflex-sky) / 0.16); border-color: hsl(var(--eflex-sky) / 0.35); color: hsl(var(--eflex-sky)); } 100% { opacity: 0.72; } }
+@keyframes dd-state-3 { 0%, 28% { opacity: 0.72; } 32%, 94% { opacity: 1; background-color: hsl(var(--eflex-sky) / 0.16); border-color: hsl(var(--eflex-sky) / 0.35); color: hsl(var(--eflex-sky)); } 100% { opacity: 0.72; } }
+@keyframes dd-state-4 { 0%, 42% { opacity: 0.72; } 46%, 94% { opacity: 1; background-color: hsl(var(--eflex-sky) / 0.16); border-color: hsl(var(--eflex-sky) / 0.35); color: hsl(var(--eflex-sky)); } 100% { opacity: 0.72; } }
+@keyframes dd-state-5 { 0%, 56% { opacity: 0.72; } 60%, 94% { opacity: 1; background-color: hsl(var(--eflex-sky) / 0.16); border-color: hsl(var(--eflex-sky) / 0.35); color: hsl(var(--eflex-sky)); } 100% { opacity: 0.72; } }
+@keyframes dd-state-6 { 0%, 66% { opacity: 0.72; } 70%, 94% { opacity: 1; background-color: hsl(var(--success) / 0.16); border-color: hsl(var(--success) / 0.35); color: hsl(var(--success)); } 100% { opacity: 0.72; } }
 
 /* ─── Défilé des technologies (accueil, `components/marketing/tech-marquee.tsx`) ───
    Deux rangées en sens opposé ; pause au survol, au focus et par le bouton. */
@@ -351,7 +364,8 @@
   }
   .animate-reveal { opacity: 1; }
   /* Animations de l'accueil : état final, immobile. */
-  .deploy-demo .dd-step, .deploy-demo .dd-url { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .deploy-demo .dd-step, .deploy-demo .dd-url, .deploy-demo .dd-state { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .deploy-demo .dd-state-6 { background-color: hsl(var(--success) / 0.16) !important; border-color: hsl(var(--success) / 0.35) !important; color: hsl(var(--success)) !important; }
   .deploy-demo .dd-bar { animation: none !important; width: 100% !important; }
   .migration-demo .mig-state { animation: none !important; opacity: 0 !important; }
   .migration-demo .mig-3 { opacity: 1 !important; }
