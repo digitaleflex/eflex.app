@@ -342,6 +342,41 @@
   75%, 100% { transform: scale(2); opacity: 0; }
 }
 
+/* ─── Hero Zone 1 : orbes de fond animés, subtils et brandés EFLEX ─── */
+.hero-orb {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+  filter: blur(56px);
+  opacity: 0.55;
+  will-change: transform;
+}
+.hero-orb-a {
+  top: -8rem;
+  left: 50%;
+  width: 34rem;
+  height: 34rem;
+  margin-left: -17rem;
+  background: radial-gradient(circle, hsl(var(--primary) / 0.22) 0%, transparent 70%);
+  animation: hero-float-a 18s ease-in-out infinite;
+}
+.hero-orb-b {
+  top: 6rem;
+  right: -6rem;
+  width: 24rem;
+  height: 24rem;
+  background: radial-gradient(circle, hsl(var(--eflex-sky) / 0.18) 0%, transparent 72%);
+  animation: hero-float-b 22s ease-in-out infinite;
+}
+@keyframes hero-float-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(0, 18px, 0) scale(1.04); }
+}
+@keyframes hero-float-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-18px, -12px, 0) scale(1.05); }
+}
+
 /* ─── Maquette du Migration Center (accueil, `components/marketing/migration-teaser.tsx`) ───
    Trois états illustratifs (source, analyse, résultat) en boucle ; réduit au résultat final. */
 .migration-demo .mig-state { position: absolute; inset: 1.25rem; opacity: 0; }
@@ -363,6 +398,7 @@
     transition-duration: 0.01ms !important;
   }
   .animate-reveal { opacity: 1; }
+  .hero-orb { animation: none !important; }
   /* Animations de l'accueil : état final, immobile. */
   .deploy-demo .dd-step, .deploy-demo .dd-url, .deploy-demo .dd-state { animation: none !important; opacity: 1 !important; transform: none !important; }
   .deploy-demo .dd-state-6 { background-color: hsl(var(--success) / 0.16) !important; border-color: hsl(var(--success) / 0.35) !important; color: hsl(var(--success)) !important; }
