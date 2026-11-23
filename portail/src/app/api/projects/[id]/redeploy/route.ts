@@ -4,6 +4,8 @@ import { enqueueProjectDeployment } from '@/lib/project-deployments'
 import { multiAppEnabled } from '@/lib/multi-app'
 import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { getPrimaryApp } from '@/lib/project-primary'
+import { blockingIssues, preflightChecks } from '@/lib/deploy-preflight'
+import { prisma } from '@/lib/prisma'
 import { assertProjectManager, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
@@ -44,6 +46,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     id: true,
     name: true,
     organizationId: true,
+    repoUrl: true,
+    branch: true,
+    framework: true,
     apps: {
       orderBy: [{ position: 'asc' }, { name: 'asc' }],
       select: { id: true, name: true, position: true, coolifyAppId: true },
@@ -51,6 +56,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   })
   if ('response' in projectResult) return projectResult.response
   const project = projectResult.project
+
+  // Pré-vérifications (#164) : on s'arrête avant la file si le déploiement échouerait à coup sûr.
+  const envKeys = (await prisma.envVar.findMany({ where: { projectId: project.id }, select: { key: true } })).map((v) => v.key)
+  const issues = preflightChecks({ repoUrl: project.repoUrl, branch: project.branch, framework: project.framework, envKeys })
+  const blocking = blockingIssues(issues)
+  if (blocking.length > 0) {
+    return NextResponse.json(
+      { error: `${blocking[0]!.message} ${blocking[0]!.action}`, code: 'preflight_failed', issues: blocking },
+      { status: 422 },
+    )
+  }
+  const warnings = issues.filter((issue) => issue.level === 'warning')
 
   const multi = multiAppEnabled()
   let apps = project.apps
@@ -101,6 +118,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       deployments: queued.deployments,
       groupId: queued.groupId,
       skipped: queued.skipped,
+      ...(warnings.length > 0 ? { warnings } : {}),
     },
     { status: 202 },
   )
