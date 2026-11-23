@@ -57,3 +57,23 @@ describe('en-têtes de sécurité', () => {
     expect(config[0].headers.length).toBeGreaterThan(0)
   })
 })
+
+describe('CSP appliquée (S7, #172)', () => {
+  it('reste en Report-Only par défaut', async () => {
+    const { securityHeaders: sh } = await import('./security-headers.mjs')
+    const keys = sh({ production: true, enforce: false }).map((h: { key: string }) => h.key)
+    expect(keys).toContain('Content-Security-Policy-Report-Only')
+    expect(keys).not.toContain('Content-Security-Policy')
+  })
+
+  it('applique la politique (et seulement elle) quand CSP_ENFORCE est actif', async () => {
+    const { securityHeaders: sh, cspEnforced } = await import('./security-headers.mjs')
+    const keys = sh({ production: true, enforce: true }).map((h: { key: string }) => h.key)
+    expect(keys).toContain('Content-Security-Policy')
+    expect(keys).not.toContain('Content-Security-Policy-Report-Only')
+    expect(cspEnforced({ CSP_ENFORCE: '1' })).toBe(true)
+    expect(cspEnforced({ CSP_ENFORCE: 'true' })).toBe(true)
+    expect(cspEnforced({})).toBe(false)
+    expect(cspEnforced({ CSP_ENFORCE: '0' })).toBe(false)
+  })
+})
