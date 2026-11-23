@@ -191,7 +191,12 @@ export function OrganizationPanel({
           </p>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div className="overflow-x-auto">
+          <div
+            className="overflow-x-auto rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            role="region"
+            aria-label="Matrice des rôles et permissions (défilement horizontal)"
+            tabIndex={0}
+          >
             <table className="w-full min-w-[36rem] border-collapse text-sm">
               <caption className="sr-only">Matrice des capacités par rôle d’organisation</caption>
               <thead>
