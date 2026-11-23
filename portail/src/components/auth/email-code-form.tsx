@@ -205,7 +205,7 @@ export function EmailCodeForm({
                     setStep('email')
                   } else void sendCode()
                 }}
-                className="min-h-11 rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="min-h-11 rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 disabled={loading}
               >
                 Renvoyer le code
@@ -259,7 +259,7 @@ export function EmailCodeForm({
           <button
             type="button"
             onClick={() => onUsePassword(email.value.trim())}
-            className="min-h-11 rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="min-h-11 rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             Utiliser un mot de passe
           </button>
