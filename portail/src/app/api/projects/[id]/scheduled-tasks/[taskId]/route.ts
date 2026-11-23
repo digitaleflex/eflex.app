@@ -4,16 +4,23 @@ import { deleteScheduledTask, updateScheduledTask } from '@/lib/coolify'
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { requireManagedProject } from '@/lib/tenant'
 import { z } from 'zod'
+import { audit } from '@/lib/audit'
+import {
+  validateContainerName,
+  validateCronExpression,
+  validateTaskCommand,
+  validateTaskName,
+} from '@/lib/scheduled-task-validation'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 const patchSchema = z.object({
   appId: z.string().min(1).optional(),
-  name: z.string().min(1).max(120).optional(),
-  command: z.string().min(1).max(4000).optional(),
-  frequency: z.string().min(1).max(120).optional(),
-  containerName: z.string().min(1).max(200).optional().nullable(),
+  name: z.string().min(1).max(120).refine(validateTaskName, 'Nom invalide.').optional(),
+  command: z.string().min(1).max(4000).refine(validateTaskCommand, 'Commande invalide : une seule ligne, sans caractère de contrôle.').optional(),
+  frequency: z.string().min(1).max(120).refine(validateCronExpression, 'Planification invalide (5 champs cron ou hourly/daily/weekly/monthly).').optional(),
+  containerName: z.string().min(1).max(200).refine(validateContainerName, 'Nom de conteneur invalide.').optional().nullable(),
   enabled: z.boolean().optional(),
 })
 
@@ -43,7 +50,7 @@ async function resolveTarget(
   if (!target?.coolifyAppId) {
     return { response: NextResponse.json({ error: 'Application non déployée sur l’hébergement.' }, { status: 409 }) }
   }
-  return { target }
+  return { target, organizationId: org.organizationId }
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string; taskId: string }> }) {
@@ -64,6 +71,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     enabled: parsed.data.enabled,
   })
   if ('error' in updated) return NextResponse.json({ error: updated.error }, { status: 502 })
+  await audit({
+    actor: { id: session.user.id, email: session.user.email },
+    action: 'project.scheduled-task.update',
+    target: { type: 'project', id },
+    organizationId: resolved.organizationId,
+    details: { taskId, fields: Object.keys(parsed.data).filter((key) => key !== 'appId' && key !== 'command'), commandChanged: parsed.data.command !== undefined },
+    request,
+  })
   return NextResponse.json({ ok: true })
 }
 
@@ -77,5 +92,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if ('response' in resolved) return resolved.response
   const deleted = await deleteScheduledTask(resolved.target.coolifyAppId as string, taskId)
   if ('error' in deleted) return NextResponse.json({ error: deleted.error }, { status: 502 })
+  await audit({
+    actor: { id: session.user.id, email: session.user.email },
+    action: 'project.scheduled-task.delete',
+    target: { type: 'project', id },
+    organizationId: resolved.organizationId,
+    details: { taskId },
+    request,
+  })
   return NextResponse.json({ ok: true })
 }
