@@ -223,7 +223,7 @@ export default function HomePage() {
 
             <p className="mt-6 text-center text-sm text-muted-foreground">
               Besoin d’aide ?{' '}
-              <a href={`mailto:${contactEmail}?subject=Question%20sur%20EFLEX`} className="font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm">
+              <a href={`mailto:${contactEmail}?subject=Question%20sur%20EFLEX`} className="font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
                 Contacter le support
               </a>
             </p>
