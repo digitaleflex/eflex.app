@@ -4,6 +4,7 @@ import { deleteScheduledTask, updateScheduledTask } from '@/lib/coolify'
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { requireManagedProject } from '@/lib/tenant'
 import { z } from 'zod'
+import { audit } from '@/lib/audit'
 import {
   validateContainerName,
   validateCronExpression,
@@ -49,7 +50,7 @@ async function resolveTarget(
   if (!target?.coolifyAppId) {
     return { response: NextResponse.json({ error: 'Application non déployée sur l’hébergement.' }, { status: 409 }) }
   }
-  return { target }
+  return { target, organizationId: org.organizationId }
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string; taskId: string }> }) {
@@ -70,6 +71,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     enabled: parsed.data.enabled,
   })
   if ('error' in updated) return NextResponse.json({ error: updated.error }, { status: 502 })
+  await audit({
+    actor: { id: session.user.id, email: session.user.email },
+    action: 'project.scheduled-task.update',
+    target: { type: 'project', id },
+    organizationId: resolved.organizationId,
+    details: { taskId, fields: Object.keys(parsed.data).filter((key) => key !== 'appId' && key !== 'command'), commandChanged: parsed.data.command !== undefined },
+    request,
+  })
   return NextResponse.json({ ok: true })
 }
 
@@ -83,5 +92,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if ('response' in resolved) return resolved.response
   const deleted = await deleteScheduledTask(resolved.target.coolifyAppId as string, taskId)
   if ('error' in deleted) return NextResponse.json({ error: deleted.error }, { status: 502 })
+  await audit({
+    actor: { id: session.user.id, email: session.user.email },
+    action: 'project.scheduled-task.delete',
+    target: { type: 'project', id },
+    organizationId: resolved.organizationId,
+    details: { taskId },
+    request,
+  })
   return NextResponse.json({ ok: true })
 }

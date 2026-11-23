@@ -4,6 +4,7 @@ import { createScheduledTask, listScheduledTasks } from '@/lib/coolify'
 import { canManageProjects } from '@/lib/organizations'
 import { requireManagedProject } from '@/lib/tenant'
 import { z } from 'zod'
+import { audit } from '@/lib/audit'
 import {
   validateContainerName,
   validateCronExpression,
@@ -96,5 +97,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     enabled: parsed.data.enabled,
   })
   if ('error' in created) return NextResponse.json({ error: created.error }, { status: 502 })
+  await audit({
+    actor: { id: session.user.id, email: session.user.email },
+    action: 'project.scheduled-task.create',
+    target: { type: 'project', id },
+    organizationId: org.organizationId,
+    // Jamais la commande : elle peut contenir des secrets.
+    details: { name: parsed.data.name.trim(), frequency: parsed.data.frequency.trim(), appId: target.id },
+    request,
+  })
   return NextResponse.json({ id: created.id, appId: target.id }, { status: 201 })
 }

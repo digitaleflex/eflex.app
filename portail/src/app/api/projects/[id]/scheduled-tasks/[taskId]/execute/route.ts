@@ -3,6 +3,7 @@ import { getSession } from '@/lib/session'
 import { executeScheduledTask } from '@/lib/coolify'
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { requireManagedProject } from '@/lib/tenant'
+import { audit } from '@/lib/audit'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -26,5 +27,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!target?.coolifyAppId) return NextResponse.json({ error: 'Application non déployée sur l’hébergement.' }, { status: 409 })
   const executed = await executeScheduledTask(target.coolifyAppId, taskId)
   if ('error' in executed) return NextResponse.json({ error: executed.error }, { status: 502 })
+  await audit({
+    actor: { id: session.user.id, email: session.user.email },
+    action: 'project.scheduled-task.execute',
+    target: { type: 'project', id },
+    organizationId: org.organizationId,
+    details: { taskId },
+    request,
+  })
   return NextResponse.json({ ok: true }, { status: 202 })
 }
