@@ -24,15 +24,18 @@ export default function HomePage() {
       <main id="contenu" tabIndex={-1} className="flex-1">
         <section
           aria-labelledby="hero-titre"
-          className="relative overflow-hidden border-b border-border/60 bg-background"
+          className="hero-surface relative overflow-hidden border-b border-border/60 bg-background"
         >
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-grid opacity-60" />
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,hsl(var(--primary)/0.10),transparent_70%)]"
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_75%_55%_at_50%_-10%,hsl(var(--primary)/0.14),transparent_68%)]"
           />
+          <div aria-hidden="true" className="hero-orb hero-orb-a" />
+          <div aria-hidden="true" className="hero-orb hero-orb-b" />
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute left-1/2 top-0 h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-primary/5 blur-3xl"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background to-transparent"
           />
 
           <div className="container relative py-16 sm:py-20 md:py-24 lg:py-28">
