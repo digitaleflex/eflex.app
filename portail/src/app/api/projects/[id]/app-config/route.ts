@@ -4,6 +4,7 @@ import { getApplicationAdvancedConfig, updateApplicationAdvancedConfig } from '@
 import { canManageProjects, resolveOrganization } from '@/lib/organizations'
 import { requireManagedProject } from '@/lib/tenant'
 import { z } from 'zod'
+import { effectivePlan } from '@/lib/billing'
 import {
   HEALTH_HOST_PATTERN,
   HEALTH_METHODS,
@@ -11,6 +12,7 @@ import {
   HEALTH_TEXT_PATTERN,
   WATCH_PATH_PATTERN,
   checkLimit,
+  resourceCapsForPlan,
   validatePort,
   type LimitField,
 } from '@/lib/app-config-validation'
@@ -75,6 +77,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { id } = await params
   const result = await requireManagedProject(session, id, {
     id: true,
+    organizationId: true,
     apps: { orderBy: [{ position: 'asc' }, { name: 'asc' }], select: { id: true, name: true, coolifyAppId: true, position: true } },
   })
   if ('response' in result) return result.response
@@ -94,12 +97,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // Limites de ressources : valeurs bornées, jamais « sans limite », et une valeur inchangée n'est pas renvoyée
   // (un client dont la limite actuelle dépasse le plafond peut donc toujours enregistrer le reste).
   const current = await getApplicationAdvancedConfig(target.coolifyAppId)
+  const caps = resourceCapsForPlan((await effectivePlan(result.project.organizationId)).id)
   const limits: Partial<Record<LimitField, string>> = {}
   for (const field of ['limitsCpus', 'limitsMemory', 'limitsMemorySwap', 'limitsMemoryReservation'] as const) {
     const raw = c[field]
     if (raw === undefined) continue
     if (!('error' in current) && raw.trim() === (current[field] ?? '').trim()) continue
-    const checked = checkLimit(field, raw)
+    const checked = checkLimit(field, raw, caps)
     if (checked.kind === 'error') return NextResponse.json({ error: checked.message }, { status: 400 })
     if (checked.kind === 'keep') limits[field] = checked.value
   }
