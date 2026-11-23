@@ -5,6 +5,7 @@ import { multiAppEnabled } from '@/lib/multi-app'
 import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { getPrimaryApp } from '@/lib/project-primary'
 import { blockingIssues, preflightChecks } from '@/lib/deploy-preflight'
+import { persistentVolumesEnabled } from '@/lib/deploy-plan'
 import { prisma } from '@/lib/prisma'
 import { assertProjectManager, requireOrg, requireProject, tenantNotFound } from '@/lib/tenant'
 
@@ -49,6 +50,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     repoUrl: true,
     branch: true,
     framework: true,
+    plan: true,
     apps: {
       orderBy: [{ position: 'asc' }, { name: 'asc' }],
       select: { id: true, name: true, position: true, coolifyAppId: true },
@@ -59,7 +61,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // Pré-vérifications (#164) : on s'arrête avant la file si le déploiement échouerait à coup sûr.
   const envKeys = (await prisma.envVar.findMany({ where: { projectId: project.id }, select: { key: true } })).map((v) => v.key)
-  const issues = preflightChecks({ repoUrl: project.repoUrl, branch: project.branch, framework: project.framework, envKeys })
+  const planVolumes = (project.plan as { volumes?: unknown } | null)?.volumes
+  const issues = preflightChecks({
+    repoUrl: project.repoUrl,
+    branch: project.branch,
+    framework: project.framework,
+    envKeys,
+    volumeMounts: Array.isArray(planVolumes) ? planVolumes.filter((v): v is string => typeof v === 'string') : [],
+    persistentVolumesEnabled: persistentVolumesEnabled(),
+  })
   const blocking = blockingIssues(issues)
   if (blocking.length > 0) {
     return NextResponse.json(
