@@ -12,6 +12,7 @@ import {
   getClientIp,
   getRateLimitMode,
   rateLimitHeaders,
+  withTrustedClientIp,
 } from './rate-limit'
 
 describe('getClientIp', () => {
@@ -125,5 +126,25 @@ describe('rate-limit (mémoire, sans Redis)', () => {
     expect(headers['X-RateLimit-Limit']).toBe('10')
     expect(headers['X-RateLimit-Remaining']).toBe('0')
     expect(headers['X-RateLimit-Reset']).toBe('1700000060')
+  })
+})
+
+describe('withTrustedClientIp', () => {
+  it('remplace X-Forwarded-For par l’adresse du proxy de confiance et garde le reste de la requête', async () => {
+    const req = new Request('https://example.test/api/auth/sign-in/email', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': '1.1.1.1, 203.0.113.7', 'content-type': 'application/json' },
+      body: JSON.stringify({ a: 1 }),
+    })
+    const out = withTrustedClientIp(req)
+    expect(out.headers.get('x-forwarded-for')).toBe('203.0.113.7')
+    expect(out.headers.get('content-type')).toBe('application/json')
+    expect(out.method).toBe('POST')
+    expect(await out.json()).toEqual({ a: 1 })
+  })
+
+  it('laisse la requête intacte sans adresse identifiable', () => {
+    const req = new Request('https://example.test')
+    expect(withTrustedClientIp(req)).toBe(req)
   })
 })

@@ -267,3 +267,16 @@ export function rateLimitedResponse(
     { status: 429, headers: { ...rateLimitHeaders(result), ...extraHeaders } },
   )
 }
+
+/**
+ * Copie de la requête dont `X-Forwarded-For` ne contient plus que l'adresse retenue par `getClientIp`.
+ * Better Auth lit la première entrée de cet en-tête, que le client contrôle : on la remplace par celle
+ * ajoutée par le proxy de confiance, sans changer le reste de la requête (issue #172, S6).
+ */
+export function withTrustedClientIp(request: Request): Request {
+  const ip = getClientIp(request)
+  if (ip === 'unknown') return request
+  const headers = new Headers(request.headers)
+  headers.set('x-forwarded-for', ip)
+  return new Request(request, { headers })
+}
