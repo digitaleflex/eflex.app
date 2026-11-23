@@ -14,6 +14,7 @@
 //  - sans jeton d'installation, un dépôt privé est refusé explicitement ;
 //  - la lecture est bornée (nombre de fichiers, taille, délais).
 
+import { analyzeVercelCompat, type VercelCompatReport } from '@/lib/migrations/vercel-compat'
 import { detect, detectApplication, detectApplications, isIgnoredPath } from '@eflex/detector'
 import type { DetectedApplication, DetectionResult, RepoSnapshot } from '@eflex/detector'
 import { canonicalRepoUrl, type GitHubRepoRef } from '@/lib/github-url'
@@ -94,6 +95,11 @@ export interface RepoAnalysis {
   apps: DetectedApplication[]
   /** Vrai si l'analyse a pu rester partielle (dépôt énorme, fichiers illisibles…). */
   incomplete: boolean
+  /**
+   * Compatibilité Vercel (#148, MIG-3), seulement si le dépôt contient un `vercel.json` ou des dépendances `@vercel/*`.
+   * Champ additif : absent pour tous les autres dépôts.
+   */
+  vercelCompat?: VercelCompatReport
 }
 
 const SHA_RE = /^[0-9a-f]{40}$/
@@ -349,6 +355,34 @@ export async function analyzeGitHubRepo(
     await fetchMany([...missing])
   }
 
+  // Phase 3 : compatibilité Vercel (#148). Seulement les fichiers du dossier analysé, jamais de jeton fournisseur.
+  const prefix = root.replace(/^\/+|\/+$/g, '')
+  const at = (name: string) => (prefix ? `${prefix}/${name}` : name)
+  const vercelPath = at('vercel.json')
+  const packagePath = at('package.json')
+  const wanted = [vercelPath, packagePath].filter((path) => blobs.has(path) && !cache.has(path))
+  if (wanted.length > 0) await fetchMany(wanted)
+  let vercelCompat: VercelCompatReport | undefined
+  {
+    const parse = (path: string): unknown => {
+      const text = cache.get(path)
+      if (!text) return null
+      try {
+        return JSON.parse(text)
+      } catch {
+        return null
+      }
+    }
+    const pkg = parse(packagePath)
+    const deps = isRecord(pkg)
+      ? [...Object.keys(isRecord(pkg.dependencies) ? pkg.dependencies : {}), ...Object.keys(isRecord(pkg.devDependencies) ? pkg.devDependencies : {})]
+      : []
+    const hasVercelFile = blobs.has(vercelPath)
+    if (hasVercelFile || deps.some((name) => name.startsWith('@vercel/'))) {
+      vercelCompat = analyzeVercelCompat(parse(vercelPath), deps)
+    }
+  }
+
   const warnings = [...detection.warnings]
   if (incomplete) {
     warnings.push("Ce dépôt est très volumineux : l'analyse peut être incomplète. Un fichier `eflex.json` à la racine permet de fixer la configuration.")
@@ -370,5 +404,6 @@ export async function analyzeGitHubRepo(
     detection: { ...detection, warnings: unique(warnings) },
     apps: applications,
     incomplete: incomplete || unreadable > 0,
+    ...(vercelCompat ? { vercelCompat } : {}),
   }
 }

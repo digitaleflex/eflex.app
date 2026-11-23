@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { FrameworkIcon } from '@/components/framework-icon'
 import { DetectionCard } from '@/components/new-project/detection-card'
+import { VercelCompatNote } from '@/components/new-project/vercel-compat-note'
 import { ApplicationPicker } from '@/components/new-project/application-picker'
 import { ApplicationMultiSelect } from '@/components/new-project/application-multi-select'
 import { GitHubPicker } from '@/components/new-project/github-picker'
@@ -535,6 +536,7 @@ export default function NewProjectPage() {
         {detection && selectedPlan && (
           <>
             <DetectionCard plan={selectedPlan} detection={detection} headingRef={resultHeading} />
+            <VercelCompatNote report={analysis?.vercelCompat} />
 
             {plans.length > 1 && (
               <details open={chosen !== null} className="rounded-xl border border-border bg-card px-4 py-3">

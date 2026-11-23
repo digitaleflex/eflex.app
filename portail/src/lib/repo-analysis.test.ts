@@ -385,3 +385,37 @@ describe('analyzeGitHubRepo', () => {
     expect(viaNetwork).toEqual(direct)
   })
 })
+
+describe('compatibilité Vercel dans l’analyse (#148, MIG-3)', () => {
+  it('ne produit rien pour un dépôt sans trace de Vercel', async () => {
+    const gh = fakeGitHub({ 'acme/app': { files: nextApp } })
+    const analysis = await analyzeGitHubRepo(ref(), { fetchImpl: gh.fetch })
+    expect(analysis.vercelCompat).toBeUndefined()
+  })
+
+  it('analyse vercel.json et les dépendances @vercel/*', async () => {
+    const gh = fakeGitHub({
+      'acme/app': {
+        files: {
+          ...nextApp,
+          'package.json': json({
+            scripts: { build: 'next build', start: 'next start' },
+            dependencies: { next: '14.2.0', react: '18.3.0', '@vercel/kv': '^1.0.0' },
+          }),
+          'vercel.json': json({ crons: [{ path: '/api/c', schedule: '0 * * * *' }], inconnu: true }),
+        },
+      },
+    })
+    const analysis = await analyzeGitHubRepo(ref(), { fetchImpl: gh.fetch })
+    expect(analysis.vercelCompat?.findings.map((f) => f.rule).sort()).toEqual(['crons', 'dep-kv'])
+    expect(analysis.vercelCompat?.unknown).toEqual(['inconnu'])
+    // Le contrat existant reste intact.
+    expect(analysis.detection.framework).toBe('nextjs')
+  })
+
+  it('un vercel.json illisible ne fait pas échouer l’analyse', async () => {
+    const gh = fakeGitHub({ 'acme/app': { files: { ...nextApp, 'vercel.json': '{ pas du json' } } })
+    const analysis = await analyzeGitHubRepo(ref(), { fetchImpl: gh.fetch })
+    expect(analysis.vercelCompat).toEqual({ findings: [], unknown: [], counts: { ok: 0, reconfigure: 0, unsupported: 0 } })
+  })
+})
