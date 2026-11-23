@@ -14,6 +14,7 @@
  * de forcer la cible sans découverte.
  */
 import { isCommitSha } from '@/lib/deployment-rollback'
+import { destinationFields } from '@/lib/org-network-context'
 import { normalizeApplicationMetrics, unavailableMetrics, type ApplicationMetrics } from '@/lib/app-metrics'
 
 const COOLIFY_URL = process.env.COOLIFY_API_URL || ''
@@ -259,6 +260,51 @@ export interface CreateApplicationParams {
  * l'appelant : Coolify tourne avec `generate_exact_labels=true` et un proxy
  * `none`, c'est le Traefik existant qui route.
  */
+export interface CoolifyDestination {
+  uuid: string
+  name: string | null
+  network: string | null
+}
+
+/** Liste les réseaux Docker (destinations) du serveur. */
+export async function listServerDestinations(): Promise<CoolifyDestination[] | { error: string }> {
+  try {
+    const target = await resolveTarget()
+    const res = await coolifyFetch<Array<{ uuid?: unknown; name?: unknown; network?: unknown }>>(
+      `/servers/${encodeURIComponent(target.serverUuid)}/destinations`,
+    )
+    if (res.error || !Array.isArray(res.data)) return { error: res.error ?? 'Réponse inattendue de l’hébergement.' }
+    return res.data
+      .filter((item) => typeof item.uuid === 'string')
+      .map((item) => ({
+        uuid: item.uuid as string,
+        name: typeof item.name === 'string' ? item.name : null,
+        network: typeof item.network === 'string' ? item.network : null,
+      }))
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Hébergement injoignable.' }
+  }
+}
+
+/** Crée un réseau Docker dédié (destination) sur le serveur. */
+export async function createServerDestination(
+  network: string,
+  name: string,
+): Promise<{ uuid: string } | { error: string; conflict?: boolean }> {
+  try {
+    const target = await resolveTarget()
+    const res = await coolifyFetch<{ uuid?: unknown }>(`/servers/${encodeURIComponent(target.serverUuid)}/destinations`, {
+      method: 'POST',
+      body: JSON.stringify({ network, name, type: 'standalone' }),
+    })
+    if (res.error) return { error: res.error, conflict: /\b(409|422)\b/.test(res.error) }
+    if (typeof res.data?.uuid !== 'string') return { error: 'Réponse inattendue de l’hébergement.' }
+    return { uuid: res.data.uuid }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Hébergement injoignable.' }
+  }
+}
+
 export async function createApplication(
   params: CreateApplicationParams,
 ): Promise<{ id: string } | { error: string }> {
@@ -273,6 +319,7 @@ export async function createApplication(
       name: params.name,
       project_uuid: target.projectUuid,
       server_uuid: target.serverUuid,
+      ...destinationFields(),
       environment_name: target.environmentName,
       git_repository: params.gitRepository,
       git_branch: params.gitBranch || 'main',
@@ -385,6 +432,7 @@ export async function createDockerImageApplication(
       name: params.name,
       project_uuid: target.projectUuid,
       server_uuid: target.serverUuid,
+      ...destinationFields(),
       environment_name: target.environmentName,
       docker_registry_image_name: image.name,
       docker_registry_image_tag: image.tag,
@@ -610,6 +658,7 @@ export async function createOneClickService(
         name,
         description: 'Service provisionné par EFLEX',
         server_uuid: target.serverUuid,
+        ...destinationFields(),
         project_uuid: target.projectUuid,
         environment_name: target.environmentName,
         instant_deploy: true,
@@ -1034,6 +1083,7 @@ export async function createManagedDatabase(
         method: 'POST',
         body: JSON.stringify({
           server_uuid: target.serverUuid,
+          ...destinationFields(),
           project_uuid: target.projectUuid,
           environment_name: target.environmentName,
           name,
