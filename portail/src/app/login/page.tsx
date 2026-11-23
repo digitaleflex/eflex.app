@@ -224,7 +224,7 @@ export default function LoginPage() {
           <Link
             suppressHydrationWarning
             href={withNext('/register')}
-            className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             Créer un compte
           </Link>
@@ -432,7 +432,7 @@ export default function LoginPage() {
                         <Link
                           suppressHydrationWarning
                           href={verifyEmailHref(email.value)}
-                          className="inline-flex min-h-11 items-center rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          className="inline-flex min-h-11 items-center rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                         >
                           Renvoyer l’e-mail de vérification
                         </Link>
@@ -447,7 +447,7 @@ export default function LoginPage() {
                             setMode('code')
                             setFormError('')
                           }}
-                          className="inline-flex min-h-11 items-center gap-2 rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          className="inline-flex min-h-11 items-center gap-2 rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                         >
                           <Mail className="h-4 w-4" aria-hidden="true" />
                           Recevoir un code par e-mail
