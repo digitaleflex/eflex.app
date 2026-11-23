@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Menu, X } from 'lucide-react'
-import { ThemeToggle } from '@/components/theme-switcher'
+
 import { LinkButton } from '@/components/link-button'
 import { cn } from '@/lib/utils'
 import { BrandLogo } from '@/components/brand-logo'
@@ -113,8 +113,6 @@ export function SiteHeader() {
         </ul>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <ThemeToggle className="shrink-0" />
-
           <Link
             href="/login"
             className="hidden min-h-11 items-center justify-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors duration-200 ease-out-expo hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:inline-flex"

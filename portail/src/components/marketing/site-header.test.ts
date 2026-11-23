@@ -79,9 +79,8 @@ describe('Zone 1 - navigation', () => {
     expect(brandLogo).toContain("dark: '/logo-horizontal-inverse.webp'")
   })
 
-  it('intègre le sélecteur de thème', () => {
-    expect(header).toContain('ThemeToggle')
-    expect(header).toContain("from '@/components/theme-switcher'")
+  it('n’affiche pas de sélecteur de thème (single theme EFLEX)', () => {
+    expect(header).not.toContain('ThemeToggle')
   })
 
   it('reste collant et identifié comme navigation de site', () => {

@@ -18,8 +18,7 @@ export default function HomePage() {
   const { email: contactEmail } = getLegalCompanyInfo()
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      {/* ─── ZONE 1 : Navigation + Hero (thème clair/sombre) ─── */}
+    <div className="homepage-light flex min-h-screen flex-col bg-background text-foreground">
       <SiteHeader />
 
       <main id="contenu" tabIndex={-1} className="flex-1">
@@ -29,11 +28,11 @@ export default function HomePage() {
         >
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,hsl(var(--primary)/0.10),transparent_70%)] dark:bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,hsl(var(--primary)/0.18),transparent_72%)]"
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,hsl(var(--primary)/0.10),transparent_70%)]"
           />
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute left-1/2 top-0 h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-primary/5 blur-3xl dark:bg-primary/10"
+            className="pointer-events-none absolute left-1/2 top-0 h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-primary/5 blur-3xl"
           />
 
           <div className="container relative py-16 sm:py-20 md:py-24 lg:py-28">
@@ -85,9 +84,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ─── Zones suivantes (périmètre Zone 1 terminé, contenu existant conservé) ─── */}
-        <div className="homepage-light">
-          <section id="technologies" aria-labelledby="technologies-titre" className="scroll-mt-20 py-16 md:py-24">
+        {/* ─── Zones suivantes ─── */}
+        <section id="technologies" aria-labelledby="technologies-titre" className="scroll-mt-20 py-16 md:py-24">
             <div className="container">
               <div className="mx-auto max-w-3xl space-y-4 text-center">
                 <h2 id="technologies-titre" className="text-display-sm font-extrabold tracking-tight text-balance text-foreground">
@@ -114,10 +112,9 @@ export default function HomePage() {
           <AgencyOverview />
           <MigrationTeaser contactEmail={contactEmail} />
           <FaqSection contactEmail={contactEmail} />
-          <FinalCta />
+        <FinalCta />
 
-          <SiteFooter />
-        </div>
+        <SiteFooter />
       </main>
     </div>
   )
