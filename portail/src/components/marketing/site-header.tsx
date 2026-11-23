@@ -10,20 +10,14 @@ import { cn } from '@/lib/utils'
 import { BrandLogo } from '@/components/brand-logo'
 
 const links = [
-  { href: '/#fonctionnement', label: 'Fonctionnement' },
+  { href: '/', label: 'Accueil' },
   { href: '/#fonctionnalites', label: 'Fonctionnalités' },
-  { href: '/#questions', label: 'Questions' },
-  { href: '/status', label: 'Statut' },
+  { href: '/tarifs', label: 'Tarifs' },
+  { href: '/docs', label: 'Ressources' },
 ]
 
 /**
- * Navigation marketing partagée (pages publiques).
- *
- * - Bureau (>= lg) : liens visibles dans la barre.
- * - Mobile/tablette (< lg) : menu accessible via bouton, avec toutes les destinations.
- * - « Connexion » reste accessible en un geste sur téléphone (toujours visible dans la barre).
- * - Accessibilité : aria-expanded/controls, fermeture au clavier (Échap), rendu du focus au bouton,
- *   et défilement du fond bloqué pendant l’ouverture.
+ * Navigation marketing (Zone 1) - theme clair/sombre, sticky, accessible.
  */
 export function SiteHeader() {
   const pathname = usePathname()
@@ -82,10 +76,10 @@ export function SiteHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-50 glass">
+    <header className="sticky top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/80">
       <nav
         aria-label="Navigation du site"
-        className="container flex h-16 items-center justify-between gap-2 sm:gap-4"
+        className="container flex h-16 items-center justify-between gap-3 lg:h-[4.5rem]"
       >
         <Link
           href="/"
@@ -94,19 +88,21 @@ export function SiteHeader() {
           <BrandLogo alt="EFLEX — accueil" className="h-6 w-auto sm:h-7 lg:h-8" priority />
         </Link>
 
-        <ul className="hidden lg:flex items-center gap-1">
+        <ul className="hidden items-center gap-1 lg:flex">
           {links.map((link) => {
-            const current = pathname === link.href
+            const current = pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href.split('#')[0] || '___'))
+            const isAnchor = link.href.startsWith('/#')
+            const active = !isAnchor && current
             return (
               <li key={link.href}>
                 <Link
                   href={link.href}
-                  aria-current={current ? 'page' : undefined}
+                  aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'inline-flex h-11 items-center rounded-lg px-3 text-sm font-medium transition-colors duration-200 ease-out-expo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                    current
+                    'inline-flex min-h-11 items-center rounded-lg px-3.5 text-sm font-medium transition-colors duration-200 ease-out-expo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    active
                       ? 'text-foreground'
-                      : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                   )}
                 >
                   {link.label}
@@ -116,19 +112,17 @@ export function SiteHeader() {
           })}
         </ul>
 
-        <div className="flex items-center gap-1 sm:gap-2">
-          {/* 44 px en pointeur grossier (convention du dépôt), 36 px en pointeur fin.
-              Masqué sur l'accueil : la page est volontairement en thème clair. */}
-          {pathname !== '/' && <ThemeToggle className="mr-1 hidden sm:inline-flex" />}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <ThemeToggle className="shrink-0" />
 
-          {/* Connexion toujours accessible en un geste, y compris sur téléphone. */}
           <Link
             href="/login"
-            className="inline-flex min-h-11 items-center justify-center rounded-lg px-2 text-sm font-medium text-foreground/80 transition-colors duration-200 ease-out-expo hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-3 [@media(pointer:coarse)]:min-h-11"
+            className="hidden min-h-11 items-center justify-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors duration-200 ease-out-expo hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:inline-flex"
           >
-            Connexion
+            Se connecter
           </Link>
-          <LinkButton href="/register" size="md" className="px-3 sm:px-4">
+
+          <LinkButton href="/register" variant="primary" size="md" className="px-3 font-semibold sm:px-4">
             <span className="sm:hidden">Compte</span>
             <span className="hidden sm:inline">Créer un compte</span>
           </LinkButton>
@@ -136,7 +130,7 @@ export function SiteHeader() {
           <button
             ref={buttonRef}
             type="button"
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-foreground transition-colors duration-200 ease-out-expo hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-foreground transition-colors duration-200 ease-out-expo hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
             aria-label={open ? 'Fermer le menu' : 'Ouvrir le menu'}
             aria-expanded={open}
             aria-controls={panelId}
@@ -175,6 +169,7 @@ export function SiteHeader() {
                 <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
+
             <ul className="mt-4 flex flex-col gap-1">
               {links.map((link) => {
                 const current = pathname === link.href
@@ -186,7 +181,7 @@ export function SiteHeader() {
                       onClick={closeMenu}
                       className={cn(
                         'flex min-h-11 items-center rounded-lg px-3 text-base font-medium transition-colors duration-200 ease-out-expo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                        current ? 'bg-muted text-foreground' : 'text-foreground/80 hover:bg-muted hover:text-foreground',
+                        current ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                       )}
                     >
                       {link.label}
@@ -195,14 +190,18 @@ export function SiteHeader() {
                 )
               })}
             </ul>
-            <div className="mt-6 border-t border-border pt-4">
+
+            <div className="mt-6 space-y-3 border-t border-border pt-4">
               <Link
                 href="/login"
                 onClick={closeMenu}
-                className="flex min-h-11 items-center justify-center rounded-lg border border-input px-4 text-base font-medium transition-colors duration-200 ease-out-expo hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex min-h-11 items-center justify-center rounded-xl border border-input px-4 text-base font-medium transition-colors duration-200 ease-out-expo hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                Connexion
+                Se connecter
               </Link>
+              <LinkButton href="/register" variant="primary" size="md" className="w-full justify-center font-semibold" onClick={closeMenu}>
+                Créer un compte
+              </LinkButton>
             </div>
           </div>
         </div>
