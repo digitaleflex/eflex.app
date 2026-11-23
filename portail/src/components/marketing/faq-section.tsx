@@ -35,7 +35,7 @@ function buildFaqs(): FaqItem[] {
     {
       question: 'Les sauvegardes de bases de données sont-elles automatiques ?',
       answer:
-        'Les sauvegardes automatiques concernent uniquement les bases PostgreSQL gérées, lorsqu’elles sont planifiées. Coolify ne sauvegarde pas Redis. Une copie hors serveur dépend de la configuration de stockage S3 disponible. La restauration doit toujours être vérifiée avant d’être considérée comme fiable.',
+        'Les sauvegardes automatiques concernent uniquement les bases PostgreSQL gérées, lorsqu’elles sont planifiées. Redis n’est pas sauvegardé. Une copie hors serveur dépend de la configuration de stockage S3 disponible. La restauration doit toujours être vérifiée avant d’être considérée comme fiable.',
     },
     {
       question: 'Un volume Docker remplace-t-il une sauvegarde ?',

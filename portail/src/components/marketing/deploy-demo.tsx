@@ -36,7 +36,7 @@ const STEPS = [
   { id: 2, label: 'Analyse en lecture seule', detail: 'Next.js 15 · Node.js 22 · pnpm', icon: Search },
   { id: 3, label: 'BuildPlan validé', detail: 'Port 3000 · commande de démarrage prête', icon: FileCode2 },
   { id: 4, label: 'Construction', detail: 'Image applicative construite', icon: Server },
-  { id: 5, label: 'Mise en ligne', detail: 'Runtime Coolify · HTTPS actif', icon: ShieldCheck },
+  { id: 5, label: 'Mise en ligne', detail: 'Hébergement EFLEX · HTTPS actif', icon: ShieldCheck },
 ] as const
 
 const LOGS = [
@@ -46,7 +46,7 @@ const LOGS = [
   { step: 3, state: 'provisioning', time: '00:08', text: 'BuildPlan généré : port 3000, build pnpm, démarrage next start' },
   { step: 4, state: 'building', time: '00:14', text: 'Construction de l’image applicative…' },
   { step: 4, state: 'building', time: '00:36', text: 'Build terminé avec succès' },
-  { step: 5, state: 'deploying', time: '00:42', text: 'Déploiement sur le runtime Coolify…' },
+  { step: 5, state: 'deploying', time: '00:42', text: 'Déploiement sur l’hébergement EFLEX…' },
   { step: 5, state: 'live', time: '00:48', text: 'Application disponible avec HTTPS actif' },
 ] as const
 
@@ -61,7 +61,7 @@ function StepIcon({ index }: { index: number }) {
 
 function StatePill({ index, label }: { index: number; label: string }) {
   return (
-    <li className={`dd-state dd-state-${index} rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/70`}>
+    <li className={`dd-state dd-state-${index} rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-medium text-white/70`}>
       {label}
     </li>
   )

@@ -84,7 +84,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ─── Zones suivantes ─── */}
+        {/* ─── Technologies ─── */}
         <section id="technologies" aria-labelledby="technologies-titre" className="scroll-mt-20 py-16 md:py-24">
             <div className="container">
               <div className="mx-auto max-w-3xl space-y-4 text-center">
@@ -105,13 +105,22 @@ export default function HomePage() {
             </div>
           </section>
 
+          {/* ─── Détection ─── */}
+
           <DetectionShowcase />
+          {/* ─── Pipeline de déploiement ─── */}
           <DeploymentPipeline />
+          {/* ─── Infrastructure ─── */}
           <InfrastructureDiagram />
+          {/* ─── Exploitation ─── */}
           <OperationsBento />
+          {/* ─── Agences ─── */}
           <AgencyOverview />
+          {/* ─── Migration ─── */}
           <MigrationTeaser contactEmail={contactEmail} />
+          {/* ─── Questions ─── */}
           <FaqSection contactEmail={contactEmail} />
+        {/* ─── Appel final ─── */}
         <FinalCta />
 
         <SiteFooter />
