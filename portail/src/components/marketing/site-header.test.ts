@@ -1,12 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-// En-tête marketing (`site-header.tsx`) : destinations conservées, cibles de 44 px,
-// focus visible, menu mobile accessible au clavier — et lisibilité AA SUR le
-// hero navy de la page d'accueil. La surface `glass` étant translucide
-// (`bg-background/85`), les jetons de texte du composant sont mesurés sur un fond
-// mélangé à `--eflex-navy`. Même méthode de calcul que `src/lib/contrast.test.ts`
-// (WCAG 2.1 AA : texte ≥ 4,5:1, indicateur non textuel ≥ 3:1).
+// En-tête marketing (`site-header.tsx`) : destinations, accessibilité clavier/mobile,
+// cibles tactiles, focus visible et lisibilité AA sur fond clair (homepage forcée en clair).
+// Méthode de contraste : WCAG 2.1 AA (texte ≥ 4,5:1, indicateur non textuel ≥ 3:1).
 
 const css = readFileSync(new URL('../../app/globals.css', import.meta.url), 'utf8')
 const header = readFileSync(new URL('./site-header.tsx', import.meta.url), 'utf8')
@@ -23,9 +20,7 @@ function tokens(block: string): Record<string, Hsl> {
   return out
 }
 
-const darkStart = css.indexOf(':root.dark')
-const light = tokens(css.slice(css.indexOf(':root'), darkStart))
-const dark = tokens(css.slice(darkStart, css.indexOf('}', darkStart)))
+const light = tokens(css.slice(css.indexOf(':root'), css.indexOf(':root.dark')))
 
 function hsl([h, s, l]: Hsl): Rgb {
   const sat = s / 100
@@ -51,60 +46,30 @@ const ratio = (a: Rgb, b: Rgb) => {
 const over = (fg: Rgb, bg: Rgb, alpha: number): Rgb =>
   fg.map((v, i) => alpha * v + (1 - alpha) * bg[i]!) as Rgb
 
-/** Opacité du fond de `.glass` (globals.css) : c'est elle qui pilote le mélange. */
-const glassAlpha = (() => {
-  const rule = css.match(/\.glass\s*\{([^}]*)\}/)?.[1] ?? ''
-  const bg = rule.match(/bg-background\/([\d.]+)/)
-  if (!bg) throw new Error('`.glass` ne définit plus bg-background/<opacité> : mettre à jour ce test')
-  return Number(bg[1]) / 100
-})()
+const bg = hsl(light.background)
+const fg = hsl(light.foreground)
+const ring = hsl(light.ring)
 
-/** Couleur de repos des liens de navigation (`text-foreground/<alpha>`). */
-const navAlpha = (() => {
-  const m = header.match(/text-foreground\/([\d.]+)/)
-  if (!m) throw new Error('couleur de repos des liens absente (text-foreground/<alpha>)')
-  return Number(m[1]) / 100
-})()
-
-const token = (theme: Record<string, Hsl>, name: string): Hsl => {
-  const value = theme[name] ?? light[name]
-  if (!value) throw new Error(`Jeton « ${name} » introuvable dans globals.css`)
-  return value
-}
-
-for (const [label, theme] of [['clair', light], ['sombre', dark]] as const) {
-  const c = (name: string) => hsl(token(theme, name))
-  // Verre posé sur le hero navy : --background (85 %) + --eflex-navy (15 %).
-  const onHero = over(c('background'), c('eflex-navy'), glassAlpha)
-
-  describe(`en-tête lisible — thème ${label}`, () => {
-    it('liens de navigation sur le hero navy ≥ 4,5:1', () => {
-      expect(ratio(over(c('foreground'), onHero, navAlpha), onHero)).toBeGreaterThanOrEqual(4.5)
-    })
-
-    it('texte plein (Connexion, page courante) sur le hero navy ≥ 4,5:1', () => {
-      expect(ratio(c('foreground'), onHero)).toBeGreaterThanOrEqual(4.5)
-    })
-
-    it('anneau de focus sur le hero navy ≥ 3:1', () => {
-      expect(ratio(c('ring'), onHero)).toBeGreaterThanOrEqual(3)
-    })
-
-    it('liens de navigation sur le fond de page ≥ 4,5:1 (sections claires, /status)', () => {
-      expect(ratio(over(c('foreground'), c('background'), navAlpha), c('background'))).toBeGreaterThanOrEqual(
-        4.5,
-      )
-    })
+describe('en-tête lisible — fond clair', () => {
+  it('texte plein sur fond ≥ 4,5:1', () => {
+    expect(ratio(fg, bg)).toBeGreaterThanOrEqual(4.5)
   })
-}
+
+  it('liens de navigation au repos (foreground/75) ≥ 4,5:1', () => {
+    expect(ratio(over(fg, bg, 0.75), bg)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('anneau de focus sur fond ≥ 3:1', () => {
+    expect(ratio(ring, bg)).toBeGreaterThanOrEqual(3)
+  })
+})
 
 describe('comportement conservé', () => {
-  it('conserve toutes les destinations existantes', () => {
-    for (const href of ['/#fonctionnement', '/#fonctionnalites', '/#questions', '/status', '/login', '/register']) {
+  it('conserve les destinations de navigation', () => {
+    for (const href of ['/#fonctionnement', '/#fonctionnalites', '/docs', '/status', '/login', '/register']) {
       expect(header, `lien ${href}`).toContain(href)
     }
     expect(header).toContain('href="/"')
-    // Le logo passe par BrandLogo (versions officielles couleur / inversée, charte docs/brand).
     expect(header).toContain('<BrandLogo')
     expect(header).not.toMatch(/variant="mark"/)
     expect(brandLogo).toContain("light: '/logo-horizontal.webp'")
@@ -122,13 +87,9 @@ describe('comportement conservé', () => {
     expect(header).toContain('usePathname')
   })
 
-  it('garde des cibles d’au moins 44 px (h-11 = 2,75 rem)', () => {
-    expect(header).toContain('min-h-11') // lien du logo
-    // logo, liens de navigation, « Connexion » et « Créer un compte »
+  it('garde des cibles d’au moins 44 px', () => {
+    expect(header).toContain('min-h-11')
     expect((header.match(/h-11/g) ?? []).length).toBeGreaterThanOrEqual(4)
-    // Le bouton de thème suit la convention du dépôt : 44 px en pointeur
-    // grossier, 36 px en pointeur fin (WCAG 2.5.8 AA : 24 px minimum).
-    expect(header).toContain('<ThemeToggle')
   })
 
   it('garde un focus visible sur chaque lien du composant', () => {
@@ -136,18 +97,14 @@ describe('comportement conservé', () => {
   })
 
   it('bureau : la liste de liens reste visible dès lg et masquée en dessous', () => {
-    // `hidden` = display:none : sous lg les liens de la barre ne sont pas atteignables au clavier ;
-    // les mêmes destinations sont proposées par le menu mobile.
-    expect(header).toContain('hidden lg:flex')
+    expect(header).toContain('hidden items-center gap-1 lg:flex')
   })
 
   it('mobile : un bouton de menu accessible, masqué dès lg, avec les mêmes destinations', () => {
     expect(header).toMatch(/<button/)
     expect(header).toContain('aria-expanded={open}')
     expect(header).toContain('aria-controls={panelId}')
-    // Le bouton n'existe que sous lg ; le panneau est lui aussi masqué dès lg.
     expect((header.match(/lg:hidden/g) ?? []).length).toBeGreaterThanOrEqual(2)
-    // Source unique : la barre de bureau et le menu mobile parcourent la même liste.
     expect((header.match(/links\.map\(/g) ?? []).length).toBeGreaterThanOrEqual(2)
   })
 

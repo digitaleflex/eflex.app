@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Menu, X } from 'lucide-react'
-import { ThemeToggle } from '@/components/theme-switcher'
 import { LinkButton } from '@/components/link-button'
 import { cn } from '@/lib/utils'
 import { BrandLogo } from '@/components/brand-logo'
@@ -12,7 +11,7 @@ import { BrandLogo } from '@/components/brand-logo'
 const links = [
   { href: '/#fonctionnement', label: 'Fonctionnement' },
   { href: '/#fonctionnalites', label: 'Fonctionnalités' },
-  { href: '/#questions', label: 'Questions' },
+  { href: '/docs', label: 'Documentation' },
   { href: '/status', label: 'Statut' },
 ]
 
@@ -82,7 +81,7 @@ export function SiteHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-50 glass">
+    <header className="sticky top-0 z-50 border-b border-border/70 bg-background/90 backdrop-blur-md">
       <nav
         aria-label="Navigation du site"
         className="container flex h-16 items-center justify-between gap-2 sm:gap-4"
@@ -94,7 +93,7 @@ export function SiteHeader() {
           <BrandLogo alt="EFLEX — accueil" className="h-6 w-auto sm:h-7 lg:h-8" priority />
         </Link>
 
-        <ul className="hidden lg:flex items-center gap-1">
+        <ul className="hidden items-center gap-1 lg:flex">
           {links.map((link) => {
             const current = pathname === link.href
             return (
@@ -103,10 +102,10 @@ export function SiteHeader() {
                   href={link.href}
                   aria-current={current ? 'page' : undefined}
                   className={cn(
-                    'inline-flex h-11 items-center rounded-lg px-3 text-sm font-medium transition-colors duration-200 ease-out-expo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    'inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition-colors duration-200 ease-out-expo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     current
                       ? 'text-foreground'
-                      : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+                      : 'text-foreground/75 hover:bg-muted hover:text-foreground',
                   )}
                 >
                   {link.label}
@@ -117,18 +116,13 @@ export function SiteHeader() {
         </ul>
 
         <div className="flex items-center gap-1 sm:gap-2">
-          {/* 44 px en pointeur grossier (convention du dépôt), 36 px en pointeur fin.
-              Masqué sur l'accueil : la page est volontairement en thème clair. */}
-          {pathname !== '/' && <ThemeToggle className="mr-1 hidden sm:inline-flex" />}
-
-          {/* Connexion toujours accessible en un geste, y compris sur téléphone. */}
           <Link
             href="/login"
-            className="inline-flex min-h-11 items-center justify-center rounded-lg px-2 text-sm font-medium text-foreground/80 transition-colors duration-200 ease-out-expo hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-3 [@media(pointer:coarse)]:min-h-11"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg px-2 text-sm font-medium text-foreground/80 transition-colors duration-200 ease-out-expo hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-3"
           >
             Connexion
           </Link>
-          <LinkButton href="/register" size="md" className="px-3 sm:px-4">
+          <LinkButton href="/register" size="md" className="px-3 font-semibold sm:px-4">
             <span className="sm:hidden">Compte</span>
             <span className="hidden sm:inline">Créer un compte</span>
           </LinkButton>
@@ -136,7 +130,7 @@ export function SiteHeader() {
           <button
             ref={buttonRef}
             type="button"
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-foreground transition-colors duration-200 ease-out-expo hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-foreground transition-colors duration-200 ease-out-expo hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
             aria-label={open ? 'Fermer le menu' : 'Ouvrir le menu'}
             aria-expanded={open}
             aria-controls={panelId}

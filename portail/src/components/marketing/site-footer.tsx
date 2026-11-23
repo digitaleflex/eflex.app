@@ -5,19 +5,20 @@ import { BrandLogo } from '@/components/brand-logo'
 const productLinks = [
   { href: '/#fonctionnement', label: 'Fonctionnement' },
   { href: '/#fonctionnalites', label: 'Fonctionnalités' },
-  { href: '/#questions', label: 'Questions' },
+  { href: '/#technologies', label: 'Technologies compatibles' },
+  { href: '/tarifs', label: 'Tarification' },
 ]
 
 const resourceLinks = [
+  { href: '/docs', label: 'Documentation' },
   { href: '/status', label: 'Statut des services' },
   { href: '/login', label: 'Connexion' },
-  { href: '/register', label: 'Créer un compte' },
 ]
 
 const legalLinks = [
-  { href: '/mentions-legales', label: 'Mentions légales' },
   { href: '/conditions', label: 'Conditions d’utilisation' },
-  { href: '/confidentialite', label: 'Confidentialité' },
+  { href: '/confidentialite', label: 'Politique de confidentialité' },
+  { href: '/mentions-legales', label: 'Mentions légales' },
 ]
 
 function FooterColumn({ title, links }: { title: string; links: { href: string; label: string }[] }) {
@@ -45,15 +46,18 @@ export function SiteFooter() {
 
   return (
     <footer className="border-t border-border bg-background">
-      <div className="container grid gap-10 py-10 sm:grid-cols-2 sm:py-12 lg:grid-cols-5">
-        <div className="space-y-3 lg:col-span-2">
-          <BrandLogo className="h-6 w-auto" />
-          <p className="max-w-sm text-sm text-muted-foreground">Le déploiement depuis Git, sans DevOps.</p>
+      <div className="container grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="space-y-4 lg:col-span-2">
+          <BrandLogo className="h-7 w-auto" />
+          <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+            EFLEX aide les développeurs à mettre leurs applications en ligne depuis GitHub, sans gérer toute l’infrastructure
+            serveur.
+          </p>
           <div className="text-sm text-muted-foreground">
             <p className="font-medium text-foreground">Contact / support</p>
             <a
               href={`mailto:${company.email}`}
-              className="inline-flex min-h-11 items-center rounded-lg text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex min-h-11 items-center rounded-lg text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {company.email}
             </a>
