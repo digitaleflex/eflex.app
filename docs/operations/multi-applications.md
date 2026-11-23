@@ -19,7 +19,7 @@ Création d'un projet à plusieurs applications du même dépôt (1 à 10), une 
 - **Au plus 10 applications par projet.**
 - Les **dépendances entre dossiers du monorepo** (paquets partagés, workspaces) ne sont pas résolues par EFLEX : chaque application est construite depuis son dossier ; un paquet partagé hors de ce dossier peut manquer au build.
 - **Pas de cache de build partagé** entre applications : chaque application reconstruit tout (temps et ressources multipliés par le nombre d'applications).
-- **Pas de filtrage par chemin** à ce jour pour les déclenchements par webhook : un push redéploie toutes les applications du projet. (Le réglage « dossiers surveillés » existe, par application, dans la configuration avancée.)
+- **Filtrage par dossier sur les webhooks** : un push GitHub ne redéploie que les applications dont le dossier est touché ; si aucun dossier d'application n'est touché, rien n'est déployé (`webhooks/github`). Si la liste des fichiers modifiés est absente de la charge du webhook, le comportement par défaut s'applique. Le réglage « dossiers surveillés » de Coolify (configuration avancée, par application) est distinct de ce filtre.
 - Une application = une application Coolify = ses propres limites de ressources.
 
 ## Stratégie d'activation en production (proposée)
