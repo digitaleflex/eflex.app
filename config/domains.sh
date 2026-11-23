@@ -32,6 +32,10 @@ ENGINE_API_URL="https://${ENGINE_API_DOMAIN}"
 AXIOM_CONSOLE_DOMAIN="axiom.${EFLEX_ROOT_DOMAIN}"
 AXIOM_CONSOLE_URL="https://${AXIOM_CONSOLE_DOMAIN}"
 
+# --- Documentation produit -----------------------------------------------------
+DOCS_DOMAIN="docs.${EFLEX_ROOT_DOMAIN}"
+DOCS_URL="https://${DOCS_DOMAIN}"
+
 # --- Outils d'exploitation (installés depuis /admin/coolify → Supervision) ------
 # Couverts par le DNS wildcard ci-dessous. Les noms sont aussi réservés aux projets
 # clients : portail/src/lib/reserved-subdomains.ts (garder les deux listes alignées).
@@ -48,5 +52,6 @@ SCHEMA_ID="https://${EFLEX_ROOT_DOMAIN}/schema/v1.json"
 
 export EFLEX_ROOT_DOMAIN PORTAL_DOMAIN PORTAL_URL BETTER_AUTH_URL GOOGLE_OAUTH_REDIRECT
 export ENGINE_API_DOMAIN ENGINE_API_URL AXIOM_CONSOLE_DOMAIN AXIOM_CONSOLE_URL
+export DOCS_DOMAIN DOCS_URL
 export OPS_UPTIME_DOMAIN OPS_METRICS_DOMAIN OPS_LOGS_DOMAIN
 export WILDCARD_DOMAIN ACME_EMAIL SCHEMA_ID

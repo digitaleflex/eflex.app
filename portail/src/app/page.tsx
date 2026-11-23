@@ -36,7 +36,7 @@ export default function HomePage() {
             className="pointer-events-none absolute left-1/2 top-0 h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-primary/5 blur-3xl dark:bg-primary/10"
           />
 
-          <div className="container relative flex min-h-[calc(100svh-4rem)] items-center justify-center py-16 sm:py-20 md:py-24">
+          <div className="container relative py-16 sm:py-20 md:py-24 lg:py-28">
             <div className="mx-auto w-full max-w-[980px] text-center">
               <p className="animate-reveal inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-primary sm:text-[13px]">
                 <span aria-hidden="true" className="h-px w-6 bg-primary/60 sm:w-8" />
@@ -49,9 +49,9 @@ export default function HomePage() {
                 className="mt-7 animate-reveal text-balance font-extrabold tracking-tight text-foreground [font-size:clamp(2.75rem,7vw,5.5rem)] [line-height:1.02]"
                 style={{ '--d': '70ms' } as CSSProperties}
               >
-                <span className="block">Connectez votre code.</span>
+                <span className="block">Concentrez-vous sur votre code.</span>
                 <span className="mt-1 block sm:mt-2">
-                  <span className="text-primary">EFLEX</span> s’occupe du reste.
+                  <span className="text-primary">EFLEX</span> s’occupe du déploiement.
                 </span>
               </h1>
 

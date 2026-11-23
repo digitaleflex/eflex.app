@@ -125,6 +125,30 @@ services:
       retries: 3
 
   ###########################################################################
+  # DOCS — site de documentation Starlight (statique)
+  ###########################################################################
+  docs:
+    build:
+      context: .
+      dockerfile: docs-site/Dockerfile
+    container_name: eflex-docs
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.docs.rule=Host(`${DOCS_DOMAIN:?sourcer config/domains.sh}`)"
+      - "traefik.http.routers.docs.entrypoints=websecure"
+      - "traefik.http.routers.docs.tls.certresolver=letsencrypt"
+      - "traefik.http.services.docs.loadbalancer.server.port=80"
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ###########################################################################
   # MIGRATE — `prisma migrate deploy` dans le réseau interne (one-off)
   ###########################################################################
   migrate:
