@@ -10,45 +10,65 @@ Ce guide décrit le parcours standard pour mettre une application en ligne sur E
 ## Avant de commencer
 
 - Un compte EFLEX.
-- Un dépôt GitHub contenant votre application.
-- Un projet compatible avec la détection EFLEX, ou un `Dockerfile` / `docker-compose.yml` fourni par le dépôt.
+- Un dépôt Git contenant votre application.
+- Un projet détectable par EFLEX, ou un `Dockerfile` / un fichier Compose fourni par le dépôt.
 
-## 1. Connecter votre dépôt
+Si votre dépôt est sur GitHub, commencez par [Connecter GitHub](/demarrer/connecter-github/).
 
-1. Connectez-vous à EFLEX.
-2. Créez un projet.
-3. Autorisez l’accès GitHub si nécessaire.
-4. Sélectionnez le dépôt et la branche à déployer.
+## 1. Créer le projet
+
+1. Connectez-vous à [EFLEX](https://eflex.app).
+2. Créez un nouveau projet.
+3. Sélectionnez le dépôt et la branche à déployer.
+4. Vérifiez les informations détectées.
 
 ## 2. Vérifier l’analyse
 
-EFLEX analyse le dépôt en lecture seule. Le détecteur identifie notamment :
+EFLEX analyse le dépôt en lecture seule. Le résultat peut inclure :
 
-- le framework ou le runtime ;
+- le framework ou le type de projet ;
+- le runtime ;
 - les commandes d’installation, de build et de démarrage ;
 - le port d’écoute ;
-- les avertissements, questions ou alternatives éventuelles.
+- des avertissements, questions ou alternatives.
 
-Vérifiez le plan proposé avant de lancer le déploiement.
+Prenez le temps de vérifier ce plan avant de lancer le déploiement, surtout si le projet a une configuration atypique.
 
-## 3. Configurer les variables
+## 3. Configurer les variables d’environnement
 
-Ajoutez les variables d’environnement nécessaires avant le premier déploiement. Les valeurs sont chiffrées côté EFLEX et ne sont pas réaffichées en clair après enregistrement.
+Ajoutez les variables nécessaires avant le premier déploiement : clés API, URL de base, secrets applicatifs, etc.
 
-Voir : [Variables d’environnement](/reference/variables-environnement/).
+- Les valeurs sont chiffrées par EFLEX.
+- Elles ne sont pas réaffichées en clair après enregistrement.
+- Elles ne doivent pas être commitées dans le dépôt.
+
+Voir [Variables d’environnement](/reference/variables-environnement/).
 
 ## 4. Lancer le déploiement
 
-EFLEX met le déploiement en file, prépare l’environnement, construit l’application puis la déploie. Les états possibles incluent : en attente, analyse, provisionnement, construction, déploiement, en ligne, échec ou annulé.
+Le déploiement passe par plusieurs états :
 
-## 5. Vérifier le résultat
+```text
+queued → analyzing → provisioning → building → deploying → live
+```
 
-Une fois le déploiement terminé :
+En cas de problème, l’état passe à `failed`. Vous pouvez aussi annuler un déploiement en cours.
+
+Voir [États de déploiement](/reference/etats-deploiement/).
+
+## 5. Vérifier l’application
+
+Une fois l’application en ligne :
 
 - ouvrez l’URL fournie ;
-- consultez les journaux de build et d’exécution ;
-- vérifiez les variables ou la configuration en cas d’échec.
+- vérifiez les journaux de build et d’exécution ;
+- testez les fonctionnalités critiques ;
+- ajoutez un domaine personnalisé si nécessaire.
 
-:::caution[Limites à connaître]
-Un plan multi-services généré sans `docker-compose.yml` fourni par le dépôt est refusé. La compatibilité détectée ne garantit pas à elle seule qu’un projet particulier fonctionnera en production sans ajustement.
+## Si le déploiement échoue
+
+Consultez d’abord les [journaux et le redéploiement](/guides/journaux-et-redeploiement/), puis le guide [Dépannage](/guides/depannage/).
+
+:::caution[Compatibilité]
+La détection automatique aide à démarrer rapidement, mais elle ne garantit pas que tous les projets fonctionnent sans ajustement. Pour les cas complexes, utilisez un `Dockerfile`, un fichier Compose ou un `eflex.json`.
 :::

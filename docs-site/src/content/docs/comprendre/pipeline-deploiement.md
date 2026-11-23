@@ -5,7 +5,7 @@ sidebar:
   order: 1
 ---
 
-EFLEX transforme un dépôt en application déployée à travers un pipeline contrôlé.
+EFLEX transforme un dépôt en application déployée à travers un pipeline contrôlé. Chaque déploiement a un état visible et des journaux.
 
 ## États principaux
 
@@ -20,16 +20,19 @@ EFLEX transforme un dépôt en application déployée à travers un pipeline con
 | `failed` | Le déploiement a échoué ; les journaux permettent le diagnostic. |
 | `cancelled` | Le déploiement a été annulé. |
 
-## Ce qu’EFLEX fait
+## Ce que EFLEX fait
 
 - lit le dépôt en lecture seule lors de l’analyse ;
-- détecte la stack et propose un plan de build ;
-- exécute le build dans l’environnement de déploiement ;
+- détecte la stack et propose un plan ;
+- chiffre et injecte les variables d’environnement configurées ;
+- construit l’application dans l’environnement de déploiement ;
 - expose les journaux utiles au diagnostic ;
-- met à jour l’état visible du déploiement.
+- met à jour l’état du déploiement.
 
-## Ce qu’EFLEX ne promet pas
+## Ce que EFLEX ne promet pas
 
 - Aucun délai de déploiement garanti.
-- Aucune compatibilité certifiée pour tous les projets détectés.
-- Aucune sauvegarde automatique implicite pour tous les types de données.
+- Aucune compatibilité universelle pour tous les projets détectés.
+- Aucune restauration automatique implicite pour tous les types de données.
+
+Pour les comportements détaillés, voir [États de déploiement](/reference/etats-deploiement/) et [Détection du dépôt](/comprendre/detection/).

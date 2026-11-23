@@ -5,30 +5,46 @@ sidebar:
   order: 1
 ---
 
-Les variables d’environnement permettent de configurer une application sans modifier le code source.
+Les variables d’environnement permettent de configurer une application sans modifier le code source ni commiter de secrets.
 
 ## Comportement
 
 | Élément | Comportement |
 |---|---|
 | Stockage | Les valeurs sont enregistrées dans EFLEX, pas dans le dépôt Git. |
-| Chiffrement | Les valeurs sont chiffrées côté EFLEX avant stockage. |
+| Chiffrement | Les valeurs sont chiffrées avant stockage. |
 | Lecture | Les valeurs ne sont pas réaffichées en clair après enregistrement. |
-| Injection | Les variables sont transmises à l’application au moment du déploiement/exécution. |
-| Mise à jour | Modifier des variables peut nécessiter un nouveau déploiement pour être pris en compte. |
+| Injection | Les variables sont injectées dans l’environnement de l’application au déploiement/exécution. |
+| Mise à jour | Une modification peut nécessiter un nouveau déploiement pour être prise en compte. |
+| Import | L’interface permet d’ajouter plusieurs variables, notamment par collage d’un contenu `.env`. |
 
 ## Bonnes pratiques
 
-- Utilisez un nom clair : `DATABASE_URL`, `API_KEY`, `NODE_ENV`.
-- Ne commitez jamais de secret dans le dépôt.
-- Vérifiez les variables requises avant le premier déploiement.
-- Limitez les variables au strict nécessaire.
+- Utilisez des noms explicites : `DATABASE_URL`, `REDIS_URL`, `API_TOKEN`.
+- Ne commitez jamais de fichier `.env` contenant des secrets.
+- Ajoutez uniquement les variables nécessaires.
+- Vérifiez les formats attendus : URL, booléen, nombre, JSON, clé multiligne.
+- Faites tourner les secrets exposés par erreur.
+
+## Variables courantes
+
+| Variable | Usage typique |
+|---|---|
+| `DATABASE_URL` | Connexion à PostgreSQL. |
+| `REDIS_URL` | Connexion à Redis. |
+| `NODE_ENV` | Mode d’exécution Node.js. |
+| `PORT` | Port d’écoute, selon le runtime/framework. |
+
+:::caution[Secrets côté client]
+N’exposez pas de secret dans des variables destinées au frontend ou intégrées au build client. Toute valeur embarquée dans un bundle frontend doit être considérée comme publique.
+:::
 
 ## Dépannage
 
-Si une application échoue au démarrage :
+Si une application échoue après configuration :
 
-1. Vérifiez les journaux de déploiement.
-2. Confirmez la présence des variables requises.
-3. Vérifiez les formats attendus (URL, booléen, nombre, clé).
-4. Relancez un déploiement après correction.
+1. Vérifiez que les variables requises existent.
+2. Vérifiez les noms exacts, y compris la casse.
+3. Vérifiez les valeurs et les espaces superflus.
+4. Relancez un déploiement.
+5. Consultez les [journaux](/guides/journaux-et-redeploiement/).
