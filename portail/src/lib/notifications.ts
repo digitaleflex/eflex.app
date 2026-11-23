@@ -19,6 +19,7 @@ export const NOTIFICATION_TYPES = {
   'analytics.traffic_drop': { label: 'Chute de trafic détectée', description: 'Quand le trafic mesuré d’une application baisse sous le seuil configuré par rapport à la période précédente.' },
   'site_monitor.down': { label: 'Site indisponible', description: 'Quand un site client surveillé devient indisponible de façon persistante (propriétaires et administrateurs).' },
   'site_monitor.recovered': { label: 'Site rétabli', description: 'Quand un site client surveillé redevient disponible après un incident (propriétaires et administrateurs).' },
+  'site_monitor.tls_expiring': { label: 'Certificat bientôt expiré', description: 'Quand le certificat TLS d’un site surveillé expire dans 14, 7, 3 ou 1 jour (propriétaires et administrateurs).' },
 } as const
 
 export type NotificationType = keyof typeof NOTIFICATION_TYPES

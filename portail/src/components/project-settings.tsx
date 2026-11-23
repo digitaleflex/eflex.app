@@ -481,7 +481,11 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
   async function deleteProject() {
     setDeleteError('')
     try {
-      const response = await fetch(`/api/projects/${project.id}`, { method: 'DELETE' })
+      const response = await fetch(`/api/projects/${project.id}`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ confirmName: project.name }),
+      })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
         setDeleteError(data.error || 'Le projet n’a pas pu être supprimé.')
@@ -730,7 +734,7 @@ export function ProjectSettings({ project, apps: initialApps = [], imageSource =
         id="domaines"
         title="Domaines"
         icon={Globe}
-        description="Le domaine EFLEX reste stable. Ajoutez vos propres domaines avec un CNAME ; le certificat SSL est émis automatiquement après vérification."
+        description="Le domaine EFLEX reste stable. Ajoutez vos propres domaines : un CNAME pour un sous-domaine, un enregistrement A pour un domaine racine. Le certificat SSL est émis automatiquement après vérification."
       >
         <ProjectDomains projectId={project.id} apps={apps.map((app) => ({ id: app.id, name: app.name }))} />
       </SettingsSection>

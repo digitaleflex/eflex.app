@@ -845,3 +845,38 @@ describe('sauvegardes de bases', () => {
     expect((await getDatabaseImportStatus('db-1', '42') as { state: string }).state).toBe('failed')
   })
 })
+
+describe('réglages avancés non écrasés au déploiement (#187)', () => {
+  const ADVANCED = /^(health_check_|limits_|watch_paths)/
+
+  it('la création d’une application depuis un dépôt n’envoie aucun champ de configuration avancée', async () => {
+    const calls = mockFetch((url, init) => {
+      if (url.endsWith('/applications/public')) return json({ uuid: 'app' }, 201)
+      return targetHandler(true)(url, init)
+    })
+    const { createApplication } = await loadModule()
+    await createApplication({ name: 'demo', gitRepository: 'https://github.com/o/r', gitBranch: 'main', buildPack: 'nixpacks', portsExposes: '3000' })
+    const body = JSON.parse(String(calls.find((c) => c.url.endsWith('/applications/public'))?.init?.body))
+    expect(Object.keys(body).filter((key) => ADVANCED.test(key))).toEqual([])
+  })
+
+  it('la création depuis une image Docker non plus', async () => {
+    const calls = mockFetch((url, init) => {
+      if (url.endsWith('/applications/dockerimage')) return json({ uuid: 'app' }, 201)
+      return targetHandler(true)(url, init)
+    })
+    const { createDockerImageApplication } = await loadModule()
+    await createDockerImageApplication({ name: 'demo', dockerRegistryImageName: 'nginx:1.27', portsExposes: '80' })
+    const body = JSON.parse(String(calls.find((c) => c.url.endsWith('/applications/dockerimage'))?.init?.body))
+    expect(Object.keys(body).filter((key) => ADVANCED.test(key))).toEqual([])
+  })
+
+  it('la mise à jour des commandes de build ne touche ni santé, ni limites, ni dossiers surveillés', async () => {
+    const calls = mockFetch(() => json({ message: 'ok' }))
+    const { updateApplication } = await loadModule()
+    await updateApplication('app-1', { buildCommand: 'npm run build', startCommand: 'npm start', portsExposes: '3000', baseDirectory: '/' })
+    const patch = calls.find((c) => (c.init?.method ?? 'GET') === 'PATCH')
+    expect(patch).toBeDefined()
+    expect(Object.keys(JSON.parse(String(patch?.init?.body))).filter((key) => ADVANCED.test(key))).toEqual([])
+  })
+})

@@ -32,8 +32,19 @@
  * n'est pas appliquée aux réponses consommées par du code non-navigateur.
  */
 
-/** Nom de l'en-tête CSP. Passer à `Content-Security-Policy` pour appliquer. */
+/** Nom de l'en-tête CSP par défaut (signale sans bloquer). */
 export const CONTENT_SECURITY_POLICY_HEADER = 'Content-Security-Policy-Report-Only'
+/** En-tête appliqué (bloque) : activé par `CSP_ENFORCE=1` (audit S7, issue #172). */
+export const CONTENT_SECURITY_POLICY_ENFORCED_HEADER = 'Content-Security-Policy'
+
+/**
+ * La CSP est évaluée au **démarrage de Next** (`headers()` de next.config) : `CSP_ENFORCE` doit donc être défini
+ * à la construction de l'image et au lancement, puis le portail redéployé.
+ * @param {Record<string, string | undefined>} [env]
+ */
+export function cspEnforced(env = process.env) {
+  return env.CSP_ENFORCE === '1' || env.CSP_ENFORCE === 'true'
+}
 
 /**
  * Politique CSP (Report-Only).
@@ -59,10 +70,10 @@ export const CONTENT_SECURITY_POLICY = [
 /**
  * Construit la liste des en-têtes de sécurité.
  *
- * @param {{ production?: boolean }} [options]
+ * @param {{ production?: boolean, enforce?: boolean }} [options]
  * @returns {{ key: string, value: string }[]}
  */
-export function securityHeaders({ production = process.env.NODE_ENV === 'production' } = {}) {
+export function securityHeaders({ production = process.env.NODE_ENV === 'production', enforce = cspEnforced() } = {}) {
   /** @type {{ key: string, value: string }[]} */
   const headers = []
 
@@ -89,7 +100,10 @@ export function securityHeaders({ production = process.env.NODE_ENV === 'product
       value: 'camera=(), microphone=(), geolocation=(), payment=(self)',
     },
     { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
-    { key: CONTENT_SECURITY_POLICY_HEADER, value: CONTENT_SECURITY_POLICY },
+    {
+      key: enforce ? CONTENT_SECURITY_POLICY_ENFORCED_HEADER : CONTENT_SECURITY_POLICY_HEADER,
+      value: CONTENT_SECURITY_POLICY,
+    },
   )
 
   return headers
