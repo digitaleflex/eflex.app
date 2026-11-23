@@ -34,10 +34,22 @@ export function RedeployButton({
       const query = appId ? `?appId=${encodeURIComponent(appId)}` : ''
       const response = await fetch(`/api/projects/${projectId}/redeploy${query}`, { method: 'POST' })
       if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { error?: string }
-        toast({ title: 'Redéploiement impossible', description: data.error ?? 'Réessayez dans un instant.', variant: 'error' })
+        const data = (await response.json().catch(() => ({}))) as { error?: string; issues?: Array<{ message: string; action: string }> }
+        // Pré-vérification refusée (#164) : message et action concrète plutôt qu'une erreur générique.
+        const first = data.issues?.[0]
+        toast({
+          title: 'Redéploiement impossible',
+          description: first ? `${first.message} ${first.action}` : (data.error ?? 'Réessayez dans un instant.'),
+          variant: 'error',
+        })
       } else {
-        toast({ title: 'Déploiement lancé', description: 'Suivez sa progression dans l’onglet Déploiements.', variant: 'success' })
+        const data = (await response.json().catch(() => ({}))) as { warnings?: Array<{ message: string; action: string }> }
+        const warning = data.warnings?.[0]
+        toast({
+          title: 'Déploiement lancé',
+          description: warning ? `Attention : ${warning.message} ${warning.action}` : 'Suivez sa progression dans l’onglet Déploiements.',
+          variant: warning ? 'info' : 'success',
+        })
         router.refresh()
       }
     } catch {

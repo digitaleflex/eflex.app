@@ -63,7 +63,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const blocking = blockingIssues(issues)
   if (blocking.length > 0) {
     return NextResponse.json(
-      { error: blocking[0]!.message, code: 'preflight_failed', issues: blocking },
+      { error: `${blocking[0]!.message} ${blocking[0]!.action}`, code: 'preflight_failed', issues: blocking },
       { status: 422 },
     )
   }
