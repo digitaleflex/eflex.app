@@ -1,0 +1,47 @@
+---
+title: Documentation EFLEX
+description: Guides, références et explications pour déployer et exploiter vos applications sur EFLEX.
+template: splash
+hero:
+  tagline: Déployez, configurez et exploitez vos applications EFLEX avec des guides clairs et factuels.
+  actions:
+    - text: Démarrer
+      link: /demarrer/premier-deploiement/
+      icon: right-arrow
+      variant: primary
+    - text: Aller sur EFLEX
+      link: https://eflex.app
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Par où commencer
+
+<CardGrid stagger>
+  <Card title="Démarrer" icon="rocket">
+    Connectez GitHub, analysez votre dépôt et lancez votre premier déploiement.
+
+    [Premier déploiement](/demarrer/premier-deploiement/)
+  </Card>
+  <Card title="Guides pratiques" icon="open-book">
+    Configurez un domaine, des variables d’environnement, des bases de données et le suivi.
+
+    [Voir les guides](/guides/domaines/)
+  </Card>
+  <Card title="Référence" icon="information">
+    Retrouvez les comportements, limites et paramètres importants.
+
+    [Variables d’environnement](/reference/variables-environnement/)
+  </Card>
+  <Card title="Comprendre" icon="magnifier">
+    Comprenez comment EFLEX analyse, construit et déploie une application.
+
+    [Pipeline de déploiement](/comprendre/pipeline-deploiement/)
+  </Card>
+</CardGrid>
+
+:::note[Documentation en évolution]
+Cette documentation décrit le comportement actuel d’EFLEX. Lorsqu’une capacité est partielle, conditionnelle ou à venir, elle est indiquée explicitement.
+:::
