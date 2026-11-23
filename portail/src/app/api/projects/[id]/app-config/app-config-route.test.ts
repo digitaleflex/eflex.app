@@ -12,10 +12,12 @@ vi.mock('@/lib/organizations', () => ({
   canManageProjects: () => true,
   resolveOrganization: async () => ({ organizationId: 'o1', role: 'owner' }),
 }))
+// Plan Pro : plafond de 2 Go / 2 CPU, identique au plafond global par défaut des tests.
+vi.mock('@/lib/billing', () => ({ effectivePlan: async () => ({ id: 'pro' }) }))
 vi.mock('@/lib/tenant', () => ({
   requireManagedProject: async () => ({
     org: { organizationId: 'o1', role: 'owner' },
-    project: { id: 'p1', apps: [{ id: 'a1', name: 'web', coolifyAppId: 'coolify-1', position: 0 }] },
+    project: { id: 'p1', organizationId: 'o1', apps: [{ id: 'a1', name: 'web', coolifyAppId: 'coolify-1', position: 0 }] },
   }),
 }))
 vi.mock('@/lib/coolify', () => ({
