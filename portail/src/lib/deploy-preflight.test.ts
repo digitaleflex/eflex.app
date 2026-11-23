@@ -33,4 +33,17 @@ describe('pré-vérifications de déploiement (#164)', () => {
     const text = JSON.stringify(preflightChecks({ ...ok, framework: 'laravel', envKeys: ['SECRET_TOKEN'] }))
     expect(text).not.toContain('SECRET_TOKEN')
   })
+
+  it('avertit quand le plan déclare des volumes alors que la persistance est désactivée (#162)', () => {
+    const issues = preflightChecks({ ...ok, volumeMounts: ['/app/storage', '/app/uploads'], persistentVolumesEnabled: false })
+    expect(issues).toEqual([expect.objectContaining({ code: 'volumes-not-persisted', level: 'warning' })])
+    expect(issues[0]!.message).toContain('/app/storage')
+    expect(blockingIssues(issues)).toEqual([])
+  })
+
+  it('ne dit rien quand les volumes sont réellement créés ou qu’il n’y en a pas', () => {
+    expect(preflightChecks({ ...ok, volumeMounts: ['/app/storage'], persistentVolumesEnabled: true })).toEqual([])
+    expect(preflightChecks({ ...ok, volumeMounts: [], persistentVolumesEnabled: false })).toEqual([])
+    expect(preflightChecks({ ...ok })).toEqual([])
+  })
 })
