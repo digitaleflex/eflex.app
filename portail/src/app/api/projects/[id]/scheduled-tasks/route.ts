@@ -4,16 +4,22 @@ import { createScheduledTask, listScheduledTasks } from '@/lib/coolify'
 import { canManageProjects } from '@/lib/organizations'
 import { requireManagedProject } from '@/lib/tenant'
 import { z } from 'zod'
+import {
+  validateContainerName,
+  validateCronExpression,
+  validateTaskCommand,
+  validateTaskName,
+} from '@/lib/scheduled-task-validation'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 const createSchema = z.object({
   appId: z.string().min(1).optional(),
-  name: z.string().min(1).max(120),
-  command: z.string().min(1).max(4000),
-  frequency: z.string().min(1).max(120),
-  containerName: z.string().min(1).max(200).optional().nullable(),
+  name: z.string().min(1).max(120).refine(validateTaskName, 'Nom invalide.'),
+  command: z.string().min(1).max(4000).refine(validateTaskCommand, 'Commande invalide : une seule ligne, sans caractère de contrôle.'),
+  frequency: z.string().min(1).max(120).refine(validateCronExpression, 'Planification invalide (5 champs cron ou hourly/daily/weekly/monthly).'),
+  containerName: z.string().min(1).max(200).refine(validateContainerName, 'Nom de conteneur invalide.').optional().nullable(),
   enabled: z.boolean().optional(),
 })
 
