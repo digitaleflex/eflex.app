@@ -257,13 +257,13 @@ export function DeploymentPipeline() {
 
   return (
     <section
-      id="deploiement"
-      aria-labelledby="deploiement-titre"
+      id="fonctionnement"
+      aria-labelledby="fonctionnement-titre"
       className="scroll-mt-20 border-y border-border bg-muted/25 py-16 md:py-24"
     >
       <div className="container">
         <div className="mx-auto max-w-3xl space-y-4 text-center">
-          <h2 id="deploiement-titre" className="text-display-sm font-extrabold tracking-tight text-balance text-foreground">
+          <h2 id="fonctionnement-titre" className="text-display-sm font-extrabold tracking-tight text-balance text-foreground">
             Un pipeline lisible, du dépôt à la mise en ligne.
           </h2>
           <p className="mx-auto max-w-2xl text-lead-lg text-muted-foreground text-pretty">

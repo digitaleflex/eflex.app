@@ -16,20 +16,22 @@ const DEFAULT_ITEMS: HeroProofItem[] = [
 export function HeroProof({
   items = DEFAULT_ITEMS,
   className = '',
+  iconClassName = 'text-primary',
 }: {
   items?: HeroProofItem[]
   className?: string
+  iconClassName?: string
 }) {
   return (
     <ul
-      className={`mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-x-5 gap-y-3 text-sm text-muted-foreground ${className}`.trim()}
+      className={`mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-x-5 gap-y-3 text-sm ${className}`.trim()}
       aria-label="Points de réassurance"
     >
       {items.map((item) => {
         const Icon = item.icon
         return (
           <li key={item.label} className="inline-flex items-center gap-2">
-            <Icon className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+            <Icon className={`h-4 w-4 shrink-0 ${iconClassName}`} aria-hidden="true" />
             <span>{item.label}</span>
           </li>
         )

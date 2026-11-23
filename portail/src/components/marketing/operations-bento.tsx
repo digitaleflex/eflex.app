@@ -223,13 +223,13 @@ function SupportScene() {
 export function OperationsBento() {
   return (
     <section
-      id="operations"
-      aria-labelledby="operations-titre"
+      id="fonctionnalites"
+      aria-labelledby="fonctionnalites-titre"
       className="scroll-mt-20 border-y border-border bg-muted/25 py-16 md:py-24"
     >
       <div className="container">
         <SectionHeading
-          id="operations-titre"
+          id="fonctionnalites-titre"
           title="Suivez, comprenez, exploitez."
           lead="Des outils concrets pour suivre vos déploiements, vérifier l’état de vos services et obtenir de l’aide quand vous en avez besoin."
         />

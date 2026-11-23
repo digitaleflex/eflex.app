@@ -66,7 +66,7 @@ describe('en-tête lisible — fond clair', () => {
 
 describe('comportement conservé', () => {
   it('conserve les destinations de navigation', () => {
-    for (const href of ['/#fonctionnement', '/#fonctionnalites', '/docs', '/status', '/login', '/register']) {
+    for (const href of ['/#fonctionnement', '/#fonctionnalites', '/#technologies', '/docs', '/status', '/login', '/register']) {
       expect(header, `lien ${href}`).toContain(href)
     }
     expect(header).toContain('href="/"')
