@@ -43,7 +43,7 @@ const rows = [STACKS.slice(0, half), STACKS.slice(half)]
 
 function Pill({ stack }: { stack: (typeof STACKS)[number] }) {
   return (
-    <span className="inline-flex h-14 shrink-0 items-center gap-3 whitespace-nowrap rounded-full border border-border bg-card px-5 text-base font-semibold text-foreground">
+    <span className="inline-flex h-14 shrink-0 items-center gap-3 whitespace-nowrap rounded-full border border-border bg-card px-5 text-base font-semibold text-foreground transition-[border-color,background-color,color,box-shadow] duration-200 ease-out-expo hover:border-primary/40 hover:bg-primary/5 hover:text-primary hover:shadow-sm">
       <FrameworkIcon framework={stack.id} alt="" className="h-7 w-7 p-1" />
       {stack.name}
       {stack.soon && (

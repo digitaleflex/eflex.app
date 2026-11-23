@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { ArrowRight, PlayCircle } from 'lucide-react'
 import { SiteHeader } from '@/components/marketing/site-header'
 import { SiteFooter } from '@/components/marketing/site-footer'
-import { TechStack } from '@/components/marketing/tech-stack'
+import { TechMarquee } from '@/components/marketing/tech-marquee'
 import { DetectionShowcase } from '@/components/marketing/detection-showcase'
 import { DeploymentPipeline } from '@/components/marketing/deployment-pipeline'
 import { InfrastructureDiagram } from '@/components/marketing/infrastructure-diagram'
@@ -97,7 +97,13 @@ export default function HomePage() {
                   EFLEX analyse vos projets et prépare leur déploiement selon leur configuration.
                 </p>
               </div>
-              <TechStack />
+              <div className="mt-10 md:mt-12">
+              <TechMarquee />
+              <p className="mx-auto mt-6 max-w-3xl text-center text-sm leading-relaxed text-muted-foreground text-pretty">
+                Un <code className="font-mono text-xs">Dockerfile</code>, un <code className="font-mono text-xs">docker-compose.yml</code> ou un{' '}
+                <code className="font-mono text-xs">eflex.json</code> dans votre dépôt ? EFLEX l’utilise tel quel.
+              </p>
+            </div>
             </div>
           </section>
 
