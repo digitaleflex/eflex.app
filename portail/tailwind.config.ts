@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  // Thème clair unique (issue #220) : la classe `dark` n'est plus jamais posée, donc `dark:` ne s'applique jamais.
   darkMode: 'class',
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',

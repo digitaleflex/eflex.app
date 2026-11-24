@@ -13,9 +13,14 @@ function tokens(block: string): Record<string, [number, number, number]> {
   }
   return out
 }
-const darkStart = css.indexOf(':root.dark')
-const light = tokens(css.slice(css.indexOf(':root'), darkStart))
-const dark = tokens(css.slice(darkStart, css.indexOf('}', darkStart)))
+// Thème clair unique (issue #220) : seul le bloc `:root` définit les tokens ; on lit jusqu'à son accolade fermante.
+const rootStart = css.indexOf(':root {')
+let rootEnd = css.indexOf('{', rootStart)
+for (let depth = 0; rootEnd < css.length; rootEnd += 1) {
+  if (css[rootEnd] === '{') depth += 1
+  else if (css[rootEnd] === '}' && --depth === 0) break
+}
+const light = tokens(css.slice(rootStart, rootEnd))
 
 type RGB = [number, number, number]
 function hsl([h, s, l]: [number, number, number]): RGB {
@@ -67,7 +72,7 @@ const nonTextPairs = [
   ['anneau de focus sur fond', 'ring', 'background'],
 ] as const
 
-for (const [theme, t] of [['clair', light], ['sombre', dark]] as const) {
+for (const [theme, t] of [['clair', light]] as const) {
   const c = (name: string) => {
     const value = t[name] ?? light[name]
     if (!value) throw new Error(`Jeton « ${name} » introuvable dans globals.css`)
@@ -116,7 +121,6 @@ describe('couverture des jetons', () => {
     ]
     for (const name of required) {
       expect(light[name], `thème clair : ${name}`).toBeDefined()
-      expect(dark[name], `thème sombre : ${name}`).toBeDefined()
     }
   })
 })

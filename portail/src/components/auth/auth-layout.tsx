@@ -3,7 +3,6 @@ import Link from 'next/link'
 import { Database, Globe, GitBranch, Sparkles } from 'lucide-react'
 
 import { BrandLogo } from '@/components/brand-logo'
-import { ThemeToggle } from '@/components/theme-switcher'
 import { Card } from '@/components/ui/card'
 import { formatPrice, PLANS } from '@/lib/plans'
 
@@ -30,10 +29,6 @@ export function AuthLayout({
 }) {
   return (
     <div className="relative min-h-screen bg-muted/40">
-      <div className="absolute right-4 top-3 z-10 sm:right-6">
-        <ThemeToggle />
-      </div>
-
       <main
         id="contenu"
         tabIndex={-1}

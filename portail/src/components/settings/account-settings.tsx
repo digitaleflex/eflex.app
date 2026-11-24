@@ -3,11 +3,10 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { KeyRound, Mail, Palette, ShieldCheck, TriangleAlert, User } from 'lucide-react'
+import { KeyRound, Mail, ShieldCheck, TriangleAlert, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { ThemeSwitcher } from '@/components/theme-switcher'
 import { authClient, authErrorMessage } from '@/lib/auth-client'
 import {
   PASSPHRASE_HINT,
@@ -228,21 +227,6 @@ export function AccountSettings({
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <h3 className="font-semibold flex items-center gap-2">
-            <Palette className="w-4 h-4" aria-hidden="true" />
-            Apparence
-          </h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            Choisissez le thème de l’interface. « Système » suit le réglage de votre appareil.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <ThemeSwitcher />
         </CardContent>
       </Card>
 

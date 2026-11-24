@@ -5,7 +5,6 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LifeBuoy, LogOut, Settings, Users } from 'lucide-react'
 import { signOut } from '@/lib/auth-client'
-import { ThemeIcons } from '@/components/theme-switcher'
 import { useConnectionState } from '@/hooks/events-provider'
 import { cn } from '@/lib/utils'
 
@@ -59,11 +58,6 @@ export function UserMenu({ name, email }: { name: string; email: string }) {
           <Link href="/dashboard/organization" onClick={() => setOpen(false)} className={item}><Users className="h-4 w-4 text-muted-foreground" aria-hidden="true" />Équipe</Link>
           <Link href="/dashboard/support" onClick={() => setOpen(false)} className={item}><LifeBuoy className="h-4 w-4 text-muted-foreground" aria-hidden="true" />Aide & support</Link>
           <Link href="/dashboard/settings" onClick={() => setOpen(false)} className={item}><Settings className="h-4 w-4 text-muted-foreground" aria-hidden="true" />Paramètres</Link>
-          <div className="my-1 h-px bg-border" />
-          <div className="flex items-center justify-between gap-2 px-2.5 py-1.5">
-            <span className="text-sm">Thème</span>
-            <ThemeIcons />
-          </div>
           <div className="my-1 h-px bg-border" />
           <button type="button" className={item} onClick={async () => { await signOut(); router.push('/'); router.refresh() }}>
             <LogOut className="h-4 w-4 text-muted-foreground" aria-hidden="true" />Se déconnecter

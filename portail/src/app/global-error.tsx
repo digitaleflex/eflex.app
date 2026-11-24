@@ -13,7 +13,7 @@ import { useEffect } from 'react'
  * remplacées par des classes utilitaires ou des variables de thème.
  */
 const CRITICAL_STYLES = `
-  :root { color-scheme: light dark; }
+  :root { color-scheme: light; }
   * { box-sizing: border-box; }
   html, body { margin: 0; min-height: 100%; }
   body {
@@ -56,17 +56,7 @@ const CRITICAL_STYLES = `
   }
   .footer { margin-top: 1.5rem; font-size: 0.875rem; color: #4b5563; }
   .footer a { color: #1d4ed8; text-decoration: underline; text-underline-offset: 2px; }
-  @media (prefers-color-scheme: dark) {
-    body { background: #0b111a; color: #eef2f7; }
-    p, .reference, .footer { color: #aab4c4; }
-    .badge { background: #3b1414; color: #ffb4ab; }
-    .primary { background: #5b8cff; color: #0b111a; }
-    .primary:hover { background: #7ba4ff; }
-    .secondary { background: #111a26; color: #eef2f7; border-color: #5b6575; }
-    .secondary:hover { background: #1a2431; }
-    .footer a { color: #8db4ff; }
-    .button:focus-visible, a:focus-visible { outline-color: #8db4ff; }
-  }
+
 `
 
 export default function GlobalError({
@@ -85,7 +75,7 @@ export default function GlobalError({
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="color-scheme" content="light dark" />
+        <meta name="color-scheme" content="light" />
         <title>Erreur critique — EFLEX</title>
         <style dangerouslySetInnerHTML={{ __html: CRITICAL_STYLES }} />
       </head>
