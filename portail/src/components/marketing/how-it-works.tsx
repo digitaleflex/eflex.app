@@ -50,7 +50,7 @@ function RepoScene() {
           <span className="rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground">Sélectionné</span>
         </div>
       </div>
-      <div className="rounded-2xl border border-border bg-background/70 p-4 opacity-75">
+      <div className="rounded-2xl border border-border bg-background/70 p-4">
         <div className="flex items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted">
             <GithubMark className="h-4 w-4 text-foreground" />
@@ -148,8 +148,8 @@ export function HowItWorks() {
 
   return (
     <div className="mt-12 md:mt-14">
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:gap-10">
-        <div>
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:gap-10">
+        <div className="min-w-0">
           <div className="mb-6 flex items-center gap-2" aria-hidden="true">
             {steps.map((step, index) => (
               <div key={step.id} className="flex items-center gap-2">

@@ -38,7 +38,7 @@ function CapabilityItem({
   text: string
 }) {
   return (
-    <li className="flex gap-4 rounded-2xl border border-border bg-card p-4">
+    <div className="flex gap-4 rounded-2xl border border-border bg-card p-4">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
         <Icon className="h-5 w-5" aria-hidden="true" />
       </span>
@@ -46,7 +46,7 @@ function CapabilityItem({
         <h3 className="text-base font-semibold tracking-tight text-foreground">{title}</h3>
         <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{text}</p>
       </div>
-    </li>
+    </div>
   )
 }
 
@@ -118,9 +118,9 @@ export function AgencyOverview() {
 
             <ul className="space-y-3">
               {capabilities.map((item, index) => (
-                <div key={item.title} className="reveal-on-view" style={{ '--i': index } as CSSProperties}>
+                <li key={item.title} className="reveal-on-view" style={{ '--i': index } as CSSProperties}>
                   <CapabilityItem icon={item.icon} title={item.title} text={item.text} />
-                </div>
+                </li>
               ))}
             </ul>
           </div>

@@ -101,7 +101,7 @@ function DeploymentLogsScene() {
           <p><span className="text-eflexsky tabular-nums">00:08</span> Dépôt cloné</p>
           <p><span className="text-eflexsky tabular-nums">00:41</span> Build terminé</p>
           <p><span className="text-eflexsky tabular-nums">01:12</span> Service démarré</p>
-          <p className="text-success"><span className="tabular-nums">01:24</span> Application disponible</p>
+          <p className="font-semibold text-white"><span className="tabular-nums">01:24</span> Application disponible</p>
         </div>
         <p className="text-xs text-muted-foreground">Les journaux vous aident à suivre la construction et à diagnostiquer un échec.</p>
       </div>

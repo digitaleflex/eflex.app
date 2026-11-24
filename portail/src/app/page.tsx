@@ -54,6 +54,7 @@ export default function HomePage() {
       <SiteHeader />
 
       <main id="contenu" tabIndex={-1} className="flex-1">
+        {/* ─── Hero ─── */}
         <section
           aria-labelledby="hero-titre"
           className="hero-surface relative overflow-hidden border-b border-border/60 bg-background"
@@ -123,6 +124,7 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ─── Technologies ─── */}
         <section id="technologies" aria-labelledby="technologies-titre" className="scroll-mt-20 py-16 md:py-20">
           <div className="container">
             <div className="mx-auto max-w-3xl space-y-4 text-center">
@@ -139,6 +141,7 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ─── Fonctionnement ─── */}
         <section id="fonctionnement" aria-labelledby="fonctionnement-titre" className="scroll-mt-20 border-y border-border bg-muted/30 py-16 md:py-24">
           <div className="container">
             <div className="mx-auto max-w-3xl space-y-4 text-center">
@@ -153,6 +156,7 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ─── Fonctionnalités ─── */}
         <section id="fonctionnalites" aria-labelledby="fonctionnalites-titre" className="scroll-mt-20 py-16 md:py-24">
           <div className="container">
             <div className="mx-auto max-w-3xl space-y-4 text-center">
@@ -188,6 +192,7 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ─── Questions ─── */}
         <section id="questions" aria-labelledby="questions-titre" className="scroll-mt-20 border-t border-border bg-muted/20 py-16 md:py-24">
           <div className="container">
             <div className="mx-auto max-w-3xl space-y-4 text-center">
@@ -218,13 +223,14 @@ export default function HomePage() {
 
             <p className="mt-6 text-center text-sm text-muted-foreground">
               Besoin d’aide ?{' '}
-              <a href={`mailto:${contactEmail}?subject=Question%20sur%20EFLEX`} className="font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm">
+              <a href={`mailto:${contactEmail}?subject=Question%20sur%20EFLEX`} className="font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
                 Contacter le support
               </a>
             </p>
           </div>
         </section>
 
+        {/* ─── Appel final ─── */}
         <FinalCta />
         <SiteFooter />
       </main>

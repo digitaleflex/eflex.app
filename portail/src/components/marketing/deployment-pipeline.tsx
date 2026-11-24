@@ -319,7 +319,7 @@ export function DeploymentPipeline() {
                           <span
                             key={status}
                             className={cn(
-                              'rounded-full px-2 py-0.5 font-mono text-[11px] tabular-nums',
+                              'rounded-full px-2 py-0.5 font-mono text-xs tabular-nums',
                               selected ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
                             )}
                           >
