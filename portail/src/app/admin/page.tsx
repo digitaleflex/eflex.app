@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import {
   Building2,
   CircleAlert,
@@ -18,6 +19,7 @@ import {
   parsePeriodDays,
 } from '@/lib/admin-metrics'
 import { PageHeader } from '@/components/page-header'
+import { PlatformStatus } from '@/components/admin/platform-status'
 import { StatCard } from '@/components/ui/stat-card'
 import {
   AlertsPanel,
@@ -61,6 +63,16 @@ export default async function AdminOverview({
           </>
         }
       />
+
+      <Suspense
+        fallback={
+          <p className="text-sm text-muted-foreground" role="status">
+            Collecte de l’état de la plateforme…
+          </p>
+        }
+      >
+        <PlatformStatus />
+      </Suspense>
 
       <section aria-labelledby="admin-action-title" className="space-y-4">
         <div className="space-y-1">
