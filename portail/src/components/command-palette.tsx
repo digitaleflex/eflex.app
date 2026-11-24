@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Activity, Bell, CornerDownLeft, FolderKanban, Globe, Moon, Plus, Rocket, ScrollText, Search, UserPlus, Users } from 'lucide-react'
-import { applyTheme, readTheme } from '@/lib/theme'
+import { Activity, Bell, CornerDownLeft, FolderKanban, Globe, Plus, Rocket, ScrollText, Search, UserPlus, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   buildProjectItems,
@@ -22,7 +21,6 @@ const ICONS: Record<PaletteIcon, React.ComponentType<{ className?: string }>> = 
   team: Users,
   invite: UserPlus,
   notifications: Bell,
-  theme: Moon,
   project: FolderKanban,
   redeploy: Rocket,
   logs: ScrollText,
@@ -128,20 +126,6 @@ export function CommandPalette({ className, hotkey = true }: { className?: strin
 
   const go = async (item: Item | undefined) => {
     if (!item) return
-    if (item.action === 'theme') {
-      hide()
-      const current = readTheme()
-      const resolved =
-        current === 'dark'
-          ? 'light'
-          : current === 'light'
-            ? 'dark'
-            : window.matchMedia('(prefers-color-scheme: dark)').matches
-              ? 'light'
-              : 'dark'
-      applyTheme(resolved)
-      return
-    }
     if (item.action === 'redeploy' && item.projectId) {
       const name = item.projectName ?? item.label
       setPendingRedeploy({ id: item.projectId, name })

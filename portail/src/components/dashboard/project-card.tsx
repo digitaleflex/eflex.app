@@ -16,7 +16,7 @@ export function FrameworkTile({ framework, name, size = 'md' }: { framework: str
   const box = size === 'lg' ? 'h-12 w-12 rounded-xl' : size === 'sm' ? 'h-8 w-8 rounded-md' : 'h-10 w-10 rounded-lg'
   const icon = size === 'lg' ? 'h-7 w-7' : size === 'sm' ? 'h-4 w-4' : 'h-5 w-5'
   return (
-    <span className={cn('flex shrink-0 items-center justify-center border border-border bg-background dark:border-white/10 dark:bg-white', box)} aria-hidden="true">
+    <span className={cn('flex shrink-0 items-center justify-center border border-border bg-background', box)} aria-hidden="true">
       {framework ? <FrameworkIcon framework={framework} alt="" className={icon} /> : <span className="font-display text-sm font-bold text-primary">{name.charAt(0).toUpperCase()}</span>}
     </span>
   )

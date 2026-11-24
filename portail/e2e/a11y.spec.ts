@@ -15,7 +15,8 @@ import { expect, test, type Page } from '@playwright/test'
  * restants sont listés dans `docs/accessibility/audit-wcag.md`.
  */
 
-const THEMES = ['light', 'dark'] as const
+// Thème clair unique (issue #220) : plus de déclinaison sombre à contrôler.
+const THEMES = ['light'] as const
 const WIDTHS = [
   { label: '360', width: 360 },
   { label: '768', width: 768 },
@@ -92,19 +93,13 @@ async function setSidebar(
   await page.evaluate((value) => window.localStorage.setItem('eflex:sidebar-collapsed', value), collapsed ? '1' : '0')
 }
 
-async function setTheme(context: import('@playwright/test').BrowserContext, theme: string, baseURL: string) {
-  await context.clearCookies({ name: 'eflex-theme' })
-  await context.addCookies([{ name: 'eflex-theme', value: theme, domain: new URL(baseURL).hostname, path: '/' }])
-}
-
 for (const theme of THEMES) {
   for (const viewport of WIDTHS) {
     test.describe(`pages publiques — ${theme} ${viewport.label} px`, () => {
       // 360 px = téléphone : pointeur grossier, donc cibles tactiles de 44 px.
       test.use({ hasTouch: viewport.width <= 480 })
-      test.beforeEach(async ({ context, page, baseURL }) => {
+      test.beforeEach(async ({ page }) => {
         await page.setViewportSize({ width: viewport.width, height: 960 })
-        await setTheme(context, theme, baseURL!)
       })
 
       for (const route of PUBLIC_PAGES) {
@@ -262,7 +257,6 @@ if (!AUTH) {
             hasTouch: viewport.width <= 480,
             reducedMotion: 'reduce',
           })
-          await setTheme(context, theme, baseURL!)
           const page = await context.newPage()
           await login(page)
           // Parcours clavier sans souris sur la coque de la console.
@@ -292,13 +286,12 @@ if (!AUTH) {
         })
 
         if (ADMIN) {
-          test('administration', async ({ browser, baseURL }) => {
+          test('administration', async ({ browser }) => {
             const context = await browser.newContext({
             viewport: { width: viewport.width, height: 960 },
             hasTouch: viewport.width <= 480,
             reducedMotion: 'reduce',
           })
-            await setTheme(context, theme, baseURL!)
             const page = await context.newPage()
             await login(page)
             for (const route of ADMIN_PAGES) {

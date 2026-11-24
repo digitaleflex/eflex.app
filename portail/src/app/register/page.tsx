@@ -13,7 +13,6 @@ import { useAuthConfig, useOAuthError } from '@/components/auth/use-auth-config'
 import { useValidatedField } from '@/components/auth/use-validated-field'
 import { CAPTCHA_ENABLED, Turnstile, captchaHeaders } from '@/components/auth/turnstile'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { authErrorMessage, signUp } from '@/lib/auth-client'
 import {
@@ -128,11 +127,11 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout
-      title="Créer un compte"
+      title="Créer votre compte"
       description="Déployez votre premier projet en quelques minutes."
       footer={
         <>
-          Déjà un compte ?{' '}
+          Déjà un compte ?{' '}
           <Link
             suppressHydrationWarning
             href={withNext('/login')}
@@ -143,133 +142,135 @@ export default function RegisterPage() {
         </>
       }
     >
-      <Card className="space-y-6 p-6">
-        {(config?.githubEnabled || config?.googleEnabled) && (
-          <div className="space-y-3">
-            {config.githubEnabled && (
-              <OAuthButton
-                provider="github"
-                primary
-                disabled={loading}
-                onError={(message) => {
-                  setFormError(message)
-                  focusAlert()
-                }}
-              />
-            )}
-            {config.googleEnabled && (
-              <OAuthButton
-                provider="google"
-                primary={!config.githubEnabled}
-                disabled={loading}
-                onError={(message) => {
-                  setFormError(message)
-                  focusAlert()
-                }}
-              />
-            )}
-            <AuthDivider label="ou avec un mot de passe" />
-          </div>
-        )}
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+        <div className="space-y-5">
+          {(config?.githubEnabled || config?.googleEnabled) && (
+            <div className="space-y-3">
+              {config.githubEnabled && (
+                <OAuthButton
+                  provider="github"
+                  primary
+                  disabled={loading}
+                  onError={(message) => {
+                    setFormError(message)
+                    focusAlert()
+                  }}
+                />
+              )}
+              {config.googleEnabled && (
+                <OAuthButton
+                  provider="google"
+                  primary={!config.githubEnabled}
+                  disabled={loading}
+                  onError={(message) => {
+                    setFormError(message)
+                    focusAlert()
+                  }}
+                />
+              )}
+              <AuthDivider label="ou avec un mot de passe" />
+            </div>
+          )}
 
-        {config?.emailCodeEnabled && (
-          <p className="rounded-lg bg-muted/60 px-3 py-2.5 text-sm text-muted-foreground">
-            Plus simple :{' '}
-            <Link
-              suppressHydrationWarning
-              href={withNext('/login')}
-              className="rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              recevez un code par e-mail
-            </Link>
-            , sans mot de passe à retenir.
-          </p>
-        )}
+          {config?.emailCodeEnabled && (
+            <div className="rounded-xl border border-primary/15 bg-primary/[0.04] px-4 py-3 text-sm text-muted-foreground">
+              Plus simple :{' '}
+              <Link
+                suppressHydrationWarning
+                href={withNext('/login')}
+                className="rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                recevez un code par e-mail
+              </Link>
+              , sans mot de passe à retenir.
+            </div>
+          )}
 
-        {formError && (
-          <FormAlert ref={alertRef} id="register-error">
-            {formError}
-          </FormAlert>
-        )}
+          {formError && (
+            <FormAlert ref={alertRef} id="register-error">
+              {formError}
+            </FormAlert>
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <Input
-            ref={nameRef}
-            id="name"
-            label="Nom"
-            autoComplete="name"
-            value={name.value}
-            onChange={(event) => name.change(event.target.value)}
-            onBlur={name.blur}
-            error={name.error ?? undefined}
-            disabled={loading}
-            required
-          />
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            <Input
+              ref={nameRef}
+              id="name"
+              label="Nom"
+              autoComplete="name"
+              value={name.value}
+              onChange={(event) => name.change(event.target.value)}
+              onBlur={name.blur}
+              error={name.error ?? undefined}
+              disabled={loading}
+              required
+            />
 
-          <Input
-            ref={emailRef}
-            id="email"
-            label="Adresse e-mail"
-            type="email"
-            placeholder="vous@exemple.com"
-            autoComplete="email"
-            inputMode="email"
-            value={email.value}
-            onChange={(event) => email.change(event.target.value)}
-            onBlur={email.blur}
-            error={email.error ?? undefined}
-            disabled={loading}
-            required
-          />
+            <Input
+              ref={emailRef}
+              id="email"
+              label="Adresse e-mail"
+              type="email"
+              placeholder="vous@exemple.com"
+              autoComplete="email"
+              inputMode="email"
+              value={email.value}
+              onChange={(event) => email.change(event.target.value)}
+              onBlur={email.blur}
+              error={email.error ?? undefined}
+              disabled={loading}
+              required
+            />
 
-          <PassphraseField
-            ref={passphraseRef}
-            id="password"
-            label="Mot de passe"
-            autoComplete="new-password"
-            value={passphrase.value}
-            onChange={passphrase.change}
-            onBlur={passphrase.blur}
-            error={passphrase.error}
-            disabled={loading}
-            required
-          />
+            <PassphraseField
+              ref={passphraseRef}
+              id="password"
+              label="Mot de passe"
+              autoComplete="new-password"
+              value={passphrase.value}
+              onChange={passphrase.change}
+              onBlur={passphrase.blur}
+              error={passphrase.error}
+              disabled={loading}
+              required
+            />
 
-          <PassphraseField
-            ref={confirmationRef}
-            id="confirm-password"
-            label="Confirmer le mot de passe"
-            autoComplete="new-password"
-            value={confirmation.value}
-            onChange={confirmation.change}
-            onBlur={confirmation.blur}
-            error={confirmation.error}
-            hint="Saisissez-le à nouveau, espaces compris."
-            disabled={loading}
-            required
-          />
+            <PassphraseField
+              ref={confirmationRef}
+              id="confirm-password"
+              label="Confirmer le mot de passe"
+              autoComplete="new-password"
+              value={confirmation.value}
+              onChange={confirmation.change}
+              onBlur={confirmation.blur}
+              error={confirmation.error}
+              hint="Saisissez-le à nouveau, espaces compris."
+              disabled={loading}
+              required
+            />
 
-          <PassphraseGuidance />
+            <PassphraseGuidance />
 
-          <p className="text-xs text-muted-foreground">
-            En créant un compte, vous reconnaissez avoir pris connaissance des{' '}
-            <Link href="/conditions" className="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
-              conditions d’utilisation
-            </Link>{' '}
-            et de la{' '}
-            <Link href="/confidentialite" className="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
-              politique de confidentialité
-            </Link>
-            .
-          </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              En créant un compte, vous reconnaissez avoir pris connaissance des{' '}
+              <Link href="/conditions" className="rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                conditions d’utilisation
+              </Link>{' '}
+              et de la{' '}
+              <Link href="/confidentialite" className="rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                politique de confidentialité
+              </Link>
+              .
+            </p>
 
-          {CAPTCHA_ENABLED && <Turnstile onToken={setCaptchaToken} />}
+            {CAPTCHA_ENABLED && <Turnstile onToken={setCaptchaToken} />}
 
-          <Button type="submit" size="lg" className="w-full" loading={loading}>
-            Créer mon compte
-          </Button>
-        </form>
-      </Card>
+            <Button type="submit" size="lg" className="w-full" loading={loading}>
+              Créer mon compte
+            </Button>
+          </form>
+        </div>
+      </div>
     </AuthLayout>
   )
 }

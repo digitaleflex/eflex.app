@@ -3,7 +3,7 @@
 import { nextFromLocation, withNext } from '@/lib/safe-next'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Fingerprint, Mail } from 'lucide-react'
+import { Fingerprint, KeyRound, Mail } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 import { AuthDivider, AuthLayout } from '@/components/auth/auth-layout'
@@ -15,7 +15,6 @@ import { useAuthConfig, useOAuthError } from '@/components/auth/use-auth-config'
 import { useValidatedField } from '@/components/auth/use-validated-field'
 import { CAPTCHA_ENABLED, Turnstile, captchaHeaders } from '@/components/auth/turnstile'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { authClient, authErrorMessage, signIn } from '@/lib/auth-client'
 import { validateEmail, validateLoginPassword } from '@/lib/auth-validation'
@@ -212,37 +211,34 @@ export default function LoginPage() {
 
   return (
     <AuthLayout
-      title="Bienvenue sur EFLEX"
+      title={twoFactor ? 'Vérification en deux étapes' : 'Connexion'}
       description={
-        anyPasswordless
-          ? 'Connectez-vous ou créez un compte : c’est le même geste.'
-          : 'Retrouvez vos projets et vos déploiements.'
+        twoFactor
+          ? useBackupCode
+            ? 'Saisissez l’un de vos codes de secours pour accéder à votre compte.'
+            : 'Saisissez le code de votre application d’authentification.'
+          : anyPasswordless
+            ? 'Accédez à vos projets ou créez un compte en quelques secondes.'
+            : 'Retrouvez vos projets et vos déploiements.'
       }
       footer={
-        <>
-          Pas encore de compte ?{' '}
-          <Link
-            suppressHydrationWarning
-            href={withNext('/register')}
-            className="rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            Créer un compte
-          </Link>
-        </>
+        !twoFactor ? (
+          <>
+            Pas encore de compte ?{' '}
+            <Link
+              suppressHydrationWarning
+              href={withNext('/register')}
+              className="rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              Créer un compte
+            </Link>
+          </>
+        ) : undefined
       }
     >
-      <Card className="space-y-6 p-6">
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
         {twoFactor ? (
-          <form onSubmit={verifyTwoFactor} className="space-y-4">
-            <div className="space-y-1.5 text-center">
-              <h2 className="text-lg font-semibold">Vérification en deux étapes</h2>
-              <p className="text-sm text-muted-foreground">
-                {useBackupCode
-                  ? 'Saisissez l’un de vos codes de secours.'
-                  : 'Saisissez le code à 6 chiffres de votre application d’authentification.'}
-              </p>
-            </div>
-
+          <form onSubmit={verifyTwoFactor} className="space-y-5">
             {formError && (
               <FormAlert ref={alertRef} id="login-error">
                 {formError}
@@ -280,10 +276,10 @@ export default function LoginPage() {
               Vérifier
             </Button>
 
-            <div className="flex flex-col gap-2 text-center text-sm">
+            <div className="flex flex-col gap-1 text-center text-sm">
               <button
                 type="button"
-                className="min-h-11 font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="inline-flex min-h-11 items-center justify-center rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 disabled={loading}
                 onClick={() => {
                   setUseBackupCode((current) => !current)
@@ -293,11 +289,11 @@ export default function LoginPage() {
                   requestAnimationFrame(() => codeRef.current?.focus())
                 }}
               >
-                {useBackupCode ? 'Utiliser un code TOTP' : 'Utiliser un code de secours'}
+                {useBackupCode ? 'Utiliser un code d’application' : 'Utiliser un code de secours'}
               </button>
               <button
                 type="button"
-                className="min-h-11 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="inline-flex min-h-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 disabled={loading}
                 onClick={resetTwoFactor}
               >
@@ -305,162 +301,165 @@ export default function LoginPage() {
               </button>
             </div>
           </form>
+        ) : !configReady ? (
+          <div aria-busy="true" aria-label="Chargement des méthodes de connexion" className="space-y-3">
+            <div className="h-12 animate-pulse rounded-xl bg-muted" />
+            <div className="h-12 animate-pulse rounded-xl bg-muted" />
+            <div className="h-10 animate-pulse rounded-xl bg-muted/70" />
+          </div>
         ) : (
-          <>
-            {!configReady ? (
-              <div aria-busy="true" aria-label="Chargement des méthodes de connexion" className="space-y-3">
-                <div className="h-12 animate-pulse rounded-lg bg-muted" />
-                <div className="h-12 animate-pulse rounded-lg bg-muted" />
-                <div className="h-12 animate-pulse rounded-lg bg-muted" />
-              </div>
-            ) : (
-              <>
-                {!(showCode && codeStep === 'code') && (config?.githubEnabled || config?.googleEnabled || passkeySupported) && (
-                  <div className="space-y-3">
-                    {config?.githubEnabled && (
-                      <OAuthButton
-                        provider="github"
-                        primary
-                        lastUsed={lastMethod === 'github'}
-                        disabled={loading}
-                        onError={providerFailed}
-                      />
+          <div className="space-y-5">
+            {!(showCode && codeStep === 'code') && (config?.githubEnabled || config?.googleEnabled || passkeySupported) && (
+              <div className="space-y-3">
+                {config?.githubEnabled && (
+                  <OAuthButton
+                    provider="github"
+                    primary
+                    lastUsed={lastMethod === 'github'}
+                    disabled={loading}
+                    onError={providerFailed}
+                  />
+                )}
+                {config?.googleEnabled && (
+                  <OAuthButton
+                    provider="google"
+                    primary={!config.githubEnabled}
+                    lastUsed={lastMethod === 'google'}
+                    disabled={loading}
+                    onError={providerFailed}
+                  />
+                )}
+                {passkeySupported && (
+                  <div className="relative">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      className="w-full justify-center gap-3 font-medium"
+                      onClick={() => void handlePasskey()}
+                      loading={passkeyLoading}
+                      disabled={loading}
+                    >
+                      <Fingerprint className="h-5 w-5" aria-hidden="true" />
+                      Se connecter avec une passkey
+                    </Button>
+                    {lastMethod === 'passkey' && (
+                      <span className="pointer-events-none absolute -top-2.5 right-3 rounded-full border border-primary/25 bg-background px-2 py-0.5 text-xs font-semibold text-primary">
+                        Dernière utilisée
+                      </span>
                     )}
-                    {config?.googleEnabled && (
-                      <OAuthButton
-                        provider="google"
-                        primary={!config.githubEnabled}
-                        lastUsed={lastMethod === 'google'}
-                        disabled={loading}
-                        onError={providerFailed}
-                      />
-                    )}
-                    {passkeySupported && (
-                      <div className="relative">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="lg"
-                          className="w-full justify-center gap-3 font-medium"
-                          onClick={() => void handlePasskey()}
-                          loading={passkeyLoading}
-                          disabled={loading}
-                        >
-                          <Fingerprint className="h-5 w-5" aria-hidden="true" />
-                          Se connecter avec une passkey
-                        </Button>
-                        {lastMethod === 'passkey' && (
-                          <span className="pointer-events-none absolute -top-2.5 right-3 rounded-full border border-primary/25 bg-background px-2 py-0.5 text-xs font-semibold text-primary">
-                            Dernière utilisée
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    <AuthDivider label="ou par e-mail" />
                   </div>
                 )}
+                <AuthDivider label="ou par e-mail" />
+              </div>
+            )}
 
-                {formError && (
-                  <FormAlert ref={alertRef} id="login-error">
-                    {formError}
-                  </FormAlert>
+            {formError && (
+              <FormAlert ref={alertRef} id="login-error">
+                {formError}
+              </FormAlert>
+            )}
+
+            {showCode ? (
+              <EmailCodeForm
+                initialEmail={email.value}
+                onSuccess={finish}
+                onStepChange={setCodeStep}
+                onUsePassword={(address) => {
+                  email.change(address)
+                  setMode('password')
+                  requestAnimationFrame(() => (address ? passphraseRef : emailRef).current?.focus())
+                }}
+                disabled={loading}
+              />
+            ) : (
+              <>
+                <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+                  <Input
+                    ref={emailRef}
+                    id="email"
+                    label="Adresse e-mail"
+                    type="email"
+                    placeholder="vous@exemple.com"
+                    autoComplete="email"
+                    inputMode="email"
+                    value={email.value}
+                    onChange={(event) => email.change(event.target.value)}
+                    onBlur={email.blur}
+                    error={email.error ?? undefined}
+                    disabled={loading}
+                    required
+                  />
+
+                  <PassphraseField
+                    ref={passphraseRef}
+                    id="password"
+                    label="Mot de passe"
+                    autoComplete="current-password"
+                    value={passphrase.value}
+                    onChange={passphrase.change}
+                    onBlur={passphrase.blur}
+                    error={passphrase.error}
+                    hint={LOGIN_PASSPHRASE_HINT}
+                    disabled={loading}
+                    required
+                  />
+
+                  <div className="flex justify-end">
+                    <Link
+                      href="/forgot-password"
+                      className="inline-flex min-h-11 items-center rounded-md text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    >
+                      Mot de passe oublié ?
+                    </Link>
+                  </div>
+
+                  {CAPTCHA_ENABLED && <Turnstile onToken={setCaptchaToken} />}
+
+                  <Button type="submit" size="lg" className="w-full" loading={loading}>
+                    Se connecter
+                  </Button>
+                </form>
+
+                {needsVerification && (
+                  <p className="text-center text-sm text-muted-foreground">
+                    <Link
+                      suppressHydrationWarning
+                      href={verifyEmailHref(email.value)}
+                      className="inline-flex min-h-11 items-center rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    >
+                      Renvoyer l’e-mail de vérification
+                    </Link>
+                  </p>
                 )}
 
-                {showCode ? (
-                  <EmailCodeForm
-                    initialEmail={email.value}
-                    onSuccess={finish}
-                    onStepChange={setCodeStep}
-                    onUsePassword={(address) => {
-                      email.change(address)
-                      setMode('password')
-                      requestAnimationFrame(() => (address ? passphraseRef : emailRef).current?.focus())
-                    }}
-                    disabled={loading}
-                  />
-                ) : (
-                  <>
-                    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-                      <Input
-                        ref={emailRef}
-                        id="email"
-                        label="Adresse e-mail"
-                        type="email"
-                        placeholder="vous@exemple.com"
-                        autoComplete="email"
-                        inputMode="email"
-                        value={email.value}
-                        onChange={(event) => email.change(event.target.value)}
-                        onBlur={email.blur}
-                        error={email.error ?? undefined}
-                        disabled={loading}
-                        required
-                      />
-
-                      <PassphraseField
-                        ref={passphraseRef}
-                        id="password"
-                        label="Mot de passe"
-                        autoComplete="current-password"
-                        value={passphrase.value}
-                        onChange={passphrase.change}
-                        onBlur={passphrase.blur}
-                        error={passphrase.error}
-                        hint={LOGIN_PASSPHRASE_HINT}
-                        disabled={loading}
-                        required
-                      />
-
-                      <div className="flex justify-end">
-                        <Link
-                          href="/forgot-password"
-                          className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md"
-                        >
-                          Mot de passe oublié ?
-                        </Link>
-                      </div>
-
-                      {CAPTCHA_ENABLED && <Turnstile onToken={setCaptchaToken} />}
-
-                      <Button type="submit" size="lg" className="w-full" loading={loading}>
-                        Se connecter
-                      </Button>
-                    </form>
-
-                    {needsVerification && (
-                      <p className="text-center text-sm text-muted-foreground">
-                        <Link
-                          suppressHydrationWarning
-                          href={verifyEmailHref(email.value)}
-                          className="inline-flex min-h-11 items-center rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                        >
-                          Renvoyer l’e-mail de vérification
-                        </Link>
-                      </p>
-                    )}
-
-                    {codeEnabled && (
-                      <p className="text-center text-sm">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMode('code')
-                            setFormError('')
-                          }}
-                          className="inline-flex min-h-11 items-center gap-2 rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                        >
-                          <Mail className="h-4 w-4" aria-hidden="true" />
-                          Recevoir un code par e-mail
-                        </button>
-                      </p>
-                    )}
-                  </>
+                {codeEnabled && (
+                  <p className="text-center text-sm">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode('code')
+                        setFormError('')
+                      }}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    >
+                      <Mail className="h-4 w-4" aria-hidden="true" />
+                      Recevoir un code par e-mail
+                    </button>
+                  </p>
                 )}
               </>
             )}
-          </>
+
+            {!showCode && !codeEnabled && (
+              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
+                Connexion sécurisée
+              </p>
+            )}
+          </div>
         )}
-      </Card>
+      </div>
     </AuthLayout>
   )
 }

@@ -9,7 +9,6 @@ import { FormAlert } from '@/components/auth/form-alert'
 import { useAuthConfig } from '@/components/auth/use-auth-config'
 import { useValidatedField } from '@/components/auth/use-validated-field'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { authClient, authErrorMessage } from '@/lib/auth-client'
 import { validateEmail } from '@/lib/auth-validation'
@@ -38,11 +37,11 @@ export default function VerifyEmailPage() {
     >
       <Suspense
         fallback={
-          <Card className="p-6">
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
             <p role="status" className="text-sm text-muted-foreground">
               Chargement du formulaire…
             </p>
-          </Card>
+          </div>
         }
       >
         <VerifyEmailForm />
@@ -111,7 +110,7 @@ function VerifyEmailForm() {
 
   if (config?.emailVerificationRequired === false) {
     return (
-      <Card className="space-y-4 p-6">
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8 space-y-4">
         <div role="status" className="space-y-2 text-sm">
           <p className="text-foreground">La vérification par e-mail n’est pas requise sur cette instance.</p>
           <p className="text-muted-foreground">Vous pouvez vous connecter directement avec votre adresse e-mail.</p>
@@ -119,12 +118,12 @@ function VerifyEmailForm() {
         <Button size="lg" className="w-full" onClick={() => router.push(withNext('/login'))}>
           Aller à la connexion
         </Button>
-      </Card>
+      </div>
     )
   }
 
   return (
-    <Card className="space-y-5 p-6">
+    <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8 space-y-5">
       {message && <FormAlert tone="success">{message}</FormAlert>}
       {formError && (
         <FormAlert ref={alertRef} id="verify-email-error">
@@ -154,6 +153,6 @@ function VerifyEmailForm() {
           {cooldown > 0 ? `Renvoyer dans ${cooldown} s` : 'Renvoyer l’e-mail'}
         </Button>
       </form>
-    </Card>
+    </div>
   )
 }

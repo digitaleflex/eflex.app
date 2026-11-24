@@ -3,58 +3,47 @@ title: Documentation EFLEX
 description: Guides, références et explications pour déployer et exploiter vos applications sur EFLEX.
 template: splash
 hero:
-  tagline: Déployez vos applications depuis GitHub, configurez vos domaines et vos variables, puis suivez vos déploiements en toute clarté.
+  title: Documentation EFLEX
+  tagline: Tout ce qu’il faut pour déployer, configurer et exploiter vos applications sur EFLEX.
   actions:
-    - text: Premier déploiement
+    - text: Commencer
       link: /demarrer/premier-deploiement/
       icon: right-arrow
       variant: primary
-    - text: Frameworks supportés
+    - text: Référence des frameworks
       link: /reference/frameworks/
-      icon: open-book
-      variant: secondary
-    - text: Ouvrir EFLEX
-      link: https://eflex.app
-      icon: external
       variant: minimal
 ---
 
-import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-## Par où commencer
+## Commencer
 
-<CardGrid stagger>
-  <Card title="Démarrer" icon="rocket">
-    Connectez GitHub, sélectionnez un dépôt et lancez votre premier déploiement.
+<LinkCard
+  title="Premier déploiement"
+  href="/demarrer/premier-deploiement/"
+  description="Connectez un dépôt, vérifiez l’analyse et mettez votre application en ligne."
+/>
+<LinkCard
+  title="Connecter GitHub"
+  href="/demarrer/connecter-github/"
+  description="Autorisez EFLEX à accéder à vos dépôts et à recevoir les mises à jour."
+/>
 
-    [Premier déploiement](/demarrer/premier-deploiement/)
-  </Card>
-  <Card title="Guides pratiques" icon="setting">
-    Configurez les domaines, les variables d’environnement, les bases de données et le suivi d’exécution.
-
-    [Configurer un domaine](/guides/domaines/)
-  </Card>
-  <Card title="Référence" icon="information">
-    Consultez les frameworks détectés, les états de déploiement et les comportements importants.
-
-    [États de déploiement](/reference/etats-deploiement/)
-  </Card>
-  <Card title="Comprendre" icon="magnifier">
-    Comprenez comment EFLEX analyse un dépôt, construit une image et met l’application en ligne.
-
-    [Pipeline de déploiement](/comprendre/pipeline-deploiement/)
-  </Card>
-</CardGrid>
-
-## Tâches fréquentes
+## Guides
 
 <CardGrid>
-  <LinkCard title="Connecter GitHub" href="/demarrer/connecter-github/" description="Autoriser EFLEX à lire vos dépôts et recevoir les mises à jour." />
-  <LinkCard title="Variables d’environnement" href="/reference/variables-environnement/" description="Ajouter les secrets et la configuration sans les commiter." />
-  <LinkCard title="Bases de données" href="/guides/bases-de-donnees/" description="Créer une base PostgreSQL ou Redis gérée pour un projet." />
-  <LinkCard title="Journaux et redéploiement" href="/guides/journaux-et-redeploiement/" description="Diagnostiquer un échec, consulter les logs et relancer un déploiement." />
+  <LinkCard title="Domaines" href="/guides/domaines/" description="Configurer un domaine EFLEX ou un domaine personnalisé." />
+  <LinkCard title="Variables d’environnement" href="/reference/variables-environnement/" description="Gérer les secrets et la configuration applicative." />
+  <LinkCard title="Bases de données" href="/guides/bases-de-donnees/" description="Provisionner PostgreSQL ou Redis pour un projet." />
+  <LinkCard title="Journaux et redéploiement" href="/guides/journaux-et-redeploiement/" description="Diagnostiquer un échec et relancer un déploiement." />
 </CardGrid>
 
-:::note[Documentation factuelle]
-Cette documentation décrit le comportement actuel d’EFLEX. Lorsqu’une capacité est partielle, conditionnelle ou à venir, elle est indiquée explicitement.
-:::
+## Référence
+
+<CardGrid>
+  <LinkCard title="Frameworks supportés" href="/reference/frameworks/" description="Types de projets détectés et ordre de détection." />
+  <LinkCard title="États de déploiement" href="/reference/etats-deploiement/" description="Signification des états du pipeline." />
+  <LinkCard title="Pipeline de déploiement" href="/comprendre/pipeline-deploiement/" description="Comprendre les étapes entre l’analyse et la mise en ligne." />
+  <LinkCard title="Détection du dépôt" href="/comprendre/detection/" description="Comment EFLEX analyse un dépôt et propose un plan." />
+</CardGrid>

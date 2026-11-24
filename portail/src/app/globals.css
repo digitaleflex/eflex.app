@@ -94,61 +94,6 @@
     scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
   }
 
-  /* Thème sombre piloté par la classe `dark` posée sur <html> (cookie ou système).
-     Le thème clair reste donc toujours accessible, quel que soit le réglage de l'OS. */
-  :root.dark {
-    --background: 215 40% 7%;
-    --foreground: 210 20% 96%;
-    --card: 215 35% 10%;
-    --card-foreground: 210 20% 96%;
-    --primary: 217 91% 65%;
-    --primary-foreground: 215 69% 12%;
-    --secondary: 215 25% 16%;
-    --secondary-foreground: 210 20% 96%;
-    --muted: 215 25% 16%;
-    --muted-foreground: 215 15% 66%;
-    --accent: 198 93% 60%;
-    --accent-foreground: 215 69% 12%;
-    /* Fond vif + texte navy : lisible comme texte sur carte ET comme bouton. */
-    --destructive: 0 85% 68%;
-    --destructive-foreground: 215 69% 12%;
-    --success: 142 60% 50%;
-    --success-foreground: 215 69% 12%;
-    --warning: 38 92% 58%;
-    --warning-foreground: 215 69% 12%;
-    --warning-surface: 30 60% 13%;
-    --info: 199 89% 66%;
-    --info-foreground: 215 69% 12%;
-    --border: 215 22% 20%;
-    --input: 215 22% 45%; /* contour de champ ≥ 3:1 sur --card et --background */
-    --ring: 217 91% 65%;
-    --surface-raised: 215 32% 13%;
-    --surface-raised-foreground: 210 20% 96%;
-
-    --shadow-color: 0 0% 0%;
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.25);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 10px 24px -6px rgb(0 0 0 / 0.45);
-    --shadow-lg: 0 12px 24px -8px rgb(0 0 0 / 0.55), 0 24px 48px -12px rgb(0 0 0 / 0.5);
-
-    /* Terminal (journal) : surface sombre intentionnelle dans les deux thèmes. */
-    --terminal: 218 47% 7%;
-    --terminal-foreground: 210 20% 94%;
-    --terminal-border: 215 22% 24%;
-    --terminal-muted: 215 28% 13%;
-    --terminal-muted-foreground: 215 15% 68%;
-    --terminal-line-number: 215 14% 56%;
-    --terminal-live: 142 60% 55%;
-    --terminal-done: 215 15% 66%;
-    --terminal-accent: 199 89% 70%;
-    --terminal-warn: 45 93% 74%;
-    --terminal-warn-surface: 45 70% 14%;
-    --terminal-error: 0 85% 74%;
-    --terminal-error-surface: 0 55% 14%;
-
-    color-scheme: dark;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.45) transparent;
-  }
-
 }
 
 @layer base {
@@ -250,11 +195,6 @@
     background-color: rgb(255 255 255 / 0.92);
     background-color: color-mix(in srgb, rgb(var(--brand-rgb, 100 116 139)) 10%, white);
     border-radius: 0.5rem;
-  }
-
-  :root.dark .framework-icon {
-    background-color: rgb(255 255 255 / 0.92);
-    background-color: color-mix(in srgb, rgb(var(--brand-rgb, 100 116 139)) 16%, white);
   }
 
   .framework-icon {
@@ -412,13 +352,9 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   Portée homepage : la page d'accueil reste CLAIRE quel que soit le réglage
-   global (cookie `dark` ou thème système), sans toucher à `:root`, au bloc
-   `dark` global ni aux tokens des routes authentifiées. Une déclaration locale
-   de custom-property l'emporte sur l'héritage de `:root.dark` : il suffit de
-   la poser sur le body qui contient la page (canvas + bandeau) et sur la
-   racine de la page elle-même. Le hero, lui, reste explicitement navy/blanc
-   (bg-eflexnavy / text-white dans page.tsx).
+   Portée homepage : mêmes valeurs claires que `:root` (thème clair unique, issue #220), conservées pour le
+   canvas et le bandeau de l'accueil. Le hero reste explicitement navy/blanc (bg-eflexnavy / text-white
+   dans page.tsx).
    ───────────────────────────────────────────────────────────────────────────── */
 @layer base {
   .homepage-light {
@@ -466,20 +402,8 @@
 
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Logo EFLEX (composant BrandLogo, charte docs/brand/README.md) : version couleur
-   sur fond clair, version inversée officielle (blanche) sur fond sombre. Jamais de
-   filtre ni de plaque. Règles hors @layer : elles l'emportent sur les utilitaires.
-   ───────────────────────────────────────────────────────────────────────────── */
-.brand-logo-on-dark { display: none; }
-:root.dark .brand-logo-on-light { display: none; }
-:root.dark .brand-logo-on-dark { display: unset; }
-/* Pages forcées en clair (accueil, tarifs, pages légales) : version couleur même en thème sombre. */
-:root.dark .homepage-light .brand-logo-on-light { display: unset; }
-:root.dark .homepage-light .brand-logo-on-dark { display: none; }
-
-/* Bandes de marque navy (hero, sections de l'accueil) : la page reste forcée en clair, mais les
-   statuts doivent rester lisibles sur le navy. Mêmes valeurs que :root.dark. */
+/* Bandes de marque navy (hero, sections de l'accueil) : surface sombre LOCALE ; les statuts doivent y rester
+   lisibles. Ce n'est pas un thème sombre global. */
 .surface-navy {
   --success: 142 60% 50%;
   --warning: 38 92% 58%;
@@ -492,9 +416,4 @@
   background-color: rgb(var(--brand-rgb) / 0.12);
   /* Teinte de marque assombrie : contraste AA garanti quelle que soit la couleur du logo. */
   color: color-mix(in srgb, rgb(var(--brand-rgb)) 45%, black);
-}
-.dark .service-icon {
-  background-color: rgb(var(--brand-rgb) / 0.18);
-  /* Teinte de marque éclaircie pour le thème sombre. */
-  color: color-mix(in srgb, rgb(var(--brand-rgb)) 40%, white);
 }

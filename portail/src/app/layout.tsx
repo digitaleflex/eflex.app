@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { JetBrains_Mono, Plus_Jakarta_Sans } from 'next/font/google'
 import { MaintenanceBanner } from '@/components/maintenance-banner'
-import { ThemeSync } from '@/components/theme-sync'
-import { themeBootScript } from '@/lib/theme'
 import { getSiteUrl } from '@/lib/site-url'
 import './globals.css'
 
@@ -52,11 +50,10 @@ export const metadata: Metadata = {
   },
 }
 
+// Thème clair unique et permanent (issue #220) : aucune variante selon le réglage de l'appareil.
 export const viewport: Viewport = {
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f7f9fc' },
-    { media: '(prefers-color-scheme: dark)', color: '#0b111a' },
-  ],
+  themeColor: '#f7f9fc',
+  colorScheme: 'light',
 }
 
 export default function RootLayout({
@@ -67,9 +64,6 @@ export default function RootLayout({
   return (
     <html lang="fr" className={`${jakarta.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans antialiased">
-        {/* Avant tout contenu : applique le thème (cookie ou système) sans flash. */}
-        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
-        <ThemeSync />
         <a
           href="#contenu"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[70] focus:rounded-lg focus:bg-background focus:px-4 focus:py-2 focus:shadow-md focus:outline-none focus:ring-2 focus:ring-ring"

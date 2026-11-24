@@ -9,7 +9,6 @@ import { FormAlert } from '@/components/auth/form-alert'
 import { PassphraseField, PassphraseGuidance } from '@/components/auth/passphrase-field'
 import { useValidatedField } from '@/components/auth/use-validated-field'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { authClient, authErrorMessage } from '@/lib/auth-client'
 import {
   validatePassphrase,
@@ -34,11 +33,11 @@ export default function ResetPasswordPage() {
     >
       <Suspense
         fallback={
-          <Card className="p-6">
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
             <p role="status" className="text-sm text-muted-foreground">
               Chargement du formulaire…
             </p>
-          </Card>
+          </div>
         }
       >
         <ResetPasswordForm />
@@ -106,7 +105,7 @@ function ResetPasswordForm() {
   }
 
   return (
-    <Card className="space-y-5 p-6">
+    <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8 space-y-5">
       {done ? (
         <div role="status" className="space-y-4">
           <p className="text-sm text-foreground">Votre mot de passe a été mis à jour. Vous pouvez vous connecter.</p>
@@ -168,6 +167,6 @@ function ResetPasswordForm() {
           </form>
         </>
       )}
-    </Card>
+    </div>
   )
 }

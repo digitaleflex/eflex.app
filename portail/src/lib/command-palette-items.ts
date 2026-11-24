@@ -10,7 +10,6 @@ export type PaletteIcon =
   | 'team'
   | 'invite'
   | 'notifications'
-  | 'theme'
   | 'project'
   | 'redeploy'
   | 'logs'
@@ -21,7 +20,7 @@ export type PaletteItem = {
   label: string
   hint?: string
   href?: string
-  action?: 'theme' | 'redeploy'
+  action?: 'redeploy'
   group: 'Actions' | 'Projets'
   icon: PaletteIcon
   projectId?: string
@@ -42,7 +41,6 @@ export const PALETTE_ACTIONS: readonly PaletteItem[] = [
   { id: 'team', label: 'Équipe', hint: 'Membres et invitations', href: '/dashboard/organization', group: 'Actions', icon: 'team' },
   { id: 'invite', label: 'Inviter un membre', hint: 'Depuis la page Équipe', href: '/dashboard/organization', group: 'Actions', icon: 'invite' },
   { id: 'notifications', label: 'Notifications', hint: 'Et préférences', href: '/dashboard/notifications', group: 'Actions', icon: 'notifications' },
-  { id: 'theme', label: 'Changer de thème', hint: 'Clair / sombre', action: 'theme', group: 'Actions', icon: 'theme' },
 ]
 
 /** Domaine de l'application principale (position la plus basse, puis nom, puis id), sinon celui du projet. */

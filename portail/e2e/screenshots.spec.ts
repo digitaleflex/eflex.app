@@ -17,7 +17,8 @@ import path from 'node:path'
  *          `PLAYWRIGHT_AUTH=1 PLAYWRIGHT_ADMIN=1 npx playwright test e2e/screenshots.spec.ts`
  */
 
-const THEMES = ['light', 'dark'] as const
+// Thème clair unique (issue #220) : plus de déclinaison sombre à contrôler.
+const THEMES = ['light'] as const
 const WIDTHS = [
   { label: '360', width: 360 },
   { label: '768', width: 768 },
@@ -74,11 +75,6 @@ function safeName(route: string) {
   return route.replace(/^\//, '').replace(/[/?=&]/g, '_').replace(/_+/g, '_').replace(/_$/, '')
 }
 
-async function setTheme(context: import('@playwright/test').BrowserContext, theme: string, baseURL: string) {
-  await context.clearCookies({ name: 'eflex-theme' })
-  await context.addCookies([{ name: 'eflex-theme', value: theme, domain: new URL(baseURL).hostname, path: '/' }])
-}
-
 /**
  * La barre latérale lit d'abord `localStorage` (`eflex:sidebar-collapsed`), écrit dès la première
  * visite : poser seulement le cookie laisserait donc l'état précédent. On pose les deux.
@@ -124,9 +120,8 @@ for (const theme of THEMES) {
   for (const viewport of WIDTHS) {
     test.describe(`captures publiques — ${theme} ${viewport.label} px`, () => {
       test.use({ hasTouch: viewport.width <= 480 })
-      test.beforeEach(async ({ context, page, baseURL }) => {
+      test.beforeEach(async ({ page }) => {
         await page.setViewportSize({ width: viewport.width, height: 960 })
-        await setTheme(context, theme, baseURL!)
       })
 
       for (const route of PUBLIC_PAGES) {
@@ -154,7 +149,6 @@ if (!AUTH) {
             hasTouch: viewport.width <= 480,
             reducedMotion: 'reduce',
           })
-          await setTheme(context, theme, baseURL!)
           const page = await context.newPage()
           await login(page)
 
@@ -187,13 +181,12 @@ if (!AUTH) {
         })
 
         if (ADMIN) {
-          test('administration', async ({ browser, baseURL }) => {
+          test('administration', async ({ browser }) => {
             const context = await browser.newContext({
               viewport: { width: viewport.width, height: 960 },
               hasTouch: viewport.width <= 480,
               reducedMotion: 'reduce',
             })
-            await setTheme(context, theme, baseURL!)
             const page = await context.newPage()
             await login(page)
             for (const route of ADMIN_PAGES) {
