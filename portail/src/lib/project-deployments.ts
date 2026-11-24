@@ -210,6 +210,7 @@ export async function enqueueProjectDeployment(
           appId: target.appId,
           groupId,
           commitSha,
+          rollback: options.rollback === true,
           status: 'queued',
         },
         select: { id: true, appId: true },

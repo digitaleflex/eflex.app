@@ -193,7 +193,11 @@ services:
     image: redis:7-alpine
     container_name: eflex-redis
     restart: unless-stopped
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    # AOF (audit M4) : la file de déploiement survit à un redémarrage de Redis.
+    # La réconciliation base → file du worker reste le filet si le volume est perdu.
+    command: ["redis-server", "--save", "", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - eflex_redis_data:/data
     networks:
       - eflex-internal
     healthcheck:
@@ -204,6 +208,7 @@ services:
 
 volumes:
   eflex_postgres_data:
+  eflex_redis_data:
 
 networks:
   proxy:
