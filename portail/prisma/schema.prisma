@@ -383,6 +383,8 @@ model Deployment {
    */
   groupId        String?
   commitSha      String
+  /** Retour arrière : la cible est `commitSha` (nécessaire pour ré-enfiler un job perdu). */
+  rollback       Boolean     @default(false)
   status         String      @default("pending") // pending, building, deploying, live, failed, rollbacked
   coolifyBuildId String?
   logsSummary    String?     @db.Text
