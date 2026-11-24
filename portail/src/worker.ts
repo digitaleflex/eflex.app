@@ -37,6 +37,7 @@ import { announceDeploymentStatus } from '@/lib/deployment-events'
 import { resolveProjectToken } from '@/lib/git-credentials'
 import { createDeployKey, deleteDeployKey } from '@/lib/github-app'
 import { parseGitHubUrl } from '@/lib/github-url'
+import { persistCreatedAppId } from '@/lib/coolify-app-id'
 import { generateDeployKeyPair } from '@/lib/ssh-key'
 import { waitForTls } from '@/lib/tls'
 import { isCommitSha } from '@/lib/deployment-rollback'
@@ -46,6 +47,7 @@ import {
   createDockerImageApplication,
   createPrivateKey,
   deployApplication,
+  deleteApplication,
   deployApplicationCommit,
   ensureApplicationStorages,
   getDeploymentLogs,
@@ -131,6 +133,17 @@ async function setStatus(id: string, next: DeploymentStatus): Promise<boolean> {
 async function currentStatus(id: string): Promise<string | null> {
   const deployment = await prisma.deployment.findUnique({ where: { id }, select: { status: true } })
   return deployment?.status ?? null
+}
+
+/** Miroir `Project.coolifyAppId` (transition) : non bloquant, mais jamais silencieux. */
+async function mirrorProjectAppId(projectId: string, value: string): Promise<void> {
+  try {
+    await prisma.project.update({ where: { id: projectId }, data: { coolifyAppId: value } })
+  } catch (error) {
+    console.warn(
+      `[eflex/worker] miroir Project.coolifyAppId non écrit (projet ${projectId}) : ${error instanceof Error ? error.message : String(error)}`,
+    )
+  }
 }
 
 async function fail(id: string, message: string): Promise<void> {
@@ -294,11 +307,11 @@ export async function processDeployment(
       if (effectiveApp) {
         await prisma.projectApp.update({ where: { id: effectiveApp.id }, data: { coolifyAppId: value } })
         if (context.primary) {
-          await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: value } }).catch(() => undefined)
+          await mirrorProjectAppId(project.id, value)
         }
         return
       }
-      await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: value } }).catch(() => undefined)
+      await mirrorProjectAppId(project.id, value)
     }
 
     const portsExposes = String((plan as { port?: number }).port ?? 80)
@@ -315,7 +328,19 @@ export async function processDeployment(
         return
       }
       appId = created.id
-      await saveCoolifyAppId(appId)
+      const persisted = await persistCreatedAppId({
+        appId,
+        write: saveCoolifyAppId,
+        rollback: (id) => inOrganizationNetwork(project.organizationId, () => deleteApplication(id)),
+      })
+      if (!persisted.ok) {
+        await fail(
+          deploymentId,
+          `Enregistrement de l'application impossible (${persisted.error}). ` +
+            (persisted.rolledBack ? 'Elle a été retirée de l\'hébergement ; relancez le déploiement.' : 'Vérifiez qu\'aucune application orpheline ne subsiste dans l\'hébergement.'),
+        )
+        return
+      }
     } else {
       const updatedImage = await updateDockerImageApplication(appId, { dockerRegistryImageName: image, portsExposes })
       if ('error' in updatedImage) {
@@ -325,7 +350,7 @@ export async function processDeployment(
     }
 
     if (effectiveApp && context.primary && appId && project.coolifyAppId !== appId) {
-      await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: appId } }).catch(() => undefined)
+      await mirrorProjectAppId(project.id, appId)
     }
 
     if (hosts.length > 0) {
@@ -471,11 +496,11 @@ export async function processDeployment(
     if (effectiveApp) {
       await prisma.projectApp.update({ where: { id: effectiveApp.id }, data: { coolifyAppId: value } })
       if (context.primary) {
-        await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: value } }).catch(() => undefined)
+        await mirrorProjectAppId(project.id, value)
       }
       return
     }
-    await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: value } }).catch(() => undefined)
+    await mirrorProjectAppId(project.id, value)
   }
 
   // Dépôt privé : Coolify a besoin d'une deploy key. On la crée à la première
@@ -556,12 +581,24 @@ export async function processDeployment(
       return
     }
     appId = created.id
-    await saveCoolifyAppId(appId)
+    const persisted = await persistCreatedAppId({
+      appId,
+      write: saveCoolifyAppId,
+      rollback: (id) => inOrganizationNetwork(project.organizationId, () => deleteApplication(id)),
+    })
+    if (!persisted.ok) {
+      await fail(
+        deploymentId,
+        `Enregistrement de l'application impossible (${persisted.error}). ` +
+          (persisted.rolledBack ? 'Elle a été retirée de l\'hébergement ; relancez le déploiement.' : 'Vérifiez qu\'aucune application orpheline ne subsiste dans l\'hébergement.'),
+      )
+      return
+    }
   }
 
   // Transition Lot G : miroir Project.coolifyAppId conservé pour compat lecteurs non migrés.
   if (effectiveApp && context.primary && appId && project.coolifyAppId !== appId) {
-    await prisma.project.update({ where: { id: project.id }, data: { coolifyAppId: appId } }).catch(() => undefined)
+    await mirrorProjectAppId(project.id, appId)
   }
 
   // Le plan stocké peut évoluer (détection, correction de commande) alors que
