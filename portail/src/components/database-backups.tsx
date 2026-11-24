@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ArchiveRestore, CloudUpload, Database, History, Info, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { ArchiveRestore, CloudUpload, History, Info, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
@@ -301,7 +301,7 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
   const restoreRunning = restore?.state === 'running' || status.restore?.status === 'running'
 
   return (
-    <section aria-label="Sauvegardes" className="mt-3 space-y-2 border-t border-border pt-3">
+    <section aria-label="Sauvegardes" className="mt-3 space-y-3 border-t border-border pt-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 space-y-1">
           <p className="flex items-center gap-2 text-sm font-medium">
@@ -313,39 +313,14 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
               Aucune sauvegarde planifiée pour cette base {status.engineLabel ? `(${status.engineLabel})` : ''}.
             </p>
           ) : (
-            <>
-              {health && (
-                <p className="flex items-center gap-2 text-xs">
-                  <span aria-hidden="true" className={cn('h-2 w-2 rounded-full', health.dot)} />
-                  <span className="font-medium">{health.label}</span>
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {summary?.lastSuccessAt
-                  ? `Dernière sauvegarde réussie le ${formatDate(summary.lastSuccessAt)}`
-                  : 'Aucune sauvegarde réussie pour l’instant'}
-                {' · '}
-                {describeFrequency(status.frequency)}
-                {' · '}
-                <span className={offsite.tone === 'warning' ? 'text-warning' : undefined}>{offsite.text}</span>
+            health && (
+              <p className="flex items-center gap-2 text-xs">
+                <span aria-hidden="true" className={cn('h-2 w-2 rounded-full', health.dot)} />
+                <span className="font-medium">{health.label}</span>
+                <span className="text-muted-foreground">· {describeFrequency(status.frequency)}</span>
               </p>
-            </>
+            )
           )}
-          {proof && (
-            <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-              <Database className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              <span>{proof}</span>
-            </p>
-          )}
-          {status.error && <p className="text-xs text-warning">État indisponible : {status.error}</p>}
-          <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            <span>
-              « Sauvegarde réussie » signifie qu’un dump/exécution a abouti. « Copie hors serveur » dépend du stockage
-              S3 configuré. « Restauration consignée » prouve une restauration effectuée ; un test régulier en
-              environnement isolé reste recommandé.
-            </span>
-          </p>
         </div>
         {status.canManage && (
           <Button
@@ -364,6 +339,50 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
           </Button>
         )}
       </div>
+
+      {status.scheduled && (
+        <div className="grid gap-2 sm:grid-cols-3">
+          <div className="rounded-lg border border-border bg-muted/20 p-2.5">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Sauvegarde réussie</p>
+            <p className="mt-1 text-xs font-medium">
+              {summary?.lastSuccessAt ? formatDate(summary.lastSuccessAt) : 'Aucune réussite'}
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {summary?.lastFailureAt ? `Dernier échec : ${formatDate(summary.lastFailureAt)}` : 'Aucun échec récent'}
+            </p>
+          </div>
+          <div className="rounded-lg border border-border bg-muted/20 p-2.5">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Copie hors serveur</p>
+            <p className={cn('mt-1 text-xs font-medium', offsite.tone === 'warning' && 'text-warning')}>
+              {status.scheduleOffsite ? 'Planifiée (S3)' : status.offsiteConfigured ? 'S3 configuré, à vérifier' : 'Non configurée'}
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">{offsite.text}</p>
+          </div>
+          <div className="rounded-lg border border-border bg-muted/20 p-2.5">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Restauration consignée</p>
+            <p className="mt-1 text-xs font-medium">
+              {status.restore?.lastSuccessfulAt
+                ? formatDate(status.restore.lastSuccessfulAt)
+                : status.restore?.status === 'failed'
+                  ? 'Échec consigné'
+                  : 'Aucune preuve'}
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {proof ?? 'Un test régulier en environnement isolé reste recommandé.'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {status.error && <p className="text-xs text-warning">État indisponible : {status.error}</p>}
+      <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span>
+          « Sauvegarde réussie » = exécution aboutie. « Copie hors serveur » = copie S3 effective/configurée selon
+          l’instance. « Restauration consignée » = preuve enregistrée ; elle ne remplace pas un test régulier en
+          environnement isolé.
+        </span>
+      </p>
 
       {restoreRunning && restore?.backupCreatedAt && (
         <p role="status" className="flex items-center gap-2 text-xs font-medium">
