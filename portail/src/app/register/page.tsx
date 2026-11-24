@@ -253,11 +253,11 @@ export default function RegisterPage() {
 
             <p className="text-xs leading-relaxed text-muted-foreground">
               En créant un compte, vous reconnaissez avoir pris connaissance des{' '}
-              <Link href="/conditions" className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <Link href="/conditions" className="rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 conditions d’utilisation
               </Link>{' '}
               et de la{' '}
-              <Link href="/confidentialite" className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <Link href="/confidentialite" className="rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 politique de confidentialité
               </Link>
               .
