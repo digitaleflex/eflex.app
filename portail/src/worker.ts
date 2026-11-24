@@ -31,7 +31,8 @@ import { startBillingMaintenance } from '@/lib/billing-renewal'
 import { startAnalyticsAlertsMaintenance } from '@/lib/analytics-alerts'
 import { startDatabaseBackupMaintenance } from '@/lib/database-backups'
 import { startSiteMonitoringMaintenance } from '@/lib/site-monitoring'
-import { DEPLOYMENT_QUEUE, redisConnection } from '@/lib/queue'
+import { DEPLOYMENT_QUEUE, deploymentsQueue, enqueueDeployment, redisConnection } from '@/lib/queue'
+import { reconcileDeploymentQueue, RECONCILE_INTERVAL_MS } from '@/lib/queue-reconcile'
 import { COOLIFY_FAILED, COOLIFY_LIVE } from '@/lib/coolify-status'
 import { announceDeploymentStatus } from '@/lib/deployment-events'
 import { resolveProjectToken } from '@/lib/git-credentials'
@@ -961,6 +962,41 @@ export async function runDeploymentWatchdog(): Promise<void> {
   }
 }
 
+/**
+ * Réconciliation base → file (audit M4) : Redis n'est pas persistant, un
+ * redémarrage efface les jobs alors que les déploiements restent en base.
+ */
+let reconcileRunning = false
+
+export async function runQueueReconciliation(): Promise<void> {
+  if (reconcileRunning) return
+  reconcileRunning = true
+  try {
+    const result = await reconcileDeploymentQueue({
+      findPending: (limit) =>
+        prisma.deployment.findMany({
+          where: { status: { notIn: [...TERMINAL_STATUSES] } },
+          select: { id: true, rollback: true },
+          orderBy: { createdAt: 'asc' },
+          take: limit,
+        }),
+      hasJob: async (id) => (await deploymentsQueue().getJob(id)) != null,
+      enqueue: (id, options) => enqueueDeployment(id, options),
+      log: (message) => console.warn(`[eflex/worker] ${message}`),
+    })
+    if (result.reenqueued.length > 0) {
+      console.warn(`[eflex/worker] ${result.reenqueued.length} déploiement(s) ré-enfilé(s) après perte de la file.`)
+    }
+  } catch (error) {
+    console.error(
+      '[eflex/worker] réconciliation de la file impossible :',
+      error instanceof Error ? error.message : String(error),
+    )
+  } finally {
+    reconcileRunning = false
+  }
+}
+
 export function startDeploymentWorker(): Worker {
   const worker = new Worker(
     DEPLOYMENT_QUEUE,
@@ -985,6 +1021,13 @@ export function startDeploymentWorker(): Worker {
   // Après un redémarrage, les déploiements bloqués doivent expirer sans attendre
   // la première minute ni l'arrivée d'un job.
   void runDeploymentWatchdog()
+
+  // Redis peut avoir perdu la file (pas de persistance) : on ré-enfile ce qui manque.
+  const reconcileTimer = setInterval(() => {
+    void runQueueReconciliation()
+  }, RECONCILE_INTERVAL_MS)
+  reconcileTimer.unref()
+  void runQueueReconciliation()
 
   // Maintenance des abonnements (relance de #18) : passe immédiate puis toutes
   // les 6 h. Aucun paiement n'est déclenché, seules les échéances sont
