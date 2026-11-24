@@ -9,7 +9,6 @@ import { useAuthConfig } from '@/components/auth/use-auth-config'
 import { useValidatedField } from '@/components/auth/use-validated-field'
 import { CAPTCHA_ENABLED, Turnstile, captchaHeaders } from '@/components/auth/turnstile'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { authClient, authErrorMessage } from '@/lib/auth-client'
 import { validateEmail } from '@/lib/auth-validation'
@@ -84,7 +83,7 @@ export default function ForgotPasswordPage() {
         </Link>
       }
     >
-      <Card className="space-y-5 p-6">
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8 space-y-5">
         {config?.emailEnabled === false ? (
           <div role="status" className="space-y-3 text-sm">
             <p className="text-foreground">La réinitialisation par e-mail sera disponible prochainement.</p>
@@ -130,7 +129,7 @@ export default function ForgotPasswordPage() {
             </form>
           </>
         )}
-      </Card>
+      </div>
     </AuthLayout>
   )
 }
