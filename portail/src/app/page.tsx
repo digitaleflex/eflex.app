@@ -4,7 +4,7 @@ import { ArrowRight, Database, GitBranch, Lock, PlayCircle, ScrollText } from 'l
 import { SiteHeader } from '@/components/marketing/site-header'
 import { SiteFooter } from '@/components/marketing/site-footer'
 import { TechMarquee } from '@/components/marketing/tech-marquee'
-import { HowItWorks } from '@/components/marketing/how-it-works'
+import { JourneyDemo } from '@/components/marketing/journey-demo'
 import { FinalCta } from '@/components/marketing/final-cta'
 import { getLegalCompanyInfo } from '@/lib/legal-info'
 
@@ -146,13 +146,13 @@ export default function HomePage() {
           <div className="container">
             <div className="mx-auto max-w-3xl space-y-4 text-center">
               <h2 id="fonctionnement-titre" className="text-display-sm font-extrabold tracking-tight text-balance text-foreground">
-                Comment ça fonctionne
+                Du dépôt à la production, sans complexité inutile.
               </h2>
               <p className="mx-auto max-w-2xl text-lead-lg text-muted-foreground text-pretty">
-                Du dépôt GitHub à l’application en ligne, en trois étapes.
+                Connectez votre dépôt. EFLEX analyse votre projet, prépare son déploiement et vous permet d’en suivre les étapes depuis un seul espace.
               </p>
             </div>
-            <HowItWorks />
+            <JourneyDemo />
           </div>
         </section>
 
