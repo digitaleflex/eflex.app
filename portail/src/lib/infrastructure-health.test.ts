@@ -7,12 +7,15 @@ import {
   clampPercent,
   connectionLevel,
   countStaleDeployments,
+  evaluatePortalBackupStatus,
   extractServerMetrics,
   formatBytes,
   formatLatency,
   normalizeQueueCounts,
   orphanApplications,
   overallHealth,
+  parsePortalBackupStatus,
+  parsePortalRestoreTestStatus,
   percentLevel,
   queueLevel,
   sanitizeErrorText,
@@ -228,5 +231,121 @@ describe('formatage', () => {
     expect(formatLatency(null)).toBe('—')
     expect(formatLatency(42)).toBe('42 ms')
     expect(formatLatency(1_250)).toBe('1,3 s')
+  })
+})
+
+describe('sauvegardes du portail (preuves status files)', () => {
+  it('parse backup.status et restore-test.status', () => {
+    const backup = parsePortalBackupStatus(
+      'local_success_at=2026-11-10T03:30:00Z\nlast_file=eflex-db-daily-20261110.dump.gz\nlast_db=eflex\noffsite=ok\noffsite_at=2026-11-10T03:31:00Z\nlast_success_at=2026-11-10T03:31:00Z\n',
+    )
+    expect(backup).toMatchObject({
+      localSuccessAt: '2026-11-10T03:30:00Z',
+      lastFile: 'eflex-db-daily-20261110.dump.gz',
+      offsite: 'ok',
+      lastSuccessAt: '2026-11-10T03:31:00Z',
+    })
+
+    const restore = parsePortalRestoreTestStatus(
+      'status=success\nlast_success_at=2026-11-09T05:20:00Z\nlast_file=eflex-db-weekly-2026-W45.dump.gz\nsource_db=eflex\ntarget_db=eflex_restore_test\ntables=34\nusers=2\nprojects=3\nmigrations=42\nproof_scope=isolated_restore_test\n',
+    )
+    expect(restore).toMatchObject({
+      status: 'success',
+      lastSuccessAt: '2026-11-09T05:20:00Z',
+      tables: 34,
+      users: 2,
+      projects: 3,
+      migrations: 42,
+      proofScope: 'isolated_restore_test',
+    })
+  })
+
+  it('signale l’absence de preuves', () => {
+    const result = evaluatePortalBackupStatus(null, null, { now: NOW })
+    expect(result.level).toBe('warning')
+    expect(result.issues.join(' ')).toContain('backup.status absent')
+    expect(result.issues.join(' ')).toContain('restauration testée')
+  })
+
+  it('passe en critique si la sauvegarde locale est trop ancienne ou la copie hors site a échoué', () => {
+    const stale = evaluatePortalBackupStatus(
+      {
+        localSuccessAt: new Date(NOW - 48 * 3_600_000).toISOString(),
+        lastFile: 'f.dump.gz',
+        lastDb: 'eflex',
+        offsite: 'ok',
+        offsiteAt: new Date(NOW - 48 * 3_600_000).toISOString(),
+        lastSuccessAt: new Date(NOW - 48 * 3_600_000).toISOString(),
+      },
+      {
+        status: 'success',
+        lastSuccessAt: new Date(NOW - 2 * DAY).toISOString(),
+        lastFile: 'f.dump.gz',
+        sourceDb: 'eflex',
+        targetDb: 'eflex_restore_test',
+        tables: 30,
+        users: 1,
+        projects: 1,
+        migrations: 10,
+        proofScope: 'isolated_restore_test',
+      },
+      { now: NOW, maxAgeHours: 26, restoreTestMaxAgeDays: 35 },
+    )
+    expect(stale.level).toBe('danger')
+    expect(stale.issues.join(' ')).toContain('trop ancienne')
+
+    const offsiteError = evaluatePortalBackupStatus(
+      {
+        localSuccessAt: new Date(NOW - 2 * 3_600_000).toISOString(),
+        lastFile: 'f.dump.gz',
+        lastDb: 'eflex',
+        offsite: 'error',
+        offsiteAt: new Date(NOW - 2 * 3_600_000).toISOString(),
+        lastSuccessAt: null,
+      },
+      {
+        status: 'success',
+        lastSuccessAt: new Date(NOW - 2 * DAY).toISOString(),
+        lastFile: 'f.dump.gz',
+        sourceDb: 'eflex',
+        targetDb: 'eflex_restore_test',
+        tables: 30,
+        users: 1,
+        projects: 1,
+        migrations: 10,
+        proofScope: 'isolated_restore_test',
+      },
+      { now: NOW },
+    )
+    expect(offsiteError.level).toBe('danger')
+    expect(offsiteError.issues.join(' ')).toContain('hors site')
+  })
+
+  it('accepte un état sain avec copie hors site et restauration testée récentes', () => {
+    const ok = evaluatePortalBackupStatus(
+      {
+        localSuccessAt: new Date(NOW - 2 * 3_600_000).toISOString(),
+        lastFile: 'f.dump.gz',
+        lastDb: 'eflex',
+        offsite: 'ok',
+        offsiteAt: new Date(NOW - 2 * 3_600_000).toISOString(),
+        lastSuccessAt: new Date(NOW - 2 * 3_600_000).toISOString(),
+      },
+      {
+        status: 'success',
+        lastSuccessAt: new Date(NOW - 3 * DAY).toISOString(),
+        lastFile: 'f.dump.gz',
+        sourceDb: 'eflex',
+        targetDb: 'eflex_restore_test',
+        tables: 30,
+        users: 1,
+        projects: 1,
+        migrations: 10,
+        proofScope: 'isolated_restore_test',
+      },
+      { now: NOW, maxAgeHours: 26, restoreTestMaxAgeDays: 35, requireOffsite: true },
+    )
+    expect(ok.level).toBe('ok')
+    expect(ok.issues).toEqual([])
   })
 })

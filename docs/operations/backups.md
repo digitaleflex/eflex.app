@@ -39,7 +39,9 @@ quand des fichiers de statut sont présents dans `EFLEX_BACKUP_DIR` (seuils :
 `EFLEX_BACKUP_MAX_AGE_HOURS`, `EFLEX_RESTORE_TEST_MAX_AGE_DAYS`,
 `EFLEX_BACKUP_REQUIRE_OFFSITE`). Cela permet d’alerter sur une sauvegarde
 absente/trop ancienne, une copie hors site manquante ou en échec, ou une preuve
-de restauration trop ancienne, sans exposer de secret.
+de restauration trop ancienne, sans exposer de secret. La page admin
+`/admin/infrastructure` expose ces mêmes preuves (sauvegarde locale, copie hors
+site, restauration testée) pour rendre l’état visible sans accès SSH.
 
 ## 2. Emplacement, nommage, permissions
 

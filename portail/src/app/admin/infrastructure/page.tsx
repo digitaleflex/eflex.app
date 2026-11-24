@@ -489,6 +489,98 @@ export default async function AdminInfrastructurePage() {
           <Card className="lg:col-span-2">
             <CardHeader className="flex flex-wrap items-start justify-between gap-3 pb-2">
               <div>
+                <h3 className="text-base font-semibold">Sauvegardes du portail</h3>
+                <p className="text-sm text-muted-foreground">
+                  Preuves locales lues depuis <code className="font-mono text-xs">backup.status</code> et{' '}
+                  <code className="font-mono text-xs">restore-test.status</code>. Une sauvegarde réussie n’est pas une
+                  restauration prouvée.
+                </p>
+              </div>
+              <LevelBadge level={src('portal-backups').level} />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-xl border border-border bg-muted/20 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sauvegarde locale</p>
+                  <p className="mt-1 text-sm font-medium">
+                    {snapshot.portalBackups.backup?.localSuccessAt
+                      ? dateTime.format(new Date(snapshot.portalBackups.backup.localSuccessAt))
+                      : 'Aucune preuve'}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {snapshot.portalBackups.backup?.lastFile
+                      ? `Fichier : ${snapshot.portalBackups.backup.lastFile}`
+                      : 'Fichier non renseigné'}
+                    {snapshot.portalBackups.backupAgeHours !== null
+                      ? ` · ${Math.max(0, Math.floor(snapshot.portalBackups.backupAgeHours))} h`
+                      : ''}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border bg-muted/20 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Copie hors site</p>
+                  <p className="mt-1 text-sm font-medium">
+                    {snapshot.portalBackups.backup?.offsite === 'ok'
+                      ? 'Confirmée'
+                      : snapshot.portalBackups.backup?.offsite === 'error'
+                        ? 'Échec'
+                        : snapshot.portalBackups.backup?.offsite === 'skipped'
+                          ? 'Non configurée'
+                          : 'Inconnue'}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {snapshot.portalBackups.backup?.offsiteAt
+                      ? `Le ${dateTime.format(new Date(snapshot.portalBackups.backup.offsiteAt))}`
+                      : snapshot.portalBackups.requireOffsite
+                        ? 'Copie hors site requise'
+                        : 'Configurez EFLEX_BACKUP_OFFSITE_CMD pour une copie indépendante du serveur.'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border bg-muted/20 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Restauration testée</p>
+                  <p className="mt-1 text-sm font-medium">
+                    {snapshot.portalBackups.restoreTest?.lastSuccessAt
+                      ? dateTime.format(new Date(snapshot.portalBackups.restoreTest.lastSuccessAt))
+                      : 'Aucune preuve'}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {snapshot.portalBackups.restoreTest?.lastFile
+                      ? `Fichier : ${snapshot.portalBackups.restoreTest.lastFile}`
+                      : 'Test isolé non consigné'}
+                    {snapshot.portalBackups.restoreTestAgeDays !== null
+                      ? ` · ${Math.max(0, Math.floor(snapshot.portalBackups.restoreTestAgeDays))} j`
+                      : ''}
+                  </p>
+                </div>
+              </div>
+
+              {snapshot.portalBackups.issues.length > 0 ? (
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {snapshot.portalBackups.issues.map((issue) => (
+                    <li key={issue} className="flex gap-2">
+                      <span aria-hidden="true">•</span>
+                      <span>{issue}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <ShieldCheck className="h-4 w-4 text-success" aria-hidden="true" />
+                  Sauvegarde locale, copie hors site et restauration testée sont dans les seuils configurés.
+                </p>
+              )}
+
+              <SourceError source={src('portal-backups')} />
+              <p className="text-xs text-muted-foreground">
+                Seuils : sauvegarde locale &gt; {number.format(snapshot.portalBackups.maxAgeHours)} h, restauration testée &gt;{' '}
+                {number.format(snapshot.portalBackups.restoreTestMaxAgeDays)} j. Voir{' '}
+                <code className="font-mono text-xs">docs/operations/backups.md</code>.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex flex-wrap items-start justify-between gap-3 pb-2">
+              <div>
                 <h3 className="text-base font-semibold">Certificats TLS</h3>
                 <p className="text-sm text-muted-foreground">
                   Expiration dans les {CERT_WARNING_DAYS} jours, d’après le dernier contrôle TLS de chaque déploiement.

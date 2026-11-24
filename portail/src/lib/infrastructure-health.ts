@@ -355,6 +355,186 @@ export function orphanApplications(
 }
 
 /* ------------------------------------------------------------------ */
+/* Sauvegardes du portail (fichiers de statut locaux)                  */
+/* ------------------------------------------------------------------ */
+
+export const PORTAL_BACKUP_MAX_AGE_HOURS = 26
+export const PORTAL_RESTORE_TEST_MAX_AGE_DAYS = 35
+
+export type PortalBackupOffsite = 'ok' | 'skipped' | 'error' | 'unknown'
+
+export interface PortalBackupStatusFile {
+  localSuccessAt: string | null
+  lastFile: string | null
+  lastDb: string | null
+  offsite: PortalBackupOffsite
+  offsiteAt: string | null
+  lastSuccessAt: string | null
+}
+
+export interface PortalRestoreTestStatusFile {
+  status: 'success' | 'unknown'
+  lastSuccessAt: string | null
+  lastFile: string | null
+  sourceDb: string | null
+  targetDb: string | null
+  tables: number | null
+  users: number | null
+  projects: number | null
+  migrations: number | null
+  proofScope: string | null
+}
+
+export interface PortalBackupSnapshot {
+  backup: PortalBackupStatusFile | null
+  restoreTest: PortalRestoreTestStatusFile | null
+  backupAgeHours: number | null
+  restoreTestAgeDays: number | null
+  requireOffsite: boolean
+  maxAgeHours: number
+  restoreTestMaxAgeDays: number
+  level: HealthLevel
+  issues: string[]
+  error: string | null
+}
+
+function parseStatusLines(raw: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const line of raw.split(/\r?\n/)) {
+    const idx = line.indexOf('=')
+    if (idx <= 0) continue
+    const key = line.slice(0, idx).trim()
+    const value = line.slice(idx + 1).trim()
+    if (key) out[key] = value
+  }
+  return out
+}
+
+function cleanStatusValue(value: string | undefined): string | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function parseStatusInt(value: string | undefined): number | null {
+  const clean = cleanStatusValue(value)
+  if (!clean) return null
+  const parsed = Number.parseInt(clean, 10)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+}
+
+function hoursSince(iso: string | null, now: number): number | null {
+  const time = toEpoch(iso)
+  if (time === null) return null
+  return (now - time) / 3_600_000
+}
+
+export function parsePortalBackupStatus(raw: string): PortalBackupStatusFile {
+  const fields = parseStatusLines(raw)
+  const offsiteRaw = cleanStatusValue(fields.offsite)
+  const offsite: PortalBackupOffsite =
+    offsiteRaw === 'ok' || offsiteRaw === 'skipped' || offsiteRaw === 'error' ? offsiteRaw : 'unknown'
+  return {
+    localSuccessAt: cleanStatusValue(fields.local_success_at),
+    lastFile: cleanStatusValue(fields.last_file),
+    lastDb: cleanStatusValue(fields.last_db),
+    offsite,
+    offsiteAt: cleanStatusValue(fields.offsite_at),
+    lastSuccessAt: cleanStatusValue(fields.last_success_at),
+  }
+}
+
+export function parsePortalRestoreTestStatus(raw: string): PortalRestoreTestStatusFile {
+  const fields = parseStatusLines(raw)
+  const status = cleanStatusValue(fields.status) === 'success' ? 'success' : 'unknown'
+  return {
+    status,
+    lastSuccessAt: cleanStatusValue(fields.last_success_at),
+    lastFile: cleanStatusValue(fields.last_file),
+    sourceDb: cleanStatusValue(fields.source_db),
+    targetDb: cleanStatusValue(fields.target_db),
+    tables: parseStatusInt(fields.tables),
+    users: parseStatusInt(fields.users),
+    projects: parseStatusInt(fields.projects),
+    migrations: parseStatusInt(fields.migrations),
+    proofScope: cleanStatusValue(fields.proof_scope),
+  }
+}
+
+export interface PortalBackupEvaluationOptions {
+  now?: number
+  maxAgeHours?: number
+  restoreTestMaxAgeDays?: number
+  requireOffsite?: boolean
+}
+
+export function evaluatePortalBackupStatus(
+  backup: PortalBackupStatusFile | null,
+  restoreTest: PortalRestoreTestStatusFile | null,
+  options: PortalBackupEvaluationOptions = {},
+): Omit<PortalBackupSnapshot, 'error'> {
+  const now = options.now ?? Date.now()
+  const maxAgeHours = options.maxAgeHours ?? PORTAL_BACKUP_MAX_AGE_HOURS
+  const restoreTestMaxAgeDays = options.restoreTestMaxAgeDays ?? PORTAL_RESTORE_TEST_MAX_AGE_DAYS
+  const requireOffsite = options.requireOffsite ?? false
+
+  const backupAgeHours = hoursSince(backup?.localSuccessAt ?? null, now)
+  const restoreTestAgeDays = hoursSince(restoreTest?.lastSuccessAt ?? null, now)
+  const restoreDays = restoreTestAgeDays === null ? null : restoreTestAgeDays / 24
+  const issues: string[] = []
+  let level: HealthLevel = 'ok'
+
+  if (!backup) {
+    issues.push('Aucune preuve de sauvegarde du portail trouvée (backup.status absent).')
+    level = 'warning'
+  } else {
+    if (!backup.localSuccessAt) {
+      issues.push('Aucune sauvegarde locale réussie consignée.')
+      level = worstLevel([level, 'danger'])
+    } else if (backupAgeHours !== null && backupAgeHours > maxAgeHours) {
+      issues.push(`Dernière sauvegarde locale trop ancienne (${Math.floor(backupAgeHours)} h, seuil ${maxAgeHours} h).`)
+      level = worstLevel([level, 'danger'])
+    }
+
+    if (backup.offsite === 'error') {
+      issues.push('La copie hors site de la dernière sauvegarde a échoué.')
+      level = worstLevel([level, 'danger'])
+    } else if (requireOffsite && backup.offsite !== 'ok') {
+      issues.push('Copie hors site requise mais non confirmée.')
+      level = worstLevel([level, 'danger'])
+    } else if (backup.offsite === 'skipped') {
+      issues.push('Aucune copie hors site configurée pour les sauvegardes du portail.')
+      level = worstLevel([level, 'warning'])
+    } else if (backup.offsite === 'unknown') {
+      issues.push('État de la copie hors site inconnu.')
+      level = worstLevel([level, 'warning'])
+    }
+  }
+
+  if (!restoreTest || restoreTest.status !== 'success' || !restoreTest.lastSuccessAt) {
+    issues.push('Aucune preuve de restauration testée en environnement isolé.')
+    level = worstLevel([level, 'warning'])
+  } else if (restoreDays !== null && restoreDays > restoreTestMaxAgeDays) {
+    issues.push(
+      `Dernière restauration testée trop ancienne (${Math.floor(restoreDays)} j, seuil ${restoreTestMaxAgeDays} j).`,
+    )
+    level = worstLevel([level, 'warning'])
+  }
+
+  return {
+    backup,
+    restoreTest,
+    backupAgeHours,
+    restoreTestAgeDays: restoreDays,
+    requireOffsite,
+    maxAgeHours,
+    restoreTestMaxAgeDays,
+    level,
+    issues,
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Erreurs et formatage                                                */
 /* ------------------------------------------------------------------ */
 

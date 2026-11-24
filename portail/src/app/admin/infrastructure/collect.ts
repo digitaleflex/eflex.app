@@ -7,6 +7,8 @@
  * d'erreur sont expurgés (jeton, identifiants d'URL) avant de quitter le
  * serveur, et le jeton Coolify n'est jamais renvoyé.
  */
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { prisma } from '@/lib/prisma'
 import { deploymentsQueue } from '@/lib/queue'
 import { ACTIVE_DEPLOYMENT_STATUSES } from '@/lib/deployment-state'
@@ -20,10 +22,13 @@ import {
   classifySourceError,
   connectionLevel,
   countStaleDeployments,
+  evaluatePortalBackupStatus,
   extractServerMetrics,
   normalizeQueueCounts,
   overallHealth,
   orphanApplications,
+  parsePortalBackupStatus,
+  parsePortalRestoreTestStatus,
   percentLevel,
   queueLevel,
   sanitizeErrorText,
@@ -35,6 +40,7 @@ import {
   type DatabaseStatsInput,
   type DeploymentSummary,
   type HealthLevel,
+  type PortalBackupSnapshot,
   type QueueCounts,
   type ServerMetrics,
   type SourceErrorKind,
@@ -57,6 +63,7 @@ export type SourceKey =
   | 'certificates'
   | 'deployments'
   | 'queue'
+  | 'portal-backups'
   | 'settings'
 
 export interface SourceInfo {
@@ -135,6 +142,10 @@ interface ProjectsAttempt extends Omit<ProjectsSnapshot, 'orphans'> {
   appIds: string[]
 }
 
+export interface PortalBackupInfraSnapshot extends PortalBackupSnapshot {
+  errorKind: SourceErrorKind | null
+}
+
 export interface InfrastructureSnapshot {
   collectedAt: string
   durationMs: number
@@ -144,6 +155,7 @@ export interface InfrastructureSnapshot {
   deployments: DeploymentsSnapshot
   queue: QueueSnapshot
   certificates: CertificatesSnapshot
+  portalBackups: PortalBackupInfraSnapshot
   projects: ProjectsSnapshot
   settings: PlatformSettingsSnapshot
   sources: SourceInfo[]
@@ -690,6 +702,64 @@ async function collectSettings(): Promise<PlatformSettingsSnapshot> {
 }
 
 /* ------------------------------------------------------------------ */
+/* Sauvegardes du portail                                              */
+/* ------------------------------------------------------------------ */
+
+function envInt(name: string, fallback: number, min: number, max: number): number {
+  const raw = process.env[name]
+  const value = Number.parseInt(raw ?? '', 10)
+  if (!Number.isFinite(value)) return fallback
+  return Math.min(max, Math.max(min, value))
+}
+
+async function readStatusFile(path: string): Promise<{ content: string | null; error: string | null }> {
+  try {
+    return { content: await readFile(path, 'utf8'), error: null }
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | null)?.code
+    if (code === 'ENOENT') return { content: null, error: null }
+    return { content: null, error: sanitizeErrorText(error) }
+  }
+}
+
+async function collectPortalBackups(): Promise<PortalBackupInfraSnapshot> {
+  const dir = (process.env.EFLEX_BACKUP_DIR ?? '/home/fantome/backups/eflex').trim() || '/home/fantome/backups/eflex'
+  const maxAgeHours = envInt('EFLEX_BACKUP_MAX_AGE_HOURS', 26, 1, 24 * 31)
+  const restoreTestMaxAgeDays = envInt('EFLEX_RESTORE_TEST_MAX_AGE_DAYS', 35, 1, 365)
+  const requireOffsite = process.env.EFLEX_BACKUP_REQUIRE_OFFSITE === '1'
+
+  const [backupFile, restoreFile] = await Promise.all([
+    readStatusFile(join(dir, 'backup.status')),
+    readStatusFile(join(dir, 'restore-test.status')),
+  ])
+
+  const readError = backupFile.error ?? restoreFile.error
+  const backup = backupFile.content ? parsePortalBackupStatus(backupFile.content) : null
+  const restoreTest = restoreFile.content ? parsePortalRestoreTestStatus(restoreFile.content) : null
+  const evaluated = evaluatePortalBackupStatus(backup, restoreTest, {
+    maxAgeHours,
+    restoreTestMaxAgeDays,
+    requireOffsite,
+  })
+
+  if (readError) {
+    return {
+      ...evaluated,
+      level: worstLevel([evaluated.level, 'warning']),
+      issues: [...evaluated.issues, `Lecture des preuves de sauvegarde impossible : ${readError}`],
+      error: readError,
+      errorKind: errorKindOf(readError),
+    }
+  }
+
+  return {
+    ...evaluated,
+    error: null,
+    errorKind: null,
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Agrégation                                                          */
 /* ------------------------------------------------------------------ */
 
@@ -709,15 +779,17 @@ export async function collectInfrastructure(): Promise<InfrastructureSnapshot> {
   const started = Date.now()
   const collectedAt = new Date(started).toISOString()
 
-  const [coolify, database, deployments, projectsAttempt, queue, certificates, settings] = await Promise.all([
-    collectCoolify(),
-    collectDatabase(),
-    collectDeployments(),
-    collectProjects(),
-    collectQueue(),
-    collectCertificates(),
-    collectSettings(),
-  ])
+  const [coolify, database, deployments, projectsAttempt, queue, certificates, portalBackups, settings] =
+    await Promise.all([
+      collectCoolify(),
+      collectDatabase(),
+      collectDeployments(),
+      collectProjects(),
+      collectQueue(),
+      collectCertificates(),
+      collectPortalBackups(),
+      collectSettings(),
+    ])
 
   // Applications présentes côté Coolify mais liées à aucun projet EFLEX.
   // Base injoignable : on ne peut pas savoir, donc on n'accuse aucune application.
@@ -728,6 +800,7 @@ export async function collectInfrastructure(): Promise<InfrastructureSnapshot> {
     error: projectsAttempt.error,
   }
 
+  const portalBackupError = portalBackups.error ?? (portalBackups.issues.length > 0 ? portalBackups.issues[0] : null)
   const sources: SourceInfo[] = [
     sourceInfo('coolify', 'Hébergement Coolify', coolify.level, coolify.latencyMs, coolify.error, collectedAt),
     sourceInfo('database', 'Base de données', database.level, database.latencyMs, database.error, collectedAt),
@@ -741,6 +814,7 @@ export async function collectInfrastructure(): Promise<InfrastructureSnapshot> {
       collectedAt,
     ),
     sourceInfo('queue', 'File de déploiements', queue.level, queue.latencyMs, queue.error, collectedAt),
+    sourceInfo('portal-backups', 'Sauvegardes du portail', portalBackups.level, null, portalBackupError, collectedAt),
     sourceInfo(
       'settings',
       'Réglages de plateforme',
@@ -760,6 +834,7 @@ export async function collectInfrastructure(): Promise<InfrastructureSnapshot> {
     deployments,
     queue,
     certificates,
+    portalBackups,
     projects,
     settings,
     sources,
