@@ -26,22 +26,28 @@ const ALLOWED_PATHS = new Set([
   '/logo-mark-inverse.png',
 ])
 
+/** Ancien cookie du sélecteur de thème (supprimé, issue #220) : on le retire des navigateurs. */
+function clearLegacyThemeCookie(request: NextRequest, response: NextResponse): NextResponse {
+  if (request.cookies.has('eflex-theme')) response.cookies.set('eflex-theme', '', { path: '/', maxAge: 0 })
+  return response
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  if (process.env.MAINTENANCE_MODE !== 'true') return NextResponse.next()
+  if (process.env.MAINTENANCE_MODE !== 'true') return clearLegacyThemeCookie(request, NextResponse.next())
   if (
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/api/webhooks') ||
     ALLOWED_PATHS.has(pathname)
-  ) return NextResponse.next()
+  ) return clearLegacyThemeCookie(request, NextResponse.next())
 
   const url = request.nextUrl.clone()
   url.pathname = '/maintenance'
   const response = NextResponse.rewrite(url, { status: 503 })
   response.headers.set('x-eflex-maintenance', '1')
   response.headers.set('Retry-After', '300')
-  return response
+  return clearLegacyThemeCookie(request, response)
 }
 
 export const config = {

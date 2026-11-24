@@ -260,7 +260,7 @@ function AnnouncementBannerContent({
         <button
           type="button"
           onClick={onDismiss}
-          className="inline-flex min-h-9 shrink-0 items-center rounded-md border border-current/20 px-3 text-xs font-medium hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:hover:bg-white/10"
+          className="inline-flex min-h-9 shrink-0 items-center rounded-md border border-current/20 px-3 text-xs font-medium hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Fermer cette annonce"
         >
           Fermer

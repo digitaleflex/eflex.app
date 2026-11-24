@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-// En-tête marketing Zone 1 : navigation, thème clair/sombre, accessibilité.
+// En-tête marketing Zone 1 : navigation, thème clair unique (issue #220), accessibilité.
 
 const css = readFileSync(new URL('../../app/globals.css', import.meta.url), 'utf8')
 const header = readFileSync(new URL('./site-header.tsx', import.meta.url), 'utf8')
@@ -18,8 +18,14 @@ function tokens(block: string): Record<string, Hsl> {
   return out
 }
 
-const light = tokens(css.slice(css.indexOf(':root'), css.indexOf(':root.dark')))
-const dark = tokens(css.slice(css.indexOf(':root.dark'), css.indexOf('}', css.indexOf(':root.dark'))))
+// Bloc `:root` seul (jusqu'à son accolade fermante) : les portées locales ne doivent pas écraser les tokens.
+const rootStart = css.indexOf(':root {')
+let rootEnd = css.indexOf('{', rootStart)
+for (let depth = 0; rootEnd < css.length; rootEnd += 1) {
+  if (css[rootEnd] === '{') depth += 1
+  else if (css[rootEnd] === '}' && --depth === 0) break
+}
+const light = tokens(css.slice(rootStart, rootEnd))
 
 function hsl([h, s, l]: Hsl): Rgb {
   const sat = s / 100
@@ -48,14 +54,8 @@ describe('lisibilité AA des contrôles de navigation', () => {
     expect(ratio(hsl(light['muted-foreground']), hsl(light.background))).toBeGreaterThanOrEqual(4.5)
   })
 
-  it('texte/fond en thème sombre ≥ 4,5:1', () => {
-    expect(ratio(hsl(dark.foreground), hsl(dark.background))).toBeGreaterThanOrEqual(4.5)
-    expect(ratio(hsl(dark['muted-foreground']), hsl(dark.background))).toBeGreaterThanOrEqual(4.5)
-  })
-
-  it('anneau de focus visible sur les deux thèmes ≥ 3:1', () => {
+  it('anneau de focus visible ≥ 3:1', () => {
     expect(ratio(hsl(light.ring), hsl(light.background))).toBeGreaterThanOrEqual(3)
-    expect(ratio(hsl(dark.ring), hsl(dark.background))).toBeGreaterThanOrEqual(3)
   })
 })
 

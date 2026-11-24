@@ -7,7 +7,6 @@ import { Activity, Bell, ChevronsLeft, ChevronsRight, FolderKanban, Gauge, LifeB
 import { OrgSwitcher } from '@/components/org-switcher'
 import { NotificationBell } from '@/components/notification-bell'
 import { CommandPalette } from '@/components/command-palette'
-import { ThemeToggle } from '@/components/theme-switcher'
 import { UserMenu } from '@/components/user-menu'
 import { activeDashboardTab, DASHBOARD_TABS, type DashboardTabKey } from '@/lib/dashboard-nav'
 import { PlanWidget } from '@/components/dashboard/plan-widget'
@@ -257,8 +256,6 @@ export function DashboardShell({
                 <div className="md:hidden">
                   <CommandPalette hotkey={false} />
                 </div>
-                {/* Sur téléphone, le thème reste accessible depuis le menu du compte. */}
-                <ThemeToggle className="hidden sm:flex" />
                 <NotificationBell />
                 <UserMenu name={user.name || 'Mon compte'} email={user.email ?? ''} />
               </div>
