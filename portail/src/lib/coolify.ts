@@ -13,6 +13,7 @@
  * « production »), `COOLIFY_PROJECT_UUID` et `COOLIFY_SERVER_UUID` permettent
  * de forcer la cible sans découverte.
  */
+import { fetchWithRetry } from './coolify-retry'
 import { isCommitSha } from '@/lib/deployment-rollback'
 import { destinationFields } from '@/lib/org-network-context'
 import { normalizeApplicationMetrics, unavailableMetrics, type ApplicationMetrics } from '@/lib/app-metrics'
@@ -74,17 +75,22 @@ export async function coolifyFetch<T>(
   const url = `${COOLIFY_URL.replace(/\/$/, '')}${path}`
   let res: Response
   try {
-    res = await fetch(url, {
-      ...options,
-      headers: {
-        Authorization: `Bearer ${COOLIFY_TOKEN}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...options.headers,
-      },
-      signal: options.signal ?? AbortSignal.timeout(20_000),
-      cache: 'no-store',
-    })
+    // Lectures seulement : rejouées sur erreur réseau ou 429/502/503/504 (audit M2).
+    res = await fetchWithRetry(
+      () =>
+        fetch(url, {
+          ...options,
+          headers: {
+            Authorization: `Bearer ${COOLIFY_TOKEN}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            ...options.headers,
+          },
+          signal: options.signal ?? AbortSignal.timeout(20_000),
+          cache: 'no-store',
+        }),
+      options.method,
+    )
   } catch (error) {
     return {
       error: `Service de déploiement injoignable : ${error instanceof Error ? error.message : 'erreur réseau'}`,
