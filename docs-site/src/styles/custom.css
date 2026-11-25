@@ -1,59 +1,60 @@
-/* EFLEX Docs — style inspiré Vercel / Next.js docs. */
+/* EFLEX Docs — charte EFLEX (navy #0B1F3B, bleu #2563EB/#3B82F6). */
 
 :root,
 ::backdrop {
-  --sl-font: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --sl-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sl-font: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --sl-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --sl-color-accent-low: #e6f2ff;
-  --sl-color-accent: #0070f3;
-  --sl-color-accent-high: #0060d1;
+  /* Accent EFLEX (bleu) */
+  --sl-color-accent-low: #eff6ff;
+  --sl-color-accent: #2563eb;
+  --sl-color-accent-high: #1d4ed8;
 
   --sl-color-white: #ffffff;
-  --sl-color-gray-1: #fafafa;
-  --sl-color-gray-2: #f5f5f5;
-  --sl-color-gray-3: #eaeaea;
-  --sl-color-gray-4: #999999;
-  --sl-color-gray-5: #666666;
-  --sl-color-gray-6: #171717;
-  --sl-color-black: #000000;
+  --sl-color-gray-1: #f8fafc;
+  --sl-color-gray-2: #f1f5f9;
+  --sl-color-gray-3: #e2e8f0;
+  --sl-color-gray-4: #94a3b8;
+  --sl-color-gray-5: #64748b;
+  --sl-color-gray-6: #0b1f3b;
+  --sl-color-black: #020617;
 
   --sl-color-bg: #ffffff;
   --sl-color-bg-nav: rgba(255, 255, 255, 0.95);
-  --sl-color-bg-sidebar: #fafafa;
-  --sl-color-hairline-light: #eaeaea;
-  --sl-color-hairline-shade: #eaeaea;
-  --sl-color-text: #171717;
-  --sl-color-text-accent: #0070f3;
+  --sl-color-bg-sidebar: #f8fafc;
+  --sl-color-hairline-light: #e2e8f0;
+  --sl-color-hairline-shade: #e2e8f0;
+  --sl-color-text: #0b1f3b;
+  --sl-color-text-accent: #2563eb;
 
-  --sl-shadow-sm: 0 0 0 1px rgba(0, 0, 0, 0.03);
-  --sl-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --sl-shadow-sm: 0 0 0 1px rgba(11, 31, 59, 0.04);
+  --sl-shadow-md: 0 2px 8px rgba(11, 31, 59, 0.06);
   --sl-content-width: 48rem;
   --sl-text-5xl: clamp(2rem, calc(1.4rem + 2.4vw), 3.25rem);
 }
 
 :root[data-theme='dark'],
 [data-theme='dark'] ::backdrop {
-  --sl-color-accent-low: rgba(0, 112, 243, 0.16);
-  --sl-color-accent: #3291ff;
-  --sl-color-accent-high: #79b8ff;
+  --sl-color-accent-low: rgba(37, 99, 235, 0.18);
+  --sl-color-accent: #3b82f6;
+  --sl-color-accent-high: #93c5fd;
 
-  --sl-color-white: #ededed;
-  --sl-color-gray-1: #111111;
-  --sl-color-gray-2: #1a1a1a;
-  --sl-color-gray-3: #333333;
-  --sl-color-gray-4: #666666;
-  --sl-color-gray-5: #888888;
-  --sl-color-gray-6: #ededed;
-  --sl-color-black: #000000;
+  --sl-color-white: #e2e8f0;
+  --sl-color-gray-1: #0b1220;
+  --sl-color-gray-2: #111a2e;
+  --sl-color-gray-3: #1e293b;
+  --sl-color-gray-4: #64748b;
+  --sl-color-gray-5: #94a3b8;
+  --sl-color-gray-6: #e2e8f0;
+  --sl-color-black: #020617;
 
-  --sl-color-bg: #000000;
-  --sl-color-bg-nav: rgba(0, 0, 0, 0.85);
-  --sl-color-bg-sidebar: #000000;
-  --sl-color-hairline-light: #1f1f1f;
-  --sl-color-hairline-shade: #1f1f1f;
-  --sl-color-text: #ededed;
-  --sl-color-text-accent: #3291ff;
+  --sl-color-bg: #020617;
+  --sl-color-bg-nav: rgba(2, 6, 23, 0.85);
+  --sl-color-bg-sidebar: #020617;
+  --sl-color-hairline-light: #1e293b;
+  --sl-color-hairline-shade: #1e293b;
+  --sl-color-text: #e2e8f0;
+  --sl-color-text-accent: #60a5fa;
 
   --sl-shadow-sm: 0 0 0 1px rgba(255, 255, 255, 0.04);
   --sl-shadow-md: 0 2px 12px rgba(0, 0, 0, 0.4);
@@ -216,327 +217,4 @@ main .content-panel + .content-panel {
   letter-spacing: -0.015em;
   font-weight: 600;
   margin-top: 2rem;
-}
-
-.sl-markdown-content p,
-.sl-markdown-content li {
-  color: var(--sl-color-gray-6);
-}
-
-:root[data-theme='dark'] .sl-markdown-content p,
-:root[data-theme='dark'] .sl-markdown-content li {
-  color: #d4d4d4;
-}
-
-.sl-markdown-content strong {
-  color: var(--sl-color-text);
-  font-weight: 600;
-}
-
-.sl-markdown-content a:not([class]) {
-  color: var(--sl-color-accent);
-  text-decoration: none;
-  font-weight: inherit;
-  transition: color 150ms ease;
-}
-
-.sl-markdown-content a:not([class]):hover {
-  color: var(--sl-color-accent-high);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-/* Inline code */
-.sl-markdown-content :not(pre) > code {
-  font-size: 0.875em;
-  padding: 0.15em 0.4em;
-  border-radius: 5px;
-  border: 1px solid var(--sl-color-hairline-light);
-  background: var(--sl-color-gray-1);
-  color: var(--sl-color-text);
-}
-
-:root[data-theme='dark'] .sl-markdown-content :not(pre) > code {
-  background: #111;
-  border-color: #333;
-}
-
-/* Code blocks */
-.expressive-code {
-  margin-block: 1.5rem;
-}
-
-.expressive-code .frame {
-  border: 1px solid var(--sl-color-hairline-light);
-  border-radius: 8px;
-  box-shadow: none;
-}
-
-.expressive-code pre {
-  border-radius: 8px;
-}
-
-/* Tables */
-.sl-markdown-content table:not(:where(.not-content *)) {
-  display: table;
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 0.875rem;
-  border: 1px solid var(--sl-color-hairline-light);
-  border-radius: 8px;
-  overflow: hidden;
-  margin-block: 1.5rem;
-}
-
-.sl-markdown-content thead:not(:where(.not-content *)) {
-  background: var(--sl-color-gray-1);
-}
-
-:root[data-theme='dark'] .sl-markdown-content thead:not(:where(.not-content *)) {
-  background: #111;
-}
-
-.sl-markdown-content th:not(:where(.not-content *)) {
-  font-weight: 500;
-  font-size: 0.8125rem;
-  color: var(--sl-color-gray-5);
-  text-align: left;
-  padding: 0.625rem 1rem;
-  border-bottom: 1px solid var(--sl-color-hairline-light);
-}
-
-.sl-markdown-content td:not(:where(.not-content *)) {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--sl-color-hairline-light);
-  vertical-align: top;
-}
-
-.sl-markdown-content tr:last-child td:not(:where(.not-content *)) {
-  border-bottom: 0;
-}
-
-/* Cards / link cards */
-.sl-link-card {
-  border: 1px solid var(--sl-color-hairline-light);
-  border-radius: 8px;
-  background: var(--sl-color-bg);
-  box-shadow: none;
-  padding: 1rem 1.25rem;
-  transition: border-color 150ms ease, background-color 150ms ease;
-}
-
-.sl-link-card:hover {
-  border-color: var(--sl-color-gray-4);
-  background: var(--sl-color-bg);
-}
-
-:root[data-theme='dark'] .sl-link-card:hover {
-  border-color: #444;
-  background: #0a0a0a;
-}
-
-.sl-link-card .title {
-  font-size: 0.9375rem;
-  font-weight: 500;
-  color: var(--sl-color-text);
-}
-
-.sl-link-card .description {
-  font-size: 0.875rem;
-  color: var(--sl-color-gray-5);
-}
-
-.sl-link-card .icon {
-  color: var(--sl-color-gray-4);
-}
-
-.card-grid > .card {
-  border: 1px solid var(--sl-color-hairline-light);
-  border-radius: 8px;
-  background: var(--sl-color-bg);
-  box-shadow: none;
-}
-
-.card .title {
-  font-weight: 600;
-  font-size: 1rem;
-}
-
-.card .icon {
-  border: 1px solid var(--sl-color-hairline-light);
-  background: var(--sl-color-gray-1);
-  color: var(--sl-color-text);
-}
-
-:root[data-theme='dark'] .card .icon {
-  background: #111;
-}
-
-/* Asides */
-.starlight-aside {
-  border-radius: 8px;
-  border: 1px solid var(--sl-color-hairline-light);
-  border-inline-start-width: 1px;
-  padding: 1rem 1.25rem;
-  background: var(--sl-color-gray-1);
-}
-
-:root[data-theme='dark'] .starlight-aside {
-  background: #0a0a0a;
-}
-
-.starlight-aside--note {
-  border-color: color-mix(in srgb, var(--sl-color-accent) 30%, var(--sl-color-hairline-light));
-}
-
-.starlight-aside--caution {
-  border-color: color-mix(in srgb, #f59e0b 35%, var(--sl-color-hairline-light));
-}
-
-.starlight-aside .starlight-aside__title {
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: 0;
-}
-
-/* Hero / splash */
-[data-has-hero] .hero {
-  padding-block: clamp(2.5rem, 6vw, 5rem) clamp(2rem, 4vw, 3rem);
-  grid-template-columns: 1fr;
-  text-align: left;
-}
-
-[data-has-hero] .hero > img,
-[data-has-hero] .hero > .hero-html {
-  display: none;
-}
-
-[data-has-hero] .hero .stack {
-  text-align: left;
-  align-items: flex-start;
-}
-
-[data-has-hero] .hero .copy {
-  align-items: flex-start;
-}
-
-[data-has-hero] .hero h1 {
-  font-size: clamp(2.5rem, 5vw, 4rem);
-  line-height: 1.05;
-  letter-spacing: -0.045em;
-  font-weight: 700;
-  max-width: 18ch;
-}
-
-[data-has-hero] .hero .tagline {
-  font-size: 1.125rem;
-  line-height: 1.6;
-  color: var(--sl-color-gray-5);
-  max-width: 42rem;
-}
-
-[data-has-hero] .hero .actions {
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-}
-
-[data-has-hero] .hero .action {
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  padding: 0.625rem 1rem;
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
-}
-
-[data-has-hero] .hero .action.primary {
-  background: var(--sl-color-text);
-  border-color: var(--sl-color-text);
-  color: var(--sl-color-bg);
-}
-
-[data-has-hero] .hero .action.primary:hover {
-  background: var(--sl-color-gray-5);
-  border-color: var(--sl-color-gray-5);
-}
-
-:root[data-theme='dark'] [data-has-hero] .hero .action.primary {
-  background: #ededed;
-  border-color: #ededed;
-  color: #000;
-}
-
-:root[data-theme='dark'] [data-has-hero] .hero .action.primary:hover {
-  background: #fff;
-  border-color: #fff;
-}
-
-[data-has-hero] .hero .action.minimal {
-  color: var(--sl-color-gray-5);
-  padding-inline: 0.5rem;
-}
-
-[data-has-hero] .hero .action.minimal:hover {
-  color: var(--sl-color-text);
-}
-
-/* Splash page content width */
-[data-has-hero] .sl-markdown-content {
-  max-width: 100%;
-}
-
-/* Pagination */
-.pagination-links a {
-  border: 1px solid var(--sl-color-hairline-light);
-  border-radius: 8px;
-  box-shadow: none;
-  padding: 0.875rem 1rem;
-  transition: border-color 150ms ease;
-}
-
-.pagination-links a:hover {
-  border-color: var(--sl-color-gray-4);
-  background: transparent;
-}
-
-.pagination-links .link-title {
-  font-size: 0.9375rem;
-  font-weight: 500;
-  color: var(--sl-color-text);
-}
-
-/* Search button */
-site-search button[data-open-modal] {
-  border-radius: 6px;
-  border: 1px solid var(--sl-color-hairline-light);
-  background: var(--sl-color-bg);
-  color: var(--sl-color-gray-5);
-  height: 2rem;
-}
-
-site-search button[data-open-modal]:hover {
-  border-color: var(--sl-color-gray-4);
-  color: var(--sl-color-text);
-}
-
-/* Focus */
-:focus-visible {
-  outline: 2px solid var(--sl-color-accent);
-  outline-offset: 2px;
-}
-
-/* Misc */
-.sl-markdown-content hr {
-  border-color: var(--sl-color-hairline-light);
-}
-
-table code {
-  white-space: nowrap;
-}
-
-@media (max-width: 50rem) {
-  [data-has-hero] .hero h1 {
-    max-width: 100%;
-  }
 }
