@@ -128,7 +128,40 @@
 
 ---
 
-## 9) Pour aller plus loin (docs dans le repo)
+## 9) Stack technique (actuelle, résumé)
+
+### Racine / outillage
+- Node.js **>=24**, **pnpm 10** (workspaces `packages/*`), **npm** dans `portail/`.
+- TypeScript, **Vitest**, ESLint, GitHub Actions (`.github/workflows`).
+
+### Portail (`portail/`) — application principale (prod)
+- **Next.js 15.5** (App Router), **React 19**, TypeScript.
+- UI : Tailwind CSS (config côté portail), **Lucide React**, **simple-icons**, etc.
+- **Better Auth** (`better-auth`, `@better-auth/passkey`) + plugins (org, admin, 2FA, email OTP, passkeys) selon configuration.
+- **PostgreSQL** + **Prisma** (`@prisma/client`, Prisma v6), schéma `portail/prisma/schema.prisma`.
+- **BullMQ** + **ioredis** (Redis). **Zod** pour validation.
+- Divers : bcryptjs, pdf-lib, qrcode, sharp, yaml, maxmind…
+- Tests e2e/a11y (scripts) : **Playwright**, **@axe-core/playwright**.
+
+### Packages TypeScript
+- `@eflex/detector` (ESM, Vitest) — analyse/détection.
+- `@eflex/renderer` (ESM, dépendance `yaml`) — génération d’artefacts/plans.
+- `schema/v1.json` + tests Ajv pour le contrat BuildPlan E-FLEX.
+
+### Services Go (gelés — Axiom)
+- Go **1.22** (`services/engine/go.mod`), modules `services/engine`, `services/agent`, `services/orchestrator`.
+- Exemples de deps engine : **pgx/v5**, **gopkg.in/yaml.v3** (voir `go.mod`). Tests `go test`.
+
+### Infra / runtime
+- **Docker**, **Docker Compose** (dev/staging/prod).
+- **Traefik** en externe sur réseau `proxy` (prod portail).
+- **PostgreSQL 16 (Alpine)**, **Redis 7** (AOF en prod) ; **MinIO** en dev selon compose.
+- **Coolify API v4.6** piloté par le portail/worker (`lib/coolify.ts`).
+- Intégrations fréquentes : GitHub (App/PAT, webhooks), **Resend**, paiements Kkiapay/FedaPay, Turnstile (optionnel), etc. (selon env).
+
+---
+
+## 10) Pour aller plus loin (docs dans le repo)
 - `docs/architecture/eflex/README.md` (source de vérité produit)
 - `docs/adr/0012-eflex-production-coolify-axiom-paused.md`
 - `PROD.md`, `DEV.md`, `docs/operations/*`
