@@ -100,9 +100,8 @@ export function OverviewStrip({ data }: { data: DashboardData }) {
   )
 }
 
-/** Ce qui demande un regard, en tête de page. N'apparaît pas quand tout va bien. */
+/** Ce qui demande un regard, en tête de page. Affiche un état vide utile quand tout va bien. */
 export function AttentionList({ items }: { items: DashboardData['attention'] }) {
-  if (items.length === 0) return null
   return (
     <section aria-labelledby="attention-title" className="overflow-hidden rounded-xl border border-border bg-card">
       <div className="border-b border-border px-4 py-2.5">
@@ -114,6 +113,22 @@ export function AttentionList({ items }: { items: DashboardData['attention'] }) 
           Déploiements, certificats et quota nécessitant une action. Un échec corrigé par un déploiement réussi plus récent n’apparaît pas.
         </p>
       </div>
+      {items.length === 0 ? (
+        <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex items-start gap-2 text-sm text-muted-foreground">
+            <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />
+            <span>
+              Rien à signaler. Les déploiements en échec ou bloqués, les certificats HTTPS à renouveler et l’usage du quota apparaîtront ici.
+            </span>
+          </p>
+          <Link
+            href="/dashboard/notifications"
+            className="inline-flex min-h-11 shrink-0 items-center gap-1 text-sm font-medium text-primary hover:underline sm:min-h-0"
+          >
+            Configurer les notifications <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Link>
+        </div>
+      ) : (
       <ul className="divide-y divide-border">
         {items.map((item) => {
           if (item.kind === 'certificate') {
@@ -185,6 +200,7 @@ export function AttentionList({ items }: { items: DashboardData['attention'] }) 
           )
         })}
       </ul>
+      )}
     </section>
   )
 }
