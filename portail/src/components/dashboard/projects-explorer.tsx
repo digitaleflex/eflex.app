@@ -1,12 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { FolderKanban, LayoutGrid, List, Plus, Search, SearchX } from 'lucide-react'
 import { ProjectCard } from '@/components/dashboard/project-card'
 import { ProjectsTable } from '@/components/dashboard/projects-table'
 import { EmptyPanel } from '@/components/dashboard/section'
 import { LinkButton } from '@/components/link-button'
+import { isSearchShortcut } from '@/lib/search-shortcut'
 import {
   PROJECT_FILTERS,
   PROJECT_SORTS,
@@ -41,6 +42,7 @@ export function ProjectsExplorer({
   const [sort, setSort] = useState<ProjectSort>(initialSort)
   const [view, setView] = useState<View>('list')
   const searchId = useId()
+  const searchRef = useRef<HTMLInputElement>(null)
   const sortId = useId()
 
   // Préférence d'affichage propre à ce navigateur (jamais indispensable).
@@ -49,6 +51,16 @@ export function ProjectsExplorer({
       const saved = localStorage.getItem(VIEW_KEY)
       if (saved === 'grid' || saved === 'list') setView(saved)
     } catch { /* stockage indisponible */ }
+  }, [])
+  // Raccourci « / » : place le curseur dans la recherche (jamais pendant une saisie).
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isSearchShortcut(event)) return
+      event.preventDefault()
+      searchRef.current?.focus()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
   const chooseView = (v: View) => {
     setView(v)
@@ -73,12 +85,20 @@ export function ProjectsExplorer({
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <input
               id={searchId}
+              ref={searchRef}
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Rechercher un projet…"
-              className="h-10 w-full rounded-lg border border-input bg-card pl-9 pr-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11"
+              aria-keyshortcuts="/"
+              className="h-10 w-full rounded-lg border border-input bg-card pl-9 pr-9 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11"
             />
+            <kbd
+              aria-hidden="true"
+              className="pointer-events-none absolute right-2.5 top-1/2 hidden h-5 -translate-y-1/2 items-center rounded-md border border-border bg-muted px-1.5 font-mono text-xs text-muted-foreground [@media(pointer:fine)]:inline-flex"
+            >
+              /
+            </kbd>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
