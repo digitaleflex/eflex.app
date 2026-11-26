@@ -8,7 +8,7 @@ export const runtime = 'nodejs'
 
 /** Serveurs Coolify (nom, adresse, état), sans réglage sensible. */
 export async function GET() {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.coolify.read')
   if ('response' in guard) return guard.response
 
   const res = await coolifyFetch<unknown>('/servers', { signal: AbortSignal.timeout(8_000) })

@@ -17,7 +17,7 @@ const MAX_LIMIT = 100
  * que la page (action, acteur, cible, période) sont appliqués côté serveur.
  */
 export async function GET(request: Request) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.live.read')
   if ('response' in guard) return guard.response
 
   const params = new URL(request.url).searchParams

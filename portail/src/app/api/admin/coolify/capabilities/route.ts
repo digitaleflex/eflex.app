@@ -9,7 +9,7 @@ export const runtime = 'nodejs'
 
 /** Capacités Coolify, notifications (entrant/sortant, best-effort) et support des moteurs de bases managées. */
 export async function GET(request: NextRequest) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.coolify.read')
   if ('response' in guard) return guard.response
 
   const force = request.nextUrl.searchParams.get('force') === '1'

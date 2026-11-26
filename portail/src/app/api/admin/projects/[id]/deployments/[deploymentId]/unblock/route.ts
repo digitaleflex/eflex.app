@@ -27,7 +27,7 @@ const schema = z.object({
  * « interrompu par un administrateur ». Le motif est imposé et journalisé.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string; deploymentId: string }> }) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.deployments.manage')
   if ('response' in guard) return guard.response
   const { session } = guard
 

@@ -3,8 +3,6 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { hasAdminPermission, normalizeAdminRole, type AdminPermission } from '@/lib/admin-rbac'
 
-const ADMIN_2FA_ENFORCE_AFTER = process.env.ADMIN_2FA_ENFORCE_AFTER?.trim() || ''
-
 type Session = NonNullable<Awaited<ReturnType<typeof getSession>>>
 
 function adminUser(session: Session | null): { role: string | null; banned: boolean; twoFactorEnabled: boolean } | null {
@@ -13,12 +11,21 @@ function adminUser(session: Session | null): { role: string | null; banned: bool
   return { role: user.role ?? null, banned: Boolean(user.banned), twoFactorEnabled: Boolean(user.twoFactorEnabled) }
 }
 
-function adminTwoFactorRequired(): boolean {
-  if (ADMIN_2FA_ENFORCE_AFTER.toLowerCase() === 'never') return false
-  if (!ADMIN_2FA_ENFORCE_AFTER) return true
-  const deadline = Date.parse(ADMIN_2FA_ENFORCE_AFTER)
-  if (Number.isNaN(deadline)) return true
-  return Date.now() >= deadline
+export function adminTwoFactorRequired(now = Date.now()): boolean {
+  const deadline = adminTwoFactorDeadline()
+  if (deadline === 'never') return false
+  if (deadline === null) return true
+  return now >= deadline.getTime()
+}
+
+/** Date limite de grâce 2FA admin : null = enforcement immédiat, 'never' = désactivé. */
+export function adminTwoFactorDeadline(): Date | 'never' | null {
+  const raw = process.env.ADMIN_2FA_ENFORCE_AFTER?.trim() || ''
+  if (raw.toLowerCase() === 'never') return 'never'
+  if (!raw) return null
+  const ms = Date.parse(raw)
+  if (Number.isNaN(ms)) return null
+  return new Date(ms)
 }
 
 function isAdminRoleSession(session: Session | null): session is Session {
@@ -52,7 +59,7 @@ export async function requireAdminPage(permission?: AdminPermission): Promise<Se
   const session = await getSession()
   const allowed = permission ? canAdmin(session, permission) : isAdmin(session)
   if (!allowed) notFound()
-  if (adminTwoFactorBlocked(session)) redirect('/dashboard/settings?tab=security&admin2fa=required')
+  if (adminTwoFactorBlocked(session)) redirect('/dashboard/settings?admin2fa=required#securite')
   return session as Session
 }
 

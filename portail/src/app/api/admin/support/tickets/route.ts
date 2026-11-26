@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
-  const admin = await requireAdminApi()
+  const admin = await requireAdminApi('admin.support.read')
   if ('response' in admin) return admin.response
 
   const url = new URL(request.url)

@@ -25,7 +25,7 @@ const LABELS: Record<ApplicationAction, string> = {
 
 /** Démarre, arrête ou redémarre les applications du projet (action auditée). */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.projects.manage')
   if ('response' in guard) return guard.response
   const { session } = guard
 

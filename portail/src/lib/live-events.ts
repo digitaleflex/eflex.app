@@ -43,6 +43,7 @@ export const SEVERITY_BADGE: Record<LiveSeverity, 'destructive' | 'warning' | 's
 const AUDIT_LABEL: Record<string, string> = {
   'user.ban': 'Compte suspendu',
   'user.unban': 'Compte réactivé',
+  'user.role.change': 'Rôle administrateur modifié',
   'user.impersonate': 'Session usurpée',
   'user.stop_impersonate': 'Fin d’usurpation',
   'organization.subscription': 'Abonnement modifié',

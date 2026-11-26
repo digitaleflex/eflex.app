@@ -5,15 +5,28 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
-export function UserActions({ id, name, banned }: { id: string; name: string; banned: boolean }) {
+type Props = {
+  id: string
+  name: string
+  banned: boolean
+  canImpersonate?: boolean
+  canManageUsers?: boolean
+}
+
+export function UserActions({ id, name, banned, canImpersonate = true, canManageUsers = true }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [impersonateOpen, setImpersonateOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [days, setDays] = useState('')
+  const [impersonateReason, setImpersonateReason] = useState('')
+  const [impersonateDuration, setImpersonateDuration] = useState('30')
   const [error, setError] = useState('')
-  const [impersonating, setImpersonating] = useState(false)
+  const [impersonateError, setImpersonateError] = useState('')
   const reasonId = useId()
   const daysId = useId()
+  const impersonateReasonId = useId()
+  const impersonateDurationId = useId()
 
   const call = async (init: RequestInit) => {
     setError('')
@@ -31,32 +44,36 @@ export function UserActions({ id, name, banned }: { id: string; name: string; ba
   }
 
   const impersonate = async () => {
-    setError('')
-    setImpersonating(true)
-    try {
-      const res = await fetch(`/api/admin/users/${id}/impersonate`, { method: 'POST' })
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string }
-        setError(data.error ?? "Impossible d'ouvrir ce compte pour le moment.")
-        return
-      }
-      router.push('/dashboard')
-      router.refresh()
-    } catch {
-      setError('Impossible de contacter le serveur.')
-    } finally {
-      setImpersonating(false)
+    setImpersonateError('')
+    const res = await fetch(`/api/admin/users/${id}/impersonate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        reason: impersonateReason.trim(),
+        durationMinutes: Number(impersonateDuration),
+      }),
+    })
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string }
+      setImpersonateError(data.error ?? "Impossible d'ouvrir ce compte pour le moment.")
+      return false
     }
+    setImpersonateOpen(false)
+    setImpersonateReason('')
+    setImpersonateDuration('30')
+    router.push('/dashboard')
+    router.refresh()
+    return true
   }
 
   return (
     <div className="flex flex-col items-start gap-1 sm:items-end">
-      {!banned && (
-        <Button variant="ghost" size="sm" loading={impersonating} onClick={() => void impersonate()}>
+      {!banned && canImpersonate && (
+        <Button variant="ghost" size="sm" onClick={() => { setImpersonateError(''); setImpersonateOpen(true) }}>
           Prendre la main<span className="sr-only"> sur le compte de {name}</span>
         </Button>
       )}
-      {banned ? (
+      {canManageUsers && (banned ? (
         <Button variant="outline" size="sm" onClick={() => void call({ method: 'DELETE' })}>
           Réactiver<span className="sr-only"> le compte de {name}</span>
         </Button>
@@ -64,7 +81,7 @@ export function UserActions({ id, name, banned }: { id: string; name: string; ba
         <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
           Suspendre<span className="sr-only"> le compte de {name}</span>
         </Button>
-      )}
+      ))}
       {error && <p role="alert" className="max-w-56 text-xs sm:text-right text-destructive">{error}</p>}
 
       <ConfirmDialog
@@ -104,6 +121,43 @@ export function UserActions({ id, name, banned }: { id: string; name: string; ba
           />
         </div>
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={impersonateOpen}
+        title={`Prendre la main sur le compte de ${name} ?`}
+        description="Vous agirez au nom de cet utilisateur pendant une durée limitée. Le motif, la durée et les actions sont enregistrés dans le journal d’audit et le propriétaire de l’organisation est notifié."
+        confirmLabel="Ouvrir la session d’assistance"
+        confirmDisabled={impersonateReason.trim().length < 5}
+        onCancel={() => setImpersonateOpen(false)}
+        onConfirm={async () => { await impersonate() }}
+      >
+        <div className="space-y-1.5">
+          <label htmlFor={impersonateReasonId} className="text-sm font-medium">Motif (obligatoire, journal d&apos;audit)</label>
+          <textarea
+            id={impersonateReasonId}
+            value={impersonateReason}
+            onChange={(e) => setImpersonateReason(e.target.value)}
+            rows={3}
+            maxLength={300}
+            required
+            className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor={impersonateDurationId} className="text-sm font-medium">Durée maximale</label>
+          <select
+            id={impersonateDurationId}
+            value={impersonateDuration}
+            onChange={(e) => setImpersonateDuration(e.target.value)}
+            className="flex h-11 w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="5">5 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+          </select>
+        </div>
+        {impersonateError && <p role="alert" className="text-sm text-destructive">{impersonateError}</p>}
       </ConfirmDialog>
     </div>
   )

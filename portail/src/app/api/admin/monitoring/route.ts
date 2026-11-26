@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.monitoring.read')
   if ('response' in guard) return guard.response
 
   try {

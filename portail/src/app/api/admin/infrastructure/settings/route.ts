@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 
 /** Réglages de plateforme : édités sans redéploiement, jamais de valeur sensible. */
 export async function POST(request: Request) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.infrastructure.manage')
   if ('response' in guard) return guard.response
 
   let body: unknown

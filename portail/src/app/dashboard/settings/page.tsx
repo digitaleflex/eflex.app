@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { isEmailConfigured } from '@/lib/email'
-import { isAdmin } from '@/lib/admin'
+import { adminTwoFactorDeadline, isAdmin } from '@/lib/admin'
 import { Card, CardContent } from '@/components/ui/card'
 import { PageHeader } from '@/components/page-header'
 import { AccountSettings } from '@/components/settings/account-settings'
@@ -20,9 +20,16 @@ const SECTIONS = [
   { id: 'connexions', label: 'Connexions', icon: Link2 },
 ] as const
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ admin2fa?: string; tab?: string }>
+}) {
   const session = await getSession()
   if (!session?.user?.id) redirect('/login')
+  const params = await searchParams
+  const admin2faRequired = params.admin2fa === 'required'
+  const admin = isAdmin(session)
 
   const [accounts, deployedProjectCount, user] = await Promise.all([
     // Les comptes Google n'ont pas de mot de passe local : les formulaires de
@@ -39,6 +46,8 @@ export default async function SettingsPage() {
       select: { twoFactorEnabled: true },
     }),
   ])
+  const deadline = adminTwoFactorDeadline()
+  const admin2faGrace = admin && !Boolean(user?.twoFactorEnabled) && deadline instanceof Date && Date.now() < deadline.getTime() ? deadline : null
   const hasPassword = accounts.some((account) => account.providerId === 'credential')
 
   return (
@@ -47,6 +56,23 @@ export default async function SettingsPage() {
         title="Paramètres"
         description="Profil, apparence, sécurité et connexions de votre compte EFLEX. Chaque section enregistre séparément et affiche son propre retour."
       />
+
+      {admin2faRequired && (
+        <div role="alert" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-950 dark:text-amber-200">
+          <p className="font-medium">Double authentification obligatoire pour l’administration</p>
+          <p className="mt-1 text-amber-900/90 dark:text-amber-200/90">
+            Activez la double authentification ci-dessous pour accéder à l’espace d’administration. Les codes de secours vous permettront de récupérer l’accès si vous perdez votre appareil.
+          </p>
+        </div>
+      )}
+      {!admin2faRequired && admin2faGrace && (
+        <div role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-950 dark:text-amber-200">
+          <p className="font-medium">Activez la double authentification avant le {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(admin2faGrace)}</p>
+          <p className="mt-1 text-amber-900/90 dark:text-amber-200/90">
+            L’accès à l’administration exigera la double authentification après cette date. Activez-la maintenant et conservez vos codes de secours.
+          </p>
+        </div>
+      )}
 
       <nav aria-label="Sections des paramètres" className="flex flex-wrap gap-2">
         {SECTIONS.map((section) => {

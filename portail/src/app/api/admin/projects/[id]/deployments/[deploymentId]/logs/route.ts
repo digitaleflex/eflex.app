@@ -21,7 +21,7 @@ const MAX_RETURN = 20_000
  * injoignable.
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string; deploymentId: string }> }) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.deployments.read')
   if ('response' in guard) return guard.response
   const { session } = guard
 

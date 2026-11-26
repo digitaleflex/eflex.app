@@ -12,7 +12,7 @@ type Params = { params: Promise<{ uuid: string }> }
 
 /** Proxy, nettoyage Docker (réglages et dernières exécutions) et analyse d'images d'un serveur. */
 export async function GET(_request: Request, { params }: Params) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.coolify.read')
   if ('response' in guard) return guard.response
   const { uuid } = await params
   if (!COOLIFY_ID.test(uuid)) return NextResponse.json({ error: 'Serveur introuvable.' }, { status: 404 })
@@ -39,7 +39,7 @@ const MESSAGES: Record<string, string> = {
 
 /** Actions sur un serveur : redémarrer le proxy, valider, nettoyer Docker, activer l'analyse d'images. */
 export async function POST(request: Request, { params }: Params) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.coolify.manage')
   if ('response' in guard) return guard.response
   const { uuid } = await params
   if (!COOLIFY_ID.test(uuid)) return NextResponse.json({ error: 'Serveur introuvable.' }, { status: 404 })
@@ -75,7 +75,7 @@ const cleanupSchema = z
 
 /** Réglages du nettoyage Docker automatique (fréquence, seuil de disque). */
 export async function PATCH(request: Request, { params }: Params) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.coolify.manage')
   if ('response' in guard) return guard.response
   const { uuid } = await params
   if (!COOLIFY_ID.test(uuid)) return NextResponse.json({ error: 'Serveur introuvable.' }, { status: 404 })

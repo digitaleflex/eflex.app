@@ -21,7 +21,7 @@ const schema = z.object({
  * Même verrou que côté client : un seul déploiement actif par projet.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.projects.manage')
   if ('response' in guard) return guard.response
   const { session } = guard
 

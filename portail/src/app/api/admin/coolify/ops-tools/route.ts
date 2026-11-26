@@ -11,7 +11,7 @@ export const runtime = 'nodejs'
 
 /** Outils d'exploitation (Uptime Kuma, Beszel, Dozzle) : installés ou non, et leur adresse. */
 export async function GET() {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.coolify.read')
   if ('response' in guard) return guard.response
   const result = await listOpsTools()
   if ('error' in result) return coolifyError(result.error)
@@ -35,7 +35,7 @@ const schema = z.discriminatedUnion('action', [
  * stockés ni journalisés). `agent-key` relie l'agent Beszel du serveur au hub.
  */
 export async function POST(request: Request) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.coolify.manage')
   if ('response' in guard) return guard.response
   const parsed = schema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) {

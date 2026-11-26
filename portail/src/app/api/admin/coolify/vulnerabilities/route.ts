@@ -8,7 +8,7 @@ export const runtime = 'nodejs'
 
 /** État de sécurité des images de toutes les ressources (analyse Syft + Grype de Coolify). */
 export async function GET() {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.coolify.read')
   if ('response' in guard) return guard.response
   const resources = await listVulnerabilities()
   if ('error' in resources) return coolifyError(resources.error)

@@ -49,7 +49,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.organizations.manage')
   if ('response' in guard) return guard.response
   const { session } = guard
 

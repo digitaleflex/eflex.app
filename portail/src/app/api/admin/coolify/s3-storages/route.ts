@@ -10,7 +10,7 @@ export const runtime = 'nodejs'
 
 /** Stockages S3 déclarés dans Coolify, sans leurs clés. */
 export async function GET() {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.coolify.read')
   if ('response' in guard) return guard.response
   const storages = await listS3Storages()
   if ('error' in storages) return coolifyError(storages.error)
@@ -35,7 +35,7 @@ const schema = z.object({
 
 /** Déclare un stockage S3 (Backblaze, R2, AURA…). Les clés partent vers Coolify et ne sont ni stockées ni journalisées. */
 export async function POST(request: Request) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.coolify.manage')
   if ('response' in guard) return guard.response
   const parsed = schema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) {

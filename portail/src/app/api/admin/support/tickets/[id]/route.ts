@@ -16,7 +16,7 @@ const patchSchema = z.object({
 })
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const admin = await requireAdminApi()
+  const admin = await requireAdminApi('admin.support.read')
   if ('response' in admin) return admin.response
   const { id } = await params
   const ticket = await prisma.supportTicket.findUnique({
@@ -34,7 +34,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const admin = await requireAdminApi()
+  const admin = await requireAdminApi('admin.support.manage')
   if ('response' in admin) return admin.response
   const { id } = await params
   const body = await request.json().catch(() => null)

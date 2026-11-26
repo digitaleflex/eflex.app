@@ -15,7 +15,7 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string; deploymentId: string }> },
 ) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.deployments.read')
   if ('response' in guard) return guard.response
 
   const { id, deploymentId } = await params

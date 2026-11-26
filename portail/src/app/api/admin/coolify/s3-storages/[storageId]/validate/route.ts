@@ -9,7 +9,7 @@ export const runtime = 'nodejs'
 
 /** Teste la connexion de Coolify au stockage S3. */
 export async function POST(request: Request, { params }: { params: Promise<{ storageId: string }> }) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.coolify.manage')
   if ('response' in guard) return guard.response
   const { storageId } = await params
   if (!COOLIFY_ID.test(storageId)) return NextResponse.json({ error: 'Stockage introuvable.' }, { status: 404 })

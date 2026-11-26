@@ -59,6 +59,7 @@ const ROUTE_MANIFEST: Record<string, RouteClass> = {
   '/admin/support/tickets/[id]': 'admin',
   '/admin/users/[id]/ban': 'admin',
   '/admin/users/[id]/impersonate': 'admin',
+  '/admin/users/[id]/role': 'admin',
   '/auth/[...all]': 'auth',
   '/auth/config': 'auth',
   '/billing/checkout': 'org',

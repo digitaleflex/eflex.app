@@ -27,7 +27,7 @@ const schema = z.object({
  * succès : un échec local est signalé et reste détectable par la réconciliation.
  */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.infrastructure.manage')
   if ('response' in guard) return guard.response
   const { session } = guard
 

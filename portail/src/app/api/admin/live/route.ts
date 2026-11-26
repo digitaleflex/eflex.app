@@ -24,7 +24,7 @@ const cursor = (value: string | null): number | null => {
  * croissant. Les charges utiles sont assainies : aucun secret, aucun corps de requête.
  */
 export async function GET(request: Request) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.live.read')
   if ('response' in guard) return guard.response
 
   const url = new URL(request.url)

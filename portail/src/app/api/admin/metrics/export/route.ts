@@ -9,7 +9,7 @@ export const runtime = 'nodejs'
 
 /** Export CSV des indicateurs du tableau de bord, pour la période demandée. */
 export async function GET(request: Request) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.overview.read')
   if ('response' in guard) return guard.response
   const { session } = guard
 

@@ -21,7 +21,7 @@ const RECHECK_MS = 30_000
  * Les charges utiles passent par `redact` : jamais de secret dans le flux.
  */
 export async function GET(request: Request) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.live.read')
   if ('response' in guard) return guard.response
   const userId = guard.session.user.id
 

@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
  * HTTP : le résumé reste exploitable pour l'administrateur.
  */
 export async function POST(request: Request) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.infrastructure.manage')
   if ('response' in guard) return guard.response
 
   const snapshot = await collectInfrastructure()

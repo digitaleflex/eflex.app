@@ -17,6 +17,7 @@ import { Select } from '@/components/ui/select'
 import { StatCard } from '@/components/ui/stat-card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { UserActions } from '@/components/admin/user-actions'
+import { UserRoleSelect } from '@/components/admin/user-role-select'
 import { PageHeader } from '@/components/page-header'
 import { LinkButton } from '@/components/link-button'
 import { requireAdminPage } from '@/lib/admin'
@@ -35,7 +36,7 @@ import {
   userListWhere,
   userRoleLabel,
 } from '@/lib/admin-users'
-import { normalizeAdminRole } from '@/lib/admin-rbac'
+import { hasAdminPermission, normalizeAdminRole, type AdminRole } from '@/lib/admin-rbac'
 
 export const metadata = { title: 'Utilisateurs — Administration' }
 export const dynamic = 'force-dynamic'
@@ -56,13 +57,18 @@ export default async function UsersPage({
   searchParams: Promise<{ q?: string; role?: string; statut?: string; email?: string; page?: string }>
 }) {
   const session = await requireAdminPage('admin.users.read')
+  const actorRole = (session.user as { role?: string | null }).role
+  const canImpersonate = hasAdminPermission(actorRole, 'admin.impersonation.manage')
+  const canManageUsers = hasAdminPermission(actorRole, 'admin.users.manage')
+  const canManageRoles = hasAdminPermission(actorRole, 'admin.roles.manage')
   const query = parseUserListQuery(await searchParams)
   const where = userListWhere(query)
   const filtered = isUserListFiltered(query)
 
+  const adminRoleFilter = { role: { in: ['admin', 'super_admin', 'exploitation', 'support', 'finance'] } }
   const [accounts, admins, suspended, unverified] = await Promise.all([
     prisma.user.count(),
-    prisma.user.count({ where: { role: 'admin' } }),
+    prisma.user.count({ where: adminRoleFilter }),
     prisma.user.count({ where: { banned: true } }),
     prisma.user.count({ where: { emailVerified: false } }),
   ])
@@ -235,14 +241,22 @@ export default async function UsersPage({
                     </p>
                   ) : null}
 
-                  {user.id !== session.user.id && !normalizeAdminRole(user.role) ? (
-                    <UserActions id={user.id} name={user.name} banned={Boolean(user.banned)} />
+                  {user.id === session.user.id ? (
+                    <p className="text-xs text-muted-foreground">Votre compte : aucune action de suspension.</p>
+                  ) : normalizeAdminRole(user.role) ? (
+                    canManageRoles ? (
+                      <UserRoleSelect id={user.id} name={user.name} currentRole={user.role as AdminRole | 'admin' | null} />
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Rôle administrateur géré par un super administrateur.</p>
+                    )
                   ) : (
-                    <p className="text-xs text-muted-foreground">
-                      {user.id === session.user.id
-                        ? 'Votre compte : aucune action de suspension.'
-                        : 'Un administrateur ne se suspend pas depuis cette page.'}
-                    </p>
+                    <UserActions
+                      id={user.id}
+                      name={user.name}
+                      banned={Boolean(user.banned)}
+                      canImpersonate={canImpersonate}
+                      canManageUsers={canManageUsers}
+                    />
                   )}
                 </li>
               ))}
@@ -301,12 +315,22 @@ export default async function UsersPage({
                     <td className="hidden px-4 py-3 md:table-cell">{user._count.members}</td>
                     <td className="hidden px-4 py-3 lg:table-cell">{date.format(user.createdAt)}</td>
                     <td className="px-4 py-3 text-right">
-                      {user.id === session.user.id || normalizeAdminRole(user.role) ? (
-                        <span className="text-xs text-muted-foreground">
-                          {user.id === session.user.id ? 'Vous' : '—'}
-                        </span>
+                      {user.id === session.user.id ? (
+                        <span className="text-xs text-muted-foreground">Vous</span>
+                      ) : normalizeAdminRole(user.role) ? (
+                        canManageRoles ? (
+                          <UserRoleSelect id={user.id} name={user.name} currentRole={user.role as AdminRole | 'admin' | null} />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )
                       ) : (
-                        <UserActions id={user.id} name={user.name} banned={Boolean(user.banned)} />
+                        <UserActions
+                          id={user.id}
+                          name={user.name}
+                          banned={Boolean(user.banned)}
+                          canImpersonate={canImpersonate}
+                          canManageUsers={canManageUsers}
+                        />
                       )}
                     </td>
                   </tr>

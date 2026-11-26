@@ -8,7 +8,7 @@ export const runtime = 'nodejs'
 
 /** Journal d'audit de Coolify : ce qui a été fait dans Coolify, y compris hors E-FLEX. */
 export async function GET(request: Request) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.coolify.read')
   if ('response' in guard) return guard.response
   const url = new URL(request.url)
   const rawSource = url.searchParams.get('source') ?? 'all'

@@ -12,7 +12,7 @@ export const runtime = 'nodejs'
  * projet correspondant a été lancé hors d'E-FLEX (interface Coolify, autre outil).
  */
 export async function GET() {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.coolify.read')
   if ('response' in guard) return guard.response
   const deployments = await listCoolifyDeployments()
   if ('error' in deployments) return coolifyError(deployments.error)

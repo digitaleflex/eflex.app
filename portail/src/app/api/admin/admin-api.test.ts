@@ -21,6 +21,7 @@ function routeFiles(dir: string): string[] {
 run('API d’administration', () => {
   process.env.BETTER_AUTH_SECRET ??= 'test-secret-test-secret-test-secret-0123'
   process.env.BETTER_AUTH_URL ??= 'http://localhost:3000'
+  process.env.ADMIN_2FA_ENFORCE_AFTER = 'never'
   const stamp = `${Date.now()}`
   const adminEmail = `admin-${stamp}@exemple.fr`
   process.env.ADMIN_EMAILS = adminEmail

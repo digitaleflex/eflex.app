@@ -15,6 +15,7 @@ export const AUDIT_PAGE_SIZE = 50
 export const AUDIT_ACTIONS = [
   'user.ban',
   'user.unban',
+  'user.role.change',
   'user.impersonate',
   'user.stop_impersonate',
   'organization.suspend',
