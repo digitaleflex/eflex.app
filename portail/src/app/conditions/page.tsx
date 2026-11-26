@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { LegalPage, LegalSection, PlaceholderNotice } from '@/components/marketing/legal-page'
 
 export const metadata: Metadata = {
-  title: 'Conditions d’utilisation et de vente — EFLEX',
+  title: 'Conditions d’utilisation et de vente',
   description: 'Conditions générales d’utilisation et, le cas échéant, de vente du service EFLEX.',
 }
 

@@ -16,7 +16,7 @@ import { TimeFr } from '@/components/admin/time-fr'
 import { formatInteger } from '@/lib/table'
 import { formatLimit } from '@/lib/plan-usage'
 
-export const metadata = { title: 'Organisation — Administration EFLEX' }
+export const metadata = { title: 'Organisation — Administration' }
 export const dynamic = 'force-dynamic'
 
 const ROLE_LABEL: Record<string, string> = {

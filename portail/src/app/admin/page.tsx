@@ -30,7 +30,7 @@ import {
   StackTable,
 } from '@/components/admin/metrics'
 
-export const metadata = { title: 'Vue d’ensemble — Administration EFLEX' }
+export const metadata = { title: 'Vue d’ensemble — Administration' }
 export const dynamic = 'force-dynamic'
 
 export default async function AdminOverview({

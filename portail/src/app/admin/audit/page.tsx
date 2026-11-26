@@ -21,7 +21,7 @@ import {
   parseAuditQuery,
 } from '@/lib/admin-audit'
 
-export const metadata = { title: "Journal d'audit — Administration EFLEX" }
+export const metadata = { title: "Journal d'audit — Administration" }
 export const dynamic = 'force-dynamic'
 
 const asDetails = (value: unknown): Record<string, unknown> =>

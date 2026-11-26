@@ -6,7 +6,7 @@ import { loadBillingState } from '@/lib/billing'
 import { executionResourcesForPlan, hasPerPlanExecutionEnforcement } from '@/lib/execution-resources'
 import { UsageView, type UsageProject, type UsageQuotaSummary } from '@/components/dashboard/usage-view'
 
-export const metadata = { title: 'Utilisation — EFLEX' }
+export const metadata = { title: 'Utilisation' }
 export const dynamic = 'force-dynamic'
 
 export default async function UsagePage() {

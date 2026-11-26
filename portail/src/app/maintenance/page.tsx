@@ -5,7 +5,7 @@ import { SystemLink, SystemScreen } from '@/components/system-screen'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Maintenance — EFLEX',
+  title: 'Maintenance',
   description: 'État de maintenance de la plateforme EFLEX.',
 }
 

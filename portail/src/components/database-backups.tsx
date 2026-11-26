@@ -343,23 +343,23 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
       {status.scheduled && (
         <div className="grid gap-2 sm:grid-cols-3">
           <div className="rounded-lg border border-border bg-muted/20 p-2.5">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Sauvegarde réussie</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sauvegarde réussie</p>
             <p className="mt-1 text-xs font-medium">
               {summary?.lastSuccessAt ? formatDate(summary.lastSuccessAt) : 'Aucune réussite'}
             </p>
-            <p className="mt-1 text-[11px] text-muted-foreground">
+            <p className="mt-1 text-xs text-muted-foreground">
               {summary?.lastFailureAt ? `Dernier échec : ${formatDate(summary.lastFailureAt)}` : 'Aucun échec récent'}
             </p>
           </div>
           <div className="rounded-lg border border-border bg-muted/20 p-2.5">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Copie hors serveur</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Copie hors serveur</p>
             <p className={cn('mt-1 text-xs font-medium', offsite.tone === 'warning' && 'text-warning')}>
               {status.scheduleOffsite ? 'Planifiée (S3)' : status.offsiteConfigured ? 'S3 configuré, à vérifier' : 'Non configurée'}
             </p>
-            <p className="mt-1 text-[11px] text-muted-foreground">{offsite.text}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{offsite.text}</p>
           </div>
           <div className="rounded-lg border border-border bg-muted/20 p-2.5">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Restauration consignée</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Restauration consignée</p>
             <p className="mt-1 text-xs font-medium">
               {status.restore?.lastSuccessfulAt
                 ? formatDate(status.restore.lastSuccessfulAt)
@@ -367,7 +367,7 @@ export function DatabaseBackups({ projectId, databaseId }: { projectId: string; 
                   ? 'Échec consigné'
                   : 'Aucune preuve'}
             </p>
-            <p className="mt-1 text-[11px] text-muted-foreground">
+            <p className="mt-1 text-xs text-muted-foreground">
               {proof ?? 'Un test régulier en environnement isolé reste recommandé.'}
             </p>
           </div>

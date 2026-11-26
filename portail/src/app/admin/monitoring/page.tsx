@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 
-export const metadata = { title: 'Surveillance des sites — Administration EFLEX' }
+export const metadata = { title: 'Surveillance des sites — Administration' }
 export const dynamic = 'force-dynamic'
 
 const dt = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })

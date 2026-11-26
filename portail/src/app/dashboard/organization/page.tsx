@@ -4,7 +4,7 @@ import { resolveOrganization } from '@/lib/organizations'
 import { prisma } from '@/lib/prisma'
 import { OrganizationPanel, type TeamActivity } from '@/components/organization/organization-panel'
 
-export const metadata = { title: 'Équipe — EFLEX' }
+export const metadata = { title: 'Équipe' }
 export const dynamic = 'force-dynamic'
 
 const TEAM_EVENT_TYPES = [

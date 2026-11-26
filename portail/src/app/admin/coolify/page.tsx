@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { requireAdminPage } from '@/lib/admin'
 import { CoolifyControl } from '@/components/admin/coolify-control'
 
-export const metadata = { title: 'Pilotage Coolify — Administration EFLEX' }
+export const metadata = { title: 'Pilotage Coolify — Administration' }
 export const dynamic = 'force-dynamic'
 
 export default async function CoolifyAdminPage() {

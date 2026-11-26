@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import { GRACE_PERIOD_DAYS, PERIOD_DAYS, PLAN_IDS, PLANS, formatFcfa, formatPrice } from '@/lib/plans'
 
 export const metadata: Metadata = {
-  title: 'Tarifs — EFLEX',
+  title: 'Tarifs',
   description:
     'Plans EFLEX en FCFA : limites projets, membres et domaines personnalisés. Paiement mobile money et carte, période de 30 jours avec 7 jours de grâce en cas d’impayé.',
 }

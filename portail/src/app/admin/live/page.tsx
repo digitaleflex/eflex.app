@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/page-header'
 import { LiveFeed } from '@/components/admin/live-feed'
 import { organizationNames, toWireEvent } from '@/lib/live-events-server'
 
-export const metadata = { title: 'Activité en direct — Administration EFLEX' }
+export const metadata = { title: 'Activité en direct — Administration' }
 // Flux propre à chaque session : jamais de cache.
 export const dynamic = 'force-dynamic'
 
