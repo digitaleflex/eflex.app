@@ -43,11 +43,20 @@ export interface IncidentView {
   resolvedAt: string | null
 }
 
+export interface StatusSli {
+  deploymentSuccessRate24h: number | null
+  deploymentSuccessRate7d: number | null
+  avgLatencyMs24h: number | null
+  deployments24h: number
+  deployments7d: number
+}
+
 export interface StatusSnapshot {
   status: OverallState
   checkedAt: string
   components: ComponentResult[]
   uptime: { window: string; percent: number | null; samples: number }[]
+  slis: StatusSli
   incidents: IncidentView[]
   maintenance: { enabled: boolean; message: string | null }
 }
@@ -273,12 +282,46 @@ async function recentIncidents(): Promise<IncidentView[]> {
   }
 }
 
+async function statusSlis(): Promise<StatusSli> {
+  try {
+    const since24h = new Date(Date.now() - 24 * 86_400_000)
+    const since7d = new Date(Date.now() - 7 * 86_400_000)
+    const [dep24, dep24Ok, dep7, dep7Ok, latency] = await Promise.all([
+      prisma.deployment.count({ where: { createdAt: { gte: since24h }, status: { in: ['live', 'failed', 'cancelled'] } } }),
+      prisma.deployment.count({ where: { createdAt: { gte: since24h }, status: 'live' } }),
+      prisma.deployment.count({ where: { createdAt: { gte: since7d }, status: { in: ['live', 'failed', 'cancelled'] } } }),
+      prisma.deployment.count({ where: { createdAt: { gte: since7d }, status: 'live' } }),
+      prisma.statusCheck.aggregate({
+        where: { checkedAt: { gte: since24h }, status: { in: ['ok', 'degraded', 'down'] }, latencyMs: { not: null } },
+        _avg: { latencyMs: true },
+      }),
+    ])
+    const rate = (ok: number, total: number) => (total > 0 ? Math.round((ok / total) * 1000) / 10 : null)
+    return {
+      deploymentSuccessRate24h: rate(dep24Ok, dep24),
+      deploymentSuccessRate7d: rate(dep7Ok, dep7),
+      avgLatencyMs24h: latency._avg.latencyMs == null ? null : Math.round(latency._avg.latencyMs),
+      deployments24h: dep24,
+      deployments7d: dep7,
+    }
+  } catch {
+    return {
+      deploymentSuccessRate24h: null,
+      deploymentSuccessRate7d: null,
+      avgLatencyMs24h: null,
+      deployments24h: 0,
+      deployments7d: 0,
+    }
+  }
+}
+
 export async function collectStatus(): Promise<StatusSnapshot> {
   const components = await probeAll()
-  const [, uptime, incidents] = await Promise.all([
+  const [, uptime, incidents, slis] = await Promise.all([
     recordSnapshot(components),
     uptimeWindows(),
     recentIncidents(),
+    statusSlis(),
   ])
 
   return {
@@ -286,6 +329,7 @@ export async function collectStatus(): Promise<StatusSnapshot> {
     checkedAt: new Date().toISOString(),
     components,
     uptime,
+    slis,
     incidents,
     maintenance: {
       enabled: process.env.MAINTENANCE_MODE === 'true',

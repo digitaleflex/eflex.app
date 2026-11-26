@@ -283,6 +283,40 @@ export default async function StatusPage() {
           </div>
         </section>
 
+        <section aria-labelledby="slis" className="space-y-4">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h2 id="slis" className="text-xl font-semibold">
+              Indicateurs de service (SLI)
+            </h2>
+            <Badge variant="outline">Observés</Badge>
+          </div>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Indicateurs calculés à partir des relevés et des déploiements enregistrés. Ils décrivent l’état observé, pas un engagement contractuel.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="p-5 space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Disponibilité 24 h</p>
+              <p className="text-2xl font-bold tabular-nums">{uptimePercentLabel(snapshot.uptime.find((u) => u.window === '24 heures')?.percent ?? null)}</p>
+              <p className="text-xs text-muted-foreground">Relevés de composants opérationnels sur 24 heures.</p>
+            </Card>
+            <Card className="p-5 space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Latence moyenne 24 h</p>
+              <p className="text-2xl font-bold tabular-nums">{snapshot.slis.avgLatencyMs24h == null ? '—' : `${snapshot.slis.avgLatencyMs24h} ms`}</p>
+              <p className="text-xs text-muted-foreground">Moyenne des sondes de composants ayant répondu.</p>
+            </Card>
+            <Card className="p-5 space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Déploiements réussis 24 h</p>
+              <p className="text-2xl font-bold tabular-nums">{uptimePercentLabel(snapshot.slis.deploymentSuccessRate24h)}</p>
+              <p className="text-xs text-muted-foreground">{snapshot.slis.deployments24h} déploiement{snapshot.slis.deployments24h > 1 ? 's' : ''} terminé{snapshot.slis.deployments24h > 1 ? 's' : ''}.</p>
+            </Card>
+            <Card className="p-5 space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Déploiements réussis 7 j</p>
+              <p className="text-2xl font-bold tabular-nums">{uptimePercentLabel(snapshot.slis.deploymentSuccessRate7d)}</p>
+              <p className="text-xs text-muted-foreground">{snapshot.slis.deployments7d} déploiement{snapshot.slis.deployments7d > 1 ? 's' : ''} terminé{snapshot.slis.deployments7d > 1 ? 's' : ''}.</p>
+            </Card>
+          </div>
+        </section>
+
         <section aria-labelledby="limites" className="space-y-4">
           <h2 id="limites" className="text-xl font-semibold">
             Ce que ces indicateurs ne mesurent pas
