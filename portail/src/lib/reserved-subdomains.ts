@@ -9,5 +9,6 @@ export const RESERVED_SUBDOMAINS = new Set([
   'mail', 'smtp', 'imap', 'webmail', 'mx', 'ns1', 'ns2', 'cdn', 'static', 'assets', 'media', 'files',
   's3', 'storage', 'aura', 'backup', 'backups', 'build', 'builds', 'registry', 'monitor', 'monitoring',
   'grafana', 'traefik', 'proxy', 'auth', 'login', 'sso', 'support', 'help', 'billing', 'pay', 'paiement',
+  'errors', 'sentry', 'bugsink', 'glitchtip',
   'blog', 'eflex', 'staging', 'preview', 'test', 'dev',
 ])

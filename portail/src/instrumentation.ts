@@ -13,3 +13,20 @@ export async function register() {
     await registerNode()
   }
 }
+
+export async function onRequestError(
+  error: unknown,
+  request: { path: string; method: string; headers: { [key: string]: string | string[] | undefined } },
+  context: { routerKind: string; routePath: string; routeType: string; renderSource?: string },
+) {
+  if (process.env.NEXT_RUNTIME !== 'nodejs') return
+  try {
+    const { captureServerError } = await import('./lib/error-tracking')
+    await captureServerError(error, {
+      route: context.routePath || request.path,
+      tags: { routerKind: context.routerKind, routeType: context.routeType, method: request.method },
+    })
+  } catch {
+    // Jamais bloquant.
+  }
+}
