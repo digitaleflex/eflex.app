@@ -27,7 +27,7 @@ function causeLabel(cause: string | null): string {
 }
 
 export default async function AdminMonitoringPage() {
-  await requireAdminPage()
+  await requireAdminPage('admin.monitoring.read')
 
   const [monitors, incidents, openCount, downCount] = await Promise.all([
     prisma.projectSiteMonitor.findMany({

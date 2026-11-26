@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { requireAdminApi } from '@/lib/admin'
+import { normalizeAdminRole } from '@/lib/admin-rbac'
 import { eventsSince, latestEventId, subscribe } from '@/lib/event-bus'
 import type { PlatformEvent } from '@/lib/event-bus'
 import { organizationNames, wireFromEvent } from '@/lib/live-events-server'
@@ -67,7 +68,7 @@ export async function GET(request: Request) {
           await sleep(RECHECK_MS, signal)
           if (signal.aborted) break
           const account = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, banned: true } })
-          if (!account || account.role !== 'admin' || account.banned) {
+          if (!account || !normalizeAdminRole(account.role) || account.banned) {
             send('end', { reason: 'forbidden' })
             return
           }

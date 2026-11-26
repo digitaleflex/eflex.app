@@ -60,7 +60,7 @@ function serverLevel(reachable: boolean | null): HealthLevel {
 }
 
 export default async function AdminInfrastructurePage() {
-  await requireAdminPage()
+  await requireAdminPage('admin.infrastructure.read')
   const snapshot = await collectInfrastructure()
 
   const byKey = new Map(snapshot.sources.map((source) => [source.key, source]))

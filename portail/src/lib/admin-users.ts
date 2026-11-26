@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client'
+import { ADMIN_ROLE_LABELS, normalizeAdminRole } from '@/lib/admin-rbac'
 
 /**
  * Recherche et filtres de la liste des utilisateurs d'administration (#51).
@@ -81,8 +82,9 @@ export function userListWhere(query: UserListQuery): Prisma.UserWhereInput {
       ],
     })
   }
-  if (query.role === 'admin') filters.push({ role: 'admin' })
-  if (query.role === 'member') filters.push({ OR: [{ role: null }, { role: { not: 'admin' } }] })
+  const adminRoles = ['admin', 'super_admin', 'exploitation', 'support', 'finance']
+  if (query.role === 'admin') filters.push({ role: { in: adminRoles } })
+  if (query.role === 'member') filters.push({ OR: [{ role: null }, { role: { notIn: adminRoles } }] })
   if (query.status === 'active') filters.push({ banned: false })
   if (query.status === 'suspended') filters.push({ banned: true })
   if (query.verification === 'verified') filters.push({ emailVerified: true })
@@ -123,9 +125,10 @@ export function userListHrefTemplate(query: UserListQuery): string {
   return `/admin/users?${params.toString()}`
 }
 
-/** « Administrateur » / « Compte standard » : le rôle plateforme est distinct du rôle d'organisation. */
+/** Libellé du rôle plateforme. */
 export function userRoleLabel(role: string | null | undefined): string {
-  return role === 'admin' ? 'Administrateur' : 'Compte standard'
+  const admin = normalizeAdminRole(role)
+  return admin ? ADMIN_ROLE_LABELS[admin] : 'Compte standard'
 }
 
 export function userSuspensionLabel(banned: boolean): string {

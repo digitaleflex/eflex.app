@@ -32,7 +32,7 @@ export default async function AuditPage({
 }: {
   searchParams: Promise<{ action?: string; acteur?: string; cible?: string; jours?: string; page?: string }>
 }) {
-  await requireAdminPage()
+  await requireAdminPage('admin.audit.read')
   const query = parseAuditQuery(await searchParams)
   const where = auditWhere(query)
   const filtered = isAuditFiltered(query)

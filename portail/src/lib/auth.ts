@@ -10,6 +10,7 @@ import { isEmailConfigured, sendEmail } from '@/lib/email'
 import { loginCodeEmail, resetPasswordEmail, verificationEmail } from '@/lib/email-templates'
 import { githubCredentials, googleCredentials, nameFromEmail } from '@/lib/auth-methods'
 import { admin, captcha, emailOTP, lastLoginMethod, organization, twoFactor } from 'better-auth/plugins'
+import { adminAc, userAc } from 'better-auth/plugins/admin/access'
 import { createAccessControl } from 'better-auth/plugins/access'
 import { passkey } from '@better-auth/passkey'
 import { personalOrganizationSlug } from '@/lib/organizations'
@@ -115,12 +116,15 @@ function memberLimitError(error: string): APIError {
   return new APIError('FORBIDDEN', { message: error, code: 'MEMBER_LIMIT_REACHED' })
 }
 
-/** Accorde le rôle `admin` à un compte listé dans ADMIN_EMAILS dont l'adresse est vérifiée. */
+/** Bootstrap : accorde `super_admin` au premier compte ADMIN_EMAILS vérifié, uniquement s'il n'existe aucun super_admin. */
 async function promoteVerifiedAdmin(userId: string): Promise<void> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, emailVerified: true, role: true } })
-  if (user && user.emailVerified && user.role !== 'admin' && adminEmails().includes(user.email.toLowerCase())) {
-    await prisma.user.update({ where: { id: userId }, data: { role: 'admin' } })
-  }
+  const adminRoles = new Set(['admin', 'super_admin', 'exploitation', 'support', 'finance'])
+  if (!user || !user.emailVerified || adminRoles.has(user.role ?? '')) return
+  if (!adminEmails().includes(user.email.toLowerCase())) return
+  const existingSuperAdmin = await prisma.user.count({ where: { role: 'super_admin' } })
+  if (existingSuperAdmin > 0) return
+  await prisma.user.update({ where: { id: userId }, data: { role: 'super_admin' } })
 }
 
 // BETTER_AUTH_SECRET et BETTER_AUTH_URL sont lus automatiquement depuis l'environnement.
@@ -437,7 +441,17 @@ export const auth = betterAuth({
       },
     }),
     // Administration de la plateforme (utilisateurs, suspension, usurpation).
-    admin(),
+    admin({
+      adminRoles: ['super_admin', 'exploitation', 'support', 'finance', 'admin'],
+      roles: {
+        super_admin: adminAc,
+        exploitation: adminAc,
+        support: adminAc,
+        finance: adminAc,
+        admin: adminAc,
+        user: userAc,
+      },
+    }),
     // Double authentification TOTP + codes de secours.
     twoFactor({ issuer: 'EFLEX' }),
     // Doit rester en dernier : permet de poser les cookies depuis les Server Actions.

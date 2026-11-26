@@ -19,6 +19,7 @@ import {
   parsePeriodDays,
 } from '@/lib/admin-metrics'
 import { PageHeader } from '@/components/page-header'
+import { requireAdminPage } from '@/lib/admin'
 import { PlatformStatus } from '@/components/admin/platform-status'
 import { StatCard } from '@/components/ui/stat-card'
 import {
@@ -38,6 +39,7 @@ export default async function AdminOverview({
 }: {
   searchParams: Promise<{ days?: string | string[] }>
 }) {
+  await requireAdminPage('admin.overview.read')
   const params = await searchParams
   const days = parsePeriodDays(params.days)
   let metrics

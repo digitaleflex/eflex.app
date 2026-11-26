@@ -42,7 +42,7 @@ function priorityVariant(priority: string): BadgeVariant {
 }
 
 export default async function AdminSupportTicketPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdminPage()
+  await requireAdminPage('admin.support.read')
   const { id } = await params
   const ticket = await prisma.supportTicket.findUnique({
     where: { id },

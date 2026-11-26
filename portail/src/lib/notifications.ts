@@ -20,6 +20,7 @@ export const NOTIFICATION_TYPES = {
   'site_monitor.down': { label: 'Site indisponible', description: 'Quand un site client surveillé devient indisponible de façon persistante (propriétaires et administrateurs).' },
   'site_monitor.recovered': { label: 'Site rétabli', description: 'Quand un site client surveillé redevient disponible après un incident (propriétaires et administrateurs).' },
   'site_monitor.tls_expiring': { label: 'Certificat bientôt expiré', description: 'Quand le certificat TLS d’un site surveillé expire dans 14, 7, 3 ou 1 jour (propriétaires et administrateurs).' },
+  'security.impersonation': { label: 'Accès support au compte', description: 'Quand un administrateur EFLEX ouvre une session d’assistance sur un compte de votre organisation (propriétaires).' },
 } as const
 
 export type NotificationType = keyof typeof NOTIFICATION_TYPES

@@ -13,6 +13,7 @@ import { PLAN_IDS, PLANS } from '@/lib/plans'
 import { computeBillingState } from '@/lib/billing'
 import { TimeFr } from '@/components/admin/time-fr'
 import { formatInteger } from '@/lib/table'
+import { requireAdminPage } from '@/lib/admin'
 import { cn } from '@/lib/utils'
 
 export const metadata = { title: 'Organisations — Administration' }
@@ -52,6 +53,7 @@ export default async function AdminOrganizationsPage({
 }: {
   searchParams: Promise<Search>
 }) {
+  await requireAdminPage('admin.organizations.read')
   const filters = await searchParams
   const now = new Date()
   const inactiveThreshold = filters.inactive ? Number(filters.inactive) : null

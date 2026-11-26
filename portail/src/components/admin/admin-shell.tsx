@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ConnectionBadge } from '@/components/connection-badge'
+import type { AdminPermission } from '@/lib/admin-rbac'
 
 type NavItem = {
   label: string
@@ -28,37 +29,38 @@ type NavItem = {
   icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>
   exact?: boolean
   soon?: boolean
+  permission: AdminPermission
 }
 
 const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Pilotage',
     items: [
-      { label: "Vue d'ensemble", href: '/admin', icon: LayoutDashboard, exact: true },
-      { label: 'Activité en direct', href: '/admin/live', icon: Radio },
-      { label: 'Surveillance des sites', href: '/admin/monitoring', icon: Activity },
-      { label: "Journal d'audit", href: '/admin/audit', icon: ScrollText },
+      { label: "Vue d'ensemble", href: '/admin', icon: LayoutDashboard, exact: true, permission: 'admin.overview.read' },
+      { label: 'Activité en direct', href: '/admin/live', icon: Radio, permission: 'admin.live.read' },
+      { label: 'Surveillance des sites', href: '/admin/monitoring', icon: Activity, permission: 'admin.monitoring.read' },
+      { label: "Journal d'audit", href: '/admin/audit', icon: ScrollText, permission: 'admin.audit.read' },
     ],
   },
   {
     title: 'Opérations',
     items: [
-      { label: 'Déploiements', href: '/admin/deployments', icon: Rocket },
-      { label: 'Projets', href: '/admin/projects', icon: FolderGit2 },
+      { label: 'Déploiements', href: '/admin/deployments', icon: Rocket, permission: 'admin.deployments.read' },
+      { label: 'Projets', href: '/admin/projects', icon: FolderGit2, permission: 'admin.projects.read' },
     ],
   },
   {
     title: 'Clients',
     items: [
-      { label: 'Utilisateurs', href: '/admin/users', icon: Users },
-      { label: 'Organisations', href: '/admin/organizations', icon: Building2 },
-      { label: 'Paiements', href: '/admin/payments', icon: CreditCard },
-      { label: 'Support', href: '/admin/support', icon: LifeBuoy },
+      { label: 'Utilisateurs', href: '/admin/users', icon: Users, permission: 'admin.users.read' },
+      { label: 'Organisations', href: '/admin/organizations', icon: Building2, permission: 'admin.organizations.read' },
+      { label: 'Paiements', href: '/admin/payments', icon: CreditCard, permission: 'admin.payments.read' },
+      { label: 'Support', href: '/admin/support', icon: LifeBuoy, permission: 'admin.support.read' },
     ],
   },
   {
     title: 'Plateforme',
-    items: [{ label: 'Infrastructure', href: '/admin/infrastructure', icon: Server }],
+    items: [{ label: 'Infrastructure', href: '/admin/infrastructure', icon: Server, permission: 'admin.infrastructure.read' }],
   },
 ]
 
@@ -66,10 +68,24 @@ function isActivePath(pathname: string, item: NavItem) {
   return item.exact ? pathname === item.href : pathname.startsWith(item.href)
 }
 
-function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+function NavLinks({
+  pathname,
+  permissions,
+  onNavigate,
+}: {
+  pathname: string
+  permissions: readonly AdminPermission[]
+  onNavigate?: () => void
+}) {
+  const allowed = new Set(permissions)
+  const sections = NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => allowed.has(item.permission)),
+  })).filter((section) => section.items.length > 0)
+
   return (
     <div className="flex flex-col gap-6">
-      {NAV_SECTIONS.map((section) => (
+      {sections.map((section) => (
         <div key={section.title}>
           <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{section.title}</p>
           <ul className="flex flex-col gap-1">
@@ -130,7 +146,15 @@ function ShellFooter({ email }: { email: string }) {
   )
 }
 
-export function AdminShell({ children, email }: { children: React.ReactNode; email: string }) {
+export function AdminShell({
+  children,
+  email,
+  permissions,
+}: {
+  children: React.ReactNode
+  email: string
+  permissions: readonly AdminPermission[]
+}) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const menuId = useId()
@@ -161,7 +185,7 @@ export function AdminShell({ children, email }: { children: React.ReactNode; ema
       <div className="flex flex-col lg:flex-row">
         <aside className="hidden border-border bg-muted/30 lg:flex lg:min-h-[calc(100vh-2.25rem)] lg:w-64 lg:shrink-0 lg:flex-col lg:border-r">
           <nav aria-label="Administration" className="flex-1 overflow-y-auto p-4">
-            <NavLinks pathname={pathname} />
+            <NavLinks pathname={pathname} permissions={permissions} />
           </nav>
           <ShellFooter email={email} />
         </aside>
@@ -208,7 +232,7 @@ export function AdminShell({ children, email }: { children: React.ReactNode; ema
                   </button>
                 </div>
                 <nav aria-label="Administration" className="flex-1 overflow-y-auto p-4">
-                  <NavLinks pathname={pathname} onNavigate={() => setOpen(false)} />
+                  <NavLinks pathname={pathname} permissions={permissions} onNavigate={() => setOpen(false)} />
                 </nav>
                 <ShellFooter email={email} />
               </div>

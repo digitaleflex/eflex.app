@@ -17,7 +17,7 @@ const INITIAL_EVENTS = 100
  * suit le flux en direct et permet pause, filtres, recherche et export.
  */
 export default async function LivePage() {
-  await requireAdminPage()
+  await requireAdminPage('admin.live.read')
 
   const rows = await prisma.event.findMany({ orderBy: { id: 'desc' }, take: INITIAL_EVENTS })
   const ordered = rows.reverse()

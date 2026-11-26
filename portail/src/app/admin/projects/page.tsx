@@ -42,7 +42,7 @@ export default async function AdminProjectsPage({
 }: {
   searchParams: Promise<{ etat?: string; stack?: string; q?: string; page?: string }>
 }) {
-  await requireAdminPage()
+  await requireAdminPage('admin.projects.read')
   const query = parseProjectListQuery(await searchParams)
   const now = new Date()
   const timeoutMs = deploymentTimeoutMs()

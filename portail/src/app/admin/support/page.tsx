@@ -42,7 +42,7 @@ function priorityVariant(priority: string): BadgeVariant {
 }
 
 export default async function AdminSupportPage() {
-  await requireAdminPage()
+  await requireAdminPage('admin.support.read')
   const tickets = await prisma.supportTicket.findMany({
     orderBy: { createdAt: 'desc' },
     take: 100,

@@ -27,7 +27,7 @@ function applicationRef(raw: Record<string, unknown>): AdminApplicationRef | nul
  * écarts sont listés pour une intervention manuelle.
  */
 export default async function AdminReconciliationPage() {
-  await requireAdminPage()
+  await requireAdminPage('admin.projects.read')
 
   const projects = await prisma.project.findMany({
     orderBy: { name: 'asc' },

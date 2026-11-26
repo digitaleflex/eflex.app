@@ -33,7 +33,9 @@ import {
   parseUserListQuery,
   userListHrefTemplate,
   userListWhere,
+  userRoleLabel,
 } from '@/lib/admin-users'
+import { normalizeAdminRole } from '@/lib/admin-rbac'
 
 export const metadata = { title: 'Utilisateurs — Administration' }
 export const dynamic = 'force-dynamic'
@@ -53,7 +55,7 @@ export default async function UsersPage({
 }: {
   searchParams: Promise<{ q?: string; role?: string; statut?: string; email?: string; page?: string }>
 }) {
-  const session = await requireAdminPage()
+  const session = await requireAdminPage('admin.users.read')
   const query = parseUserListQuery(await searchParams)
   const where = userListWhere(query)
   const filtered = isUserListFiltered(query)
@@ -198,8 +200,8 @@ export default async function UsersPage({
                     <div>
                       <dt className="text-muted-foreground">Rôle</dt>
                       <dd className="mt-1">
-                        {user.role === 'admin' ? (
-                          <StatusBadge status="admin" label="Administrateur" tone="info" dot={false} />
+                        {normalizeAdminRole(user.role) ? (
+                          <StatusBadge status="admin" label={userRoleLabel(user.role)} tone="info" dot={false} />
                         ) : (
                           <StatusBadge status="member" label="Compte standard" tone="neutral" dot={false} />
                         )}
@@ -233,7 +235,7 @@ export default async function UsersPage({
                     </p>
                   ) : null}
 
-                  {user.id !== session.user.id && user.role !== 'admin' ? (
+                  {user.id !== session.user.id && !normalizeAdminRole(user.role) ? (
                     <UserActions id={user.id} name={user.name} banned={Boolean(user.banned)} />
                   ) : (
                     <p className="text-xs text-muted-foreground">
@@ -275,8 +277,8 @@ export default async function UsersPage({
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      {user.role === 'admin' ? (
-                        <StatusBadge status="admin" label="Administrateur" tone="info" dot={false} />
+                      {normalizeAdminRole(user.role) ? (
+                        <StatusBadge status="admin" label={userRoleLabel(user.role)} tone="info" dot={false} />
                       ) : (
                         <StatusBadge status="member" label="Compte standard" tone="neutral" dot={false} />
                       )}
@@ -299,7 +301,7 @@ export default async function UsersPage({
                     <td className="hidden px-4 py-3 md:table-cell">{user._count.members}</td>
                     <td className="hidden px-4 py-3 lg:table-cell">{date.format(user.createdAt)}</td>
                     <td className="px-4 py-3 text-right">
-                      {user.id === session.user.id || user.role === 'admin' ? (
+                      {user.id === session.user.id || normalizeAdminRole(user.role) ? (
                         <span className="text-xs text-muted-foreground">
                           {user.id === session.user.id ? 'Vous' : '—'}
                         </span>

@@ -28,7 +28,7 @@ export const dynamic = 'force-dynamic'
 const dateTime = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full', timeStyle: 'medium' })
 
 export default async function AdminDeploymentPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdminPage()
+  await requireAdminPage('admin.deployments.read')
   const { id } = await params
   const now = new Date()
 

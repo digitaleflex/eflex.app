@@ -8,6 +8,7 @@ import { StatusBadge, type StatusTone } from '@/components/ui/status-badge'
 import { AdminPaymentRow } from '@/components/admin/payment-row'
 import { formatFcfa, planById } from '@/lib/plans'
 import { formatInteger } from '@/lib/table'
+import { requireAdminPage } from '@/lib/admin'
 
 export const metadata = { title: 'Paiements — Administration' }
 export const dynamic = 'force-dynamic'
@@ -30,6 +31,7 @@ function statusTone(status: string): StatusTone {
 }
 
 export default async function AdminPaymentsPage() {
+  await requireAdminPage('admin.payments.read')
   const payments = await prisma.payment.findMany({
     orderBy: { createdAt: 'desc' },
     take: 50,

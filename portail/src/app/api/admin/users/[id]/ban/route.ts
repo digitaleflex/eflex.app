@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 import { requireAdminApi } from '@/lib/admin'
+import { normalizeAdminRole } from '@/lib/admin-rbac'
 import { prisma } from '@/lib/prisma'
 
 const banSchema = z.object({
@@ -17,7 +18,7 @@ async function loadTarget(id: string, actorId: string) {
   }
   const target = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, role: true, banned: true } })
   if (!target) return { error: NextResponse.json({ error: 'Utilisateur introuvable.' }, { status: 404 }) }
-  if (target.role === 'admin') {
+  if (normalizeAdminRole(target.role)) {
     return { error: NextResponse.json({ error: "Retirez d'abord le rôle administrateur de ce compte." }, { status: 409 }) }
   }
   return { target }
@@ -25,7 +26,7 @@ async function loadTarget(id: string, actorId: string) {
 
 /** Suspend un compte : motif obligatoire, sessions fermées, action auditée. */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.users.manage')
   if ('response' in guard) return guard.response
   const { session } = guard
   const { id } = await params
@@ -55,7 +56,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
 /** Réactive un compte suspendu. */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdminApi()
+  const guard = await requireAdminApi('admin.users.manage')
   if ('response' in guard) return guard.response
   const { session } = guard
   const { id } = await params

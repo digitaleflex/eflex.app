@@ -6,7 +6,7 @@ export const metadata = { title: 'Pilotage Coolify — Administration' }
 export const dynamic = 'force-dynamic'
 
 export default async function CoolifyAdminPage() {
-  await requireAdminPage()
+  await requireAdminPage('admin.coolify.read')
   return (
     <div className="space-y-6">
       <div className="max-w-2xl">

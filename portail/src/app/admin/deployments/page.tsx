@@ -33,7 +33,7 @@ export default async function AdminDeploymentsPage({
 }: {
   searchParams: Promise<{ projet?: string }>
 }) {
-  await requireAdminPage()
+  await requireAdminPage('admin.deployments.read')
   const { projet } = await searchParams
   const projectId = typeof projet === 'string' && projet.length > 0 ? projet : null
   const now = new Date()

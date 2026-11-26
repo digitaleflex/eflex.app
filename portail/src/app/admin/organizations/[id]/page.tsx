@@ -46,7 +46,7 @@ const AUDIT_LABEL: Record<string, string> = {
 }
 
 export default async function AdminOrganizationPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdminPage()
+  await requireAdminPage('admin.organizations.read')
   const { id } = await params
   const now = new Date()
 
