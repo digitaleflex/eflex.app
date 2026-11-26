@@ -85,6 +85,8 @@ function PrimaryAction({ action, projectId, multiApp }: { action: NextProjectAct
   )
 }
 
+export const metadata = { title: 'Projet' }
+
 export default async function ProjectPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const session = await getSession()
   if (!session?.user?.id) redirect('/login')

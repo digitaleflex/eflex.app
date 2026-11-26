@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { formatInteger } from '@/lib/table'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Support — Administration EFLEX' }
+export const metadata = { title: 'Support — Administration' }
 
 function statusVariant(status: string): BadgeVariant {
   switch (status) {

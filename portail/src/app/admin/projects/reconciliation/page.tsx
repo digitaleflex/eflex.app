@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { listApplications } from '@/lib/coolify'
 import { reconcileApplications, type AdminApplicationRef } from '@/lib/admin-projects'
 
-export const metadata = { title: 'Réconciliation — Administration EFLEX' }
+export const metadata = { title: 'Réconciliation — Administration' }
 export const dynamic = 'force-dynamic'
 
 const dateTime = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })

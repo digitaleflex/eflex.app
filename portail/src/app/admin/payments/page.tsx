@@ -9,7 +9,7 @@ import { AdminPaymentRow } from '@/components/admin/payment-row'
 import { formatFcfa, planById } from '@/lib/plans'
 import { formatInteger } from '@/lib/table'
 
-export const metadata = { title: 'Paiements — Administration EFLEX' }
+export const metadata = { title: 'Paiements — Administration' }
 export const dynamic = 'force-dynamic'
 
 const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })

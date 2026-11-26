@@ -22,7 +22,7 @@ import {
   summarizePlan,
 } from '@/lib/admin-projects'
 
-export const metadata = { title: 'Déploiement — Administration EFLEX' }
+export const metadata = { title: 'Déploiement — Administration' }
 export const dynamic = 'force-dynamic'
 
 const dateTime = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full', timeStyle: 'medium' })

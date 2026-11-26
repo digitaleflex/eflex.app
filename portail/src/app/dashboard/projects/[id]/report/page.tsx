@@ -7,7 +7,7 @@ import { loadSiteReport, parseMonth } from '@/lib/site-report'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { PrintButton } from '@/components/print-button'
 
-export const metadata = { title: 'Rapport d’exploitation — EFLEX' }
+export const metadata = { title: 'Rapport d’exploitation' }
 export const dynamic = 'force-dynamic'
 
 const CAUSES: Record<string, string> = {

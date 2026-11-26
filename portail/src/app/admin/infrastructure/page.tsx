@@ -22,7 +22,7 @@ import {
 } from '@/lib/infrastructure-health'
 import { collectInfrastructure, type SourceInfo, type SourceKey } from './collect'
 
-export const metadata = { title: 'Infrastructure — Administration EFLEX' }
+export const metadata = { title: 'Infrastructure — Administration' }
 // Sondes réseau et base à chaque visite : jamais de cache.
 export const dynamic = 'force-dynamic'
 

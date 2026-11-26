@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Vérification de l’e-mail — EFLEX',
+  title: 'Vérification de l’e-mail',
   description: 'Vérifiez votre adresse e-mail pour activer votre compte EFLEX.',
 }
 

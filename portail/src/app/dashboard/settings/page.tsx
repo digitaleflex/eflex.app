@@ -11,6 +11,7 @@ import { AccountSettings } from '@/components/settings/account-settings'
 import { SecuritySettings } from '@/components/settings/security-settings'
 import { GitHubConnection } from '@/components/settings/github-connection'
 
+export const metadata = { title: 'Paramètres du compte' }
 export const dynamic = 'force-dynamic'
 
 const SECTIONS = [

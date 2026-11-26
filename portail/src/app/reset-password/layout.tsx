@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Nouveau mot de passe — EFLEX',
+  title: 'Nouveau mot de passe',
   description: 'Définissez un nouveau mot de passe pour votre compte EFLEX.',
 }
 

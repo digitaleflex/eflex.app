@@ -355,15 +355,14 @@ export function GitHubPicker({ onSelect }: { onSelect: (selection: GitHubSelecti
               </>
             ) : (
               <>
+                <li>Dépôt public : collez simplement son adresse ci-dessous, aucune connexion n’est nécessaire.</li>
                 <li>
-                  Ouvrez{' '}
+                  Dépôt privé : ajoutez un jeton personnel GitHub dans{' '}
                   <Link href="/dashboard/settings#github" className="font-medium text-primary hover:underline">
                     Paramètres → Connexion GitHub
                   </Link>
-                  .
+                  , puis revenez ici.
                 </li>
-                <li>Créez la GitHub App (administrateur) ou ajoutez un jeton personnel.</li>
-                <li>Installez l’application, puis revenez ici pour choisir un dépôt.</li>
               </>
             )}
           </ol>

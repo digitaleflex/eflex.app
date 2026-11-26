@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { LegalPage, LegalSection, PlaceholderNotice } from '@/components/marketing/legal-page'
 
 export const metadata: Metadata = {
-  title: 'Politique de confidentialité — EFLEX',
+  title: 'Politique de confidentialité',
   description: 'Informations sur les données traitées dans le cadre du service EFLEX.',
 }
 
