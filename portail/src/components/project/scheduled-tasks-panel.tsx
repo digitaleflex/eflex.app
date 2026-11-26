@@ -120,9 +120,11 @@ export function ScheduledTasksPanel({
       const data = (await res.json().catch(() => ({}))) as { executions?: Execution[] }
       if (res.ok && Array.isArray(data.executions)) {
         setExecutions((prev) => ({ ...prev, [taskId]: data.executions as Execution[] }))
+      } else if (!res.ok) {
+        setError('Impossible de charger l’historique des exécutions.')
       }
     } catch {
-      // sans blocage
+      setError('Impossible de charger l’historique des exécutions.')
     }
   }
 

@@ -24,9 +24,11 @@ describe('plan-usage', () => {
 
 
 describe('formatLimit', () => {
-  it('affiche « illimité » plutôt que « Infinity »', () => {
-    expect(formatLimit(Number.POSITIVE_INFINITY)).toBe('illimité')
-    expect(formatUsageOf(1, Number.POSITIVE_INFINITY)).toBe('1 / illimité')
+  it('ne promet pas de limite quand elle n’est pas définie', () => {
+    expect(formatLimit(Number.POSITIVE_INFINITY)).toBeNull()
+    expect(formatUsageOf(0, Number.POSITIVE_INFINITY)).toBe('0 application')
+    expect(formatUsageOf(1, Number.POSITIVE_INFINITY)).toBe('1 application')
+    expect(formatUsageOf(2, Number.POSITIVE_INFINITY)).toBe('2 applications')
   })
 
   it('formate une limite finie à la française', () => {

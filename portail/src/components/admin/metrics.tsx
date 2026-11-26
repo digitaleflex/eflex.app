@@ -52,9 +52,10 @@ export function ExportCsvLink({ days }: { days: PeriodDays }) {
 
 /** Alertes : le libellé de gravité est écrit, la couleur ne porte jamais l'information seule. */
 export function AlertsPanel({ alerts }: { alerts: AdminMetrics['alerts'] }) {
-  const criticalCount = alerts.filter((a) => a.severity === 'critical').length
-  const warningCount = alerts.filter((a) => a.severity === 'warning').length
-  const hasIssues = alerts.length > 0
+  const safeAlerts = alerts ?? []
+  const criticalCount = safeAlerts.filter((a) => a.severity === 'critical').length
+  const warningCount = safeAlerts.filter((a) => a.severity === 'warning').length
+  const hasIssues = safeAlerts.length > 0
 
   return (
     <section
@@ -71,7 +72,7 @@ export function AlertsPanel({ alerts }: { alerts: AdminMetrics['alerts'] }) {
           </h3>
           {hasIssues && (
             <Badge variant={criticalCount > 0 ? 'destructive' : warningCount > 0 ? 'warning' : 'outline'}>
-              {formatInteger(alerts.length)} {alerts.length > 1 ? 'alertes' : 'alerte'}
+              {formatInteger(safeAlerts.length)} {safeAlerts.length > 1 ? 'alertes' : 'alerte'}
             </Badge>
           )}
         </div>
@@ -83,14 +84,14 @@ export function AlertsPanel({ alerts }: { alerts: AdminMetrics['alerts'] }) {
           </p>
         )}
       </div>
-      {alerts.length === 0 ? (
+      {safeAlerts.length === 0 ? (
         <p className="flex items-center gap-2 px-5 py-4 text-sm text-muted-foreground">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />
           Aucune alerte sur la période.
         </p>
       ) : (
         <ul className="divide-y divide-border">
-          {alerts.map((alert) => (
+          {safeAlerts.map((alert) => (
             <AlertRow key={alert.id} alert={alert} />
           ))}
         </ul>
@@ -132,12 +133,13 @@ const failedPattern = {
 
 /** Barres empilées par jour + tableau complet : aucune information portée par la couleur seule. */
 export function DeploymentChart({
-  daily,
+  daily: dailyInput,
   days,
 }: {
   daily: AdminMetrics['deployments']['daily']
   days: PeriodDays
 }) {
+  const daily = dailyInput ?? []
   const max = Math.max(1, ...daily.map((bucket) => bucket.live + bucket.failed + bucket.other))
   const totals = daily.reduce(
     (acc, bucket) => {
@@ -262,12 +264,13 @@ export function DeploymentChart({
 
 /** Erreurs récurrentes : causes probables à investiguer sur les déploiements en échec. */
 export function RecurringErrorsPanel({
-  errors,
+  errors: errorsInput,
   days,
 }: {
   errors: AdminMetrics['recurringErrors']
   days: PeriodDays
 }) {
+  const errors = errorsInput ?? []
   const hasErrors = errors.length > 0
 
   return (
@@ -343,7 +346,14 @@ export function RecurringErrorsPanel({
   )
 }
 
-export function StackTable({ stacks, days }: { stacks: AdminMetrics['deployments']['stacks']; days: PeriodDays }) {
+export function StackTable({
+  stacks: stacksInput,
+  days,
+}: {
+  stacks: AdminMetrics['deployments']['stacks']
+  days: PeriodDays
+}) {
+  const stacks = stacksInput ?? []
   return (
     <section aria-labelledby="admin-stacks-title" className="min-w-0 rounded-xl border border-border bg-card p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">

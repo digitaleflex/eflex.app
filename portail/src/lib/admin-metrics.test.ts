@@ -338,3 +338,34 @@ describe('export CSV', () => {
     expect(lines).toContain('warning;2 déploiements en échec;Taux d’échec de 22 %.')
   })
 })
+
+describe('tolérance aux données vides ou partielles', () => {
+  it('dailyDeploymentSeries renvoie une série vide mais continue sans lignes', () => {
+    const series = dailyDeploymentSeries([], 7, now)
+    expect(series).toHaveLength(7)
+    expect(series.every((bucket) => bucket.live === 0 && bucket.failed === 0 && bucket.other === 0)).toBe(true)
+  })
+
+  it('deploymentTotals et stackDeploymentStats acceptent des tableaux vides', () => {
+    expect(deploymentTotals([])).toEqual({ live: 0, failed: 0, other: 0, total: 0 })
+    expect(stackDeploymentStats([])).toEqual([])
+  })
+
+  it('buildAdminAlerts ne signale rien quand les compteurs sont nuls ou absents', () => {
+    expect(
+      buildAdminAlerts({
+        failedDeployments: 0,
+        finishedDeployments: 0,
+        stuckDeployments: 0,
+        pendingPayments: 0,
+        pendingAmountFcfa: 0,
+        pastDueSubscriptions: 0,
+        quotaOverruns: [],
+      }),
+    ).toEqual([])
+  })
+
+  it('quotaOverruns ignore les organisations sans compteurs', () => {
+    expect(quotaOverruns([], [], [])).toEqual([])
+  })
+})

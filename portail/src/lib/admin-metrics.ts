@@ -295,16 +295,17 @@ export function buildAdminAlerts(input: {
     })
   }
 
-  if (input.quotaOverruns.length > 0) {
-    const sample = input.quotaOverruns
+  const quotaOverruns = input.quotaOverruns ?? []
+  if (quotaOverruns.length > 0) {
+    const sample = quotaOverruns
       .slice(0, 3)
       .map((overrun) => `${overrun.name} (${overrun.kind === 'projects' ? 'projets' : 'membres'} ${overrun.used}/${overrun.limit})`)
       .join(', ')
-    const rest = input.quotaOverruns.length - 3
+    const rest = quotaOverruns.length - 3
     alerts.push({
       id: 'quota-overruns',
       severity: 'warning',
-      title: `${formatInteger(input.quotaOverruns.length)} organisation${input.quotaOverruns.length > 1 ? 's' : ''} au-delà de son quota`,
+      title: `${formatInteger(quotaOverruns.length)} organisation${quotaOverruns.length > 1 ? 's' : ''} au-delà de son quota`,
       detail: `${sample}${rest > 0 ? ` et ${formatInteger(rest)} autre${rest > 1 ? 's' : ''}` : ''}.`,
     })
   }

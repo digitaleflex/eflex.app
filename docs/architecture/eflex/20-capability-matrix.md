@@ -20,6 +20,8 @@ Cette matrice empêche de confondre présence de code, capacité activée, preuv
 | Monitoring plateforme | En place / partiel | Healthcheck et statut plateforme |
 | Monitoring continu des sites clients | À construire / à compléter | Probes et incidents par projet |
 | Logs runtime et métriques app | Partiel | Coolify et disponibilité API/configuration |
+| Prévisualisations de pull requests | En place (MVP) | Activables par projet (#185) ; création/mise à jour/fermeture pilotées par webhook GitHub, garde-fous (forks ignorés, brouillons, plafond d’actifs, pas de secrets fork). Disponibilité selon le support et la configuration réseau/TLS de l’hébergement. |
+| Tâches planifiées (cron) | En place (MVP) | Création, exécution manuelle, historique et suppression par application via l’API Coolify (#189). Nécessite une application déployée ; la sûreté de la commande reste sous la responsabilité du projet. |
 | Analytics audience | En place | Agrégats privacy-first : pages vues, visiteurs uniques quotidiens (somme sur période), dimensions opt-in (référent, appareil/navigateur/OS, pays local, UTM) et événements nommés ; sans sessions/durée/rebond ni déduplication inter-jours (voir `docs/operations/analytics.md`) |
 | Build Plane dédié | À construire | Pas de serveur/registre dédié intégré dans le chemin actuel du portail |
 | Registry immuable | À construire dans le pipeline E-FLEX | Réutiliser un registre existant |

@@ -25,12 +25,17 @@ export function usageLabel(level: UsageLevel): string {
   }
 }
 
-/** Limite lisible : « illimité » quand le plan n'en a pas (`Infinity`), sinon le nombre. */
-export function formatLimit(limit: number): string {
-  return Number.isFinite(limit) ? limit.toLocaleString('fr-FR') : 'illimité'
+/** Limite lisible ; `null` quand aucune limite finie n'est définie (pas une promesse). */
+export function formatLimit(limit: number): string | null {
+  return Number.isFinite(limit) ? limit.toLocaleString('fr-FR') : null
 }
 
-/** « 1 / 5 » ou « 1 / illimité » ; l'utilisation reste un nombre. */
+/** « 1 / 5 » ou « 1 application » quand la limite n'est pas définie. */
 export function formatUsageOf(used: number, limit: number): string {
-  return `${used.toLocaleString('fr-FR')} / ${formatLimit(limit)}`
+  const formattedLimit = formatLimit(limit)
+  if (formattedLimit === null) {
+    const n = used.toLocaleString('fr-FR')
+    return `${n} application${used > 1 ? 's' : ''}`
+  }
+  return `${used.toLocaleString('fr-FR')} / ${formattedLimit}`
 }

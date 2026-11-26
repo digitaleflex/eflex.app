@@ -200,17 +200,35 @@ export default async function AdminOrganizationPage({ params }: { params: Promis
         />
         <StatCard
           label="Applications"
-          value={`${formatInteger(usage.apps)} / ${formatLimit(state.limits.projects)}`}
-          hint={usage.apps >= state.limits.projects ? 'Quota atteint' : `${formatInteger(usage.projects)} projet${usage.projects > 1 ? 's' : ''} réels`}
+          value={
+            Number.isFinite(state.limits.projects)
+              ? `${formatInteger(usage.apps)} / ${formatLimit(state.limits.projects)}`
+              : formatInteger(usage.apps)
+          }
+          hint={
+            Number.isFinite(state.limits.projects) && usage.apps >= state.limits.projects
+              ? 'Quota atteint'
+              : `${formatInteger(usage.projects)} projet${usage.projects > 1 ? 's' : ''} réels${Number.isFinite(state.limits.projects) ? '' : ' · aucune limite définie'}`
+          }
           icon={Gauge}
-          tone={usage.apps >= state.limits.projects ? 'warning' : 'neutral'}
+          tone={Number.isFinite(state.limits.projects) && usage.apps >= state.limits.projects ? 'warning' : 'neutral'}
         />
         <StatCard
           label="Membres"
-          value={`${formatInteger(usage.members)} / ${formatLimit(state.limits.members)}`}
-          hint={usage.members >= state.limits.members ? 'Quota atteint' : 'Dans la limite du plan'}
+          value={
+            Number.isFinite(state.limits.members)
+              ? `${formatInteger(usage.members)} / ${formatLimit(state.limits.members)}`
+              : formatInteger(usage.members)
+          }
+          hint={
+            Number.isFinite(state.limits.members) && usage.members >= state.limits.members
+              ? 'Quota atteint'
+              : Number.isFinite(state.limits.members)
+                ? 'Dans la limite du plan'
+                : 'Aucune limite définie'
+          }
           icon={Users}
-          tone={usage.members >= state.limits.members ? 'warning' : 'neutral'}
+          tone={Number.isFinite(state.limits.members) && usage.members >= state.limits.members ? 'warning' : 'neutral'}
         />
       </section>
 
@@ -431,19 +449,25 @@ export default async function AdminOrganizationPage({ params }: { params: Promis
 }
 
 function Usage({ label, value, limit }: { label: string; value: number; limit: number }) {
-  const percent = Math.min(100, Math.round((value / Math.max(1, limit)) * 100))
-  const full = value >= limit
+  const finite = Number.isFinite(limit)
+  const percent = finite ? Math.min(100, Math.round((value / Math.max(1, limit)) * 100)) : 0
+  const full = finite && value >= limit
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
         <span className="text-muted-foreground">{label}</span>
         <span className={full ? 'font-medium text-warning tabular-nums' : 'font-medium tabular-nums'}>
-          {value} / {formatLimit(limit)}
+          {finite ? `${value} / ${formatLimit(limit)}` : `${value} (aucune limite définie)`}
         </span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-muted" role="presentation">
-        <div className={full ? 'h-full rounded-full bg-warning' : 'h-full rounded-full bg-primary'} style={{ width: `${percent}%` }} />
-      </div>
+      {finite ? (
+        <div className="h-2 overflow-hidden rounded-full bg-muted" role="presentation">
+          <div
+            className={full ? 'h-full rounded-full bg-warning' : 'h-full rounded-full bg-primary'}
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      ) : null}
     </div>
   )
 }

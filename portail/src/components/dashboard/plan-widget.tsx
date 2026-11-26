@@ -15,9 +15,19 @@ type BillingLite = {
 export function PlanWidget({ billing, className }: { billing: BillingLite; className?: string }) {
   const used = billing.usage.apps
   const limit = billing.limits.projects
+  const finiteLimit = Number.isFinite(limit)
+  const formattedLimit = formatLimit(limit)
   const pct = usagePercent(used, limit)
   const level = usageLevel(used, limit)
+  const showCta = billing.blocked || billing.plan.id === 'agency' || (finiteLimit && level !== 'ok')
   const cta = billing.plan.id === 'agency' ? 'Gérer l’abonnement' : 'Mettre à niveau'
+  const usageText = finiteLimit
+    ? `${used.toLocaleString('fr-FR')} / ${formattedLimit} application${limit < 2 ? '' : 's'}`
+    : `${used.toLocaleString('fr-FR')} application${used > 1 ? 's' : ''}`
+  const usageAriaLabel = finiteLimit
+    ? `${used} application${used > 1 ? 's' : ''} utilisée${used > 1 ? 's' : ''} sur ${formattedLimit}`
+    : `${used} application${used > 1 ? 's' : ''} utilisée${used > 1 ? 's' : ''}`
+
   return (
     <Link
       href="/dashboard/organization"
@@ -31,24 +41,31 @@ export function PlanWidget({ billing, className }: { billing: BillingLite; class
         <span className="truncate text-xs font-semibold text-foreground">Votre plan · {billing.plan.label}</span>
         {billing.blocked ? (
           <span className="shrink-0 rounded-full bg-destructive/10 px-1.5 py-0.5 text-xs font-medium text-destructive">Bloqué</span>
-        ) : level !== 'ok' ? (
-          <span className={cn('shrink-0 rounded-full px-1.5 py-0.5 text-xs font-medium', level === 'full' ? 'bg-destructive/10 text-destructive' : 'bg-warning/15 text-warning')}>
+        ) : finiteLimit && level !== 'ok' ? (
+          <span
+            className={cn(
+              'shrink-0 rounded-full px-1.5 py-0.5 text-xs font-medium',
+              level === 'full' ? 'bg-destructive/10 text-destructive' : 'bg-warning/15 text-warning',
+            )}
+          >
             {usageLabel(level)}
           </span>
         ) : null}
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={`${used} application${used > 1 ? 's' : ''} utilisée${used > 1 ? 's' : ''} sur ${formatLimit(limit)}`}>
-        <div
-          className={cn(
-            'h-full rounded-full transition-[width] duration-300 ease-out-expo',
-            level === 'full' || billing.blocked ? 'bg-destructive' : level === 'warning' ? 'bg-warning' : 'bg-primary',
-          )}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+      {finiteLimit ? (
+        <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={usageAriaLabel}>
+          <div
+            className={cn(
+              'h-full rounded-full transition-[width] duration-300 ease-out-expo',
+              level === 'full' || billing.blocked ? 'bg-destructive' : level === 'warning' ? 'bg-warning' : 'bg-primary',
+            )}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      ) : null}
       <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span className="tabular-nums">{used} / {formatLimit(limit)} application{Number.isFinite(limit) && limit < 2 ? '' : 's'}</span>
-        <span className="font-medium text-primary">{cta}</span>
+        <span className="tabular-nums">{usageText}</span>
+        {showCta ? <span className="font-medium text-primary">{cta}</span> : null}
       </div>
     </Link>
   )

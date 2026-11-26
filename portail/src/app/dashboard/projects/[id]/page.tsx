@@ -29,9 +29,8 @@ import { ProjectAnalyticsTab } from '@/components/project/project-analytics-tab'
 import { ProjectTasksTab } from '@/components/project/project-tasks-tab'
 import { ProjectPreviewsTab } from '@/components/project/project-previews-tab'
 import { statusInfo } from '@/lib/project-status'
-import { runtimeHealth, tlsHealth } from '@/lib/project-health'
+import { tlsHealth } from '@/lib/project-health'
 import { nextProjectAction, projectSituation, type NextProjectAction } from '@/lib/project-actions'
-import { getApplicationRuntime } from '@/lib/coolify'
 import { getPrimaryApp } from '@/lib/project-apps'
 import { repoLabel } from '@/lib/repo'
 import { dockerImageFromRepoUrl } from '@/lib/docker-image-ref'
@@ -160,20 +159,6 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const primaryTlsCheckedAt = primaryApp?.tlsCheckedAt ?? null
   const deployed = project.apps.some((app) => Boolean(app.coolifyAppId))
 
-  const runtime = primaryCoolifyAppId ? await getApplicationRuntime(primaryCoolifyAppId, 3_000) : null
-  const runtimeStatus = primaryCoolifyAppId ? (runtime && !('error' in runtime) ? runtime.status : null) : null
-  const runtimeError = runtime && 'error' in runtime ? runtime.error : null
-  const runtimeInfo = runtime && !('error' in runtime) ? runtime : null
-  const appHealth = primaryCoolifyAppId
-    ? runtimeHealth({
-        status: runtimeStatus,
-        healthCheckEnabled: runtimeInfo?.healthCheckEnabled,
-        healthCheckPath: runtimeInfo?.healthCheckPath,
-        restartCount: runtimeInfo?.restartCount ?? null,
-        lastRestartAt: runtimeInfo?.lastRestartAt ?? null,
-        restartReason: runtimeInfo?.restartReason ?? null,
-      })
-    : { label: 'Pas encore déployé', detail: 'Le statut sera disponible après le premier déploiement.', tone: 'muted' as const }
   const certificateHealth = tlsHealth(primaryTlsValid, primaryTlsExpiresAt, primaryTlsCheckedAt)
 
   const deployments = project.deployments
@@ -367,8 +352,6 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           principalDomains={principalDomains.map((d) => ({ id: d.id, hostname: d.hostname }))}
           pendingDomains={pendingDomains.map((d) => ({ id: d.id, hostname: d.hostname }))}
           analysis={analysis}
-          appHealth={appHealth}
-          runtimeError={runtimeError}
           certificateHealth={certificateHealth}
           metricsApps={metricsApps}
         />

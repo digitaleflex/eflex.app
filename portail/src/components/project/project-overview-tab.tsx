@@ -16,6 +16,7 @@ import { SectionCard } from '@/components/dashboard/section'
 import { Notice } from '@/components/dashboard/notice'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ProjectMetrics } from '@/components/project-metrics'
+import { ProjectRuntimeHealth } from '@/components/project/project-runtime-health'
 import { SiteMonitoringPanel } from '@/components/project/site-monitoring'
 import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
 import { projectTabHref } from '@/lib/project-tabs'
@@ -57,8 +58,6 @@ export function ProjectOverviewTab({
   principalDomains,
   pendingDomains,
   analysis,
-  appHealth,
-  runtimeError,
   certificateHealth,
   metricsApps,
 }: {
@@ -77,8 +76,6 @@ export function ProjectOverviewTab({
   principalDomains: readonly OverviewDomain[]
   pendingDomains: readonly OverviewDomain[]
   analysis: StoredAnalysis | null
-  appHealth: HealthInfo
-  runtimeError: string | null
   certificateHealth: HealthInfo
   metricsApps: { id: string; name: string }[]
 }) {
@@ -204,26 +201,7 @@ export function ProjectOverviewTab({
         description="Dernier statut connu de l’hébergement et du certificat, sans garantie de disponibilité en temps réel."
       >
         <dl className="grid divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-          <div className="p-4">
-            <dt className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <span
-                aria-hidden="true"
-                className={cn(
-                  'h-2 w-2 shrink-0 rounded-full',
-                  appHealth.tone === 'success' && 'bg-success',
-                  appHealth.tone === 'warning' && 'bg-warning',
-                  appHealth.tone === 'danger' && 'bg-destructive',
-                  appHealth.tone === 'muted' && 'bg-muted-foreground/50',
-                )}
-              />
-              Application
-            </dt>
-            <dd className="mt-1 text-sm font-medium">
-              {appHealth.label}
-              {appHealth.detail && <span className="mt-0.5 block text-xs font-normal text-muted-foreground">{appHealth.detail}</span>}
-              {runtimeError && <span className="mt-1 block text-xs font-normal text-warning">Hébergement : {runtimeError}</span>}
-            </dd>
-          </div>
+          <ProjectRuntimeHealth projectId={projectId} deployed={deployed} />
           <div className="p-4">
             <dt className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               {certificateHealth.tone === 'success' ? (

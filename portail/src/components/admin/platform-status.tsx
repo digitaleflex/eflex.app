@@ -11,14 +11,17 @@ const DAY_MS = 86_400_000
 export async function PlatformStatus() {
   const since = new Date(Date.now() - DAY_MS)
   const [infra, failedDeployments24h, openSiteIncidents, databasesWithoutBackup] = await Promise.all([
-    collectInfrastructure().catch(() => null),
+    collectInfrastructure().catch((error) => {
+      console.error('[PlatformStatus] Collecte d’infrastructure indisponible', error)
+      return null
+    }),
     prisma.deployment.count({ where: { status: 'failed', createdAt: { gte: since } } }),
     prisma.projectSiteIncident.count({ where: { status: 'open' } }),
     prisma.projectDatabase.count({ where: { kind: 'postgresql', backupId: null } }),
   ])
 
   const status = buildPlatformStatus({
-    infrastructure: infra
+    infrastructure: infra?.sources
       ? infra.sources.map((source) => ({
           key: source.key,
           label: source.label,
