@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { billingSummary } from '@/lib/billing'
 import { computeNextSteps } from '@/lib/next-steps'
 import { LiveRefresh } from '@/components/live-refresh'
-import { ActivityFeed, AttentionList, OverviewStrip } from '@/components/dashboard/overview'
+import { ActivityFeed, AttentionList, OverviewStrip, RecentPreviews } from '@/components/dashboard/overview'
 import { DashboardOnboarding } from '@/components/dashboard/onboarding'
 import { NextStepsCard } from '@/components/dashboard/next-steps-card'
 import { UsageTile } from '@/components/dashboard/usage-tile'
@@ -82,6 +82,7 @@ export default async function DashboardPage() {
         <>
           <OverviewStrip data={data} />
           <AttentionList items={data.attention} />
+          <RecentPreviews previews={data.previews} />
 
           {/* `grid-cols-1` (= minmax(0, 1fr)) sous xl : sans définition de colonne, la piste implicite est
               `auto` et les enfants prennent la largeur minimale de leur contenu, ce qui fait déborder la

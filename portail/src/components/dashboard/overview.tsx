@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Activity, ArrowRight, CircleAlert, CircleCheck, Gauge, Layers, Loader2, Rocket, ShieldAlert } from 'lucide-react'
+import { Activity, ArrowRight, CircleAlert, CircleCheck, ExternalLink, Gauge, GitPullRequest, Layers, Loader2, Rocket, ShieldAlert } from 'lucide-react'
 import { StatusDot } from '@/components/dashboard/status-pill'
 import { relativeTime } from '@/lib/relative-time'
 import { statusInfo } from '@/lib/project-status'
@@ -205,4 +205,57 @@ export function AttentionList({ items }: { items: DashboardData['attention'] }) 
   )
 }
 
-/** Fil d'activité réutilisé (rendu extrait dans `components/dashboard/activity-feed.tsx`). */
+/** Prévisualisations de pull requests actives/récentes, si le projet en a. */
+export function RecentPreviews({ previews }: { previews: DashboardData['previews'] }) {
+  if (previews.length === 0) return null
+  return (
+    <section aria-labelledby="recent-previews-title" className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="border-b border-border px-4 py-2.5">
+        <h2 id="recent-previews-title" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <GitPullRequest className="h-3.5 w-3.5" aria-hidden="true" />
+          Aperçus récents
+          <span className="rounded-full bg-muted px-1.5 text-xs font-medium tabular-nums text-muted-foreground">{previews.length}</span>
+        </h2>
+        <p className="mt-1 text-xs text-muted-foreground">Prévisualisations actives de pull requests sur vos projets.</p>
+      </div>
+      <ul className="divide-y divide-border">
+        {previews.map((preview) => (
+          <li key={preview.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+            <div className="min-w-0 flex-[1_1_14rem]">
+              <p className="text-sm">
+                <span className="font-semibold">{preview.projectName}</span>
+                <span className="text-muted-foreground"> · PR #{preview.prNumber}</span>
+                {preview.prTitle ? <span className="text-muted-foreground"> — {preview.prTitle}</span> : null}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                <span className="font-mono">{preview.headRef}</span>
+                {' · '}
+                {preview.status === 'updating' ? 'Mise à jour en cours' : 'Active'}
+              </p>
+            </div>
+            <div className="ml-7 flex shrink-0 items-center gap-3 sm:ml-0">
+              <Link
+                href={`/dashboard/projects/${preview.projectId}?tab=previews`}
+                className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary hover:underline sm:min-h-0"
+              >
+                Voir <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="sr-only">la prévisualisation PR #{preview.prNumber} de {preview.projectName}</span>
+              </Link>
+              {preview.previewUrl ? (
+                <a
+                  href={preview.previewUrl.startsWith('http') ? preview.previewUrl : `https://${preview.previewUrl}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground hover:underline sm:min-h-0"
+                >
+                  Ouvrir <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span className="sr-only">la prévisualisation (nouvel onglet)</span>
+                </a>
+              ) : null}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}

@@ -64,6 +64,19 @@ export type DashboardActivity =
 
 export type OrgRecentEvent = Extract<DashboardActivity, { kind: 'domain_verified' | 'member_added' }>
 
+export type DashboardPreview = {
+  id: string
+  prNumber: number
+  prTitle: string | null
+  prUrl: string | null
+  headRef: string
+  status: string
+  previewUrl: string | null
+  updatedAt: string
+  projectId: string
+  projectName: string
+}
+
 /**
  * Événements fiables récents de l'organisation hors déploiements (domaines vérifiés, membres ajoutés),
  * dédupliqués par identifiant source et triés du plus récent au plus ancien.
@@ -135,7 +148,7 @@ export async function loadRecentOrgEvents(organizationId: string, take = 15): Pr
  */
 export async function loadDashboard(organizationId: string, now = new Date(), options?: { quota?: { used: number; limit: number } | null }) {
   const since = new Date(now.getTime() - DAYS * 86_400_000)
-  const [projects, recent, deployments, domainVerifications, memberEvents] = await Promise.all([
+  const [projects, recent, deployments, domainVerifications, memberEvents, previews] = await Promise.all([
     prisma.project.findMany({
       where: { organizationId },
       orderBy: { updatedAt: 'desc' },
@@ -197,6 +210,22 @@ export async function loadDashboard(organizationId: string, now = new Date(), op
       orderBy: { createdAt: 'desc' },
       take: 12,
       select: { id: true, createdAt: true, user: { select: { name: true } } },
+    }),
+    prisma.projectPreview.findMany({
+      where: { project: { organizationId }, status: { in: ['active', 'updating'] } },
+      orderBy: { updatedAt: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        prNumber: true,
+        prTitle: true,
+        prUrl: true,
+        headRef: true,
+        status: true,
+        previewUrl: true,
+        updatedAt: true,
+        project: { select: { id: true, name: true } },
+      },
     }),
   ])
 
@@ -318,6 +347,18 @@ export async function loadDashboard(organizationId: string, now = new Date(), op
     deploymentsInWindow: recent.length,
     successRate: successRate(recent),
     activity,
+    previews: previews.map((preview) => ({
+      id: preview.id,
+      prNumber: preview.prNumber,
+      prTitle: preview.prTitle,
+      prUrl: preview.prUrl,
+      headRef: preview.headRef,
+      status: preview.status,
+      previewUrl: preview.previewUrl,
+      updatedAt: preview.updatedAt.toISOString(),
+      projectId: preview.project.id,
+      projectName: preview.project.name,
+    })),
     windowDays: DAYS,
   }
 }
