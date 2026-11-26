@@ -92,6 +92,8 @@ pnpm-debug.log*
 data/
 tmp/
 *.pid
+.env.ops
+.env.*.ops
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Deployment artefacts — these are per-environment and infrastructure specific

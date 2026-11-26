@@ -40,12 +40,29 @@ export default async function AdminOverview({
 }) {
   const params = await searchParams
   const days = parsePeriodDays(params.days)
-  const metrics = await loadAdminMetricsCached(days)
+  let metrics
+  try {
+    metrics = await loadAdminMetricsCached(days)
+  } catch (error) {
+    console.error('[admin/page] Échec du chargement des indicateurs', error)
+    return (
+      <div className="space-y-10">
+        <PageHeader
+          title="Vue d’ensemble"
+          description="Les indicateurs n’ont pas pu être chargés pour le moment."
+        />
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          Impossible de charger les indicateurs d’administration. Le détail a été consigné côté serveur.
+        </div>
+      </div>
+    )
+  }
 
-  const finished = metrics.deployments.live + metrics.deployments.failed
-  const unpaidTotal = metrics.unpaid.pendingAmountFcfa + metrics.unpaid.pastDueAmountFcfa
-  const firstDay = metrics.deployments.daily[0]?.day
-  const lastDay = metrics.deployments.daily[metrics.deployments.daily.length - 1]?.day
+  const daily = metrics.deployments?.daily ?? []
+  const finished = (metrics.deployments?.live ?? 0) + (metrics.deployments?.failed ?? 0)
+  const unpaidTotal = (metrics.unpaid?.pendingAmountFcfa ?? 0) + (metrics.unpaid?.pastDueAmountFcfa ?? 0)
+  const firstDay = daily[0]?.day
+  const lastDay = daily[daily.length - 1]?.day
   const periodRange =
     firstDay && lastDay
       ? `du ${formatDayLong(firstDay)} au ${formatDayLong(lastDay)} (UTC)`
@@ -85,8 +102,8 @@ export default async function AdminOverview({
           </p>
         </div>
         <div className="grid gap-6 xl:grid-cols-2">
-          <AlertsPanel alerts={metrics.alerts} />
-          <RecurringErrorsPanel errors={metrics.recurringErrors} days={days} />
+          <AlertsPanel alerts={metrics.alerts ?? []} />
+          <RecurringErrorsPanel errors={metrics.recurringErrors ?? []} days={days} />
         </div>
       </section>
 
@@ -202,8 +219,8 @@ export default async function AdminOverview({
           </p>
         </div>
         <div className="space-y-6">
-          <DeploymentChart daily={metrics.deployments.daily} days={days} />
-          <StackTable stacks={metrics.deployments.stacks} days={days} />
+          <DeploymentChart daily={metrics.deployments?.daily ?? []} days={days} />
+          <StackTable stacks={metrics.deployments?.stacks ?? []} days={days} />
         </div>
       </section>
 
