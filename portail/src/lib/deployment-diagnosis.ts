@@ -68,7 +68,7 @@ const RULES: Rule[] = [
         t,
       ),
     cause: "Le port d'écoute de l'application n'a pas été détecté.",
-    action: (id) => ({ label: 'Corriger le port', href: `/dashboard/projects/${id}/settings` }),
+    action: (id) => ({ label: 'Corriger le port', href: `/dashboard/projects/${id}/settings#avance` }),
   },
   {
     id: 'disk-space',

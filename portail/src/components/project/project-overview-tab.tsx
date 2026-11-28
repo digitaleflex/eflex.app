@@ -241,31 +241,32 @@ export function ProjectOverviewTab({
         </dl>
       </SectionCard>
 
-      <SiteMonitoringPanel projectId={projectId} />
-
-      {deployed ? (
-        <ProjectMetrics projectId={projectId} apps={multiApp ? metricsApps : []} />
-      ) : (
-        <section
-          aria-labelledby="project-metrics-title"
-          className="overflow-hidden rounded-xl border border-border bg-card"
-        >
-          <div className="border-b border-border px-4 py-4 sm:px-5">
-            <h2 id="project-metrics-title" className="flex items-center gap-2 text-base font-semibold">
+      <details className="group rounded-xl border border-border bg-card" open={deployed}>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-left sm:px-5 [&::-webkit-details-marker]:hidden">
+          <div>
+            <p className="flex items-center gap-2 text-base font-semibold text-foreground">
               <Activity className="h-4 w-4 text-primary" aria-hidden="true" />
-              Ressources
-            </h2>
+              Surveillance et ressources
+            </p>
             <p className="mt-1 text-sm text-muted-foreground">
+              Disponibilité, métriques et santé du projet.
+            </p>
+          </div>
+          <span className="shrink-0 text-sm text-muted-foreground group-open:hidden">Afficher</span>
+          <span className="hidden shrink-0 text-sm text-muted-foreground group-open:inline">Masquer</span>
+        </summary>
+        <div className="space-y-4 border-t border-border p-4 sm:p-5">
+          <SiteMonitoringPanel projectId={projectId} />
+
+          {deployed ? (
+            <ProjectMetrics projectId={projectId} apps={multiApp ? metricsApps : []} />
+          ) : (
+            <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
               Les métriques CPU et mémoire seront disponibles après le premier déploiement.
-            </p>
-          </div>
-          <div className="p-4 sm:p-5">
-            <p className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-              Métriques CPU/mémoire indisponibles : aucune application déployée pour le moment. Aucune valeur estimée n’est affichée.
-            </p>
-          </div>
-        </section>
-      )}
+            </div>
+          )}
+        </div>
+      </details>
 
       <div className={cn('grid gap-6', analysis && 'lg:grid-cols-2')}>
         <SectionCard
