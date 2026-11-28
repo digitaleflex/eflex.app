@@ -51,7 +51,7 @@ describe('recherche et filtres des utilisateurs', () => {
             { email: { contains: 'test', mode: 'insensitive' } },
           ],
         },
-        { role: 'admin' },
+        { role: { in: ['admin', 'super_admin', 'exploitation', 'support', 'finance'] } },
         { banned: true },
         { emailVerified: true },
       ],
@@ -60,7 +60,10 @@ describe('recherche et filtres des utilisateurs', () => {
 
   it('traite les comptes sans rôle comme des comptes standard', () => {
     expect(userListWhere(parseUserListQuery({ role: 'member' }))).toEqual({
-      OR: [{ role: null }, { role: { not: 'admin' } }],
+      OR: [
+        { role: null },
+        { role: { notIn: ['admin', 'super_admin', 'exploitation', 'support', 'finance'] } },
+      ],
     })
   })
 
@@ -76,7 +79,7 @@ describe('recherche et filtres des utilisateurs', () => {
   })
 
   it('distingue rôle, vérification et suspension', () => {
-    expect(userRoleLabel('admin')).toBe('Administrateur')
+    expect(userRoleLabel('admin')).toBe('Super administrateur')
     expect(userRoleLabel('user')).toBe('Compte standard')
     expect(userRoleLabel(null)).toBe('Compte standard')
     expect(userSuspensionLabel(true)).toBe('Suspendu')

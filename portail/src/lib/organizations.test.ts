@@ -53,17 +53,17 @@ run('multi-tenant (Better Auth organization + admin)', () => {
     // 1. Inscription avec l'adresse d'un administrateur, sans la posséder : aucun privilège, même après connexion.
     const res = await auth.api.signUpEmail({ body: { name: 'Usurpateur', email: bossEmail, password: 'motdepasse-solide' } })
     await auth.api.signInEmail({ body: { email: bossEmail, password: 'motdepasse-solide' } })
-    expect((await prisma.user.findUniqueOrThrow({ where: { id: res.user.id } })).role).not.toBe('admin')
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: res.user.id } })).role).not.toBe('super_admin')
 
     // 2. Dès que l'adresse est vérifiée (lien reçu, ou connexion Google), la prochaine connexion accorde le rôle.
     await prisma.user.update({ where: { id: res.user.id }, data: { emailVerified: true } })
     await auth.api.signInEmail({ body: { email: bossEmail, password: 'motdepasse-solide' } })
-    expect((await prisma.user.findUniqueOrThrow({ where: { id: res.user.id } })).role).toBe('admin')
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: res.user.id } })).role).toBe('super_admin')
 
     // 3. Une adresse hors liste, même vérifiée, reste utilisateur.
     const other = await signUp('Eve', email('eve'))
     await prisma.user.update({ where: { id: other.userId }, data: { emailVerified: true } })
-    expect((await prisma.user.findUniqueOrThrow({ where: { id: other.userId } })).role).not.toBe('admin')
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: other.userId } })).role).not.toBe('super_admin')
   })
 
   it("resolveOrganization ne donne jamais l'organisation d'un autre locataire", async () => {

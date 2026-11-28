@@ -153,7 +153,6 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const primaryDomain = primaryApp?.domain ?? null
   const primaryFramework = primaryApp?.framework ?? null
   const primaryRuntime = primaryApp?.runtime ?? null
-  const primaryCoolifyAppId = primaryApp?.coolifyAppId ?? null
   const primaryTlsValid = primaryApp?.tlsValid ?? null
   const primaryTlsExpiresAt = primaryApp?.tlsExpiresAt ?? null
   const primaryTlsCheckedAt = primaryApp?.tlsCheckedAt ?? null

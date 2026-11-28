@@ -12,7 +12,7 @@ function session(role: string | null, opts: { banned?: boolean; twoFactorEnabled
   return {
     session: { id: 's1' },
     user: { id: 'u1', email: 'a@b.test', role, banned: opts.banned ?? false, twoFactorEnabled: opts.twoFactorEnabled ?? false },
-  } as any
+  } as never
 }
 
 afterEach(() => {

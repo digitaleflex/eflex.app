@@ -58,17 +58,17 @@ export default async function SettingsPage({
       />
 
       {admin2faRequired && (
-        <div role="alert" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-950 dark:text-amber-200">
+        <div role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
           <p className="font-medium">Double authentification obligatoire pour l’administration</p>
-          <p className="mt-1 text-amber-900/90 dark:text-amber-200/90">
+          <p className="mt-1 text-warning/90">
             Activez la double authentification ci-dessous pour accéder à l’espace d’administration. Les codes de secours vous permettront de récupérer l’accès si vous perdez votre appareil.
           </p>
         </div>
       )}
       {!admin2faRequired && admin2faGrace && (
-        <div role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-950 dark:text-amber-200">
+        <div role="status" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
           <p className="font-medium">Activez la double authentification avant le {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(admin2faGrace)}</p>
-          <p className="mt-1 text-amber-900/90 dark:text-amber-200/90">
+          <p className="mt-1 text-warning/90">
             L’accès à l’administration exigera la double authentification après cette date. Activez-la maintenant et conservez vos codes de secours.
           </p>
         </div>
