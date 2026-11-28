@@ -92,23 +92,29 @@ export function DeploymentItem({
 
           {open && (
             <div id={detailsId} className="mt-3 space-y-3">
-              {deployment.status === 'failed' &&
-                (diagnosis ? (
-                  <div className="rounded-md border border-destructive/20 bg-destructive/5 p-2.5 text-xs">
-                    <p className="font-medium text-foreground">{diagnosis.cause}</p>
-                    <Link
-                      href={diagnosis.action.href}
-                      className="mt-1 inline-flex rounded-md font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {diagnosis.action.label}
-                    </Link>
-                  </div>
-                ) : (
-                  <p className="text-xs text-destructive">
-                    Le déploiement a échoué. Ouvrez le journal pour identifier la cause ; les
-                    valeurs connues des variables y sont masquées.
-                  </p>
-                ))}
+              {deployment.status === 'failed' && (
+                <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-destructive">Diagnostic</p>
+                  {diagnosis ? (
+                    <>
+                      <p className="mt-1.5 font-medium text-foreground">{diagnosis.cause}</p>
+                      <Link
+                        href={diagnosis.action.href}
+                        className="mt-2 inline-flex min-h-9 items-center rounded-md bg-background px-3 text-sm font-medium text-foreground border border-border hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {diagnosis.action.label}
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-1.5 font-medium text-foreground">Le déploiement a échoué.</p>
+                      <p className="mt-1 text-muted-foreground">
+                        Ouvrez le journal ci-dessous pour identifier la cause. Les secrets connus sont masqués.
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
 
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <DeploymentLogs
