@@ -13,7 +13,7 @@ export interface Diagnosis {
 type Rule = {
   id: string
   test: (text: string) => boolean
-  cause: string
+  cause: string | ((text: string) => string)
   action: (projectId: string) => DiagnosisAction
 }
 
@@ -26,6 +26,22 @@ const RULES: Rule[] = [
       ),
     cause: "Le dépôt semble inaccessible (privé ou droits insuffisants).",
     action: (id) => ({ label: 'Vérifier la connexion Git', href: `/dashboard/projects/${id}/settings` }),
+  },
+  {
+    id: 'compose-missing-env',
+    test: (t) =>
+      /required variable\s+[A-Z][A-Z0-9_]*\s+is missing a value/i.test(t) ||
+      /error while interpolating/i.test(t) && /missing a value/i.test(t),
+    cause: (text) => {
+      const vars = extractComposeMissingEnvVars(text)
+      const list = vars.length > 0 ? vars.join(', ') : 'certaines variables requises'
+      const prefix =
+        vars.length === 1
+          ? `La variable d'environnement ${list} est manquante`
+          : `Des variables d'environnement sont manquantes (${list})`
+      return `${prefix}. Ajoutez-les dans les variables du projet puis relancez le déploiement. La version en ligne n’a pas été modifiée.`
+    },
+    action: (id) => ({ label: 'Ouvrir les variables', href: `/dashboard/projects/${id}?tab=variables` }),
   },
   {
     id: 'missing-env',
@@ -288,10 +304,19 @@ const RULES: Rule[] = [
     action: (id) => ({ label: 'Voir les journaux et la configuration des volumes', href: `/dashboard/projects/${id}?tab=logs` }),
   },
   {
-    id: 'coolify-error',
+    id: 'build-infra-unavailable',
+    test: (t) =>
+      /Server is not functional/i.test(t) ||
+      (/Illuminate\\Queue\\ManuallyFailedException/i.test(t) && /deployment failed|Server is not functional/i.test(t)),
+    cause:
+      "Le serveur de build ou d’hébergement ne répond pas correctement. La version en ligne n’a pas été modifiée. Réessayez le déploiement ; si le problème persiste, vérifiez l’état de l’hébergement.",
+    action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
+  },
+  {
+    id: 'hosting-platform-error',
     test: (t) =>
       /\bCoolify\b/i.test(t) && /\b(erreur|impossible|refus|indisponible|échou|timeout)\b/i.test(t),
-    cause: "L'hébergement (Coolify) a signalé une erreur pendant le déploiement.",
+    cause: "La plateforme d'hébergement a signalé une erreur pendant le déploiement.",
     action: (id) => ({ label: 'Voir les journaux', href: `/dashboard/projects/${id}?tab=logs` }),
   },
   {
@@ -313,6 +338,21 @@ const RULES: Rule[] = [
   },
 ]
 
+function extractComposeMissingEnvVars(text: string): string[] {
+  const found = new Set<string>()
+  const patterns = [
+    /required variable\s+([A-Z][A-Z0-9_]*)\s+is missing a value/gi,
+    /interpolating\s+[^\n:]*?\.([A-Z][A-Z0-9_]*)\s*:[^\n]*?variable\s+([A-Z][A-Z0-9_]*)\s+is missing a value/gi,
+  ]
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      const name = match[2] ?? match[1]
+      if (name) found.add(name)
+    }
+  }
+  return [...found]
+}
+
 /** Retourne un diagnostic uniquement si un motif reconnu est présent. */
 export function diagnoseFailure(input: { status: string; logs?: string | null; projectId: string }): Diagnosis | null {
   if (input.status !== 'failed') return null
@@ -320,7 +360,10 @@ export function diagnoseFailure(input: { status: string; logs?: string | null; p
   if (!text.trim()) return null
   for (const rule of RULES) {
     try {
-      if (rule.test(text)) return { cause: rule.cause, action: rule.action(input.projectId) }
+      if (rule.test(text)) {
+        const cause = typeof rule.cause === 'function' ? rule.cause(text) : rule.cause
+        return { cause, action: rule.action(input.projectId) }
+      }
     } catch {
       // Un motif défectueux ne doit jamais casser l'affichage.
     }

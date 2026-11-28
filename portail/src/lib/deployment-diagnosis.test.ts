@@ -20,6 +20,38 @@ describe('deployment-diagnosis', () => {
     })
   })
 
+  it('détecte les variables manquantes d’un Compose avec un diagnostic prescriptif', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: [
+        'error while interpolating services.api.environment.AURA_API_TOKEN: required variable AURA_API_TOKEN is missing a value: AURA_API_TOKEN est requis',
+        'error while interpolating services.api.environment.AURA_API_URL: required variable AURA_API_URL is missing a value: AURA_API_URL est requis',
+        'error while interpolating services.api.environment.JWT_SECRET: required variable JWT_SECRET is missing a value: JWT_SECRET est requis (32 caractères minimum)',
+        'error while interpolating services.worker.environment.AURA_API_TOKEN: required variable AURA_API_TOKEN is missing a value: AURA_API_TOKEN est requis',
+      ].join('\n'),
+      projectId: 'p1',
+    })
+    expect(d).not.toBeNull()
+    expect(d?.cause).toContain('AURA_API_TOKEN')
+    expect(d?.cause).toContain('AURA_API_URL')
+    expect(d?.cause).toContain('JWT_SECRET')
+    expect(d?.cause).toContain('version en ligne n’a pas été modifiée')
+    expect(d?.action).toEqual({ label: 'Ouvrir les variables', href: '/dashboard/projects/p1?tab=variables' })
+  })
+
+  it('détecte une indisponibilité du serveur de build/hébergement', () => {
+    const d = diagnoseFailure({
+      status: 'failed',
+      logs: 'Server is not functional.\nError type: Illuminate\\Queue\\ManuallyFailedException',
+      projectId: 'p1',
+    })
+    expect(d).toEqual({
+      cause:
+        "Le serveur de build ou d’hébergement ne répond pas correctement. La version en ligne n’a pas été modifiée. Réessayez le déploiement ; si le problème persiste, vérifiez l’état de l’hébergement.",
+      action: { label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' },
+    })
+  })
+
   it('détecte un problème de port', () => {
     const d = diagnoseFailure({ status: 'failed', logs: 'No open ports detected', projectId: 'p1' })
     expect(d).toEqual({
@@ -494,13 +526,16 @@ npm ERR! network request to https://registry.npmjs.org/react/-/react-18.3.1.tgz 
     expect(d?.cause).toContain('volumes persistants')
   })
 
-  it('détecte une erreur remontée par Coolify', () => {
+  it('détecte une erreur remontée par la plateforme d’hébergement', () => {
     const d = diagnoseFailure({
       status: 'failed',
       logs: 'Coolify: impossible de démarrer le conteneur (erreur serveur).',
       projectId: 'p1',
     })
-    expect(d?.cause).toContain('Coolify')
+    expect(d).toEqual({
+      cause: "La plateforme d'hébergement a signalé une erreur pendant le déploiement.",
+      action: { label: 'Voir les journaux', href: '/dashboard/projects/p1?tab=logs' },
+    })
   })
 
   it('détecte un montage de cache BuildKit impossible sur tsconfig.tsbuildinfo', () => {

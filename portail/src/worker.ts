@@ -268,7 +268,7 @@ export async function processDeployment(
   if (deployment.coolifyBuildId) {
     await appendLogs(
       deploymentId,
-      `[reprise] Build Coolify déjà associé (${deployment.coolifyBuildId}) : reprise du suivi sans nouveau déclenchement.`,
+      `[reprise] Build d’hébergement déjà associé (${deployment.coolifyBuildId}) : reprise du suivi sans nouveau déclenchement.`,
     )
     console.info(
       `[eflex/worker] déploiement ${deploymentId} : suivi du build existant ${deployment.coolifyBuildId}.`,
@@ -427,7 +427,7 @@ export async function processDeployment(
   if (kind === 'multiple-without-compose') {
     const persistence =
       artifacts.persistentVolumes.length > 0
-        ? ` Persistance déclarée (${artifacts.persistentVolumes.map((volume) => volume.mountPath).join(', ')}) non appliquée : aucun stockage Coolify n’est créé tant que le déploiement est refusé. ` +
+        ? ` Persistance déclarée (${artifacts.persistentVolumes.map((volume) => volume.mountPath).join(', ')}) non appliquée : aucun stockage d’hébergement n’est créé tant que le déploiement est refusé. ` +
           'Pour conserver ces données, ajoutez un fichier compose (D1) qui déclare les volumes partagés entre services (par exemple `storage` pour Laravel).'
         : ''
     await fail(
@@ -635,7 +635,7 @@ export async function processDeployment(
   ) {
     await appendLogs(
       deploymentId,
-      '[compose] mapping de domaine Coolify indisponible pour cette application existante ; ' +
+      '[compose] mapping de domaine de l’hébergement indisponible pour cette application existante ; ' +
         'le routage repose sur les labels Traefik déclarés dans le compose.',
     )
     updated = await updateApplication(appId, {
@@ -655,7 +655,7 @@ export async function processDeployment(
   if (composeSource) {
     await appendLogs(
       deploymentId,
-      '[volumes] les volumes sont déclarés dans le compose du dépôt : aucun stockage Coolify n’est créé.',
+      '[volumes] les volumes sont déclarés dans le compose du dépôt : aucun stockage d’hébergement n’est créé.',
     )
     if (artifacts.postDeploy.length > 0) {
       await appendLogs(
