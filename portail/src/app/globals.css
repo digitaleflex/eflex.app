@@ -38,7 +38,7 @@
     --destructive-foreground: 0 0% 100%;
     --success: 142 72% 26%; /* ≥ 4,5:1 en bouton (texte blanc) et en texte sur teinte à 10 % */
     --success-foreground: 0 0% 100%;
-    --warning: 32 95% 30%;
+    --warning: 38 92% 34%;
     --warning-foreground: 0 0% 100%;
     --warning-surface: 45 93% 94%; /* bandeau d'avertissement OPAQUE (collant) */
     /* Information : bleu-cyan distinct du bleu royal d'action. */
@@ -391,7 +391,7 @@
     --destructive-foreground: 0 0% 100%;
     --success: 142 72% 26%;
     --success-foreground: 0 0% 100%;
-    --warning: 32 95% 30%;
+    --warning: 38 92% 34%;
     --warning-foreground: 0 0% 100%;
     --warning-surface: 45 93% 94%; /* bandeau d'avertissement OPAQUE (collant) */
     --info: 199 89% 32%;
