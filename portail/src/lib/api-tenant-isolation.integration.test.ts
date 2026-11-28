@@ -126,6 +126,7 @@ const ROUTE_MANIFEST: Record<string, RouteClass> = {
   '/admin/monitoring': 'admin',
   '/projects/[id]/app-config': 'org-project',
   '/projects/[id]/coolify-deployments': 'org-project',
+  '/projects/[id]/hosting-deployments': 'org-project',
   '/projects/[id]/coolify-services': 'org-project',
   '/projects/[id]/coolify-services/[serviceId]': 'org-project',
   '/projects/[id]/coolify-services/[serviceId]/action': 'org-project',
