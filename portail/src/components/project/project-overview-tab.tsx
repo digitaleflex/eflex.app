@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import {
   Activity,
+  ArrowUpRight,
   ExternalLink,
   GitBranch,
   GitCommitHorizontal,
@@ -19,6 +20,7 @@ import { ProjectMetrics } from '@/components/project-metrics'
 import { ProjectRuntimeHealth } from '@/components/project/project-runtime-health'
 import { SiteMonitoringPanel } from '@/components/project/site-monitoring'
 import { confidenceLevel, frameworkLabel, runtimeLabel } from '@/lib/frameworks'
+import type { NextProjectAction } from '@/lib/project-actions'
 import { projectTabHref } from '@/lib/project-tabs'
 import { relativeTime } from '@/lib/relative-time'
 import { cn } from '@/lib/utils'
@@ -60,6 +62,7 @@ export function ProjectOverviewTab({
   analysis,
   certificateHealth,
   metricsApps,
+  nextAction,
 }: {
   projectId: string
   branch: string
@@ -78,6 +81,7 @@ export function ProjectOverviewTab({
   analysis: StoredAnalysis | null
   certificateHealth: HealthInfo
   metricsApps: { id: string; name: string }[]
+  nextAction?: NextProjectAction | null
 }) {
   const deploymentsHref = projectTabHref(projectId, 'deployments')
 
@@ -135,6 +139,22 @@ export function ProjectOverviewTab({
                         Configurer
                       </Link>
                     </>
+                  )}
+                </p>
+              )}
+              {nextAction && nextAction.kind !== 'visit' && (
+                <p className="mt-4 inline-flex max-w-full items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs text-white/85">
+                  <span className="font-medium text-white">Prochaine étape :</span>
+                  {nextAction.href ? (
+                    <Link
+                      href={nextAction.href}
+                      className="inline-flex items-center gap-1 underline underline-offset-2 hover:text-white"
+                    >
+                      {nextAction.label}
+                      {nextAction.external && <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />}
+                    </Link>
+                  ) : (
+                    <span>{nextAction.label}</span>
                   )}
                 </p>
               )}

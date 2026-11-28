@@ -14,7 +14,7 @@ export function RedeployButton({
   projectId,
   appId,
   variant = 'outline',
-  label = 'Redéployer',
+  label,
   srLabel,
 }: {
   projectId: string
@@ -24,6 +24,7 @@ export function RedeployButton({
   /** Contexte supplémentaire pour les lecteurs d'écran (ex. nom de l'application). */
   srLabel?: string
 }) {
+  const resolvedLabel = label ?? (appId ? 'Redéployer l’application' : 'Redéployer')
   const router = useRouter()
   const { toast } = useToast()
   const [busy, setBusy] = useState(false)
@@ -62,7 +63,7 @@ export function RedeployButton({
   return (
     <Button variant={variant} size="sm" onClick={redeploy} loading={busy}>
       <RotateCw className="h-4 w-4" aria-hidden="true" />
-      {label}
+      {resolvedLabel}
       {srLabel && <span className="sr-only"> {srLabel}</span>}
     </Button>
   )

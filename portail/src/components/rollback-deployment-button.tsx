@@ -8,10 +8,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useToast } from '@/components/ui/toast'
 
 /**
- * Retour arrière : recrée la version d'un déploiement réussi déjà en ligne
- * (route POST …/rollback). Le commit est fourni par la page ; la confirmation
- * rappelle que les variables actuelles sont réutilisées et que la base n'est
- * pas remise dans son état d'alors.
+ * Redéploie la version d'un déploiement réussi déjà en ligne (route POST …/rollback).
+ * Les variables actuelles sont réutilisées ; les migrations de base de données ne sont pas annulées.
  */
 export function RollbackDeploymentButton({
   projectId,
@@ -42,14 +40,14 @@ export function RollbackDeploymentButton({
       const data = (await response.json().catch(() => ({}))) as { error?: string }
       if (!response.ok) {
         toast({
-          title: 'Retour arrière impossible',
+          title: 'Redéploiement impossible',
           description: data.error ?? 'Réessayez dans un instant.',
           variant: 'error',
         })
         return
       }
       toast({
-        title: 'Retour arrière lancé',
+        title: 'Redéploiement lancé',
         description: `La version ${shortSha} est en cours de reconstruction. Suivez sa progression dans les journaux du déploiement.`,
         variant: 'success',
       })
@@ -81,17 +79,16 @@ export function RollbackDeploymentButton({
       </Button>
       <ConfirmDialog
         open={open}
-        title="Revenir à cette version ?"
+        title="Redéployer cette version ?"
         description={
           <>
             La version <code className="font-mono">{shortSha}</code> du {createdAtLabel} sera
-            reconstruite et remise en ligne à la place de la version actuelle. Les variables
-            d’environnement actuelles seront utilisées et les migrations de base de données ne sont
-            pas annulées.
+            reconstruite et remise en ligne. Les variables d’environnement actuelles seront
+            utilisées et les migrations de base de données ne sont pas annulées.
           </>
         }
         confirmLabel="Redéployer cette version"
-        cancelLabel="Conserver la version actuelle"
+        cancelLabel="Annuler"
         onConfirm={rollback}
         onCancel={() => setOpen(false)}
       />

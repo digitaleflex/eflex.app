@@ -12,7 +12,24 @@ export const PROJECT_TABS = [
 
 export type ProjectTab = (typeof PROJECT_TABS)[number]['id']
 
+/** Onglets principaux, affichés en premier dans la navigation. */
+export const PROJECT_MAIN_TABS = PROJECT_TABS.filter(
+  (tab): tab is (typeof PROJECT_TABS)[number] & { id: 'overview' | 'deployments' | 'logs' | 'variables' } =>
+    ['overview', 'deployments', 'logs', 'variables'].includes(tab.id),
+)
+
+/** Onglets avancés, regroupés sous une entrée dédiée. */
+export const PROJECT_ADVANCED_TABS = PROJECT_TABS.filter(
+  (tab): tab is (typeof PROJECT_TABS)[number] & { id: 'previews' | 'tasks' | 'analytics' } =>
+    ['previews', 'tasks', 'analytics'].includes(tab.id),
+)
+
 const PROJECT_TAB_IDS = new Set<string>(PROJECT_TABS.map((tab) => tab.id))
+const PROJECT_ADVANCED_TAB_IDS = new Set<string>(PROJECT_ADVANCED_TABS.map((tab) => tab.id))
+
+export function isProjectAdvancedTab(tab: ProjectTab): boolean {
+  return PROJECT_ADVANCED_TAB_IDS.has(tab)
+}
 
 /** Résout l'onglet demandé : valeur invalide ou absente => `overview`. */
 export function resolveProjectTab(value: string | null | undefined): ProjectTab {

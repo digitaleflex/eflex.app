@@ -309,51 +309,6 @@ export default function LoginPage() {
           </div>
         ) : (
           <div className="space-y-5">
-            {!(showCode && codeStep === 'code') && (config?.githubEnabled || config?.googleEnabled || passkeySupported) && (
-              <div className="space-y-3">
-                {config?.githubEnabled && (
-                  <OAuthButton
-                    provider="github"
-                    primary
-                    lastUsed={lastMethod === 'github'}
-                    disabled={loading}
-                    onError={providerFailed}
-                  />
-                )}
-                {config?.googleEnabled && (
-                  <OAuthButton
-                    provider="google"
-                    primary={!config.githubEnabled}
-                    lastUsed={lastMethod === 'google'}
-                    disabled={loading}
-                    onError={providerFailed}
-                  />
-                )}
-                {passkeySupported && (
-                  <div className="relative">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="lg"
-                      className="w-full justify-center gap-3 font-medium"
-                      onClick={() => void handlePasskey()}
-                      loading={passkeyLoading}
-                      disabled={loading}
-                    >
-                      <Fingerprint className="h-5 w-5" aria-hidden="true" />
-                      Se connecter avec une passkey
-                    </Button>
-                    {lastMethod === 'passkey' && (
-                      <span className="pointer-events-none absolute -top-2.5 right-3 rounded-full border border-primary/25 bg-background px-2 py-0.5 text-xs font-semibold text-primary">
-                        Dernière utilisée
-                      </span>
-                    )}
-                  </div>
-                )}
-                <AuthDivider label="ou par e-mail" />
-              </div>
-            )}
-
             {formError && (
               <FormAlert ref={alertRef} id="login-error">
                 {formError}
@@ -361,17 +316,63 @@ export default function LoginPage() {
             )}
 
             {showCode ? (
-              <EmailCodeForm
-                initialEmail={email.value}
-                onSuccess={finish}
-                onStepChange={setCodeStep}
-                onUsePassword={(address) => {
-                  email.change(address)
-                  setMode('password')
-                  requestAnimationFrame(() => (address ? passphraseRef : emailRef).current?.focus())
-                }}
-                disabled={loading}
-              />
+              <>
+                <EmailCodeForm
+                  initialEmail={email.value}
+                  onSuccess={finish}
+                  onStepChange={setCodeStep}
+                  onUsePassword={(address) => {
+                    email.change(address)
+                    setMode('password')
+                    setFormError('')
+                    requestAnimationFrame(() => (address ? passphraseRef : emailRef).current?.focus())
+                  }}
+                  disabled={loading}
+                />
+
+                {codeStep !== 'code' && (config?.githubEnabled || config?.googleEnabled || passkeySupported) && (
+                  <section aria-label="Autres moyens de connexion" className="space-y-3">
+                    <AuthDivider label="Autres moyens de connexion" />
+                    {config?.githubEnabled && (
+                      <OAuthButton
+                        provider="github"
+                        lastUsed={lastMethod === 'github'}
+                        disabled={loading}
+                        onError={providerFailed}
+                      />
+                    )}
+                    {config?.googleEnabled && (
+                      <OAuthButton
+                        provider="google"
+                        lastUsed={lastMethod === 'google'}
+                        disabled={loading}
+                        onError={providerFailed}
+                      />
+                    )}
+                    {passkeySupported && (
+                      <div className="relative">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="md"
+                          className="w-full justify-center gap-2 text-muted-foreground hover:text-foreground"
+                          onClick={() => void handlePasskey()}
+                          loading={passkeyLoading}
+                          disabled={loading}
+                        >
+                          <Fingerprint className="h-4 w-4" aria-hidden="true" />
+                          Se connecter avec une passkey
+                        </Button>
+                        {lastMethod === 'passkey' && (
+                          <span className="pointer-events-none absolute -top-2.5 right-3 rounded-full border border-primary/25 bg-background px-2 py-0.5 text-xs font-semibold text-primary">
+                            Dernière utilisée
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </section>
+                )}
+              </>
             ) : (
               <>
                 <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -448,14 +449,57 @@ export default function LoginPage() {
                     </button>
                   </p>
                 )}
-              </>
-            )}
 
-            {!showCode && !codeEnabled && (
-              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
-                Connexion sécurisée
-              </p>
+                {(config?.githubEnabled || config?.googleEnabled || passkeySupported) && (
+                  <section aria-label="Autres moyens de connexion" className="space-y-3">
+                    <AuthDivider label="Autres moyens de connexion" />
+                    {config?.githubEnabled && (
+                      <OAuthButton
+                        provider="github"
+                        lastUsed={lastMethod === 'github'}
+                        disabled={loading}
+                        onError={providerFailed}
+                      />
+                    )}
+                    {config?.googleEnabled && (
+                      <OAuthButton
+                        provider="google"
+                        lastUsed={lastMethod === 'google'}
+                        disabled={loading}
+                        onError={providerFailed}
+                      />
+                    )}
+                    {passkeySupported && (
+                      <div className="relative">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="md"
+                          className="w-full justify-center gap-2 text-muted-foreground hover:text-foreground"
+                          onClick={() => void handlePasskey()}
+                          loading={passkeyLoading}
+                          disabled={loading}
+                        >
+                          <Fingerprint className="h-4 w-4" aria-hidden="true" />
+                          Se connecter avec une passkey
+                        </Button>
+                        {lastMethod === 'passkey' && (
+                          <span className="pointer-events-none absolute -top-2.5 right-3 rounded-full border border-primary/25 bg-background px-2 py-0.5 text-xs font-semibold text-primary">
+                            Dernière utilisée
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </section>
+                )}
+
+                {!codeEnabled && (
+                  <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                    <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
+                    Connexion sécurisée
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}

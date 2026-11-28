@@ -275,28 +275,35 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           {primaryAction && <PrimaryAction action={primaryAction} projectId={project.id} multiApp={multiApp} />}
-          {canManage && situation === 'failed' && <RedeployButton projectId={project.id} label={multiApp ? 'Tout redéployer' : 'Redéployer'} />}
-          {canManage && situation === 'live' && primaryAction?.kind === 'visit' && <RedeployButton projectId={project.id} label={multiApp ? 'Tout redéployer' : 'Redéployer'} />}
-          {canManage && last && statusInfo(last.status).inProgress && (
+          {canManage && last && statusInfo(last.status).inProgress ? (
             <CancelDeploymentButton projectId={project.id} deploymentId={last.id} />
-          )}
-          {!primaryImage && (
-            <a href={project.repoUrl} target="_blank" rel="noopener noreferrer" className={ghostLinkClass}>
-              <GithubMark className="h-4 w-4" />
-              Dépôt<span className="sr-only"> (nouvel onglet)</span>
-            </a>
-          )}
-          <Link href={`/dashboard/projects/${project.id}/report`} className={ghostLinkClass}>
-            Rapport
-          </Link>
-          {canManage && (
+          ) : canManage && (situation === 'failed' || (situation === 'live' && primaryAction?.kind === 'visit')) ? (
+            <RedeployButton projectId={project.id} label={multiApp ? 'Tout redéployer' : 'Redéployer'} />
+          ) : canManage ? (
             <Link href={`/dashboard/projects/${project.id}/settings`} className={secondaryLinkClass}>
               <Settings className="h-4 w-4" aria-hidden="true" />
               Paramètres
             </Link>
-          )}
+          ) : null}
+          <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+            {!primaryImage && (
+              <a href={project.repoUrl} target="_blank" rel="noopener noreferrer" className={ghostLinkClass}>
+                <GithubMark className="h-4 w-4" />
+                Dépôt<span className="sr-only"> (nouvel onglet)</span>
+              </a>
+            )}
+            <Link href={`/dashboard/projects/${project.id}/report`} className={ghostLinkClass}>
+              Rapport
+            </Link>
+            {canManage && ((last && statusInfo(last.status).inProgress) || situation === 'failed' || (situation === 'live' && primaryAction?.kind === 'visit')) && (
+              <Link href={`/dashboard/projects/${project.id}/settings`} className={ghostLinkClass}>
+                <Settings className="h-4 w-4" aria-hidden="true" />
+                Paramètres
+              </Link>
+            )}
+          </div>
         </div>
       </header>
 
@@ -366,6 +373,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           analysis={analysis}
           certificateHealth={certificateHealth}
           metricsApps={metricsApps}
+          nextAction={primaryAction}
         />
       )}
 
