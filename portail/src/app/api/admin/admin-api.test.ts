@@ -52,6 +52,12 @@ run('API d’administration', () => {
 
   beforeAll(async () => {
     admin = await account('Admin', adminEmail, true)
+    // Le bootstrap ADMIN_EMAILS ne promeut que s'il n'existe aucun super_admin.
+    // En CI/tests parallèles, un autre fichier peut en avoir créé un : on force
+    // le rôle pour garder ce test déterministe (il ne teste pas le bootstrap).
+    const { prisma } = await import('@/lib/prisma')
+    await prisma.user.update({ where: { id: admin.id }, data: { role: 'super_admin' } })
+    ;(admin.session as { user: { role: string } }).user.role = 'super_admin'
     victim = await account('Victime', `victime-${stamp}@exemple.fr`)
     regular = await account('Simple', `simple-${stamp}@exemple.fr`)
   })
