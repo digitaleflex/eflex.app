@@ -361,32 +361,39 @@ export default function NewProjectPage() {
                 resetAnalysis()
               }}
             />
-            <VercelImport
-              disabled={analyzing}
-              onPrefill={(prefill) => {
-                resetAnalysis()
-                if (prefill.repoUrl) setRepoUrl(prefill.repoUrl)
-                if (prefill.branch) setBranch(prefill.branch)
-                if (!nameEdited && prefill.name) setName(prefill.name)
-                setInstallationId('')
-                setUsePat(false)
-                const hints = [...prefill.warnings]
-                if (prefill.root) {
-                  hints.unshift(
-                    `Dossier racine indiqué sur Vercel : « ${prefill.root} ». Vérifiez et sélectionnez le bon dossier après l'analyse si nécessaire.`,
-                  )
-                }
-                if (prefill.framework) {
-                  hints.push(
-                    `Framework déclaré sur Vercel : ${prefill.framework}. EFLEX le détectera depuis le dépôt lors de l'analyse.`,
-                  )
-                }
-                if (prefill.envRows && prefill.envRows.length > 0) {
-                  setEnvVars((current) => mergeEnvRows(current, prefill.envRows!))
-                }
-                setImportHints(hints)
-              }}
-            />
+            <details className="rounded-lg border border-border bg-muted/20">
+              <summary className="cursor-pointer list-none px-3 py-2.5 text-sm font-medium text-foreground [&::-webkit-details-marker]:hidden">
+                Importer depuis Vercel <span className="font-normal text-muted-foreground">(optionnel)</span>
+              </summary>
+              <div className="border-t border-border p-3">
+                <VercelImport
+                  disabled={analyzing}
+                  onPrefill={(prefill) => {
+                    resetAnalysis()
+                    if (prefill.repoUrl) setRepoUrl(prefill.repoUrl)
+                    if (prefill.branch) setBranch(prefill.branch)
+                    if (!nameEdited && prefill.name) setName(prefill.name)
+                    setInstallationId('')
+                    setUsePat(false)
+                    const hints = [...prefill.warnings]
+                    if (prefill.root) {
+                      hints.unshift(
+                        `Dossier racine indiqué sur Vercel : « ${prefill.root} ». Vérifiez et sélectionnez le bon dossier après l'analyse si nécessaire.`,
+                      )
+                    }
+                    if (prefill.framework) {
+                      hints.push(
+                        `Framework déclaré sur Vercel : ${prefill.framework}. EFLEX le détectera depuis le dépôt lors de l'analyse.`,
+                      )
+                    }
+                    if (prefill.envRows && prefill.envRows.length > 0) {
+                      setEnvVars((current) => mergeEnvRows(current, prefill.envRows!))
+                    }
+                    setImportHints(hints)
+                  }}
+                />
+              </div>
+            </details>
             <Input
               id="repo"
               label="Adresse du dépôt GitHub"
