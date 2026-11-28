@@ -126,6 +126,32 @@ Pour obtenir `DEPLOY_HOST_KEY` :
 ssh-keyscan -t ed25519 VOTRE_HOST
 ```
 
+## Étape 4 bis — Autoriser GitHub Actions dans le pare-feu
+
+Le serveur ferme son port SSH (22) à Internet : `ufw` ne l'autorise que depuis
+Tailscale (`100.64.0.0/10`). Le runner GitHub-hosté arrive depuis Internet, il
+faut donc autoriser **uniquement les plages d'IP des runners GitHub Actions**,
+sans ouvrir le port au monde entier.
+
+```bash
+sudo apt-get install -y ipset iptables-persistent
+sudo bash scripts/update-github-actions-ssh.sh
+```
+
+Ce que fait le script :
+
+- récupère les plages officielles (`https://api.github.com/meta`, clé `actions`) ;
+- les charge dans un ensemble `ipset` `gh-actions` (+ `gh-actions-v6`) ;
+- insère une règle `iptables` qui accepte le port 22 depuis cet ensemble ;
+- sauvegarde l'ensemble dans `/etc/ipset.conf` et les règles via
+  `netfilter-persistent`.
+
+Persistance au redémarrage : le plugin
+`/usr/share/netfilter-persistent/plugins.d/10-ipset` recharge l'ipset avant les
+règles iptables. Mise à jour quotidienne : `/etc/cron.d/eflex-github-actions-ssh`
+(03:17). Si GitHub change ses plages et que le déploiement échoue en
+`Connection timed out`, relancer le script à la main.
+
 ## Étape 5 — Vérification
 
 1. Pousser un commit sur `main`, ou lancer manuellement depuis l'onglet
