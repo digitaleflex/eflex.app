@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { STATUS_LABELS, isDeploymentStatus } from '@/lib/deployment-state'
+import { neutralizeHostingBrand } from '@/lib/log-lines'
 import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { requireDeploymentById, requireOrg, tenantNotFound } from '@/lib/tenant'
 
@@ -31,19 +32,19 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     id: true,
     status: true,
     commitSha: true,
-    coolifyBuildId: true,
     logsSummary: true,
     createdAt: true,
   })
   if ('response' in result) return result.response
   const deployment = result.deployment
 
-  const rest = deployment
+  const { logsSummary, ...rest } = deployment
   return NextResponse.json(
     {
       deployment: {
         ...rest,
         label: isDeploymentStatus(rest.status) ? STATUS_LABELS[rest.status] : rest.status,
+        logsSummary: logsSummary ? neutralizeHostingBrand(logsSummary) : logsSummary,
         createdAt: rest.createdAt.toISOString(),
       },
     },

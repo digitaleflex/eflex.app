@@ -1,5 +1,5 @@
 import { mapCoolifyStatus } from '@/lib/coolify-status'
-import { maskSecrets, parseLogs, type LogLine } from '@/lib/log-lines'
+import { parseLogs, sanitizeLogText, type LogLine } from '@/lib/log-lines'
 import { sleep, type SseSend } from '@/lib/sse'
 
 const TERMINAL = new Set(['live', 'failed'])
@@ -33,7 +33,10 @@ export type StreamInput = {
 }
 
 const toPayload = (lines: LogLine[], secrets: readonly string[]) =>
-  lines.map((l) => ({ n: l.n, text: maskSecrets(l.text, secrets), ...(l.ts ? { ts: l.ts } : {}) }))
+  lines.map((l) => {
+    const sanitized = sanitizeLogText(l.text, secrets)
+    return { n: l.n, text: sanitized.text, ...(l.ts ? { ts: l.ts } : {}) }
+  })
 
 /**
  * Diffuse les journaux d'un déploiement : uniquement les lignes nouvelles, secrets masqués,

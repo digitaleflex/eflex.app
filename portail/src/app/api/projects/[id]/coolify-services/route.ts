@@ -51,7 +51,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const cap = capabilities.byCatalogId[parsed.data.catalogId]
   if (cap && !cap.provisionable && capabilities.source === 'instance') {
     return NextResponse.json({
-      error: cap.reason ?? 'Ce type de service n’est pas supporté par l’instance Coolify.',
+      error: cap.reason ?? "Ce type de service n’est pas supporté par l’instance d’hébergement.",
       capabilities,
     }, { status: 400 })
   }

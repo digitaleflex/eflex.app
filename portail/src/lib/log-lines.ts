@@ -61,13 +61,20 @@ export function truncateLogLine(
   return { text: `${text.slice(0, keep)}${suffix}`, truncated: true }
 }
 
-/** Masque les secrets connus puis tronque la ligne (ordre important : jamais de secret tronqué partiellement exposé). */
+/** Remplace les mentions de l'infrastructure sous-jacente par un terme neutre côté client. */
+export function neutralizeHostingBrand(text: string): string {
+  return text
+    .replace(/\bCoolify\b/g, "L'hébergement")
+    .replace(/\bcoolify\b/g, "l'hébergement")
+}
+
+/** Masque les secrets connus, neutralise les marques d'infra, puis tronque la ligne. */
 export function sanitizeLogText(
   text: string,
   secrets: readonly string[],
   maxLength = DEFAULT_MAX_LINE_LENGTH,
 ): { text: string; truncated: boolean; suspicious: boolean } {
-  const masked = maskSecrets(text, secrets)
+  const masked = neutralizeHostingBrand(maskSecrets(text, secrets))
   const suspicious = hasPossibleSecret(masked)
   const cut = truncateLogLine(masked, maxLength)
   return { text: cut.text, truncated: cut.truncated, suspicious }

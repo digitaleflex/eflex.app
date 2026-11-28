@@ -74,10 +74,10 @@ describe('streamDeploymentLogs', () => {
     expect(events.at(-1)).toMatchObject({ event: 'end', data: { reason: 'unavailable' } })
   })
 
-  it('sans déploiement Coolify, rejoue le résumé et termine', async () => {
+  it('sans déploiement hébergement, rejoue le résumé neutralisé et termine', async () => {
     const { events, client } = await run([], { deployment: { status: 'failed', coolifyBuildId: null, logsSummary: 'Coolify non configuré' } })
     expect(client.calls()).toBe(0)
-    expect(lines(events)).toEqual(['Coolify non configuré'])
+    expect(lines(events)).toEqual(["L'hébergement non configuré"])
     expect(events.find((e) => e.event === 'status')!.data.status).toBe('failed')
   })
 

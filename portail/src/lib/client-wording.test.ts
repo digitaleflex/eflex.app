@@ -17,6 +17,14 @@ function walk(dir: string): string[] {
   })
 }
 
+function walkAll(dir: string, ext: string): string[] {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) return walkAll(full, ext)
+    return full.endsWith(ext) ? [full] : []
+  })
+}
+
 const CLIENT_FILES = [
   ...walk(path.join(SRC, 'app/dashboard')),
   ...walk(path.join(SRC, 'components')).filter((file) => !file.includes(`${path.sep}components${path.sep}admin${path.sep}`)),
@@ -24,6 +32,12 @@ const CLIENT_FILES = [
     path.join(SRC, 'lib', name),
   ),
 ]
+
+const CLIENT_API_FILES = walkAll(path.join(SRC, 'app/api'), '.ts').filter(
+  (file) =>
+    !file.includes(`${path.sep}app${path.sep}api${path.sep}admin${path.sep}`) &&
+    !file.includes(`${path.sep}app${path.sep}api${path.sep}webhooks${path.sep}coolify${path.sep}`),
+)
 
 /** Texte hors commentaires, imports et blocs de commentaires JSX. */
 function visibleText(source: string): string {
@@ -51,6 +65,17 @@ describe('vocabulaire côté client', () => {
         .map((line, index) => ({ line, index }))
         .filter(({ line }) => pattern.test(line))
         .map(({ line }) => `${path.relative(SRC, file)} : ${line.trim().slice(0, 100)}`),
+    )
+    expect(offenders).toEqual([])
+  })
+
+  it('aucun « Coolify » dans les réponses/chaînes des routes API client', () => {
+    const pattern = FORBIDDEN[0][1]
+    const offenders = CLIENT_API_FILES.flatMap((file) =>
+      visibleText(fs.readFileSync(file, 'utf8'))
+        .split('\n')
+        .filter((line) => pattern.test(line))
+        .map((line) => `${path.relative(SRC, file)} : ${line.trim().slice(0, 120)}`),
     )
     expect(offenders).toEqual([])
   })

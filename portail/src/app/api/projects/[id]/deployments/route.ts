@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { STATUS_LABELS, isDeploymentStatus } from '@/lib/deployment-state'
+import { neutralizeHostingBrand } from '@/lib/log-lines'
 import { check, checkOrg, rateLimitedResponse } from '@/lib/rate-limit'
 import { requireOrg, requireProject, requireProjectApp, tenantNotFound } from '@/lib/tenant'
 
@@ -98,7 +99,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       app: { select: { name: true } },
       status: true,
       commitSha: true,
-      coolifyBuildId: true,
       logsSummary: true,
       createdAt: true,
     },
@@ -108,10 +108,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   return NextResponse.json(
     {
-      deployments: page.map(({ app, ...deployment }) => ({
+      deployments: page.map(({ app, logsSummary, ...deployment }) => ({
         ...deployment,
         appName: app?.name ?? null,
         label: isDeploymentStatus(deployment.status) ? STATUS_LABELS[deployment.status] : deployment.status,
+        logsSummary: logsSummary ? neutralizeHostingBrand(logsSummary) : logsSummary,
         createdAt: deployment.createdAt.toISOString(),
       })),
       nextCursor: rows.length > limit ? page[page.length - 1]!.id : null,

@@ -18,7 +18,7 @@ export function CoolifyDeploymentsPanel({ projectId, multiApp }: { projectId: st
   const load = async () => {
     setLoading(true); setError(null)
     try {
-      const res = await fetch(`/api/projects/${projectId}/coolify-deployments`, { cache: 'no-store' })
+      const res = await fetch(`/api/projects/${projectId}/hosting-deployments`, { cache: 'no-store' })
       const data = (await res.json().catch(() => ({}))) as { apps?: AppHistory[]; error?: string }
       if (!res.ok) { setError(data.error ?? 'Historique hébergement indisponible.'); setApps(null) }
       else setApps(Array.isArray(data.apps) ? data.apps : [])

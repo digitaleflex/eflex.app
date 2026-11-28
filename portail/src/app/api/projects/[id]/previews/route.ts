@@ -86,7 +86,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       forksIgnored: true,
       draftsIgnoredUntilReady: true,
       secretsNote:
-        'Les prévisualisations utilisent la configuration de l’application Coolify, y compris ses variables d’environnement. Ne les activez pas si des secrets de production sensibles ne doivent pas être exposés à du code de revue.',
+        "Les prévisualisations utilisent la configuration de l’application sur l’hébergement, y compris ses variables d’environnement. Ne les activez pas si des secrets de production sensibles ne doivent pas être exposés à du code de revue.",
     },
   })
 }

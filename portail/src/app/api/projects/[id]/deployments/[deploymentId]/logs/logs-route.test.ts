@@ -67,7 +67,7 @@ run('GET /api/projects/[id]/deployments/[deploymentId]/logs', () => {
         deployments: {
           create: [
             { commitSha: 'pending', status: 'building', coolifyBuildId: 'depabc123' },
-            { commitSha: 'pending', status: 'failed', logsSummary: 'Coolify non configuré' },
+            { commitSha: 'pending', status: 'failed', logsSummary: 'L’hébergement non configuré' },
           ],
         },
       },
@@ -119,11 +119,11 @@ run('GET /api/projects/[id]/deployments/[deploymentId]/logs', () => {
     expect(lines).toEqual(['\u001b[32mBuild terminé\u001b[0m'])
   })
 
-  it('rejoue le résumé d’un déploiement qui n’est jamais parti chez Coolify', async () => {
+  it('rejoue le résumé d’un déploiement qui n’est jamais parti chez l’hébergement', async () => {
     await asUser(owner)
     deploymentId = noCoolifyId
     const events = await readSse(await get('/x'))
-    expect(events.filter((e) => e.event === 'log').flatMap((e) => e.data.lines.map((l: { text: string }) => l.text))).toEqual(['Coolify non configuré'])
+    expect(events.filter((e) => e.event === 'log').flatMap((e) => e.data.lines.map((l: { text: string }) => l.text))).toEqual(['L’hébergement non configuré'])
     expect(events.find((e) => e.event === 'status')!.data.status).toBe('failed')
   })
 })
