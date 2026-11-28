@@ -73,6 +73,7 @@ export function ProjectsExplorer({
     [projects, query, filter, sort],
   )
   const filtered = query.trim() !== '' || filter !== 'all'
+  const showControls = projects.length > 4 || filtered
 
   return (
     <section aria-labelledby="projects-title" className="space-y-3">
@@ -80,79 +81,90 @@ export function ProjectsExplorer({
 
       <div className="space-y-2">
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <div className="relative min-w-0 sm:min-w-[12rem] sm:flex-[1_1_16rem]">
-            <label htmlFor={searchId} className="sr-only">Rechercher un projet</label>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <input
-              id={searchId}
-              ref={searchRef}
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Rechercher un projet…"
-              aria-keyshortcuts="/"
-              className="h-10 w-full rounded-lg border border-input bg-card pl-9 pr-9 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11"
-            />
-            <kbd
-              aria-hidden="true"
-              className="pointer-events-none absolute right-2.5 top-1/2 hidden h-5 -translate-y-1/2 items-center rounded-md border border-border bg-muted px-1.5 font-mono text-xs text-muted-foreground [@media(pointer:fine)]:inline-flex"
-            >
-              /
-            </kbd>
-          </div>
+          {showControls ? (
+            <div className="relative min-w-0 sm:min-w-[12rem] sm:flex-[1_1_16rem]">
+              <label htmlFor={searchId} className="sr-only">Rechercher un projet</label>
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <input
+                id={searchId}
+                ref={searchRef}
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Rechercher un projet…"
+                aria-keyshortcuts="/"
+                className="h-10 w-full rounded-lg border border-input bg-card pl-9 pr-9 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11"
+              />
+              <kbd
+                aria-hidden="true"
+                className="pointer-events-none absolute right-2.5 top-1/2 hidden h-5 -translate-y-1/2 items-center rounded-md border border-border bg-muted px-1.5 font-mono text-xs text-muted-foreground [@media(pointer:fine)]:inline-flex"
+              >
+                /
+              </kbd>
+            </div>
+          ) : (
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-muted-foreground">
+                {countLabel(projects.length)} dans votre espace
+              </p>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Sur mobile, la barre de filtres défile horizontalement au lieu de déborder. */}
-            <div
-              role="group"
-              aria-label="Filtrer par statut"
-              className="flex min-w-0 max-w-full overflow-x-auto rounded-lg border border-border bg-card p-0.5 [scrollbar-width:none]"
-            >
-              {PROJECT_FILTERS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-pressed={filter === item.id}
-                  onClick={() => setFilter(item.id)}
-                  className={cn(
-                    'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11',
-                    filter === item.id ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
-                  )}
+            {showControls && (
+              <>
+                <div
+                  role="group"
+                  aria-label="Filtrer par statut"
+                  className="flex min-w-0 max-w-full overflow-x-auto rounded-lg border border-border bg-card p-0.5 [scrollbar-width:none]"
                 >
-                  {item.label}
-                  <span className={cn('tabular-nums', filter === item.id ? 'text-background/70' : 'text-muted-foreground/80')}>
-                    {counts[item.id]}
-                  </span>
-                </button>
-              ))}
-            </div>
+                  {PROJECT_FILTERS.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      aria-pressed={filter === item.id}
+                      onClick={() => setFilter(item.id)}
+                      className={cn(
+                        'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11',
+                        filter === item.id ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {item.label}
+                      <span className={cn('tabular-nums', filter === item.id ? 'text-background/70' : 'text-muted-foreground/80')}>
+                        {counts[item.id]}
+                      </span>
+                    </button>
+                  ))}
+                </div>
 
-            <label htmlFor={sortId} className="sr-only">Trier les projets</label>
-            <select
-              id={sortId}
-              value={sort}
-              onChange={(e) => setSort(e.target.value as ProjectSort)}
-              className="h-9 rounded-lg border border-border bg-card px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11"
-            >
-              {PROJECT_SORTS.map((item) => (
-                <option key={item.id} value={item.id}>{item.label}</option>
-              ))}
-            </select>
-
-            <div role="group" aria-label="Affichage" className="flex rounded-lg border border-border bg-card p-0.5">
-              {([['grid', LayoutGrid, 'Grille'], ['list', List, 'Tableau']] as const).map(([value, Icon, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={view === value}
-                  onClick={() => chooseView(value)}
-                  className={cn('flex h-8 w-8 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11', view === value ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}
+                <label htmlFor={sortId} className="sr-only">Trier les projets</label>
+                <select
+                  id={sortId}
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as ProjectSort)}
+                  className="h-9 rounded-lg border border-border bg-card px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11"
                 >
-                  <Icon className="h-4 w-4" aria-hidden="true" />
-                  <span className="sr-only">{label}</span>
-                </button>
-              ))}
-            </div>
+                  {PROJECT_SORTS.map((item) => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+
+                <div role="group" aria-label="Affichage" className="flex rounded-lg border border-border bg-card p-0.5">
+                  {([['grid', LayoutGrid, 'Grille'], ['list', List, 'Tableau']] as const).map(([value, Icon, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      aria-pressed={view === value}
+                      onClick={() => chooseView(value)}
+                      className={cn('flex h-8 w-8 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11', view === value ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}
+                    >
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                      <span className="sr-only">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
             {canManage && (
               <Link
@@ -166,13 +178,15 @@ export function ProjectsExplorer({
           </div>
         </div>
 
-        <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
-          <span className="tabular-nums">
-            {filtered ? `${countLabel(visible.length)} sur ${projects.length}` : countLabel(visible.length)}
-          </span>
-          {' · '}
-          {PROJECT_SORT_HINTS[sort]}
-        </p>
+        {showControls && (
+          <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
+            <span className="tabular-nums">
+              {filtered ? `${countLabel(visible.length)} sur ${projects.length}` : countLabel(visible.length)}
+            </span>
+            {' · '}
+            {PROJECT_SORT_HINTS[sort]}
+          </p>
+        )}
       </div>
 
       {projects.length === 0 ? (
