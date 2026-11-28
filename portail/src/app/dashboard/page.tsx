@@ -9,7 +9,6 @@ import { LiveRefresh } from '@/components/live-refresh'
 import { ActivityFeed, AttentionList, OverviewStrip, RecentPreviews } from '@/components/dashboard/overview'
 import { DashboardOnboarding } from '@/components/dashboard/onboarding'
 import { NextStepsCard } from '@/components/dashboard/next-steps-card'
-import { UsageTile } from '@/components/dashboard/usage-tile'
 import { ProjectsExplorer } from '@/components/dashboard/projects-explorer'
 
 export const metadata = { title: 'Projets' }
@@ -98,9 +97,7 @@ export default async function DashboardPage() {
             </aside>
           </div>
 
-          {/* L'action principale (les projets) vient avant l'aide à la mise en route et le résumé d'usage. */}
           {nextSteps.length > 0 && <NextStepsCard steps={nextSteps} />}
-          <UsageTile />
         </>
       ) : (
         <DashboardOnboarding organizationName={organizationName} canManage={canManage} />

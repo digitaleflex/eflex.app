@@ -33,7 +33,7 @@ export function ProjectDeploymentsTab({
           <RedeployButton
             projectId={projectId}
             variant={multiApp ? 'primary' : 'outline'}
-            label={multiApp ? 'Redéployer toutes les applications' : 'Nouveau déploiement'}
+            label={multiApp ? 'Redéployer toutes les applications' : 'Redéployer'}
           />
         ) : undefined
       }
