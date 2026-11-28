@@ -98,6 +98,7 @@ Détails : [deployment operations](docs/operations/deployments.md), [monorepos e
 - [Production](PROD.md)
 - [Détecteur](packages/detector/README.md)
 - [Contrat de schéma](schema/README.md)
+- [Déploiement continu (CD)](docs/operations/cd-deploy.md) — déploiement automatique du portail sur `push` vers `main` via GitHub Actions.
 - [Sauvegardes et restauration du portail](docs/operations/backups.md) — ne couvre pas automatiquement les données des applications clientes.
 - [Mesure d'audience](docs/operations/analytics.md) — analytics agrégées intégrées, avec limites de collecte documentées.
 - [Décisions d'architecture](docs/adr/README.md)

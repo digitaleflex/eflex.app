@@ -1,0 +1,62 @@
+name: Déploiement production
+
+# Déploie le portail EFLEX sur le serveur de production via SSH.
+# Le runner est GitHub-hosté (ubuntu-latest) : aucun runner auto-hébergé ne
+# tourne sur le VPS de prod. Le serveur exécute `scripts/deploy-prod.sh` via la
+# commande forcée de la clé SSH (utilisateur `deploy`).
+#
+# Installation complète : docs/operations/cd-deploy.md
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Un seul déploiement à la fois : un push pendant un déploiement en cours ne
+# part pas en parallèle (deploy-prod.sh refuse de toute façon un état divergent).
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Déployer le portail
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Commit ciblé
+        run: echo "Déploiement de ${{ github.sha }} (${{ github.ref_name }})"
+
+      - name: Installer la clé SSH et l'hôte connu
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          if [ -n "$DEPLOY_HOST_KEY" ]; then
+            printf '%s %s\n' "$DEPLOY_HOST" "$DEPLOY_HOST_KEY" >> ~/.ssh/known_hosts
+          else
+            ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          fi
+
+      - name: Déployer
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          # La commande forcée de la clé (utilisateur `deploy`) exécute
+          # `cd <checkout> && bash scripts/deploy-prod.sh` ; on n'envoie donc
+          # aucune commande, le serveur impose la sienne.
+          ssh -i ~/.ssh/deploy_key \
+              -o BatchMode=yes \
+              -o IdentitiesOnly=yes \
+              "${DEPLOY_USER}@${DEPLOY_HOST}"

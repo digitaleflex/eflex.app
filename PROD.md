@@ -59,6 +59,12 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod logs -f portail
 
 ## Mise à jour du portail
 
+Déploiement automatique sur `push` vers `main` : voir
+[`docs/operations/cd-deploy.md`](operations/cd-deploy.md) (workflow
+`.github/workflows/deploy.yml`, utilisateur SSH `deploy`).
+
+Déploiement manuel :
+
 ```bash
 bash deploy.sh
 ```
