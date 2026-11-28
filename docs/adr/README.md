@@ -32,5 +32,10 @@ Context · Decision · Consequences · Alternatives considered (when relevant) �
 | [0010](0010-deployment-engine-supersedes-orchestrator.md) | Deployment Engine supersedes generic orchestrator state machine | Accepted |
 | [0011](0011-coolify-then-axiom.md) | Coolify remains the deployment backend, behind an abstraction before Axiom | Superseded by ADR-0012 |
 | [0012](0012-eflex-production-coolify-axiom-paused.md) | E-FLEX production path: portail + Coolify ; Axiom en pause | Proposed |
+| [0013](0013-managed-database-capabilities-and-adapters.md) | Capacités et adaptateurs pour les bases managées (Coolify / EFLEX) | Proposed |
+| [0014](0014-build-plane-separe.md) | Build Plane séparé : Build Server Coolify d'abord, pipeline compose ensuite | Proposed |
+| [0015](0015-error-tracking-sentry-compatible.md) | Suivi des erreurs applicatives via endpoint compatible Sentry | Accepted |
+| [0016](0016-axiom-paused-keep-readonly.md) | Axiom maintenu gelé (lecture seule) | Accepted |
+| [0017](0017-semver-release-please.md) | SemVer strict, release-please et version globale du monorepo | Accepted |
 
 Note: the initial plan named "OpenTelemetry-based observability" for ADR-0006. The accepted ADR-0006 records structured logs + Prometheus-compatible metrics for V0.1, with OpenTelemetry tracing deferred (see ADR text).

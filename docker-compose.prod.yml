@@ -30,6 +30,8 @@ services:
       dockerfile: portail/Dockerfile
       args:
         NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
+        APP_VERSION: ${APP_VERSION:-dev}
+        GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-}
     container_name: eflex-portail
     restart: unless-stopped
     environment:

@@ -10,10 +10,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: go-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: ${{ matrix.module }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -39,7 +44,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: services/${{ matrix.module }}/go.mod
-          cache: false
+          cache-dependency-path: services/${{ matrix.module }}/go.sum
       - name: gofmt
         run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
       - run: go vet ./...

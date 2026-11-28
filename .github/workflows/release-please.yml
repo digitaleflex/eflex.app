@@ -1,0 +1,51 @@
+name: Release
+
+# Crée et maintient automatiquement une PR de release à partir des Conventional
+# Commits (SemVer strict, version globale du monorepo). Fusionner la PR de
+# release crée le tag + la GitHub Release, qui déclenche le déploiement
+# (workflow deploy.yml, événement release:published).
+#
+# Historique : les tags CalVer (v2026.11.x) sont antérieurs à ce flux.
+# bootstrap-sha dans release-please-config.json limite le premier changelog aux
+# commits postérieurs au dernier tag CalVer.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Release Please
+        id: release
+        uses: googleapis/release-please-action@a02a34c4d625f9be7cb89156071d8567266a2445 # v4.2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # Une release créée avec GITHUB_TOKEN ne déclenche pas les workflows
+      # `release: published`. On déclenche donc explicitement le déploiement.
+      - name: Déclencher le déploiement
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: gh workflow run deploy.yml -R "${{ github.repository }}" -f ref="${TAG}"

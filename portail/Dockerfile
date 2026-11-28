@@ -5,10 +5,17 @@
 ARG DATABASE_URL=postgresql://eflex:eflexpass@localhost:5432/eflex
 # Clé publique du captcha Turnstile (facultative). Inlinée par Next au build.
 ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+# Version/release injectée au build (error tracking, diagnostics).
+ARG APP_VERSION=dev
+ARG GIT_COMMIT_SHA=
 
 FROM node:24-alpine AS builder
 ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+ARG APP_VERSION=dev
+ARG GIT_COMMIT_SHA=
 ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+ENV APP_VERSION=${APP_VERSION}
+ENV GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
 # Même disposition que dans le dépôt : portail/ et packages/ côte à côte,
 # car le code importe « ../packages/detector » (alias @eflex/detector).
 WORKDIR /repo/portail
@@ -34,8 +41,12 @@ CMD ["npx", "prisma", "migrate", "deploy"]
 
 FROM node:24-alpine AS runner
 WORKDIR /app
+ARG APP_VERSION=dev
+ARG GIT_COMMIT_SHA=
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV APP_VERSION=${APP_VERSION}
+ENV GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
 
 COPY --from=builder /repo/portail/.next/standalone ./
 COPY --from=builder /repo/portail/.next/static ./.next/static

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "924759dc89b61fc3f140657b3d49b8fe2464e2ad",
+  "include-component-in-tag": false,
+  "include-v-in-tag": true,
+  "separate-pull-requests": false,
+  "pull-request-title-pattern": "chore(release): ${version}",
+  "pull-request-header": "Release automatique générée par release-please à partir de l'historique des commits (Conventional Commits). Fusionner cette PR crée le tag, la GitHub Release et déclenche le déploiement.",
+  "changelog-sections": [
+    { "type": "feat", "section": "Fonctionnalités" },
+    { "type": "fix", "section": "Corrections" },
+    { "type": "perf", "section": "Performance" },
+    { "type": "refactor", "section": "Refactoring" },
+    { "type": "docs", "section": "Documentation", "hidden": false },
+    { "type": "test", "section": "Tests", "hidden": false },
+    { "type": "build", "section": "Build" },
+    { "type": "ci", "section": "CI/CD", "hidden": false },
+    { "type": "chore", "section": "Maintenance", "hidden": false },
+    { "type": "revert", "section": "Annulations" }
+  ],
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "package-name": "eflex",
+      "changelog-path": "CHANGELOG.md",
+      "release-as": "1.0.0",
+      "bump-minor-pre-major": false,
+      "bump-patch-for-minor-pre-major": false,
+      "extra-files": [
+        "portail/package.json",
+        "packages/detector/package.json",
+        "packages/renderer/package.json"
+      ]
+    }
+  }
+}

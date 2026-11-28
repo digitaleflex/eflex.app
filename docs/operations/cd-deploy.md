@@ -2,7 +2,11 @@
 
 Ce document décrit l'installation du workflow `.github/workflows/deploy.yml`,
 qui déploie automatiquement le portail EFLEX sur le serveur de production à
-chaque `push` sur `main` (et via un bouton manuel `workflow_dispatch`).
+chaque **release publiée** (et via un bouton manuel `workflow_dispatch`).
+
+La chaîne normale est : commits Conventional Commits → release-please ouvre une
+PR de release → fusion de la PR → tag + GitHub Release → `deploy.yml` → SSH →
+`scripts/deploy-prod.sh`.
 
 ## Principe
 
@@ -168,9 +172,10 @@ règles iptables. Mise à jour quotidienne : `/etc/cron.d/eflex-github-actions-s
 - **Pas de retour arrière automatique** : si le site ne répond pas, le job est
   rouge ; revenir en arrière à la main (`git checkout <sha> && bash deploy.sh`),
   ou suivre la commande affichée dans le journal.
-- Le workflow déploie **tout** push sur `main`. Pour exiger que la CI passe
-  avant le déploiement, protéger `main` (Settings → Branches → required checks :
-  `Tests, schémas et typecheck`, `Go`, etc.) et n'autoriser la fusion que via PR.
+- Le workflow déploie sur **publication de release** (et `workflow_dispatch`).
+  Un push sur `main` ne déploie plus directement : il met à jour la PR de
+  release (release-please). Protéger `main` avec les checks requis
+  (`Tests, schémas et typecheck`, `Go`, etc.) et n'autoriser la fusion que via PR.
 - Si le repo est **public**, la clé SSH n'est jamais exposée (uniquement un
   secret côté serveur) ; aucun fork ne peut la récupérer.
 

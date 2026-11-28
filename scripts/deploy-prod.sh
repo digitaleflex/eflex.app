@@ -66,6 +66,13 @@ echo "==> 2/4 Commit à déployer"
 echo "    $(git log -1 --format='%h %s' HEAD)"
 echo "    Précédent (retour arrière) : $(git log -1 --format='%h' "$PREVIOUS")"
 
+# Version injectée dans les images (error tracking, diagnostics).
+# Priorité : tag SemVer exact sur HEAD > version package.json > SHA court.
+APP_VERSION="$(git describe --tags --exact-match HEAD 2>/dev/null || node -p "require('./package.json').version" 2>/dev/null || echo dev)"
+GIT_COMMIT_SHA="$(git rev-parse HEAD)"
+export APP_VERSION GIT_COMMIT_SHA
+echo "    Version image : ${APP_VERSION} (${GIT_COMMIT_SHA:0:12})"
+
 if [ "$DRY_RUN" -eq 1 ]; then
   echo "(--dry-run) Rien n'est déployé."
   exit 0

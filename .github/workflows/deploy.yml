@@ -5,12 +5,21 @@ name: Déploiement production
 # tourne sur le VPS de prod. Le serveur exécute `scripts/deploy-prod.sh` via la
 # commande forcée de la clé SSH (utilisateur `deploy`).
 #
+# Déclenchement :
+# - release publiée (chaîne normale : merge de la PR release-please → release → deploy)
+# - manuel (workflow_dispatch) pour un redéploiement ou un hotfix urgent
+#
 # Installation complète : docs/operations/cd-deploy.md
 
 on:
-  push:
-    branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "Ref à déployer (branche, tag ou SHA). Vide = main."
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -27,8 +36,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - name: Commit ciblé
-        run: echo "Déploiement de ${{ github.sha }} (${{ github.ref_name }})"
+      - name: Cible du déploiement
+        env:
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ github.event.release.tag_name }}
+          REF: ${{ inputs.ref }}
+          SHA: ${{ github.sha }}
+        run: |
+          echo "Événement : ${EVENT}"
+          echo "Ref       : ${REF:-main}"
+          echo "Tag       : ${TAG:-aucun}"
+          echo "SHA       : ${SHA}"
 
       - name: Installer la clé SSH et l'hôte connu
         env:
