@@ -3,22 +3,22 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useId, useRef, useState } from 'react'
-import { Menu, X } from 'lucide-react'
+import { ArrowRight, Menu, X } from 'lucide-react'
 
-import { LinkButton } from '@/components/link-button'
 import { cn } from '@/lib/utils'
 import { BrandLogo } from '@/components/brand-logo'
 
 const links = [
-  { href: '/', label: 'Accueil' },
-  { href: '/#fonctionnalites', label: 'Fonctionnalités' },
+  { href: '/#fonctionnement', label: 'Fonctionnement' },
+  { href: '/docs', label: 'Documentation' },
   { href: '/tarifs', label: 'Tarifs' },
-  { href: '/docs', label: 'Ressources' },
 ]
 
-/**
- * Navigation marketing (Zone 1) - theme clair/sombre, sticky, accessible.
- */
+function isCurrent(pathname: string, href: string) {
+  if (href.startsWith('/#')) return false
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
+
 export function SiteHeader() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
@@ -76,33 +76,35 @@ export function SiteHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/80">
+    <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/70">
       <nav
         aria-label="Navigation du site"
-        className="container flex h-16 items-center justify-between gap-3 lg:h-[4.5rem]"
+        className="container flex h-16 items-center justify-between gap-4 lg:h-[4.5rem]"
       >
         <Link
           href="/"
-          className="flex min-h-11 shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="group inline-flex min-h-11 shrink-0 items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <BrandLogo alt="EFLEX — accueil" className="h-6 w-auto sm:h-7 lg:h-8" priority />
+          <BrandLogo
+            alt="EFLEX — accueil"
+            className="h-6 w-auto transition-opacity duration-200 ease-out-expo group-hover:opacity-90 sm:h-7 lg:h-8"
+            priority
+          />
         </Link>
 
-        <ul className="hidden items-center gap-1 lg:flex">
+        <ul className="hidden items-center gap-1 rounded-full border border-border/60 bg-muted/30 p-1 lg:flex">
           {links.map((link) => {
-            const current = pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href.split('#')[0] || '___'))
-            const isAnchor = link.href.startsWith('/#')
-            const active = !isAnchor && current
+            const active = isCurrent(pathname, link.href)
             return (
               <li key={link.href}>
                 <Link
                   href={link.href}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'inline-flex min-h-11 items-center rounded-lg px-3.5 text-sm font-medium transition-colors duration-200 ease-out-expo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    'relative inline-flex min-h-10 items-center rounded-full px-4 text-sm font-medium transition-[color,background-color,box-shadow] duration-200 ease-out-expo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     active
-                      ? 'text-foreground'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
                   {link.label}
@@ -112,23 +114,26 @@ export function SiteHeader() {
           })}
         </ul>
 
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex items-center gap-2">
           <Link
             href="/login"
-            className="hidden min-h-11 items-center justify-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors duration-200 ease-out-expo hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:inline-flex"
+            className="hidden min-h-11 items-center justify-center rounded-full px-4 text-sm font-medium text-muted-foreground transition-[color,background-color] duration-200 ease-out-expo hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:inline-flex"
           >
-            Se connecter
+            Connexion
           </Link>
 
-          <LinkButton href="/register" variant="primary" size="md" className="px-3 font-semibold sm:px-4">
-            <span className="sm:hidden">Compte</span>
-            <span className="hidden sm:inline">Créer un compte</span>
-          </LinkButton>
+          <Link
+            href="/register"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-[background-color,box-shadow,transform] duration-200 ease-out-expo hover:bg-primary/90 hover:shadow-primary active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:px-5"
+          >
+            <span>Créer un compte</span>
+            <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden="true" />
+          </Link>
 
           <button
             ref={buttonRef}
             type="button"
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-foreground transition-colors duration-200 ease-out-expo hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/70 bg-background text-foreground transition-[background-color,border-color,color] duration-200 ease-out-expo hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
             aria-label={open ? 'Fermer le menu' : 'Ouvrir le menu'}
             aria-expanded={open}
             aria-controls={panelId}
@@ -143,7 +148,7 @@ export function SiteHeader() {
         <div className="fixed inset-0 z-40 lg:hidden" role="presentation">
           <button
             type="button"
-            className="absolute inset-0 bg-background/80 backdrop-blur-sm motion-reduce:transition-none"
+            className="absolute inset-0 bg-background/60 backdrop-blur-sm"
             aria-label="Fermer le menu"
             tabIndex={-1}
             onClick={closeMenu}
@@ -154,13 +159,16 @@ export function SiteHeader() {
             role="dialog"
             aria-modal="true"
             aria-label="Menu de navigation"
-            className="absolute right-0 top-0 flex h-full w-full max-w-sm flex-col border-l border-border bg-card p-4 shadow-xl motion-reduce:transition-none"
+            className="absolute inset-x-3 top-3 rounded-3xl border border-border/70 bg-card/95 p-4 shadow-xl backdrop-blur-xl"
           >
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold">Navigation</p>
+            <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Navigation</p>
+                <p className="text-xs text-muted-foreground">EFLEX</p>
+              </div>
               <button
                 type="button"
-                className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-foreground transition-colors duration-200 ease-out-expo hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/70 text-foreground transition-colors duration-200 ease-out-expo hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label="Fermer le menu"
                 onClick={closeMenu}
               >
@@ -168,38 +176,44 @@ export function SiteHeader() {
               </button>
             </div>
 
-            <ul className="mt-4 flex flex-col gap-1">
+            <ul className="mt-4 space-y-1">
               {links.map((link) => {
-                const current = pathname === link.href
+                const active = isCurrent(pathname, link.href)
                 return (
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      aria-current={current ? 'page' : undefined}
+                      aria-current={active ? 'page' : undefined}
                       onClick={closeMenu}
                       className={cn(
-                        'flex min-h-11 items-center rounded-lg px-3 text-base font-medium transition-colors duration-200 ease-out-expo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                        current ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                        'flex min-h-11 items-center justify-between rounded-2xl px-4 text-base font-medium transition-[background-color,color] duration-200 ease-out-expo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        active ? 'bg-primary/10 text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                       )}
                     >
-                      {link.label}
+                      <span>{link.label}</span>
+                      {active && <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />}
                     </Link>
                   </li>
                 )
               })}
             </ul>
 
-            <div className="mt-6 space-y-3 border-t border-border pt-4">
+            <div className="mt-4 grid gap-2 border-t border-border pt-4">
               <Link
                 href="/login"
                 onClick={closeMenu}
-                className="flex min-h-11 items-center justify-center rounded-xl border border-input px-4 text-base font-medium transition-colors duration-200 ease-out-expo hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-input px-4 text-sm font-semibold text-foreground transition-colors duration-200 ease-out-expo hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                Se connecter
+                Connexion
               </Link>
-              <LinkButton href="/register" variant="primary" size="md" className="w-full justify-center font-semibold" onClick={closeMenu}>
+              <Link
+                href="/register"
+                onClick={closeMenu}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors duration-200 ease-out-expo hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 Créer un compte
-              </LinkButton>
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
             </div>
           </div>
         </div>

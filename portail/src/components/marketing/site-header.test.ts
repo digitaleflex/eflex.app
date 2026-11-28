@@ -61,14 +61,13 @@ describe('lisibilité AA des contrôles de navigation', () => {
 
 describe('Zone 1 - navigation', () => {
   it('contient les destinations de la spec', () => {
-    for (const href of ['href="/"', '/#fonctionnalites', '/tarifs', '/docs', '/login', '/register']) {
+    for (const href of ['href="/"', '/#fonctionnement', '/docs', '/tarifs', '/login', '/register']) {
       expect(header, `lien ${href}`).toContain(href)
     }
-    expect(header).toContain('Accueil')
-    expect(header).toContain('Fonctionnalités')
+    expect(header).toContain('Fonctionnement')
+    expect(header).toContain('Documentation')
     expect(header).toContain('Tarifs')
-    expect(header).toContain('Ressources')
-    expect(header).toContain('Se connecter')
+    expect(header).toContain('Connexion')
     expect(header).toContain('Créer un compte')
   })
 
@@ -100,7 +99,8 @@ describe('Zone 1 - navigation', () => {
   })
 
   it('desktop visible dès lg, menu mobile accessible', () => {
-    expect(header).toContain('hidden items-center gap-1 lg:flex')
+    expect(header).toContain('hidden items-center gap-1 rounded-full')
+    expect(header).toContain('lg:flex')
     expect(header).toContain('aria-expanded={open}')
     expect(header).toContain('aria-controls={panelId}')
     expect((header.match(/lg:hidden/g) ?? []).length).toBeGreaterThanOrEqual(2)

@@ -4,21 +4,26 @@ import { BrandLogo } from '@/components/brand-logo'
 
 const productLinks = [
   { href: '/#fonctionnement', label: 'Fonctionnement' },
-  { href: '/#fonctionnalites', label: 'Fonctionnalités' },
+  { href: '/#capacites', label: 'Capacités' },
+  { href: '/#diagnostic', label: 'Diagnostic' },
   { href: '/#technologies', label: 'Technologies compatibles' },
+  { href: '/#questions', label: 'FAQ' },
   { href: '/tarifs', label: 'Tarification' },
 ]
 
 const resourceLinks = [
   { href: '/docs', label: 'Documentation' },
   { href: '/status', label: 'Statut des services' },
-  { href: '/login', label: 'Connexion' },
+  { href: '/contact', label: 'Contact' },
+  { href: '/securite', label: 'Sécurité' },
 ]
 
 const legalLinks = [
   { href: '/conditions', label: 'Conditions d’utilisation' },
   { href: '/confidentialite', label: 'Politique de confidentialité' },
   { href: '/mentions-legales', label: 'Mentions légales' },
+  { href: '/cookies', label: 'Cookies' },
+  { href: '/sous-traitants', label: 'Sous-traitants' },
 ]
 
 function FooterColumn({ title, links }: { title: string; links: { href: string; label: string }[] }) {

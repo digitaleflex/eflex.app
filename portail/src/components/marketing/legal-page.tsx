@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Clock } from 'lucide-react'
 import { SiteHeader } from '@/components/marketing/site-header'
 import { SiteFooter } from '@/components/marketing/site-footer'
 
@@ -6,12 +7,14 @@ export function LegalPage({
   title,
   description,
   updatedAt,
+  comingSoon = false,
   children,
 }: {
   title: string
   description: string
   updatedAt: string
-  children: ReactNode
+  comingSoon?: boolean
+  children?: ReactNode
 }) {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground homepage-light">
@@ -28,10 +31,24 @@ export function LegalPage({
             <p className="text-sm font-medium text-primary">Informations légales</p>
             <h1 className="font-display text-display-sm font-bold tracking-tight text-balance sm:text-4xl">{title}</h1>
             <p className="text-base text-muted-foreground text-pretty">{description}</p>
-            <p className="text-xs text-muted-foreground">Dernière mise à jour : {updatedAt}</p>
+            <p className="text-xs text-muted-foreground">
+              {comingSoon ? 'Disponibilité : bientôt' : `Dernière mise à jour : ${updatedAt}`}
+            </p>
           </header>
           <div className="mt-8 space-y-8 text-sm leading-7 text-foreground/90 sm:text-base">
-            {children}
+            {comingSoon ? (
+              <section className="rounded-2xl border border-border bg-card p-8 text-center">
+                <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Clock className="h-6 w-6" aria-hidden="true" />
+                </span>
+                <h2 className="mt-4 text-xl font-semibold text-foreground">Bientôt disponible</h2>
+                <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+                  Cette page est en cours de préparation. Le contenu sera publié prochainement.
+                </p>
+              </section>
+            ) : (
+              children
+            )}
           </div>
         </article>
       </main>

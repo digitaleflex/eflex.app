@@ -317,6 +317,23 @@
   50% { transform: translate3d(-18px, -12px, 0) scale(1.05); }
 }
 
+/* Flux subtil évoquant un pipeline maîtrisé, sans distraire la lecture. */
+.hero-flow {
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, transparent 0%, hsl(var(--primary) / 0.045) 45%, transparent 55%),
+    linear-gradient(115deg, transparent 20%, hsl(var(--eflex-sky) / 0.035) 50%, transparent 60%);
+  transform: translate3d(-8%, 0, 0);
+  animation: hero-flow 18s linear infinite;
+  will-change: transform;
+}
+@keyframes hero-flow {
+  0% { transform: translate3d(-8%, 0, 0); }
+  100% { transform: translate3d(8%, 0, 0); }
+}
+
 /* ─── Maquette du Migration Center (accueil, `components/marketing/migration-teaser.tsx`) ───
    Trois états illustratifs (source, analyse, résultat) en boucle ; réduit au résultat final. */
 .migration-demo .mig-state { position: absolute; inset: 1.25rem; opacity: 0; }
@@ -338,7 +355,7 @@
     transition-duration: 0.01ms !important;
   }
   .animate-reveal { opacity: 1; }
-  .hero-orb { animation: none !important; }
+  .hero-orb, .hero-flow { animation: none !important; }
   /* Animations de l'accueil : état final, immobile. */
   .deploy-demo .dd-step, .deploy-demo .dd-url, .deploy-demo .dd-state { animation: none !important; opacity: 1 !important; transform: none !important; }
   .deploy-demo .dd-state-6 { background-color: hsl(var(--success) / 0.16) !important; border-color: hsl(var(--success) / 0.35) !important; color: hsl(var(--success)) !important; }

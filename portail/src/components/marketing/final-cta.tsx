@@ -22,10 +22,10 @@ export function FinalCta() {
           <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
             <div className="max-w-3xl">
               <h2 id="appel-titre" className="text-display-sm font-extrabold tracking-tight text-balance text-white">
-                Votre prochain projet mérite d’être en ligne.
+                Mettez vos applications en production avec plus de contrôle.
               </h2>
               <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/80 text-pretty sm:text-lg">
-                Connectez votre dépôt GitHub et découvrez une nouvelle manière de déployer vos applications.
+                Connectez votre dépôt, déployez et suivez vos projets depuis un espace unique, conçu pour les équipes qui livrent pour leurs clients.
               </p>
             </div>
 

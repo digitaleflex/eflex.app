@@ -1,175 +1,327 @@
 import type { CSSProperties } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Database, GitBranch, Lock, PlayCircle, ScrollText } from 'lucide-react'
+import {
+  ArrowRight,
+  Building2,
+  CheckCircle2,
+  FileSearch,
+  GitBranch,
+  Globe,
+  Lock,
+  PlayCircle,
+  ShieldCheck,
+  Terminal,
+  TriangleAlert,
+} from 'lucide-react'
 import { SiteHeader } from '@/components/marketing/site-header'
 import { SiteFooter } from '@/components/marketing/site-footer'
 import { TechMarquee } from '@/components/marketing/tech-marquee'
 import { JourneyDemo } from '@/components/marketing/journey-demo'
 import { FinalCta } from '@/components/marketing/final-cta'
-import { getLegalCompanyInfo } from '@/lib/legal-info'
 
-const capabilities = [
+const facts = [
+  { icon: GitBranch, label: 'Déploiements depuis Git', detail: 'Branche suivie, statuts, historique.' },
+  { icon: Globe, label: 'HTTPS et domaines', detail: 'Adresse EFLEX et domaines personnalisés.' },
+  { icon: Terminal, label: 'Logs centralisés', detail: 'Build et exécution au même endroit.' },
+  { icon: Building2, label: 'Organisations et rôles', detail: 'Projets et accès gérés par équipe.' },
+]
+
+const steps = [
   {
-    icon: GitBranch,
-    title: 'Déploiement depuis GitHub',
-    text: 'Connectez un dépôt, lancez un déploiement et suivez l’évolution de votre application.',
+    number: '01',
+    title: 'Connecter le dépôt',
+    text: 'Liez un dépôt GitHub et choisissez le projet à mettre en ligne.',
   },
+  {
+    number: '02',
+    title: 'Déployer avec visibilité',
+    text: 'EFLEX analyse le projet, lance le déploiement et affiche chaque état en temps réel.',
+  },
+  {
+    number: '03',
+    title: 'Suivre la production',
+    text: 'Consultez les logs, les domaines, la configuration et l’état de vos applications depuis la console.',
+  },
+]
+
+const agencyPoints = [
+  {
+    icon: Building2,
+    title: 'Plusieurs projets, un seul espace',
+    text: 'Regroupez les applications clients dans une organisation, avec des membres et des rôles adaptés.',
+  },
+  {
+    icon: FileSearch,
+    title: 'Contexte clair en cas d’incident',
+    text: 'Statut, journaux et diagnostic permettent de comprendre ce qui s’est passé sans fouiller dans plusieurs outils.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Contrôle avant promesse',
+    text: 'Variables chiffrées, domaines, paramètres et suivi de production : l’essentiel pour opérer proprement.',
+  },
+]
+
+const reliability = [
   {
     icon: Lock,
+    title: 'Variables chiffrées',
+    text: 'Les variables d’environnement sont stockées chiffrées et ne doivent pas être exposées en clair côté client.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Isolation par organisation',
+    text: 'Les projets, accès et actions sont rattachés à une organisation avec contrôle côté serveur.',
+  },
+  {
+    icon: Globe,
     title: 'HTTPS et domaines',
-    text: 'Adresse EFLEX fournie et domaines personnalisés selon la configuration de votre projet.',
-  },
-  {
-    icon: ScrollText,
-    title: 'Journaux de build et d’exécution',
-    text: 'Consultez les logs pour comprendre un déploiement ou diagnostiquer une erreur.',
-  },
-  {
-    icon: Database,
-    title: 'Configuration et données',
-    text: 'Variables chiffrées et bases managées PostgreSQL/Redis selon les besoins du projet.',
+    text: 'Certificats TLS et domaines personnalisés gérés dans le flux de déploiement, selon la configuration du projet.',
   },
 ]
 
 const faqs = [
   {
-    q: 'Dois-je configurer un serveur ?',
-    a: 'Non. EFLEX prend en charge la construction et la mise en ligne des projets compatibles. Vous gardez le contrôle sur la configuration de votre application.',
-  },
-  {
-    q: 'Quelles technologies sont prises en charge ?',
-    a: 'EFLEX détecte notamment Next.js, Nuxt, Astro, Vite, SvelteKit, Remix, SolidStart, RedwoodJS, Node.js, PHP, Python et les sites statiques. Un Dockerfile ou un docker-compose.yml peut aussi être utilisé tel quel.',
+    q: 'À qui s’adresse EFLEX ?',
+    a: 'Aux développeurs, studios et agences qui livrent des applications en production et veulent un cadre clair pour déployer, suivre et opérer.',
   },
   {
     q: 'Que se passe-t-il si un déploiement échoue ?',
-    a: 'Le déploiement est marqué en échec et les journaux restent disponibles pour identifier la cause. L’application déjà en ligne reste en place tant qu’un nouveau déploiement réussi ne la remplace pas.',
+    a: 'Le déploiement est marqué en échec, les journaux restent accessibles et la version déjà en ligne n’est pas remplacée tant qu’un nouveau déploiement réussi n’a pas abouti.',
+  },
+  {
+    q: 'Dois-je configurer un serveur ?',
+    a: 'Non pour les projets compatibles. EFLEX prend en charge l’analyse, la construction et la mise en ligne. Vous gardez le contrôle sur la configuration applicative.',
+  },
+  {
+    q: 'Puis-je gérer plusieurs applications clients ?',
+    a: 'Oui. Les projets peuvent être regroupés dans une organisation, avec des membres, des rôles et un suivi centralisé.',
   },
 ]
 
 export default function HomePage() {
-  const { email: contactEmail } = getLegalCompanyInfo()
-
   return (
     <div className="homepage-light flex min-h-screen flex-col bg-background text-foreground">
       <SiteHeader />
 
       <main id="contenu" tabIndex={-1} className="flex-1">
         {/* ─── Hero ─── */}
-        <section
-          aria-labelledby="hero-titre"
-          className="hero-surface relative overflow-hidden border-b border-border/60 bg-background"
-        >
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-grid opacity-60" />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_75%_55%_at_50%_-10%,hsl(var(--primary)/0.14),transparent_68%)]"
-          />
+        <section aria-labelledby="hero-titre" className="relative overflow-hidden border-b border-border/60 bg-background">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-grid opacity-50" />
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,hsl(var(--primary)/0.12),transparent_70%)]" />
+          <div aria-hidden="true" className="hero-flow" />
           <div aria-hidden="true" className="hero-orb hero-orb-a" />
           <div aria-hidden="true" className="hero-orb hero-orb-b" />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background to-transparent"
-          />
-
           <div className="container relative py-16 sm:py-20 md:py-24 lg:py-28">
-            <div className="mx-auto w-full max-w-[980px] text-center">
-              <p className="animate-reveal inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-primary sm:text-[13px]">
-                <span aria-hidden="true" className="h-px w-6 bg-primary/60 sm:w-8" />
-                Plateforme de déploiement et d’exploitation
-                <span aria-hidden="true" className="h-px w-6 bg-primary/60 sm:w-8" />
-              </p>
+            <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <div className="max-w-2xl">
+                <p className="animate-reveal inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-primary sm:text-[13px]">
+                  <span aria-hidden="true" className="h-px w-6 bg-primary/60 sm:w-8" />
+                  Pour les développeurs, studios et agences
+                </p>
 
-              <h1
-                id="hero-titre"
-                className="mt-7 animate-reveal text-balance font-extrabold tracking-tight text-foreground [font-size:clamp(2.75rem,7vw,5.5rem)] [line-height:1.02]"
-                style={{ '--d': '70ms' } as CSSProperties}
-              >
-                <span className="block">Concentrez-vous sur votre code.</span>
-                <span className="mt-1 block sm:mt-2">
-                  <span className="text-primary">EFLEX</span> simplifie le reste.
-                </span>
-              </h1>
-
-              <p
-                className="mx-auto mt-7 max-w-2xl animate-reveal text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg md:text-xl"
-                style={{ '--d': '140ms' } as CSSProperties}
-              >
-                Déployez vos applications et centralisez leur gestion depuis une seule plateforme.
-              </p>
-
-              <div
-                className="mt-10 flex animate-reveal flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4"
-                style={{ '--d': '210ms' } as CSSProperties}
-              >
-                <Link
-                  href="/register"
-                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-7 text-base font-semibold text-primary-foreground shadow-primary transition-[background-color,box-shadow,transform] duration-200 ease-out-expo hover:bg-primary/90 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto"
+                <h1
+                  id="hero-titre"
+                  className="mt-7 animate-reveal text-balance font-extrabold tracking-tight text-foreground [font-size:clamp(2.7rem,6.5vw,5.2rem)] [line-height:1.02]"
+                  style={{ '--d': '70ms' } as CSSProperties}
                 >
-                  Découvrir EFLEX
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </Link>
-                <Link
-                  href="#fonctionnement"
-                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-input bg-background/60 px-7 text-base font-semibold text-foreground transition-[background-color,border-color,color,transform] duration-200 ease-out-expo hover:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto"
+                  La production de vos clients,
+                  <span className="block text-primary">sous contrôle.</span>
+                </h1>
+
+                <p
+                  className="mt-7 max-w-xl animate-reveal text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg md:text-xl"
+                  style={{ '--d': '140ms' } as CSSProperties}
                 >
-                  <PlayCircle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  Voir comment ça fonctionne
-                </Link>
+                  Déployez, suivez et opérez vos applications depuis un seul espace. Gardez une vue claire sur chaque mise en production, sans complexité inutile.
+                </p>
+
+                <div
+                  className="mt-10 flex animate-reveal flex-col gap-3 sm:flex-row sm:gap-4"
+                  style={{ '--d': '210ms' } as CSSProperties}
+                >
+                  <Link
+                    href="/register"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-7 text-base font-semibold text-primary-foreground shadow-primary transition-[background-color,box-shadow,transform] duration-200 ease-out-expo hover:bg-primary/90 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  >
+                    Créer un compte
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </Link>
+                  <Link
+                    href="#fonctionnement"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-input bg-background/70 px-7 text-base font-semibold text-foreground transition-[background-color,border-color,color,transform] duration-200 ease-out-expo hover:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  >
+                    <PlayCircle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    Voir le fonctionnement
+                  </Link>
+                </div>
+
+                <ul className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
+                  {['Déploiements Git', 'HTTPS & domaines', 'Logs & diagnostic'].map((item) => (
+                    <li key={item} className="inline-flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
               </div>
 
-              <p className="mt-8 text-sm text-muted-foreground">
-                Analyse en lecture seule · HTTPS automatique · Journaux et configuration centralisés
-              </p>
+              {/* Product proof */}
+              <div className="animate-reveal lg:justify-self-end" style={{ '--d': '180ms' } as CSSProperties}>
+                <div className="rounded-3xl border border-border bg-card p-5 shadow-lg sm:p-6">
+                  <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Déploiement — app-client</p>
+                      <p className="text-xs text-muted-foreground">main · commit a1b2c3d</p>
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
+                      <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" />
+                      En ligne
+                    </span>
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    {[
+                      { label: 'Build', value: 'Terminé', ok: true },
+                      { label: 'Domaine', value: 'app.client.fr', ok: true },
+                      { label: 'TLS', value: 'Actif', ok: true },
+                      { label: 'Journaux', value: 'Disponibles', ok: true },
+                    ].map((row) => (
+                      <div key={row.label} className="flex items-center justify-between rounded-xl bg-muted/35 px-4 py-3">
+                        <span className="text-sm text-muted-foreground">{row.label}</span>
+                        <span className={`text-sm font-medium tabular-nums ${row.ok ? 'text-foreground' : 'text-muted-foreground'}`}>{row.value}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-primary/15 bg-primary/5 p-4">
+                    <p className="text-sm font-medium text-foreground">La version en ligne reste active.</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                      En cas d’échec, EFLEX conserve les journaux et indique l’action à effectuer avant de relancer.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* ─── Technologies ─── */}
-        <section id="technologies" aria-labelledby="technologies-titre" className="scroll-mt-20 py-16 md:py-20">
+        {/* ─── Faits ─── */}
+        <section id="capacites" aria-labelledby="faits-titre" className="scroll-mt-20 py-14 md:py-16">
           <div className="container">
-            <div className="mx-auto max-w-3xl space-y-4 text-center">
-              <h2 id="technologies-titre" className="text-display-sm font-extrabold tracking-tight text-balance text-foreground">
-                Compatible avec votre stack
-              </h2>
-              <p className="mx-auto max-w-2xl text-lead-lg text-muted-foreground text-pretty">
-                EFLEX détecte votre projet et vous aide à le mettre en ligne rapidement.
-              </p>
-            </div>
-            <div className="mt-10">
-              <TechMarquee />
-            </div>
+            <h2 id="faits-titre" className="sr-only">Capacités principales</h2>
+            <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {facts.map((item) => (
+                <li key={item.label} className="rounded-2xl border border-border bg-card p-5">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <item.icon className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <p className="mt-4 text-sm font-semibold text-foreground">{item.label}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
-        {/* ─── Fonctionnement ─── */}
-        <section id="fonctionnement" aria-labelledby="fonctionnement-titre" className="scroll-mt-20 border-y border-border bg-muted/30 py-16 md:py-24">
+        {/* ─── Parcours ─── */}
+        <section id="fonctionnement" aria-labelledby="fonctionnement-titre" className="scroll-mt-20 border-y border-border bg-muted/25 py-16 md:py-24">
           <div className="container">
-            <div className="mx-auto max-w-3xl space-y-4 text-center">
+            <div className="mx-auto max-w-3xl text-center">
               <h2 id="fonctionnement-titre" className="text-display-sm font-extrabold tracking-tight text-balance text-foreground">
-                Du dépôt à la production, sans complexité inutile.
+                Un parcours clair, du dépôt à la production
               </h2>
-              <p className="mx-auto max-w-2xl text-lead-lg text-muted-foreground text-pretty">
-                Connectez votre dépôt. EFLEX analyse votre projet, prépare son déploiement et vous permet d’en suivre les étapes depuis un seul espace.
+              <p className="mx-auto mt-4 max-w-2xl text-lead-lg text-muted-foreground text-pretty">
+                Connectez votre dépôt, déployez, puis suivez l’état réel de votre application depuis un seul espace.
               </p>
             </div>
+
+            <ol className="mt-10 grid gap-4 md:grid-cols-3">
+              {steps.map((step) => (
+                <li key={step.number} className="rounded-2xl border border-border bg-card p-6">
+                  <p className="font-mono text-xs font-semibold tracking-[0.18em] text-primary">{step.number}</p>
+                  <h3 className="mt-3 text-lg font-semibold text-foreground">{step.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step.text}</p>
+                </li>
+              ))}
+            </ol>
+
             <JourneyDemo />
           </div>
         </section>
 
-        {/* ─── Fonctionnalités ─── */}
-        <section id="fonctionnalites" aria-labelledby="fonctionnalites-titre" className="scroll-mt-20 py-16 md:py-24">
+        {/* ─── Diagnostic ─── */}
+        <section id="diagnostic" aria-labelledby="diagnostic-titre" className="scroll-mt-20 py-16 md:py-24">
           <div className="container">
-            <div className="mx-auto max-w-3xl space-y-4 text-center">
-              <h2 id="fonctionnalites-titre" className="text-display-sm font-extrabold tracking-tight text-balance text-foreground">
-                L’essentiel pour déployer sereinement
+            <div className="grid gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-center">
+              <div className="max-w-xl">
+                <h2 id="diagnostic-titre" className="text-display-sm font-extrabold tracking-tight text-balance text-foreground">
+                  Quand ça échoue, vous savez quoi faire
+                </h2>
+                <p className="mt-4 text-lead-lg text-muted-foreground text-pretty">
+                  Un déploiement échoué ne doit pas devenir une chasse aux logs. EFLEX affiche l’état, la cause probable et l’action à effectuer, pour corriger rapidement.
+                </p>
+                <ul className="mt-8 space-y-3 text-sm text-muted-foreground">
+                  <li className="flex gap-3"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />Cause probable identifiée à partir des signaux observables.</li>
+                  <li className="flex gap-3"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />Action recommandée, avec lien vers le bon réglage.</li>
+                  <li className="flex gap-3"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />Impact explicite : la version en ligne n’est pas remplacée tant que le déploiement n’a pas réussi.</li>
+                </ul>
+              </div>
+
+              <div className="rounded-3xl border border-border bg-card p-5 shadow-sm sm:p-6">
+                <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Déploiement échoué</p>
+                    <p className="text-xs text-muted-foreground">app-client · il y a 2 min</p>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
+                    <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
+                    Échec
+                  </span>
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-warning/30 bg-warning/10 p-4">
+                  <p className="text-sm font-semibold text-foreground">Variables d’environnement manquantes</p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    Des variables d’environnement sont manquantes (<code className="font-mono text-xs text-foreground">AURA_API_TOKEN</code>,{' '}
+                    <code className="font-mono text-xs text-foreground">AURA_API_URL</code>,{' '}
+                    <code className="font-mono text-xs text-foreground">JWT_SECRET</code>). Ajoutez-les dans les variables du projet puis relancez le déploiement.
+                    La version en ligne n’a pas été modifiée.
+                  </p>
+                  <div className="mt-4">
+                    <span className="inline-flex min-h-10 items-center rounded-lg bg-background px-4 text-sm font-medium text-foreground border border-border">
+                      Ouvrir les variables
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-xl bg-muted/35 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Journal</p>
+                  <p className="mt-2 font-mono text-xs leading-relaxed text-muted-foreground">
+                    [deploy] Vérification de la configuration…<br />
+                    [deploy] Variables requises manquantes détectées.<br />
+                    [deploy] Déploiement interrompu avant mise en production.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ─── Agences / équipes ─── */}
+        <section id="equipes" aria-labelledby="equipes-titre" className="scroll-mt-20 border-y border-border bg-muted/20 py-16 md:py-24">
+          <div className="container">
+            <div className="mx-auto max-w-3xl text-center">
+              <h2 id="equipes-titre" className="text-display-sm font-extrabold tracking-tight text-balance text-foreground">
+                Pensé pour les équipes qui gèrent plusieurs applications
               </h2>
-              <p className="mx-auto max-w-2xl text-lead-lg text-muted-foreground text-pretty">
-                Les fonctionnalités clés pour mettre en ligne, sécuriser et suivre vos applications.
+              <p className="mx-auto mt-4 max-w-2xl text-lead-lg text-muted-foreground text-pretty">
+                EFLEX aide les agences et studios à garder la main sur les projets qu’ils livrent, avec un contexte clair quand un incident survient.
               </p>
             </div>
 
-            <ul className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-              {capabilities.map((item) => (
+            <ul className="mt-12 grid gap-5 md:grid-cols-3">
+              {agencyPoints.map((item) => (
                 <li key={item.title} className="rounded-2xl border border-border bg-card p-6">
                   <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     <item.icon className="h-5 w-5" aria-hidden="true" />
@@ -179,28 +331,74 @@ export default function HomePage() {
                 </li>
               ))}
             </ul>
+          </div>
+        </section>
 
-            <div className="mt-10 flex justify-center">
-              <Link
-                href="/docs"
-                className="inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                Voir la documentation
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
+        {/* ─── Technologies ─── */}
+        <section id="technologies" aria-labelledby="technologies-titre" className="scroll-mt-20 py-16 md:py-20">
+          <div className="container">
+            <div className="mx-auto max-w-3xl space-y-4 text-center">
+              <h2 id="technologies-titre" className="text-display-sm font-extrabold tracking-tight text-balance text-foreground">
+                Compatible avec les stacks que vous livrez déjà
+              </h2>
+              <p className="mx-auto max-w-2xl text-lead-lg text-muted-foreground text-pretty">
+                EFLEX détecte les projets courants et prend aussi en charge les dépôts fournissant leur propre Dockerfile ou Docker Compose.
+              </p>
+            </div>
+            <div className="mt-10">
+              <TechMarquee />
             </div>
           </div>
         </section>
 
-        {/* ─── Questions ─── */}
-        <section id="questions" aria-labelledby="questions-titre" className="scroll-mt-20 border-t border-border bg-muted/20 py-16 md:py-24">
+        {/* ─── Fiabilité / sécurité ─── */}
+        <section id="fiabilite" aria-labelledby="fiabilite-titre" className="scroll-mt-20 border-y border-border bg-muted/20 py-16 md:py-20">
+          <div className="container">
+            <div className="grid gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start">
+              <div className="max-w-xl">
+                <h2 id="fiabilite-titre" className="text-display-sm font-extrabold tracking-tight text-balance text-foreground">
+                  Des bases solides, sans promesses inutiles
+                </h2>
+                <p className="mt-4 text-lead-lg text-muted-foreground text-pretty">
+                  EFLEX met l’accent sur les contrôles essentiels : accès, configuration, déploiement et visibilité. Les engagements doivent rester clairs et vérifiables.
+                </p>
+                <Link
+                  href="/securite"
+                  className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  Voir la page Sécurité
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </div>
+
+              <ul className="grid gap-4">
+                {reliability.map((item) => (
+                  <li key={item.title} className="rounded-2xl border border-border bg-card p-5">
+                    <div className="flex items-start gap-4">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <item.icon className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
+                        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.text}</p>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        {/* ─── FAQ ─── */}
+        <section id="questions" aria-labelledby="questions-titre" className="scroll-mt-20 py-16 md:py-24">
           <div className="container">
             <div className="mx-auto max-w-3xl space-y-4 text-center">
               <h2 id="questions-titre" className="text-display-sm font-extrabold tracking-tight text-balance text-foreground">
                 Questions fréquentes
               </h2>
               <p className="mx-auto max-w-2xl text-lead-lg text-muted-foreground text-pretty">
-                L’essentiel avant de commencer. Les détails techniques sont dans la documentation.
+                Les réponses essentielles avant de mettre un premier projet en production.
               </p>
             </div>
 
@@ -221,16 +419,18 @@ export default function HomePage() {
               ))}
             </div>
 
-            <p className="mt-6 text-center text-sm text-muted-foreground">
-              Besoin d’aide ?{' '}
-              <a href={`mailto:${contactEmail}?subject=Question%20sur%20EFLEX`} className="font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
-                Contacter le support
-              </a>
-            </p>
+            <div className="mt-8 flex justify-center">
+              <Link
+                href="/docs"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Voir les ressources
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            </div>
           </div>
         </section>
 
-        {/* ─── Appel final ─── */}
         <FinalCta />
         <SiteFooter />
       </main>
