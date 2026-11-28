@@ -13,8 +13,8 @@ const STATUSES: Record<string, StatusInfo> = {
   deploying: { label: 'Mise en ligne…', tone: 'warning', inProgress: true },
   pending: { label: 'En attente', tone: 'neutral', inProgress: true },
   queued: { label: 'En file d’attente', tone: 'neutral', inProgress: true },
-  analyzing: { label: 'Analyse du dépôt', tone: 'warning', inProgress: true },
-  provisioning: { label: 'Préparation', tone: 'warning', inProgress: true },
+  analyzing: { label: 'Analyse en cours', tone: 'warning', inProgress: true },
+  provisioning: { label: 'Préparation en cours', tone: 'warning', inProgress: true },
   cancelled: { label: 'Annulé', tone: 'neutral', inProgress: false },
   failed: { label: 'Échec', tone: 'danger', inProgress: false },
   rollbacked: { label: 'Annulé', tone: 'neutral', inProgress: false },
@@ -34,4 +34,16 @@ export function attentionRank(status: string | null | undefined): number {
   if (info.inProgress && info.tone === 'warning') return 1
   if (info.inProgress) return 2
   return 3
+}
+
+export type StatusGroup = 'online' | 'in_progress' | 'action_required' | 'offline'
+
+/** Regroupe les statuts techniques en 4 états utilisateur simples. */
+export function statusGroup(status: string | null | undefined): StatusGroup {
+  const info = statusInfo(status)
+  if (info.tone === 'success') return 'online'
+  if (info.tone === 'danger') return 'action_required'
+  if (info.inProgress) return 'in_progress'
+  if (!status) return 'offline'
+  return 'offline'
 }
