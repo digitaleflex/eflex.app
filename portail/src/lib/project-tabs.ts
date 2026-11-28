@@ -3,11 +3,11 @@
 export const PROJECT_TABS = [
   { id: 'overview', label: "Vue d'ensemble", short: 'Aperçu' },
   { id: 'deployments', label: 'Déploiements', short: 'Déploiements' },
-  { id: 'previews', label: 'Prévisualisations', short: 'Préviews' },
+  { id: 'logs', label: 'Logs', short: 'Logs' },
   { id: 'variables', label: 'Variables', short: 'Variables' },
+  { id: 'previews', label: 'Prévisualisations', short: 'Préviews' },
   { id: 'tasks', label: 'Tâches planifiées', short: 'Tâches' },
   { id: 'analytics', label: 'Analytique', short: 'Analytique' },
-  { id: 'logs', label: 'Logs', short: 'Logs' },
 ] as const
 
 export type ProjectTab = (typeof PROJECT_TABS)[number]['id']

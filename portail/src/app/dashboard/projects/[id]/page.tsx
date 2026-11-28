@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import {
+  ArrowLeft,
   ArrowUpRight,
   GitBranch,
   Globe,
@@ -56,6 +57,8 @@ const primaryLinkClass =
   'inline-flex h-9 items-center gap-1.5 rounded-lg bg-foreground px-3 text-sm font-semibold text-background hover:bg-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [@media(pointer:coarse)]:h-11'
 const secondaryLinkClass =
   'inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11'
+const ghostLinkClass =
+  'inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11'
 
 /** Action prioritaire du projet : même emplacement et même style quel que soit l'état. */
 function PrimaryAction({ action, projectId, multiApp }: { action: NextProjectAction; projectId: string; multiApp?: boolean }) {
@@ -214,6 +217,16 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       <AutoRefresh active={inProgress} />
       <LiveRefresh types={['deployment.created', 'deployment.status']} projectId={project.id} />
 
+      <div>
+        <Link
+          href="/dashboard"
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-md text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Projets
+        </Link>
+      </div>
+
       <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 items-start gap-4">
           <FrameworkTile framework={primaryFramework} name={project.name} size="lg" />
@@ -270,12 +283,12 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             <CancelDeploymentButton projectId={project.id} deploymentId={last.id} />
           )}
           {!primaryImage && (
-            <a href={project.repoUrl} target="_blank" rel="noopener noreferrer" className={secondaryLinkClass}>
+            <a href={project.repoUrl} target="_blank" rel="noopener noreferrer" className={ghostLinkClass}>
               <GithubMark className="h-4 w-4" />
               Dépôt<span className="sr-only"> (nouvel onglet)</span>
             </a>
           )}
-          <Link href={`/dashboard/projects/${project.id}/report`} className={secondaryLinkClass}>
+          <Link href={`/dashboard/projects/${project.id}/report`} className={ghostLinkClass}>
             Rapport
           </Link>
           {canManage && (
