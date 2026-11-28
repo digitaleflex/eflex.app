@@ -37,7 +37,12 @@ jobs:
         id: release
         uses: googleapis/release-please-action@a02a34c4d625f9be7cb89156071d8567266a2445 # v4.2.0
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN suffit si le dépôt autorise "Allow GitHub Actions to
+          # create and approve pull requests" (Settings → Actions → General →
+          # Workflow permissions). Sinon, créer un PAT (contents + pull-requests
+          # + issues) ou un token de GitHub App et l'exposer comme secret
+          # RELEASE_PLEASE_TOKEN.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 

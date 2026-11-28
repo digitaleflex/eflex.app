@@ -56,6 +56,12 @@ suivants normalement).
 
 - **La PR de release n'apparaît pas** : vérifier que les commits sur `main`
   respectent les Conventional Commits et que le workflow `Release` a tourné.
+- **`GitHub Actions is not permitted to create or approve pull requests`** :
+  soit activer **Settings → Actions → General → Workflow permissions → Allow
+  GitHub Actions to create and approve pull requests**, soit définir un secret
+  `RELEASE_PLEASE_TOKEN` (PAT avec `contents`, `pull-requests`, `issues`, ou
+  token d'une GitHub App) ; le workflow l'utilise en priorité sur
+  `GITHUB_TOKEN`.
 - **Mauvais bump** : corriger le message de commit (amend/rebase avant merge) ou
   ajuster la PR de release manuellement avant fusion.
 - **Forcer une version** : ajouter `Release-As: X.Y.Z` dans le corps d'un commit
