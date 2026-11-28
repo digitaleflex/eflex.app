@@ -94,7 +94,7 @@ function StepDetail({ id }: { id: StepId }) {
 
 function ResultPanel({ visible }: { visible: boolean }) {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
+    <div className="min-w-0 flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Résultat en production</p>
       <div className="overflow-hidden rounded-xl border border-border bg-background">
         <div className="flex items-center gap-2 border-b border-border px-3 py-2">
@@ -164,7 +164,7 @@ export function JourneyDemo() {
   return (
     <div className="mt-12 md:mt-14">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_auto_minmax(0,1.6fr)_auto_minmax(0,0.9fr)] lg:items-start lg:gap-3">
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="min-w-0 flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Votre code</p>
           <p className="font-mono text-sm font-medium text-foreground">mon-application</p>
           <ul className="space-y-1.5 text-sm text-muted-foreground" aria-label="Contenu du dépôt d’exemple">
@@ -179,7 +179,7 @@ export function JourneyDemo() {
 
         <Connector />
 
-        <div className="flex flex-col gap-4 rounded-2xl border-2 border-primary/40 bg-card p-5 shadow-md">
+        <div className="min-w-0 flex flex-col gap-4 rounded-2xl border-2 border-primary/40 bg-card p-4 shadow-md sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-primary">Centre de coordination EFLEX</p>
             {!reduceMotion && (active === LAST_STEP || !playing) && (

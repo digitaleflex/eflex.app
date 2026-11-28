@@ -114,7 +114,7 @@ export default function HomePage() {
           <div aria-hidden="true" className="hero-orb hero-orb-b" />
           <div className="container relative py-16 sm:py-20 md:py-24 lg:py-28">
             <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-              <div className="max-w-2xl">
+              <div className="min-w-0 max-w-2xl">
                 <p className="animate-reveal inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-primary sm:text-[13px]">
                   <span aria-hidden="true" className="h-px w-6 bg-primary/60 sm:w-8" />
                   Pour les développeurs, studios et agences
@@ -167,38 +167,54 @@ export default function HomePage() {
               </div>
 
               {/* Product proof */}
-              <div className="animate-reveal lg:justify-self-end" style={{ '--d': '180ms' } as CSSProperties}>
-                <div className="rounded-3xl border border-border bg-card p-5 shadow-lg sm:p-6">
-                  <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Déploiement — app-client</p>
-                      <p className="text-xs text-muted-foreground">main · commit a1b2c3d</p>
+              <div className="min-w-0 animate-reveal lg:justify-self-end" style={{ '--d': '180ms' } as CSSProperties}>
+                <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-lg">
+                  <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4 sm:px-6">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground">app-client</p>
+                      <p className="truncate text-xs text-muted-foreground">Branche <span className="font-mono">main</span> · commit <span className="font-mono">a1b2c3d</span></p>
                     </div>
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
                       <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" />
                       En ligne
                     </span>
                   </div>
 
-                  <div className="mt-4 space-y-2">
-                    {[
-                      { label: 'Build', value: 'Terminé', ok: true },
-                      { label: 'Domaine', value: 'app.client.fr', ok: true },
-                      { label: 'TLS', value: 'Actif', ok: true },
-                      { label: 'Journaux', value: 'Disponibles', ok: true },
-                    ].map((row) => (
-                      <div key={row.label} className="flex items-center justify-between rounded-xl bg-muted/35 px-4 py-3">
-                        <span className="text-sm text-muted-foreground">{row.label}</span>
-                        <span className={`text-sm font-medium tabular-nums ${row.ok ? 'text-foreground' : 'text-muted-foreground'}`}>{row.value}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <div className="space-y-4 px-5 py-4 sm:px-6 sm:py-5">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {[
+                        { label: 'Domaine', value: 'app.client.fr' },
+                        { label: 'HTTPS', value: 'Certificat actif' },
+                        { label: 'Dernier déploiement', value: 'Réussi' },
+                        { label: 'Environnement', value: 'Production' },
+                      ].map((row) => (
+                        <div key={row.label} className="rounded-xl bg-muted/35 px-3.5 py-3">
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{row.label}</p>
+                          <p className="mt-1 text-sm font-medium text-foreground">{row.value}</p>
+                        </div>
+                      ))}
+                    </div>
 
-                  <div className="mt-4 rounded-xl border border-primary/15 bg-primary/5 p-4">
-                    <p className="text-sm font-medium text-foreground">La version en ligne reste active.</p>
-                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      En cas d’échec, EFLEX conserve les journaux et indique l’action à effectuer avant de relancer.
-                    </p>
+                    <div className="rounded-xl border border-border bg-background">
+                      <div className="flex items-center justify-between border-b border-border px-3.5 py-2.5">
+                        <p className="text-xs font-medium text-foreground">Journaux de déploiement</p>
+                        <span className="text-[11px] text-muted-foreground tabular-nums">14:32:08</span>
+                      </div>
+                      <div className="space-y-1.5 px-3.5 py-3 font-mono text-[11px] leading-relaxed text-muted-foreground sm:text-xs">
+                        <p><span className="text-success">✓</span> Build terminé</p>
+                        <p><span className="text-success">✓</span> Image publiée</p>
+                        <p><span className="text-success">✓</span> Domaine et TLS vérifiés</p>
+                        <p className="text-foreground"><span className="text-success">✓</span> Application en ligne</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-primary/5 px-3.5 py-3">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                      <p className="text-sm text-foreground">
+                        <span className="font-medium">Version en ligne conservée.</span>{' '}
+                        <span className="text-muted-foreground">En cas d’échec, EFLEX affiche la cause probable et l’action à effectuer.</span>
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -268,40 +284,63 @@ export default function HomePage() {
                 </ul>
               </div>
 
-              <div className="rounded-3xl border border-border bg-card p-5 shadow-sm sm:p-6">
-                <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">Déploiement échoué</p>
-                    <p className="text-xs text-muted-foreground">app-client · il y a 2 min</p>
+              <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
+                <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4 sm:px-6">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">app-client</p>
+                    <p className="text-xs text-muted-foreground">Déploiement <span className="font-mono">#184</span> · il y a 2 min</p>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
                     <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
                     Échec
                   </span>
                 </div>
 
-                <div className="mt-4 rounded-2xl border border-warning/30 bg-warning/10 p-4">
-                  <p className="text-sm font-semibold text-foreground">Variables d’environnement manquantes</p>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    Des variables d’environnement sont manquantes (<code className="font-mono text-xs text-foreground">AURA_API_TOKEN</code>,{' '}
-                    <code className="font-mono text-xs text-foreground">AURA_API_URL</code>,{' '}
-                    <code className="font-mono text-xs text-foreground">JWT_SECRET</code>). Ajoutez-les dans les variables du projet puis relancez le déploiement.
-                    La version en ligne n’a pas été modifiée.
+                <div className="border-b border-border bg-success/5 px-5 py-3 sm:px-6">
+                  <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />
+                    Version en ligne conservée — aucune interruption pour vos utilisateurs.
                   </p>
-                  <div className="mt-4">
-                    <span className="inline-flex min-h-10 items-center rounded-lg bg-background px-4 text-sm font-medium text-foreground border border-border">
-                      Ouvrir les variables
-                    </span>
-                  </div>
                 </div>
 
-                <div className="mt-4 rounded-xl bg-muted/35 p-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Journal</p>
-                  <p className="mt-2 font-mono text-xs leading-relaxed text-muted-foreground">
-                    [deploy] Vérification de la configuration…<br />
-                    [deploy] Variables requises manquantes détectées.<br />
-                    [deploy] Déploiement interrompu avant mise en production.
-                  </p>
+                <div className="space-y-4 px-5 py-4 sm:px-6 sm:py-5">
+                  <div className="rounded-2xl border border-warning/30 bg-warning/10 p-4">
+                    <div className="flex items-start gap-3">
+                      <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground">Variables d’environnement manquantes</p>
+                        <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                          Ajoutez les variables manquantes puis relancez le déploiement.
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {['AURA_API_TOKEN', 'AURA_API_URL', 'JWT_SECRET'].map((v) => (
+                            <code key={v} className="rounded-md bg-background/80 px-2 py-1 font-mono text-[11px] text-foreground border border-warning/20">
+                              {v}
+                            </code>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <span className="inline-flex min-h-10 items-center rounded-lg bg-foreground px-4 text-sm font-medium text-background">
+                        Ouvrir les variables
+                      </span>
+                      <span className="text-xs text-muted-foreground">Puis relancer le déploiement</span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-border bg-muted/20">
+                    <div className="flex items-center gap-4 border-b border-border px-4 py-2.5 text-xs font-medium">
+                      <span className="text-foreground">Diagnostic</span>
+                      <span className="text-muted-foreground">Journaux</span>
+                    </div>
+                    <div className="space-y-1.5 px-4 py-3 font-mono text-[11px] leading-relaxed text-muted-foreground sm:text-xs">
+                      <p>[14:32:01] Vérification de la configuration…</p>
+                      <p className="text-warning">[14:32:02] Variables requises manquantes détectées.</p>
+                      <p>[14:32:02] Déploiement interrompu avant mise en production.</p>
+                      <p className="text-success">[14:32:02] Version en ligne conservée.</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
