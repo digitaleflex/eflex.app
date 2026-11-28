@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { LegalPage, LegalSection } from '@/components/marketing/legal-page'
+import { getLegalCompanyInfo } from '@/lib/legal-info'
 
 export const metadata: Metadata = {
   title: 'Sous-traitants et données',
@@ -8,53 +9,59 @@ export const metadata: Metadata = {
 
 const rows = [
   {
-    service: 'Hébergement / infrastructure',
-    provider: 'À renseigner (éditeur)',
+    service: 'Hébergement (serveur)',
+    provider: 'Contabo GmbH',
     purpose: 'Hébergement de la plateforme, base de données, cache, stockage, exécution des services.',
     data: 'Données de compte, projets, logs, métadonnées techniques, selon configuration.',
-    location: 'À renseigner',
+    location: 'Société allemande ; serveur en Union européenne',
+  },
+  {
+    service: 'Domaines, DNS, anti-abus',
+    provider: 'Cloudflare, Inc.',
+    purpose: 'Gestion DNS/domaines et protection anti-abus (Turnstile) selon la configuration active.',
+    data: 'Données techniques de résolution/accès et de vérification anti-abus selon le fournisseur.',
+    location: 'États-Unis',
   },
   {
     service: 'E-mail transactionnel',
-    provider: 'Resend (si activé)',
+    provider: 'Resend (Plus Five Five, Inc.)',
     purpose: 'Envoi d’e-mails de vérification, réinitialisation, notifications.',
     data: 'Adresse e-mail, contenu du message, métadonnées techniques d’envoi.',
-    location: 'À vérifier contractuellement',
+    location: 'États-Unis',
   },
   {
     service: 'Paiement',
-    provider: 'Kkiapay / FedaPay (selon moyen activé)',
+    provider: 'Kkiapay (Open-Si) / FedaPay SAS',
     purpose: 'Encaissement, vérification de transaction, webhooks de paiement, remboursement selon support.',
     data: 'Références transaction, montant, statut, identifiants nécessaires au traitement. Les données de carte/mobile money sont traitées par le prestataire.',
-    location: 'À vérifier contractuellement',
+    location: 'Bénin',
   },
   {
     service: 'Dépôt source / Git',
-    provider: 'GitHub (si connecté)',
+    provider: 'GitHub, Inc. / GitHub B.V.',
     purpose: 'Connexion de dépôt, webhooks, accès aux sources autorisées pour analyse/déploiement.',
     data: 'Métadonnées dépôt, commits, webhooks, accès autorisé selon intégration.',
-    location: 'À vérifier contractuellement',
-  },
-  {
-    service: 'Anti-abus / CAPTCHA',
-    provider: 'Cloudflare Turnstile (si activé)',
-    purpose: 'Protection des formulaires contre l’abus automatisé.',
-    data: 'Données techniques de vérification selon le fournisseur.',
-    location: 'À vérifier contractuellement',
+    location: 'États-Unis',
   },
 ]
 
 export default function SousTraitantsPage() {
+  const company = getLegalCompanyInfo()
+
   return (
     <LegalPage
       title="Sous-traitants et données"
       description="Informations sur les sous-traitants susceptibles de traiter des données dans le cadre du service EFLEX."
       updatedAt="28 novembre 2026"
     >
-      <p className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-foreground">
-        <strong className="font-semibold">À valider par l’éditeur :</strong> cette liste doit refléter les services réellement actifs, les DPA/contrats signés,
-        les localisations et les garanties de transfert. Ajouter ou retirer tout fournisseur selon la configuration réelle.
-      </p>
+      <LegalSection title="Éditeur">
+        <p className="text-muted-foreground">
+          <span className="font-medium text-foreground">{company.name}</span>, {company.legalForm.toLowerCase()} de {company.publisher}, RCCM {company.rccm}, IFU {company.ifu}, {company.address}. Contact :{' '}
+          <a href={`mailto:${company.email}`} className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
+            {company.email}
+          </a>.
+        </p>
+      </LegalSection>
 
       <LegalSection title="Sous-traitants principaux">
         <div className="overflow-x-auto rounded-xl border border-border bg-card">

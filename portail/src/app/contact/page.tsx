@@ -11,7 +11,8 @@ export const metadata: Metadata = {
 }
 
 export default function ContactPage() {
-  const { email } = getLegalCompanyInfo()
+  const company = getLegalCompanyInfo()
+  const { email } = company
 
   return (
     <div className="homepage-light flex min-h-screen flex-col bg-background text-foreground">
@@ -81,7 +82,27 @@ export default function ContactPage() {
             </article>
           </div>
 
-          <div className="mx-auto mt-10 max-w-3xl rounded-2xl border border-border bg-muted/20 p-6 text-sm text-muted-foreground">
+          <div className="mx-auto mt-10 max-w-3xl rounded-2xl border border-border bg-card p-6 text-sm">
+            <p className="font-medium text-foreground">Éditeur</p>
+            <dl className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-[12rem_1fr]">
+              <dt className="font-medium text-foreground">Nom commercial</dt>
+              <dd>{company.name}, {company.legalForm.toLowerCase()} de {company.publisher}</dd>
+              <dt className="font-medium text-foreground">RCCM</dt>
+              <dd>{company.rccm}</dd>
+              <dt className="font-medium text-foreground">IFU</dt>
+              <dd>{company.ifu}</dd>
+              <dt className="font-medium text-foreground">Adresse</dt>
+              <dd>{company.address}</dd>
+              <dt className="font-medium text-foreground">E-mail</dt>
+              <dd>
+                <a href={`mailto:${company.email}`} className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
+                  {company.email}
+                </a>
+              </dd>
+            </dl>
+          </div>
+
+          <div className="mx-auto mt-6 max-w-3xl rounded-2xl border border-border bg-muted/20 p-6 text-sm text-muted-foreground">
             <p className="font-medium text-foreground">Avant de nous écrire</p>
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>Indiquez l’e-mail du compte concerné et, si possible, l’identifiant du projet ou du déploiement.</li>

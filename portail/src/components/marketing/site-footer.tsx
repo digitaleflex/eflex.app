@@ -80,7 +80,7 @@ export function SiteFooter() {
         </nav>
       </div>
       <div className="container border-t border-border py-6 text-xs text-muted-foreground">
-        © {new Date().getFullYear()} {company.name}. Tous droits réservés.
+        © 2026 {company.name} · {company.legalForm} · RCCM {company.rccm.split(' (')[0]} · IFU {company.ifu}
       </div>
     </footer>
   )

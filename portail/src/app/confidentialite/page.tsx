@@ -17,18 +17,16 @@ export default function ConfidentialitePage() {
       description="Informations sur les données personnelles traitées, leurs finalités, leurs durées de conservation et vos droits."
       updatedAt="28 novembre 2026"
     >
-      <p className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-foreground">
-        <strong className="font-semibold">À valider par l’éditeur :</strong> cette politique doit être confirmée selon les traitements réellement actifs,
-        les sous-traitants contractés, les localisations de données et la réglementation applicable.
-      </p>
-
       <LegalSection title="1. Responsable du traitement">
         <p className="text-muted-foreground">
-          Responsable du traitement : <span className="font-medium text-foreground">{company.name}</span>
-          {company.address ? `, ${company.address}` : ''}. Contact :{' '}
+          Responsable du traitement : <span className="font-medium text-foreground">{company.name}</span>, {company.legalForm.toLowerCase()} de {company.publisher}, RCCM {company.rccm}, IFU {company.ifu}, {company.address}.
+          Contact :{' '}
           <a href={`mailto:${company.email}`} className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
             {company.email}
           </a>.
+        </p>
+        <p className="text-muted-foreground">
+          Cadre applicable : {company.dataProtectionLaw}. Autorité de contrôle : {company.dataAuthority}.
         </p>
       </LegalSection>
 
@@ -65,14 +63,16 @@ export default function ConfidentialitePage() {
           EFLEX peut recourir à des sous-traitants pour l’hébergement, l’e-mail transactionnel, le paiement et l’intégration dépôt source. La liste indicative est publiée sur{' '}
           <Link href="/sous-traitants" className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
             Sous-traitants
-          </Link>. Les localisations, DPA et mécanismes de transfert doivent être complétés.
+          </Link>.
+        </p>
+        <p className="text-muted-foreground">
+          Les données sont hébergées dans l’Union européenne (Contabo). Cloudflare, Resend et GitHub peuvent les traiter aux États-Unis.
         </p>
       </LegalSection>
 
       <LegalSection title="6. Conservation">
         <p className="text-muted-foreground">
-          Les durées exactes doivent être définies par l’éditeur. À titre indicatif à valider : compte/organisation pendant la relation contractuelle, puis archivage limité ;
-          factures selon obligations légales ; logs de sécurité/déploiement selon besoin opérationnel et sécurité ; sauvegardes selon politique de rétention.
+          Durées de conservation : [à valider par l’exploitant, par catégorie].
         </p>
       </LegalSection>
 
@@ -92,7 +92,10 @@ export default function ConfidentialitePage() {
           Contact :{' '}
           <a href={`mailto:${company.email}`} className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
             {company.email}
-          </a>. À compléter : délai de réponse et autorité compétente de réclamation.
+          </a>. Délai de réponse aux demandes de droits : 30 jours.
+        </p>
+        <p className="text-muted-foreground">
+          Autorité de réclamation : vous pouvez adresser une réclamation à l’{company.dataAuthority}.
         </p>
       </LegalSection>
 
